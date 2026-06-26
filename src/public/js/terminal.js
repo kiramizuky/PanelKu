@@ -74,7 +74,7 @@ const TerminalPage = (() => {
 
     term.onData((data) => {
       if (socket && sessionId) {
-        socket.emit('terminal:data', { sessionId, data });
+        socket.emit('terminal:input', { sessionId, data });
       }
     });
 
