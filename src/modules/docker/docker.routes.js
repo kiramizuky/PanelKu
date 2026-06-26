@@ -19,6 +19,7 @@ router.post('/containers/:id/kill', requirePermission('docker_manage', 'execute'
 router.delete('/containers/:id', requirePermission('docker_manage', 'delete'), dockerController.removeContainer);
 
 router.get('/images', dockerController.listImages);
+router.post('/images/prune', requirePermission('docker_manage', 'delete'), dockerController.pruneImages);
 router.delete('/images/:id', requirePermission('docker_manage', 'delete'), dockerController.removeImage);
 
 export default router;

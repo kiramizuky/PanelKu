@@ -95,6 +95,17 @@ class DockerController {
       return errorResponse(res, 500, error.message);
     }
   }
+
+  async pruneImages(req, res) {
+    try {
+      const result = await dockerService.pruneImages();
+      const count = result?.ImagesDeleted?.length || 0;
+      const reclaimed = result?.SpaceReclaimed || 0;
+      return successResponse(res, { count, reclaimed }, `Pruned ${count} unused images`);
+    } catch (error) {
+      return errorResponse(res, 500, error.message);
+    }
+  }
 }
 
 export default new DockerController();

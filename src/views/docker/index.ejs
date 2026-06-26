@@ -79,6 +79,10 @@
   <!-- Images Tab -->
   <div class="tab-pane fade" id="images">
     <div class="lp-glass-card" style="padding:0;overflow-x:auto;">
+      <div style="padding:15px; border-bottom:1px solid var(--glass-border); display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:600; color:var(--text-primary);">Docker Images</span>
+        <button class="btn-lp btn-lp-danger btn-lp-sm" onclick="DockerPage.pruneImages()"><i class="bi bi-trash"></i> Prune Unused Images</button>
+      </div>
       <table class="lp-table">
         <thead>
           <tr>

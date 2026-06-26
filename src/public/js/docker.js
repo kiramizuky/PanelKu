@@ -162,6 +162,21 @@ const DockerPage = (() => {
     }
   }
 
+  async function pruneImages() {
+    const confirmed = await LP.confirm('Are you sure you want to prune all unused images? This cannot be undone.', 'Prune Images');
+    if (!confirmed) return;
+
+    LP.toast('Pruning unused images...', 'info');
+    const res = await LP.post('/docker/images/prune');
+    if (res?.success) {
+      const { count, reclaimed } = res.data;
+      LP.toast(`Pruned ${count} images (${LP.formatBytes(reclaimed)} reclaimed)`, 'success');
+      loadData();
+    } else {
+      LP.toast(res?.message || 'Failed to prune images', 'error');
+    }
+  }
+
   function initSocket() {
     const token = localStorage.getItem('lp_token');
     if (!token) return;
@@ -265,10 +280,12 @@ const DockerPage = (() => {
     loadData,
     action,
     deleteImage,
+    pruneImages,
     viewLogs,
     detachLogs,
     installPackage
   };
 })();
 
+window.DockerPage = DockerPage;
 document.addEventListener('DOMContentLoaded', () => DockerPage.init());

@@ -137,6 +137,16 @@ class DockerService {
       throw new Error(`Failed to remove image: ${error.message}`);
     }
   }
+
+  async pruneImages() {
+    try {
+      // filters: dangling=false removes all unused images, not just dangling ones
+      const res = await this.docker.pruneImages({ filters: { dangling: ['false'] } });
+      return res;
+    } catch (error) {
+      throw new Error(`Failed to prune unused images: ${error.message}`);
+    }
+  }
 }
 
 export default new DockerService();
