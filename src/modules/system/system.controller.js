@@ -4,7 +4,7 @@ import { success, errorResponse } from '../../helpers/response.js';
 class SystemController {
   async getServicesStatus(req, res) {
     try {
-      const servicesToWatch = ['nginx', 'docker', 'mongodb', 'mysql', 'ssh', 'cron'];
+      const servicesToWatch = ['nginx', 'apache2', 'docker', 'mongodb', 'mysql', 'ssh', 'cron'];
       const statuses = {};
       
       for (const svc of servicesToWatch) {

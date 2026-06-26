@@ -11,6 +11,19 @@ class MonitorController {
     }
   }
 
+  async getSysInfo(req, res) {
+    try {
+      const si = (await import('systeminformation')).default;
+      const [os, cpu] = await Promise.all([
+        si.osInfo(),
+        si.cpu()
+      ]);
+      return success(res, { os, cpu });
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
   async getHistory(req, res) {
     try {
       const minutes = parseInt(req.query.minutes) || 60;

@@ -322,6 +322,7 @@ const Dashboard = (() => {
 
       initCharts();
       connectSocket();
+      this.fetchWebserverStatus();
 
       // Fallback HTTP polling if socket fails
       setTimeout(async () => {
@@ -342,7 +343,51 @@ const Dashboard = (() => {
       } else {
         this.init();
       }
+      this.fetchWebserverStatus();
     },
+
+    activeWebserver: null,
+
+    async fetchWebserverStatus() {
+      try {
+        const res = await LP.get('/system/services/status');
+        if (res?.success) {
+          const { nginx, apache2 } = res.data;
+          
+          let name = 'Not Installed';
+          let status = false;
+          
+          if (nginx || apache2) {
+            name = nginx ? 'Nginx' : 'Apache2';
+            status = true;
+            this.activeWebserver = name.toLowerCase();
+          } else {
+            // Check if installed but offline, we'll try to find out by checking info but for now fallback to Nginx
+            this.activeWebserver = 'nginx';
+          }
+          
+          document.getElementById('wsName').textContent = this.activeWebserver === 'nginx' ? 'Nginx' : (this.activeWebserver === 'apache2' ? 'Apache' : 'Webserver');
+          document.getElementById('wsStatusSpan').innerHTML = status 
+            ? '<span class="lp-badge lp-badge-success"><span class="lp-badge-dot"></span>Online</span>' 
+            : '<span class="lp-badge lp-badge-danger"><span class="lp-badge-dot"></span>Offline</span>';
+        }
+      } catch (err) {
+        console.error('Failed to load webserver status', err);
+      }
+    },
+
+    async controlWebserver(action) {
+      if (!this.activeWebserver) return;
+      if (!(await LP.confirm(`Are you sure you want to ${action} ${this.activeWebserver}?`, 'Confirm Action'))) return;
+      
+      const res = await LP.post('/system/services', { service: this.activeWebserver, action });
+      if (res?.success) {
+        LP.toast(`Service ${this.activeWebserver} ${action}ed successfully.`, 'success');
+        setTimeout(() => this.fetchWebserverStatus(), 1000);
+      } else {
+        LP.toast(res?.message || 'Action failed', 'error');
+      }
+    }
   };
 })();
 

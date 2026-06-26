@@ -317,6 +317,11 @@ body {
 /* Overriding Xterm Background */
 .xterm-viewport {
   background-color: transparent !important;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.xterm-viewport::-webkit-scrollbar {
+  display: none;
 }
 .xterm-screen {
   background-color: rgba(0, 0, 0, 0.4) !important;
