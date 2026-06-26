@@ -30,7 +30,9 @@ const createApp = () => {
 
   // Security
   app.use(helmet({
+    crossOriginOpenerPolicy: false,
     contentSecurityPolicy: {
+      useDefaults: true,
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com'],
@@ -38,6 +40,7 @@ const createApp = () => {
         fontSrc: ["'self'", 'fonts.gstatic.com', 'cdn.jsdelivr.net'],
         imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'", 'ws:', 'wss:', 'cdn.jsdelivr.net'],
+        upgradeInsecureRequests: null,
       },
     },
   }));
