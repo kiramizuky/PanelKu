@@ -11,7 +11,7 @@ const DNSPage = {
 
   async saveToken() {
     const token = document.getElementById('cfTokenInput').value;
-    if (!token) return LP.showToast('Token is required', 'error');
+    if (!token) return LP.toast('Token is required', 'error');
     
     localStorage.setItem('cf_token', token);
     await this.loadZones();
@@ -46,11 +46,11 @@ const DNSPage = {
           </div>
         `).join('');
       } else {
-        LP.showToast(res.message, 'error');
+        LP.toast(res.message, 'error');
         document.getElementById('zonesList').innerHTML = '<div style="color:var(--accent-danger)">Error loading zones. Check your token.</div>';
       }
     } catch (err) {
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
     }
   },
 
@@ -125,15 +125,15 @@ const DNSPage = {
       }).then(r => r.json());
 
       if (res?.success) {
-        LP.showToast('Record added successfully', 'success');
+        LP.toast('Record added successfully', 'success');
         bootstrap.Modal.getInstance(document.getElementById('addRecordModal')).hide();
         document.getElementById('addRecordForm').reset();
         this.loadRecords();
       } else {
-        LP.showToast(res.message, 'error');
+        LP.toast(res.message, 'error');
       }
     } catch (err) {
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
     }
   },
 
@@ -147,13 +147,13 @@ const DNSPage = {
       }).then(r => r.json());
 
       if (res?.success) {
-        LP.showToast('Record deleted', 'success');
+        LP.toast('Record deleted', 'success');
         this.loadRecords();
       } else {
-        LP.showToast(res.message, 'error');
+        LP.toast(res.message, 'error');
       }
     } catch (err) {
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
     }
   }
 };

@@ -55,12 +55,12 @@ const WAFPage = {
 
     const res = await LP.post('/waf/rules', { type, value, action, description });
     if (res?.success) {
-      LP.showToast('WAF Rule added successfully', 'success');
+      LP.toast('WAF Rule added successfully', 'success');
       bootstrap.Modal.getInstance(document.getElementById('addRuleModal')).hide();
       document.getElementById('addRuleForm').reset();
       this.loadRules();
     } else {
-      LP.showToast(res.message, 'error');
+      LP.toast(res.message, 'error');
     }
   },
 
@@ -70,13 +70,13 @@ const WAFPage = {
     try {
       const res = await LP.delete(`/waf/rules/${id}`);
       if (res?.success) {
-        LP.showToast('Rule deleted', 'success');
+        LP.toast('Rule deleted', 'success');
         this.loadRules();
       } else {
-        LP.showToast(res.message, 'error');
+        LP.toast(res.message, 'error');
       }
     } catch (err) {
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
     }
   }
 };

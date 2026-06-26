@@ -63,15 +63,15 @@ const FirewallPage = {
     try {
       const res = await LP.post('/firewall/toggle', { enable });
       if (res?.success) {
-        LP.showToast(`Firewall ${enable ? 'enabled' : 'disabled'}`, 'success');
+        LP.toast(`Firewall ${enable ? 'enabled' : 'disabled'}`, 'success');
         this.loadStatus();
       } else {
         el.checked = !enable;
-        LP.showToast(res.message, 'error');
+        LP.toast(res.message, 'error');
       }
     } catch (err) {
       el.checked = !enable;
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
     }
   },
 
@@ -87,12 +87,12 @@ const FirewallPage = {
 
     const res = await LP.post('/firewall/rules', { port, protocol, action });
     if (res?.success) {
-      LP.showToast('Rule added', 'success');
+      LP.toast('Rule added', 'success');
       bootstrap.Modal.getInstance(document.getElementById('addRuleModal')).hide();
       document.getElementById('addRuleForm').reset();
       this.loadStatus();
     } else {
-      LP.showToast(res.message, 'error');
+      LP.toast(res.message, 'error');
     }
   },
 
@@ -101,10 +101,10 @@ const FirewallPage = {
     
     const res = await LP.delete(`/firewall/rules/${id}`);
     if (res?.success) {
-      LP.showToast('Rule deleted', 'success');
+      LP.toast('Rule deleted', 'success');
       this.loadStatus();
     } else {
-      LP.showToast(res.message, 'error');
+      LP.toast(res.message, 'error');
     }
   }
 };

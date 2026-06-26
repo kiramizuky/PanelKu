@@ -47,7 +47,7 @@ const AlertsPage = {
         }
       }
     } catch (err) {
-      LP.showToast('Failed to load alert config', 'error');
+      LP.toast('Failed to load alert config', 'error');
     }
   },
 
@@ -90,26 +90,26 @@ const AlertsPage = {
     try {
       const res = await LP.post('/alerts/config', payload);
       if (res?.success) {
-        LP.showToast('Alert configuration saved successfully', 'success');
+        LP.toast('Alert configuration saved successfully', 'success');
       } else {
-        LP.showToast(res.message, 'error');
+        LP.toast(res.message, 'error');
       }
     } catch (err) {
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
     }
   },
 
   async testAlert() {
     try {
-      LP.showToast('Sending test alert...', 'info');
+      LP.toast('Sending test alert...', 'info');
       const res = await LP.post('/alerts/test');
       if (res?.success) {
-        LP.showToast('Test alert dispatched!', 'success');
+        LP.toast('Test alert dispatched!', 'success');
       } else {
-        LP.showToast(res.message, 'error');
+        LP.toast(res.message, 'error');
       }
     } catch (err) {
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
     }
   }
 };

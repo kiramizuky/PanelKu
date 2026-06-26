@@ -20,13 +20,13 @@ const SystemPage = {
     try {
       const res = await LP.post('/system/auto-update', { enabled });
       if (res?.success) {
-        LP.showToast(res.message, 'success');
+        LP.toast(res.message, 'success');
       } else {
-        LP.showToast('Failed to change auto-update setting', 'error');
+        LP.toast('Failed to change auto-update setting', 'error');
         document.getElementById('autoUpdateToggle').checked = !enabled; // revert
       }
     } catch (e) {
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
       document.getElementById('autoUpdateToggle').checked = !enabled; // revert
     }
   },
@@ -85,15 +85,15 @@ const SystemPage = {
     try {
       const res = await LP.post('/system/services/manage', { service, action });
       if (res?.success) {
-        LP.showToast(`Service ${service} ${action}ed`, 'success');
+        LP.toast(`Service ${service} ${action}ed`, 'success');
         this.loadServices();
       } else {
-        LP.showToast(res.message, 'error');
+        LP.toast(res.message, 'error');
         btn.innerHTML = oldHtml;
         btn.disabled = false;
       }
     } catch (err) {
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
       btn.innerHTML = oldHtml;
       btn.disabled = false;
     }
@@ -110,12 +110,12 @@ const SystemPage = {
       if (res?.success) {
         document.getElementById('aptLogContent').textContent = res.data.log || 'No output';
         new bootstrap.Modal(document.getElementById('aptLogModal')).show();
-        LP.showToast(`APT ${action} completed`, 'success');
+        LP.toast(`APT ${action} completed`, 'success');
       } else {
-        LP.showToast(res.message, 'error');
+        LP.toast(res.message, 'error');
       }
     } catch (err) {
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
     } finally {
       btn.innerHTML = oldHtml;
       btn.disabled = false;
@@ -128,13 +128,13 @@ const SystemPage = {
     try {
       const res = await LP.post('/system/reboot');
       if (res?.success) {
-        LP.showToast('Server is rebooting. You will be disconnected...', 'warning');
+        LP.toast('Server is rebooting. You will be disconnected...', 'warning');
         setTimeout(() => window.location.reload(), 15000); // Try reload after 15s
       } else {
-        LP.showToast(res.message, 'error');
+        LP.toast(res.message, 'error');
       }
     } catch (err) {
-      LP.showToast('Failed to initiate reboot', 'error');
+      LP.toast('Failed to initiate reboot', 'error');
     }
   }
 };
