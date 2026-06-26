@@ -55,7 +55,7 @@ install_dependencies() {
   apt-get update -qq
 
   info "Installing dependencies..."
-  apt-get install -y -qq curl git build-essential python3 make g++ mongodb redis-server nginx docker.io docker-compose ufw
+  apt-get install -y -qq curl git build-essential python3 make g++ mongodb-org redis-server nginx docker.io docker-compose ufw
 
   # Install acme.sh for SSL
   if [ ! -d ~/.acme.sh ]; then
