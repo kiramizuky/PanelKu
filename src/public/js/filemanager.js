@@ -3,7 +3,7 @@
  * Full-featured file manager with grid/list view, context menu, upload, etc.
  */
 
-const FM = (() => {
+const FMPage = (() => {
   let currentPath = '/';
   let selectedItem = null;
   let viewMode = localStorage.getItem('lp_fm_view') || 'grid';
@@ -77,9 +77,9 @@ const FM = (() => {
         data-path="${escHtml(item.path)}"
         data-type="${item.type}"
         data-name="${escHtml(item.name)}"
-        onclick="FM.selectItem(this)"
-        ondblclick="FM.openItem(this)"
-        oncontextmenu="FM.showContextMenu(event, this)"
+        onclick="FMPage.selectItem(this)"
+        ondblclick="FMPage.openItem(this)"
+        oncontextmenu="FMPage.showContextMenu(event, this)"
         title="${escHtml(item.path)}">
         <div class="fm-item-icon">${getIcon(item)}</div>
         <div class="fm-item-name">${escHtml(item.name)}</div>
@@ -335,5 +335,5 @@ const FM = (() => {
   };
 })();
 
-document.addEventListener('DOMContentLoaded', () => FM.init());
-window.FM = FM;
+document.addEventListener('DOMContentLoaded', () => FMPage.init());
+window.FMPage = FMPage;
