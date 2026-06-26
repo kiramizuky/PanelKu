@@ -35,11 +35,11 @@ const createApp = () => {
       useDefaults: true,
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com'],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'cdn.socket.io'],
         styleSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'fonts.googleapis.com'],
         fontSrc: ["'self'", 'fonts.gstatic.com', 'cdn.jsdelivr.net'],
         imgSrc: ["'self'", 'data:', 'blob:'],
-        connectSrc: ["'self'", 'ws:', 'wss:', 'cdn.jsdelivr.net'],
+        connectSrc: ["'self'", 'ws:', 'wss:', 'cdn.jsdelivr.net', 'cdn.socket.io'],
         upgradeInsecureRequests: null,
       },
     },

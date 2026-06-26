@@ -1,43 +1,53 @@
+/**
+ * Linux Panel — ssl.js
+ * SSL Certificate management frontend
+ */
+
 const SSLPage = {
   async init() {
+    await LP.init();
+    if (!LP.state.accessToken) return;
     await this.loadCertificates();
   },
 
   async loadCertificates() {
     const tbody = document.getElementById('sslTableBody');
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>';
-    
+
     try {
       const res = await LP.get('/ssl/certificates');
       if (res?.success) {
         const certs = res.data;
 
-        if (certs.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">No certificates found</td></tr>';
+        if (!certs.length) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">No certificates found. Issue one using the button above.</td></tr>';
           return;
         }
 
         tbody.innerHTML = certs.map(c => {
           const isExpired = new Date(c.expiresAt) < new Date();
+          const daysLeft = Math.ceil((new Date(c.expiresAt) - Date.now()) / 86400000);
           return `
-          <tr>
-            <td style="font-weight:500;">${c.domain}</td>
-            <td><span class="lp-badge lp-badge-primary">${c.provider}</span></td>
-            <td>${new Date(c.expiresAt).toLocaleDateString()}</td>
-            <td>
-              <span class="lp-badge ${isExpired ? 'lp-badge-danger' : 'lp-badge-success'}">
-                ${isExpired ? 'Expired' : 'Valid'}
-              </span>
-            </td>
-            <td style="text-align:right">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="SSLPage.renewCertificate('${c.id}')" style="color:var(--accent-info)">
-                <i class="bi bi-arrow-repeat"></i> Renew
-              </button>
-            </td>
-          </tr>
-        `}).join('');
+            <tr>
+              <td style="font-weight:500;">${c.domain}</td>
+              <td><span class="lp-badge lp-badge-primary">${c.provider}</span></td>
+              <td>${new Date(c.expiresAt).toLocaleDateString()}</td>
+              <td>
+                <span class="lp-badge ${isExpired ? 'lp-badge-danger' : daysLeft <= 14 ? 'lp-badge-warning' : 'lp-badge-success'}">
+                  <span class="lp-badge-dot"></span>
+                  ${isExpired ? 'Expired' : `Valid (${daysLeft}d)`}
+                </span>
+              </td>
+              <td style="text-align:right">
+                <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="SSLPage.renewCertificate('${c.id}')" style="color:var(--accent-info)" title="Renew">
+                  <i class="bi bi-arrow-repeat"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
       } else {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${res.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${res?.message || 'Unknown error'}</td></tr>`;
       }
     } catch (err) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Failed to load certificates</td></tr>';
@@ -52,7 +62,10 @@ const SSLPage = {
     try {
       const res = await LP.get('/websites');
       if (res?.success) {
-        select.innerHTML = res.data.map(w => `<option value="${w._id}">${w.domain} (${w.type})</option>`).join('');
+        const websites = res.data?.websites || res.data || [];
+        select.innerHTML = websites.length
+          ? websites.map(w => `<option value="${w._id}">${w.domain} (${w.type})</option>`).join('')
+          : '<option value="">No websites found. Create a website first.</option>';
       }
     } catch (err) {
       select.innerHTML = '<option value="">Error loading websites</option>';
@@ -62,23 +75,24 @@ const SSLPage = {
   async issueCertificate(e) {
     e.preventDefault();
     const websiteId = document.getElementById('sslWebsiteId').value;
+    if (!websiteId) return LP.toast('Please select a website', 'warning');
+
     const btn = e.target.querySelector('button[type="submit"]');
     const oldHtml = btn.innerHTML;
-
-    btn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Issuing... (This may take a minute)';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Issuing... (may take a minute)';
     btn.disabled = true;
 
     try {
       const res = await LP.post('/ssl/issue', { websiteId });
       if (res?.success) {
-        LP.showToast('Certificate issued successfully', 'success');
+        LP.toast('Certificate issued successfully!', 'success');
         bootstrap.Modal.getInstance(document.getElementById('issueSslModal')).hide();
         this.loadCertificates();
       } else {
-        LP.showToast(res.message, 'error');
+        LP.toast(res?.message || 'Failed to issue certificate', 'error');
       }
     } catch (err) {
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
     } finally {
       btn.innerHTML = oldHtml;
       btn.disabled = false;
@@ -87,22 +101,19 @@ const SSLPage = {
 
   async renewCertificate(id) {
     if (!confirm('Attempt to renew this certificate?')) return;
-
+    LP.toast('Renewing certificate...', 'info');
     try {
-      LP.showToast('Renewing certificate...', 'info');
       const res = await LP.post(`/ssl/renew/${id}`);
       if (res?.success) {
-        LP.showToast('Certificate renewed successfully', 'success');
+        LP.toast('Certificate renewed successfully!', 'success');
         this.loadCertificates();
       } else {
-        LP.showToast(res.message, 'error');
+        LP.toast(res?.message || 'Renewal failed', 'error');
       }
     } catch (err) {
-      LP.showToast('Connection error', 'error');
+      LP.toast('Connection error', 'error');
     }
   }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-  SSLPage.init();
-});
+document.addEventListener('DOMContentLoaded', () => SSLPage.init());

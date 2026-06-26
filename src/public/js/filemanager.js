@@ -297,13 +297,21 @@ const FM = (() => {
   // ── Drag & Drop ───────────────────────────────────
   function initDragDrop() {
     const overlay = document.getElementById('dropOverlay');
-    const zone = document.getElementById('fmFiles');
+    const zone = document.getElementById('fileList'); // tbody where files are listed
+    const container = document.querySelector('.lp-card-body'); // use parent container for drag
 
-    zone.addEventListener('dragover', (e) => { e.preventDefault(); overlay.classList.add('visible'); });
-    zone.addEventListener('dragleave', () => overlay.classList.remove('visible'));
-    zone.addEventListener('drop', (e) => {
+    if (!container) return; // guard: filemanager not on page
+
+    container.addEventListener('dragover', (e) => {
       e.preventDefault();
-      overlay.classList.remove('visible');
+      if (overlay) overlay.classList.add('visible');
+    });
+    container.addEventListener('dragleave', () => {
+      if (overlay) overlay.classList.remove('visible');
+    });
+    container.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (overlay) overlay.classList.remove('visible');
       if (e.dataTransfer.files.length) upload(e.dataTransfer.files);
     });
   }

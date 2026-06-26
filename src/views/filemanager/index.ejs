@@ -34,4 +34,16 @@
   </div>
 </div>
 
+<!-- Drop Overlay -->
+<div id="dropOverlay" style="display:none; position:fixed; inset:0; background:rgba(99,102,241,0.2); border:3px dashed var(--accent-primary); z-index:9000; align-items:center; justify-content:center; pointer-events:none;">
+  <div style="text-align:center; color:var(--accent-primary);">
+    <i class="bi bi-cloud-upload" style="font-size:64px;"></i>
+    <h3 style="margin-top:10px; color:#fff;">Drop files to upload</h3>
+  </div>
+</div>
+<style>
+  #dropOverlay { display:none; }
+  #dropOverlay.visible { display:flex !important; }
+</style>
+
 <script src="/js/filemanager.js"></script>
