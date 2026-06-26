@@ -71,7 +71,7 @@
     </div>
 
     <!-- Webserver Widget -->
-    <div class="lp-glass-card mb-2" style="padding: 10px 15px; height: 130px;">
+    <div class="lp-glass-card mb-2" style="padding: 10px 15px; height: 150px;">
       <div class="lp-card-title" style="margin-bottom: 10px; font-size: 13px;">Webserver</div>
       <div class="d-flex flex-column justify-content-center">
         <div class="d-flex align-items-center mb-3">
@@ -83,10 +83,10 @@
             </div>
           </div>
         </div>
-        <div class="d-flex gap-2 justify-content-center">
-          <button class="btn-lp btn-lp-primary btn-lp-sm flex-fill" style="font-size: 11px; padding: 4px 0;" onclick="controlWebserver('start')"><i class="bi bi-play-fill"></i></button>
-          <button class="btn-lp btn-lp-danger btn-lp-sm flex-fill" style="font-size: 11px; padding: 4px 0;" onclick="controlWebserver('stop')"><i class="bi bi-stop-fill"></i></button>
-          <button class="btn-lp btn-lp-warning btn-lp-sm flex-fill" style="font-size: 11px; padding: 4px 0;" onclick="controlWebserver('restart')"><i class="bi bi-arrow-clockwise"></i></button>
+        <div class="d-flex justify-content-between mt-2">
+          <button class="btn-lp btn-lp-ghost text-success flex-fill me-1" style="font-size: 12px; padding: 6px 0;" onclick="controlWebserver('start')"><i class="bi bi-play-fill"></i> Start</button>
+          <button class="btn-lp btn-lp-ghost text-danger flex-fill mx-1" style="font-size: 12px; padding: 6px 0;" onclick="controlWebserver('stop')"><i class="bi bi-stop-fill"></i> Stop</button>
+          <button class="btn-lp btn-lp-ghost text-warning flex-fill ms-1" style="font-size: 12px; padding: 6px 0;" onclick="controlWebserver('restart')"><i class="bi bi-arrow-clockwise"></i> Restart</button>
         </div>
       </div>
     </div>
@@ -236,7 +236,7 @@
 
   async function fetchWebserverStatus() {
     try {
-      const res = await LP.get('/system/services/status');
+      const res = await LP.get('/system/services');
       if (res?.success) {
         const { nginx, apache2 } = res.data;
         let name = 'Not Installed';
@@ -264,7 +264,7 @@
     if (!window.activeWebserver) return;
     if (!(await LP.confirm(`Are you sure you want to ${action} ${window.activeWebserver}?`, 'Confirm Action'))) return;
     
-    const res = await LP.post('/system/services', { service: window.activeWebserver, action });
+    const res = await LP.post('/system/services/manage', { service: window.activeWebserver, action });
     if (res?.success) {
       LP.toast(`Service ${window.activeWebserver} ${action}ed successfully.`, 'success');
       setTimeout(fetchWebserverStatus, 1000);
