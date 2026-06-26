@@ -70,13 +70,13 @@ const MonitorPage = (() => {
       container.innerHTML = '<div class="text-center text-muted">No disk data</div>';
       return;
     }
-    container.innerHTML = disks.map(d => {
+    container.innerHTML = disks.slice(0, 5).map(d => {
       const usedPct = d.usedPercent || Math.round((d.used / (d.total || 1)) * 100);
       return `
         <div class="mb-3">
           <div class="d-flex justify-content-between mb-1" style="font-size:12px;">
-            <span class="font-mono text-muted">${d.fs || d.mount}</span>
-            <span>${usedPct}% (${LP.formatBytes(d.used)} / ${LP.formatBytes(d.total)})</span>
+            <span class="font-mono" style="color: #cbd5e1;">${d.fs || d.mount}</span>
+            <span style="color: #f8fafc;">${usedPct}% (${LP.formatBytes(d.used)} / ${LP.formatBytes(d.total)})</span>
           </div>
           <div class="progress" style="height:6px; background:rgba(255,255,255,0.1)">
             <div class="progress-bar ${usedPct > 80 ? 'bg-danger' : usedPct > 60 ? 'bg-warning' : 'bg-primary'}" style="width:${usedPct}%"></div>
@@ -95,8 +95,8 @@ const MonitorPage = (() => {
     container.innerHTML = networks.map(n => `
       <div class="d-flex justify-content-between align-items-center mb-2" style="font-size:13px; padding: 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
         <div>
-          <div style="font-weight:600; color:var(--text-primary)">${n.iface}</div>
-          <div class="font-mono text-muted" style="font-size:11px">${n.ip4 || 'No IP'}</div>
+          <div style="font-weight:600; color:#f8fafc">${n.iface}</div>
+          <div class="font-mono" style="font-size:11px; color:#cbd5e1">${n.ip4 || 'No IP'}</div>
         </div>
         <div class="text-end" style="font-size:12px;">
           <div><span class="text-info"><i class="bi bi-arrow-down"></i></span> ${LP.formatBytes(n.rxSec || n.rx_sec || 0)}/s</div>
