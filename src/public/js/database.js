@@ -141,6 +141,11 @@ const DatabasePage = (() => {
     const type = document.getElementById('dbType').value;
     const name = document.getElementById('dbName').value;
     
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const oldHtml = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Creating...';
+    submitBtn.disabled = true;
+    
     try {
       const res = await LP.post('/database', { type, name });
       if (res?.success) {
@@ -152,6 +157,9 @@ const DatabasePage = (() => {
       }
     } catch (err) {
       LP.toast('Error creating database', 'error');
+    } finally {
+      submitBtn.innerHTML = oldHtml;
+      submitBtn.disabled = false;
     }
   }
 
@@ -183,3 +191,5 @@ const DatabasePage = (() => {
     installPackage
   };
 })();
+
+window.DatabasePage = DatabasePage;

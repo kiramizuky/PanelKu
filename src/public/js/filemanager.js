@@ -47,7 +47,7 @@ const FMPage = (() => {
       }
 
       currentPath = path;
-      document.getElementById('currentPath').textContent = path;
+      document.getElementById('currentPath').value = path;
       document.getElementById('upBtn').disabled = path === '/';
       selectedItem = null;
 
