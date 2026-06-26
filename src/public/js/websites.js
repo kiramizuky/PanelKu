@@ -32,34 +32,39 @@ const WebsitesPage = (() => {
         return;
       }
 
-    tbody.innerHTML = websites.map(w => {
-      const isProxy = w.type === 'proxy';
-      const sslStatus = w.ssl?.enabled ? '<i class="bi bi-shield-lock-fill text-success" title="SSL Enabled"></i>' : '<i class="bi bi-shield-lock text-muted" title="No SSL"></i>';
+      tbody.innerHTML = websites.map(w => {
+        const isProxy = w.type === 'proxy';
+        const sslStatus = w.ssl?.enabled ? '<i class="bi bi-shield-lock-fill text-success" title="SSL Enabled"></i>' : '<i class="bi bi-shield-lock text-muted" title="No SSL"></i>';
 
-      return `
-        <tr>
-          <td>
-            <div style="font-weight:600;color:var(--text-primary)"><a href="http://${w.domain}" target="_blank" style="color:inherit;text-decoration:none">${w.domain} <i class="bi bi-box-arrow-up-right" style="font-size:10px;color:var(--text-muted)"></i></a></div>
-            ${w.aliases.length ? `<div style="font-size:11px;color:var(--text-muted)">${w.aliases.join(', ')}</div>` : ''}
-          </td>
-          <td><span class="lp-badge ${w.status === 'active' ? 'lp-badge-success' : 'lp-badge-warning'}"><span class="lp-badge-dot"></span>${w.status}</span></td>
-          <td><span class="lp-badge" style="background:var(--bg-secondary);border:1px solid var(--border-color);text-transform:uppercase">${w.type}</span></td>
-          <td class="font-mono" style="font-size:12px;color:var(--text-muted)">
-            ${isProxy ? `127.0.0.1:${w.port}` : w.rootDirectory}
-          </td>
-          <td style="font-size:14px">${sslStatus}</td>
-          <td style="text-align:right">
-            ${w.gitRepo ? `
-              ${w.autoDeploy ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="WebsitesPage.showWebhook('${w._id}', '${w.webhookToken}')" title="Show Webhook URL"><i class="bi bi-link-45deg"></i></button>` : ''}
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="WebsitesPage.deployGit('${w._id}')" title="Deploy from Git"><i class="bi bi-cloud-arrow-down"></i></button>
-            ` : ''}
-            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WebsitesPage.configSSL('${w._id}')" title="SSL Settings"><i class="bi bi-shield"></i></button>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WebsitesPage.openFolder('${w.rootDirectory}')" title="File Manager"><i class="bi bi-folder"></i></button>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="WebsitesPage.deleteWebsite('${w._id}', '${w.domain}')" title="Delete"><i class="bi bi-trash"></i></button>
-          </td>
-        </tr>
-      `;
-    }).join('');
+        return `
+          <tr>
+            <td>
+              <div style="font-weight:600;color:var(--text-primary)"><a href="http://${w.domain}" target="_blank" style="color:inherit;text-decoration:none">${w.domain} <i class="bi bi-box-arrow-up-right" style="font-size:10px;color:var(--text-muted)"></i></a></div>
+              ${w.aliases.length ? `<div style="font-size:11px;color:var(--text-muted)">${w.aliases.join(', ')}</div>` : ''}
+            </td>
+            <td><span class="lp-badge ${w.status === 'active' ? 'lp-badge-success' : 'lp-badge-warning'}"><span class="lp-badge-dot"></span>${w.status}</span></td>
+            <td><span class="lp-badge" style="background:var(--bg-secondary);border:1px solid var(--border-color);text-transform:uppercase">${w.type}</span></td>
+            <td class="font-mono" style="font-size:12px;color:var(--text-muted)">
+              ${isProxy ? `127.0.0.1:${w.port}` : w.rootDirectory}
+            </td>
+            <td style="font-size:14px">${sslStatus}</td>
+            <td style="text-align:right">
+              ${w.gitRepo ? `
+                ${w.autoDeploy ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="WebsitesPage.showWebhook('${w._id}', '${w.webhookToken}')" title="Show Webhook URL"><i class="bi bi-link-45deg"></i></button>` : ''}
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="WebsitesPage.deployGit('${w._id}')" title="Deploy from Git"><i class="bi bi-cloud-arrow-down"></i></button>
+              ` : ''}
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WebsitesPage.configSSL('${w._id}')" title="SSL Settings"><i class="bi bi-shield"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WebsitesPage.openFolder('${w.rootDirectory}')" title="File Manager"><i class="bi bi-folder"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="WebsitesPage.deleteWebsite('${w._id}', '${w.domain}')" title="Delete"><i class="bi bi-trash"></i></button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } catch (err) {
+      console.error('loadWebsites error:', err);
+      const tbody = document.getElementById('websitesTableBody');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error: ${err.message}</td></tr>`;
+    }
   }
 
   return {
