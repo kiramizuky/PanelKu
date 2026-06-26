@@ -16,11 +16,7 @@ const BackupPage = (() => {
 
   function renderBackups(backups) {
     const tbody = document.getElementById('backupTableBody');
-    if (!backups.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted)">No backups found</td></tr>';
-      return;
-    }
-    tbody.innerHTML = backups.map(b => `
+    LP.paginate(backups, 10, 'backupTableBody', 'backupPagination', b => `
       <tr>
         <td class="font-mono"><strong>${b.name}</strong></td>
         <td>${LP.formatBytes(b.size)}</td>
@@ -30,7 +26,7 @@ const BackupPage = (() => {
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="BackupPage.deleteBackup('${b.name}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
-    `).join('');
+    `, 'No backups found', 4);
   }
 
   function showCreateModal() {

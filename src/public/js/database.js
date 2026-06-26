@@ -57,18 +57,14 @@ const DatabasePage = (() => {
       </td></tr>`;
       return;
     }
-    if (!dbs.length) {
-      tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;padding:20px;color:var(--text-muted)">No MySQL databases found</td></tr>';
-      return;
-    }
-    tbody.innerHTML = dbs.map(db => `
+    LP.paginate(dbs, 10, 'mysqlTableBody', 'mysqlPagination', db => `
       <tr>
         <td class="font-mono"><strong>${db}</strong></td>
         <td style="text-align:right">
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DatabasePage.deleteDb('mysql', '${db}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
-    `).join('');
+    `, 'No MySQL databases found', 2);
   }
 
   function renderPostgres(dbs, isInstalled) {
@@ -80,18 +76,14 @@ const DatabasePage = (() => {
       </td></tr>`;
       return;
     }
-    if (!dbs.length) {
-      tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;padding:20px;color:var(--text-muted)">No PostgreSQL databases found</td></tr>';
-      return;
-    }
-    tbody.innerHTML = dbs.map(db => `
+    LP.paginate(dbs, 10, 'postgresTableBody', 'postgresPagination', db => `
       <tr>
         <td class="font-mono"><strong>${db}</strong></td>
         <td style="text-align:right">
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DatabasePage.deleteDb('postgres', '${db}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
-    `).join('');
+    `, 'No PostgreSQL databases found', 2);
   }
 
   function renderMongo(dbs, isInstalled) {
@@ -103,31 +95,23 @@ const DatabasePage = (() => {
       </td></tr>`;
       return;
     }
-    if (!dbs.length) {
-      tbody.innerHTML = '<tr><td style="text-align:center;padding:20px;color:var(--text-muted)">No MongoDB databases found</td></tr>';
-      return;
-    }
-    tbody.innerHTML = dbs.map(db => `
+    LP.paginate(dbs, 10, 'mongoTableBody', 'mongoPagination', db => `
       <tr>
         <td class="font-mono"><strong>${db}</strong></td>
       </tr>
-    `).join('');
+    `, 'No MongoDB databases found', 1);
   }
 
   function renderSqlite(dbs) {
     const tbody = document.getElementById('sqliteTableBody');
-    if (!dbs.length) {
-      tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;padding:20px;color:var(--text-muted)">No SQLite databases found</td></tr>';
-      return;
-    }
-    tbody.innerHTML = dbs.map(db => `
+    LP.paginate(dbs, 10, 'sqliteTableBody', 'sqlitePagination', db => `
       <tr>
         <td class="font-mono"><strong>${db}</strong></td>
         <td style="text-align:right">
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DatabasePage.deleteDb('sqlite', '${db}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
-    `).join('');
+    `, 'No SQLite databases found', 2);
   }
 
   function showCreateModal() {

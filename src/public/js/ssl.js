@@ -19,12 +19,7 @@ const SSLPage = {
       if (res?.success) {
         const certs = res.data;
 
-        if (!certs.length) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">No certificates found. Issue one using the button above.</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = certs.map(c => {
+        LP.paginate(certs, 10, 'sslTableBody', 'sslPagination', c => {
           const isExpired = new Date(c.expiresAt) < new Date();
           const daysLeft = Math.ceil((new Date(c.expiresAt) - Date.now()) / 86400000);
           return `
@@ -45,7 +40,7 @@ const SSLPage = {
               </td>
             </tr>
           `;
-        }).join('');
+        }, 'No certificates found. Issue one using the button above.', 5);
       } else {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${res?.message || 'Unknown error'}</td></tr>`;
       }

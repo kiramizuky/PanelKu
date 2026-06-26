@@ -15,11 +15,7 @@ const CronPage = (() => {
 
   function renderTasks(tasks) {
     const tbody = document.getElementById('cronTableBody');
-    if (!tasks.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">No scheduled tasks found</td></tr>';
-      return;
-    }
-    tbody.innerHTML = tasks.map(t => `
+    LP.paginate(tasks, 10, 'cronTableBody', 'cronPagination', t => `
       <tr>
         <td class="font-mono"><strong>${t.name}</strong></td>
         <td class="font-mono">${t.schedule}</td>
@@ -35,7 +31,7 @@ const CronPage = (() => {
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="CronPage.deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
-    `).join('');
+    `, 'No scheduled tasks found', 6);
   }
 
   function showCreateModal() {

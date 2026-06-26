@@ -27,12 +27,7 @@ const WebsitesPage = (() => {
       }
 
       const { websites } = res.data;
-      if (!websites.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No websites configured</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = websites.map(w => {
+      LP.paginate(websites, 10, 'websitesTableBody', 'websitesPagination', w => {
         const isProxy = w.type === 'proxy';
         const sslStatus = w.ssl?.enabled ? '<i class="bi bi-shield-lock-fill text-success" title="SSL Enabled"></i>' : '<i class="bi bi-shield-lock text-muted" title="No SSL"></i>';
 
@@ -59,7 +54,7 @@ const WebsitesPage = (() => {
             </td>
           </tr>
         `;
-      }).join('');
+      }, 'No websites configured', 6);
     } catch (err) {
       console.error('loadWebsites error:', err);
       const tbody = document.getElementById('websitesTableBody');

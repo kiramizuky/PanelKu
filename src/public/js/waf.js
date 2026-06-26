@@ -12,12 +12,7 @@ const WAFPage = {
       if (res?.success) {
         const rules = res.data;
 
-        if (rules.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">No WAF rules found</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = rules.map(r => `
+        LP.paginate(rules, 10, 'wafTableBody', 'wafPagination', r => `
           <tr>
             <td style="font-weight:500;text-transform:uppercase;">${r.type.replace('_', ' ')}</td>
             <td><span class="lp-badge lp-badge-primary" style="font-family:var(--font-mono);">${r.value}</span></td>
@@ -33,7 +28,7 @@ const WAFPage = {
               </button>
             </td>
           </tr>
-        `).join('');
+        `, 'No WAF rules found', 5);
       } else {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${res.message}</td></tr>`;
       }

@@ -334,6 +334,58 @@ const LP = {
   num(n) {
     return typeof n === 'number' ? n.toLocaleString() : n;
   },
+
+  // Pagination Helper
+  _paginationState: {},
+  paginate(data, itemsPerPage, tbodyId, paginationContainerId, renderRowFn, emptyMessage, colspan) {
+    const tbody = document.getElementById(tbodyId);
+    const pagContainer = document.getElementById(paginationContainerId);
+    
+    if (!data || data.length === 0) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center text-muted">${emptyMessage}</td></tr>`;
+      if (pagContainer) pagContainer.innerHTML = '';
+      return;
+    }
+    
+    let currentPage = 1;
+    const totalPages = Math.ceil(data.length / itemsPerPage);
+
+    const render = () => {
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = start + itemsPerPage;
+      const pageData = data.slice(start, end);
+      
+      if (tbody) tbody.innerHTML = pageData.map(renderRowFn).join('');
+      
+      if (pagContainer) {
+        if (totalPages > 1) {
+          pagContainer.innerHTML = `
+            <div class="lp-pagination mt-3 d-flex justify-content-between align-items-center">
+              <span class="text-muted" style="font-size:12px">Showing ${start + 1} to ${Math.min(end, data.length)} of ${data.length}</span>
+              <div class="btn-group">
+                <button class="btn-lp btn-lp-sm btn-lp-ghost" ${currentPage === 1 ? 'disabled' : ''} onclick="LP._pageChange('${paginationContainerId}', -1)"><i class="bi bi-chevron-left"></i></button>
+                <button class="btn-lp btn-lp-sm btn-lp-ghost" ${currentPage === totalPages ? 'disabled' : ''} onclick="LP._pageChange('${paginationContainerId}', 1)"><i class="bi bi-chevron-right"></i></button>
+              </div>
+            </div>
+          `;
+          LP._paginationState[paginationContainerId] = { currentPage, totalPages, render };
+        } else {
+          pagContainer.innerHTML = '';
+        }
+      }
+    };
+    
+    render();
+  },
+
+  _pageChange(containerId, dir) {
+    const state = LP._paginationState[containerId];
+    if (!state) return;
+    state.currentPage += dir;
+    if (state.currentPage < 1) state.currentPage = 1;
+    if (state.currentPage > state.totalPages) state.currentPage = state.totalPages;
+    state.render();
+  }
 };
 
 // Auto-init on DOM ready

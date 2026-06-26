@@ -36,12 +36,7 @@ const DockerPage = (() => {
     }
 
     const { containers } = res.data;
-    if (!containers.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No containers found</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = containers.map(c => {
+    LP.paginate(containers, 10, 'containersTableBody', 'containersPagination', c => {
       const isRunning = c.state === 'running';
       const badgeClass = isRunning ? 'lp-badge-success' : 'lp-badge-danger';
       const ports = c.ports?.map(p => `${p.PublicPort || p.PrivatePort}/${p.Type}`).join(', ') || '—';
@@ -67,7 +62,7 @@ const DockerPage = (() => {
           </td>
         </tr>
       `;
-    }).join('');
+    }, 'No containers found', 6);
   }
 
   async function loadImages(isInstalled) {
@@ -87,12 +82,7 @@ const DockerPage = (() => {
     }
 
     const { images } = res.data;
-    if (!images.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No images found</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = images.map(img => {
+    LP.paginate(images, 10, 'imagesTableBody', 'imagesPagination', img => {
       const tag = img.tags[0] || '<none>:<none>';
       
       let inUseHtml = '<span class="text-muted">—</span>';
@@ -118,7 +108,7 @@ const DockerPage = (() => {
           </td>
         </tr>
       `;
-    }).join('');
+    }, 'No images found', 6);
   }
 
   async function action(type, id) {

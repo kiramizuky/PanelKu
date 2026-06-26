@@ -24,12 +24,7 @@ const FirewallPage = {
           text.style.color = 'var(--text-muted)';
         }
 
-        if (rules.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">No active rules</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = rules.map(r => `
+        LP.paginate(rules, 10, 'firewallTableBody', 'firewallPagination', r => `
           <tr>
             <td><span style="font-family:var(--font-mono);color:var(--text-muted)">[${r.id}]</span></td>
             <td><span class="lp-badge lp-badge-primary" style="font-size:12px">${r.to}</span></td>
@@ -45,7 +40,7 @@ const FirewallPage = {
               </button>
             </td>
           </tr>
-        `).join('');
+        `, 'No active rules', 5);
       } else {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${res.message}</td></tr>`;
       }

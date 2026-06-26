@@ -71,12 +71,7 @@ const DNSPage = {
       
       if (res?.success) {
         const records = res.data;
-        if (records.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">No records found</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = records.map(r => `
+        LP.paginate(records, 10, 'recordsTableBody', 'dnsPagination', r => `
           <tr>
             <td style="font-weight:600;color:var(--accent-info)">${r.type}</td>
             <td class="font-mono">${r.name}</td>
@@ -92,7 +87,7 @@ const DNSPage = {
               </button>
             </td>
           </tr>
-        `).join('');
+        `, 'No records found', 5);
       } else {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${res.message}</td></tr>`;
       }
