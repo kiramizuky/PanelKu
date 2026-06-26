@@ -12,9 +12,9 @@ export const registerTerminalSocket = (namespace) => {
     let activeSessions = new Set();
 
     // Create terminal session
-    socket.on('terminal:create', ({ shell = 'bash', cols = 80, rows = 24 }) => {
+    socket.on('terminal:create', ({ shell = 'bash', cols = 80, rows = 24, osUser = 'root' }) => {
       try {
-        const { sessionId, pid } = terminalService.create(socket.user._id, shell, cols, rows);
+        const { sessionId, pid } = terminalService.create(socket.user._id, shell, cols, rows, osUser);
         activeSessions.add(sessionId);
 
         socket.emit('terminal:created', { sessionId, pid });

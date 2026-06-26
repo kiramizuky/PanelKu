@@ -12,4 +12,28 @@
 <link href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+
+<!-- Terminal Login Modal -->
+<div class="modal fade" id="terminalLoginModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content lp-glass-card">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title" style="font-size: 16px; font-weight: 600;"><i class="bi bi-terminal"></i> Terminal Login</h5>
+      </div>
+      <div class="modal-body pt-3 pb-2">
+        <form id="terminalLoginForm" onsubmit="event.preventDefault(); TerminalPage.connect(document.getElementById('osUser').value);">
+          <div class="lp-form-group mb-0">
+            <label class="lp-label">OS Username</label>
+            <input type="text" id="osUser" class="lp-input" value="root" placeholder="Enter OS user" required autocomplete="off">
+            <small style="color:var(--text-muted); font-size:11px; margin-top:5px; display:block;">Defaults to root. If non-root, it will prompt for OS password inside the terminal.</small>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="submit" form="terminalLoginForm" class="btn-lp btn-lp-primary w-100">Connect</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/js/terminal.js"></script>

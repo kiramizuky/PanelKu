@@ -14,16 +14,22 @@ class TerminalService {
   /**
    * Create a new PTY session.
    */
-  create(userId, shell = 'bash', cols = 80, rows = 24) {
+  create(userId, shell = 'bash', cols = 80, rows = 24, osUser = 'root') {
     if (this._sessions.size >= this._MAX_SESSIONS) {
       throw new Error('Maximum terminal sessions reached');
     }
 
     const sessionId = uuidv4();
     const isWin = process.platform === 'win32';
-    const shellPath = this._resolveShell(shell);
+    let shellPath = this._resolveShell(shell);
+    let shellArgs = [];
 
-    const ptyProcess = pty.spawn(shellPath, [], {
+    if (!isWin && osUser && osUser !== 'root') {
+      shellPath = 'su';
+      shellArgs = ['-', osUser];
+    }
+
+    const ptyProcess = pty.spawn(shellPath, shellArgs, {
       name: 'xterm-256color',
       cols,
       rows,

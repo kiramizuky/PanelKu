@@ -8,10 +8,21 @@ const TerminalPage = (() => {
   let term = null;
   let fitAddon = null;
   let sessionId = null;
+  let selectedOsUser = 'root';
+  let loginModal = null;
 
   async function init() {
     await LP.init();
     if (!LP.state.accessToken) return;
+
+    // Show modal
+    loginModal = new bootstrap.Modal(document.getElementById('terminalLoginModal'));
+    loginModal.show();
+    
+    // Auto focus input
+    document.getElementById('terminalLoginModal').addEventListener('shown.bs.modal', () => {
+      document.getElementById('osUser').focus();
+    });
 
     // Init Socket
     socket = io('/terminal', {
@@ -26,7 +37,8 @@ const TerminalPage = (() => {
         socket.emit('terminal:create', {
           cols: term.cols,
           rows: term.rows,
-          shell: 'bash'
+          shell: 'bash',
+          osUser: selectedOsUser
         });
       }
     });
@@ -56,7 +68,13 @@ const TerminalPage = (() => {
     socket.on('disconnect', () => {
       console.log('Terminal socket disconnected');
     });
+  }
 
+  function connect(osUser) {
+    if (!osUser) return;
+    selectedOsUser = osUser;
+    if (loginModal) loginModal.hide();
+    
     initTerminal();
   }
 
@@ -106,12 +124,13 @@ const TerminalPage = (() => {
       socket.emit('terminal:create', {
         cols: term.cols,
         rows: term.rows,
-        shell: 'bash'
+        shell: 'bash',
+        osUser: selectedOsUser
       });
     }
   }
 
-  return { init };
+  return { init, connect };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
