@@ -13,6 +13,12 @@
 </div>
 
 <div class="lp-glass-card" style="padding:0;overflow-x:auto;">
+  <div style="padding:15px; border-bottom:1px solid var(--glass-border); display:flex; justify-content:flex-end;">
+    <div style="position:relative; width: 100%; max-width: 300px;">
+      <i class="bi bi-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted)"></i>
+      <input type="text" id="firewallSearch" class="lp-input" placeholder="Cari port, aksi, atau IP..." style="padding-left:35px; width:100%" oninput="FirewallPage.filterRules(this.value)">
+    </div>
+  </div>
   <table class="lp-table">
     <thead>
       <tr>

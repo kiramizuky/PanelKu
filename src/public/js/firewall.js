@@ -1,4 +1,5 @@
 const FirewallPage = {
+  allRules: [],
   async init() {
     await this.loadStatus();
   },
@@ -24,23 +25,13 @@ const FirewallPage = {
           text.style.color = 'var(--text-muted)';
         }
 
-        LP.paginate(rules, 10, 'firewallTableBody', 'firewallPagination', r => `
-          <tr>
-            <td><span style="font-family:var(--font-mono);color:var(--text-muted)">[${r.id}]</span></td>
-            <td><span class="lp-badge lp-badge-primary" style="font-size:12px">${r.to}</span></td>
-            <td>
-              <span class="lp-badge ${r.action.toLowerCase() === 'allow' ? 'lp-badge-success' : 'lp-badge-danger'}">
-                ${r.action} ${r.direction}
-              </span>
-            </td>
-            <td style="color:var(--text-secondary)">${r.from}</td>
-            <td style="text-align:right">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FirewallPage.deleteRule('${r.id}')" style="color:var(--accent-danger)">
-                <i class="bi bi-trash"></i> Delete
-              </button>
-            </td>
-          </tr>
-        `, 'No active rules', 5);
+        this.allRules = rules;
+        this.renderRules(this.allRules);
+        
+        // Reset search field if it exists
+        const searchInput = document.getElementById('firewallSearch');
+        if (searchInput) searchInput.value = '';
+        
       } else {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${res.message}</td></tr>`;
       }
@@ -101,6 +92,38 @@ const FirewallPage = {
     } else {
       LP.toast(res.message, 'error');
     }
+  },
+
+  renderRules(rules) {
+    LP.paginate(rules, 10, 'firewallTableBody', 'firewallPagination', r => `
+      <tr>
+        <td><span style="font-family:var(--font-mono);color:var(--text-muted)">[${r.id}]</span></td>
+        <td><span class="lp-badge lp-badge-primary" style="font-size:12px">${r.to}</span></td>
+        <td>
+          <span class="lp-badge ${r.action.toLowerCase() === 'allow' ? 'lp-badge-success' : 'lp-badge-danger'}">
+            ${r.action} ${r.direction}
+          </span>
+        </td>
+        <td style="color:var(--text-secondary)">${r.from}</td>
+        <td style="text-align:right">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FirewallPage.deleteRule('${r.id}')" style="color:var(--accent-danger)">
+            <i class="bi bi-trash"></i> Delete
+          </button>
+        </td>
+      </tr>
+    `, 'No rules match your search', 5);
+  },
+
+  filterRules(query) {
+    if (!query) return this.renderRules(this.allRules);
+    query = query.toLowerCase();
+    const filtered = this.allRules.filter(r => 
+      String(r.to).toLowerCase().includes(query) ||
+      String(r.from).toLowerCase().includes(query) ||
+      String(r.action).toLowerCase().includes(query) ||
+      String(r.id).toLowerCase().includes(query)
+    );
+    this.renderRules(filtered);
   }
 };
 

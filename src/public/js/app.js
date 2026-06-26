@@ -347,35 +347,38 @@ const LP = {
       return;
     }
     
-    let currentPage = 1;
     const totalPages = Math.ceil(data.length / itemsPerPage);
 
-    const render = () => {
-      const start = (currentPage - 1) * itemsPerPage;
-      const end = start + itemsPerPage;
-      const pageData = data.slice(start, end);
-      
-      if (tbody) tbody.innerHTML = pageData.map(renderRowFn).join('');
-      
-      if (pagContainer) {
-        if (totalPages > 1) {
-          pagContainer.innerHTML = `
-            <div class="lp-pagination mt-3 d-flex justify-content-between align-items-center">
-              <span class="text-muted" style="font-size:12px">Showing ${start + 1} to ${Math.min(end, data.length)} of ${data.length}</span>
-              <div class="btn-group">
-                <button class="btn-lp btn-lp-sm btn-lp-ghost" ${currentPage === 1 ? 'disabled' : ''} onclick="LP._pageChange('${paginationContainerId}', -1)"><i class="bi bi-chevron-left"></i></button>
-                <button class="btn-lp btn-lp-sm btn-lp-ghost" ${currentPage === totalPages ? 'disabled' : ''} onclick="LP._pageChange('${paginationContainerId}', 1)"><i class="bi bi-chevron-right"></i></button>
+    LP._paginationState[paginationContainerId] = { 
+      currentPage: 1, 
+      totalPages, 
+      render: function() {
+        const state = LP._paginationState[paginationContainerId];
+        const start = (state.currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const pageData = data.slice(start, end);
+        
+        if (tbody) tbody.innerHTML = pageData.map(renderRowFn).join('');
+        
+        if (pagContainer) {
+          if (state.totalPages > 1) {
+            pagContainer.innerHTML = `
+              <div class="lp-pagination mt-3 d-flex justify-content-between align-items-center">
+                <span class="text-muted" style="font-size:12px">Showing ${start + 1} to ${Math.min(end, data.length)} of ${data.length}</span>
+                <div class="btn-group">
+                  <button class="btn-lp btn-lp-sm btn-lp-ghost" ${state.currentPage === 1 ? 'disabled' : ''} onclick="LP._pageChange('${paginationContainerId}', -1)"><i class="bi bi-chevron-left"></i></button>
+                  <button class="btn-lp btn-lp-sm btn-lp-ghost" ${state.currentPage === state.totalPages ? 'disabled' : ''} onclick="LP._pageChange('${paginationContainerId}', 1)"><i class="bi bi-chevron-right"></i></button>
+                </div>
               </div>
-            </div>
-          `;
-          LP._paginationState[paginationContainerId] = { currentPage, totalPages, render };
-        } else {
-          pagContainer.innerHTML = '';
+            `;
+          } else {
+            pagContainer.innerHTML = '';
+          }
         }
       }
     };
     
-    render();
+    LP._paginationState[paginationContainerId].render();
   },
 
   _pageChange(containerId, dir) {
