@@ -15,14 +15,21 @@ const TerminalPage = (() => {
     await LP.init();
     if (!LP.state.accessToken) return;
 
-    // Show modal
-    loginModal = new bootstrap.Modal(document.getElementById('terminalLoginModal'));
-    loginModal.show();
-    
-    // Auto focus input
-    document.getElementById('terminalLoginModal').addEventListener('shown.bs.modal', () => {
-      document.getElementById('osUser').focus();
-    });
+    const savedUser = sessionStorage.getItem('lp_terminal_user');
+    if (savedUser) {
+      // Set the input value just in case
+      const inputEl = document.getElementById('osUser');
+      if (inputEl) inputEl.value = savedUser;
+    } else {
+      // Show modal
+      loginModal = new bootstrap.Modal(document.getElementById('terminalLoginModal'));
+      loginModal.show();
+      
+      // Auto focus input
+      document.getElementById('terminalLoginModal').addEventListener('shown.bs.modal', () => {
+        document.getElementById('osUser').focus();
+      });
+    }
 
     // Init Socket
     socket = io('/terminal', {
@@ -57,6 +64,7 @@ const TerminalPage = (() => {
       if (data.sessionId === sessionId && term) {
         term.write(`\r\n\x1b[33m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
         sessionId = null;
+        sessionStorage.removeItem('lp_terminal_user');
       }
     });
 
@@ -68,11 +76,16 @@ const TerminalPage = (() => {
     socket.on('disconnect', () => {
       console.log('Terminal socket disconnected');
     });
+
+    if (savedUser) {
+      connect(savedUser);
+    }
   }
 
   function connect(osUser) {
     if (!osUser) return;
     selectedOsUser = osUser;
+    sessionStorage.setItem('lp_terminal_user', osUser);
     if (loginModal) loginModal.hide();
     
     initTerminal();
