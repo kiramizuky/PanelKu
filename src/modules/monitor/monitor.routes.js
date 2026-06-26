@@ -9,7 +9,7 @@ router.use(authenticate);
 router.use(rbac(RESOURCES.MONITOR, ACTIONS.READ));
 
 router.get('/current', monitorController.getCurrent.bind(monitorController));
-router.get('/metrics', monitorController.getCurrent.bind(monitorController));
+router.get('/metrics', monitorController.getMetrics.bind(monitorController));
 router.get('/sysinfo', monitorController.getSysInfo.bind(monitorController));
 router.get('/history', monitorController.getHistory.bind(monitorController));
 router.get('/disk', monitorController.getDiskHealth.bind(monitorController));

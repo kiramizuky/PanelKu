@@ -1,10 +1,20 @@
 import monitorService from './monitor.service.js';
+import dashboardService from '../dashboard/dashboard.service.js';
 import { success, error } from '../../helpers/response.js';
 
 class MonitorController {
   async getCurrent(req, res) {
     try {
       const data = await monitorService.getCurrent();
+      return success(res, data);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async getMetrics(req, res) {
+    try {
+      const data = await dashboardService.getMetrics();
       return success(res, data);
     } catch (err) {
       return error(res, err.message, 500);

@@ -99,8 +99,8 @@ const MonitorPage = (() => {
           <div class="font-mono text-muted" style="font-size:11px">${n.ip4 || 'No IP'}</div>
         </div>
         <div class="text-end" style="font-size:12px;">
-          <div><span class="text-info"><i class="bi bi-arrow-down"></i></span> ${LP.formatBytes(n.rx_sec || 0)}/s</div>
-          <div><span class="text-warning"><i class="bi bi-arrow-up"></i></span> ${LP.formatBytes(n.tx_sec || 0)}/s</div>
+          <div><span class="text-info"><i class="bi bi-arrow-down"></i></span> ${LP.formatBytes(n.rxSec || n.rx_sec || 0)}/s</div>
+          <div><span class="text-warning"><i class="bi bi-arrow-up"></i></span> ${LP.formatBytes(n.txSec || n.tx_sec || 0)}/s</div>
         </div>
       </div>
     `).join('');
@@ -120,7 +120,7 @@ const MonitorPage = (() => {
         const d = res.data;
         
         // Update Uptime
-        document.getElementById('sys-uptime').textContent = formatUptime(d.time?.uptime || 0);
+        document.getElementById('sys-uptime').textContent = formatUptime(d.system?.uptime || 0);
 
         // Update CPU Chart
         const cpuPct = Math.round(d.cpu?.usage || 0);
@@ -140,7 +140,7 @@ const MonitorPage = (() => {
         renderDisks(d.disk || []);
 
         // Update Network
-        renderNetwork(d.network || []);
+        renderNetwork(Array.isArray(d.network) ? d.network : [d.network].filter(Boolean));
       }
     } catch (err) {
       console.error('Failed to poll metrics:', err);
