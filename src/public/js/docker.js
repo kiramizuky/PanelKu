@@ -94,14 +94,27 @@ const DockerPage = (() => {
 
     tbody.innerHTML = images.map(img => {
       const tag = img.tags[0] || '<none>:<none>';
+      
+      let inUseHtml = '<span class="text-muted">—</span>';
+      let hasRunningContainers = false;
+      
+      if (img.containers && img.containers.length > 0) {
+        hasRunningContainers = img.containers.some(c => c.state === 'running');
+        inUseHtml = img.containers.map(c => {
+          const color = c.state === 'running' ? 'var(--accent-success)' : 'var(--text-muted)';
+          return `<span style="color:${color};font-size:11px;margin-right:4px;" title="State: ${c.state}">${c.names[0]}</span>`;
+        }).join('');
+      }
+
       return `
         <tr>
           <td class="font-mono" style="color:var(--text-primary)">${tag}</td>
           <td class="font-mono" style="font-size:12px;color:var(--text-muted)">${img.id}</td>
+          <td>${inUseHtml}</td>
           <td style="font-size:12px">${LP.formatBytes(img.size)}</td>
           <td style="font-size:12px;color:var(--text-muted)">${new Date(img.created * 1000).toLocaleString()}</td>
           <td style="text-align:right">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.deleteImage('${img.id}')" title="Delete"><i class="bi bi-trash"></i></button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.deleteImage('${img.id}', ${hasRunningContainers})" title="Delete"><i class="bi bi-trash"></i></button>
           </td>
         </tr>
       `;
@@ -109,23 +122,21 @@ const DockerPage = (() => {
   }
 
   async function action(type, id) {
-    let method = 'POST';
-    let url = `/docker/containers/${id}/${type}`;
-    
     if (type === 'delete') {
       const confirmed = await LP.confirm('Delete this container?', 'Delete Container');
       if (!confirmed) return;
-      method = 'DELETE';
-      url = `/docker/containers/${id}?force=true`;
-    } else {
-      LP.toast(`Executing ${type}...`, 'info', null, 1000);
+      const res = await LP.del(`/docker/containers/${id}?force=true`);
+      if (res?.success) {
+        LP.toast(`Container deleted successfully`, 'success');
+        loadData();
+      } else {
+        LP.toast(res?.message || 'Delete failed', 'error');
+      }
+      return;
     }
-
-    const res = await fetch(`/api${url}`, {
-      method,
-      headers: { 'Authorization': `Bearer ${LP.state.accessToken}` }
-    }).then(r => r.json());
-
+    
+    LP.toast(`Executing ${type}...`, 'info');
+    const res = await LP.post(`/docker/containers/${id}/${type}`);
     if (res?.success) {
       LP.toast(`Container ${type} successful`, 'success');
       loadData();
@@ -134,15 +145,18 @@ const DockerPage = (() => {
     }
   }
 
-  async function deleteImage(id) {
+  async function deleteImage(id, hasRunningContainers) {
+    if (hasRunningContainers) {
+      LP.toast('Cannot delete image: It is currently used by running container(s). Please stop them first.', 'error');
+      return;
+    }
     const confirmed = await LP.confirm('Delete this image?', 'Delete Image');
     if (!confirmed) return;
 
     const res = await LP.del(`/docker/images/${id}?force=true`);
     if (res?.success) {
       LP.toast('Image deleted', 'success');
-      loadImages();
-      loadSummary();
+      loadData();
     } else {
       LP.toast(res?.message || 'Failed to delete image', 'error');
     }

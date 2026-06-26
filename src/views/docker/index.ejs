@@ -36,10 +36,21 @@
   </div>
 </div>
 
-<!-- Tabs -->
-<ul class="nav nav-tabs mb-4" style="border-bottom: 1px solid var(--glass-border);">
-  <li class="nav-item"><a class="nav-link active" style="color:var(--text-primary); background:transparent; border-color:var(--glass-border) var(--glass-border) transparent;" data-bs-toggle="tab" href="#containers">Containers</a></li>
-  <li class="nav-item"><a class="nav-link" style="color:var(--text-muted); background:transparent; border:none;" data-bs-toggle="tab" href="#images">Images</a></li>
+<style>
+  .dk-tabs { border-bottom: 1px solid var(--glass-border); }
+  .dk-tabs .nav-link { color: var(--text-muted); background: transparent; border: none; padding: 10px 16px; font-weight: 500; border-radius: 8px 8px 0 0; }
+  .dk-tabs .nav-link:hover { color: var(--text-primary); border-color: transparent; }
+  .dk-tabs .nav-link.active { 
+    color: var(--accent-primary); 
+    background: rgba(99,102,241,0.1); 
+    border: 1px solid var(--glass-border); 
+    border-bottom-color: transparent; 
+  }
+</style>
+
+<ul class="nav nav-tabs mb-4 dk-tabs">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#containers">Containers</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#images">Images</a></li>
 </ul>
 
 <!-- Tab Content -->
@@ -73,13 +84,14 @@
           <tr>
             <th>Repository:Tag</th>
             <th>Image ID</th>
+            <th>In Use By</th>
             <th>Size</th>
             <th>Created</th>
             <th style="text-align:right">Actions</th>
           </tr>
         </thead>
         <tbody id="imagesTableBody">
-          <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+          <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
         </tbody>
       </table>
     </div>

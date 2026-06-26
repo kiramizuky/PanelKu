@@ -107,12 +107,22 @@ class DockerService {
   async listImages() {
     try {
       const images = await this.docker.listImages();
-      return images.map(img => ({
-        id: img.Id.split(':')[1].substring(0, 12),
-        tags: img.RepoTags || [],
-        size: img.Size,
-        created: img.Created
-      }));
+      const containers = await this.docker.listContainers({ all: true });
+      return images.map(img => {
+        const usingContainers = containers.filter(c => c.ImageID === img.Id).map(c => ({
+          id: c.Id.substring(0, 12),
+          names: c.Names.map(n => n.replace('/', '')),
+          state: c.State
+        }));
+        return {
+          id: img.Id.split(':')[1].substring(0, 12),
+          rawId: img.Id,
+          tags: img.RepoTags || [],
+          size: img.Size,
+          created: img.Created,
+          containers: usingContainers
+        };
+      });
     } catch (error) {
       throw new Error(`Failed to list images: ${error.message}`);
     }
