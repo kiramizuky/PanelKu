@@ -1,0 +1,86 @@
+<div class="lp-page-header" style="margin-bottom:20px;">
+  <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">System Monitoring</h1>
+  <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Real-time performance metrics</p>
+</div>
+
+<div class="row g-4">
+  <!-- System Info -->
+  <div class="col-12 col-xl-4">
+    <div class="lp-glass-card h-100">
+      <div class="lp-card-header" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-bottom: 15px;">
+        <h3 class="lp-card-title m-0" style="font-size:16px;">System Information</h3>
+      </div>
+      <div class="lp-card-body" style="padding:0;">
+        <table class="table table-borderless table-sm m-0" style="color:var(--text-primary); font-size:13px;">
+          <tbody id="sysInfoTable">
+            <tr><td>Hostname</td><td class="text-end font-mono" id="sys-hostname">—</td></tr>
+            <tr><td>OS</td><td class="text-end font-mono" id="sys-os">—</td></tr>
+            <tr><td>Platform</td><td class="text-end font-mono" id="sys-platform">—</td></tr>
+            <tr><td>Kernel</td><td class="text-end font-mono" id="sys-kernel">—</td></tr>
+            <tr><td>Uptime</td><td class="text-end font-mono" id="sys-uptime">—</td></tr>
+            <tr><td>CPU Model</td><td class="text-end font-mono" id="sys-cpuModel">—</td></tr>
+            <tr><td>Cores</td><td class="text-end font-mono" id="sys-cpuCores">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="col-12 col-xl-8">
+    <div class="row g-4">
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card">
+          <div class="lp-card-header" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-bottom: 15px;">
+            <h3 class="lp-card-title m-0" style="font-size:16px;">CPU Usage</h3>
+          </div>
+          <div class="lp-card-body" style="padding:0; position:relative; height:200px;">
+            <canvas id="cpuChart"></canvas>
+            <div id="cpuValue" style="position:absolute;top:10px;right:10px;font-size:24px;font-weight:bold;color:var(--accent-success)">0%</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card">
+          <div class="lp-card-header" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-bottom: 15px;">
+            <h3 class="lp-card-title m-0" style="font-size:16px;">Memory Usage</h3>
+          </div>
+          <div class="lp-card-body" style="padding:0; position:relative; height:200px;">
+            <canvas id="memChart"></canvas>
+            <div id="memValue" style="position:absolute;top:10px;right:10px;font-size:24px;font-weight:bold;color:var(--accent-info)">0%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Disks and Network -->
+  <div class="col-12 col-lg-6">
+    <div class="lp-glass-card">
+      <div class="lp-card-header" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-bottom: 15px;">
+        <h3 class="lp-card-title m-0" style="font-size:16px;">Disks</h3>
+      </div>
+      <div class="lp-card-body" style="padding:0;">
+        <div id="disksContainer">
+          <div class="text-center text-muted py-3">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="lp-glass-card">
+      <div class="lp-card-header" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-bottom: 15px;">
+        <h3 class="lp-card-title m-0" style="font-size:16px;">Network Interfaces</h3>
+      </div>
+      <div class="lp-card-body" style="padding:0;">
+        <div id="networkContainer">
+          <div class="text-center text-muted py-3">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/js/monitor.js"></script>

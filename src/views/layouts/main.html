@@ -1,0 +1,187 @@
+<!-- Linux Panel — Main Layout (include this via template or copy into each page) -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{PAGE_TITLE}} — Linux Panel</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/css/app.css" rel="stylesheet">
+</head>
+<body>
+<div class="lp-wrapper">
+
+  <!-- Sidebar -->
+  <aside class="lp-sidebar" id="sidebar">
+    <!-- Brand -->
+    <div class="lp-sidebar-brand">
+      <div class="lp-brand-icon">⚡</div>
+      <span class="lp-brand-text">Linux Panel</span>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="lp-nav">
+      <div class="lp-nav-section">Overview</div>
+      <div class="lp-nav-item">
+        <a href="/dashboard" class="lp-nav-link" id="nav-dashboard">
+          <span class="lp-nav-icon"><i class="bi bi-grid-1x2-fill"></i></span>
+          <span class="lp-nav-label">Dashboard</span>
+        </a>
+      </div>
+      <div class="lp-nav-item">
+        <a href="/monitor" class="lp-nav-link" id="nav-monitor">
+          <span class="lp-nav-icon"><i class="bi bi-activity"></i></span>
+          <span class="lp-nav-label">Monitoring</span>
+        </a>
+      </div>
+
+      <div class="lp-nav-section">Tools</div>
+      <div class="lp-nav-item">
+        <a href="/terminal" class="lp-nav-link" id="nav-terminal">
+          <span class="lp-nav-icon"><i class="bi bi-terminal-fill"></i></span>
+          <span class="lp-nav-label">Terminal</span>
+        </a>
+      </div>
+      <div class="lp-nav-item">
+        <a href="/filemanager" class="lp-nav-link" id="nav-filemanager">
+          <span class="lp-nav-icon"><i class="bi bi-folder2-open"></i></span>
+          <span class="lp-nav-label">File Manager</span>
+        </a>
+      </div>
+
+      <div class="lp-nav-section">Services</div>
+      <div class="lp-nav-item">
+        <a href="/docker" class="lp-nav-link" id="nav-docker">
+          <span class="lp-nav-icon"><i class="bi bi-boxes"></i></span>
+          <span class="lp-nav-label">Docker</span>
+          <span class="lp-nav-badge" id="sideDockerCount">0</span>
+        </a>
+      </div>
+      <div class="lp-nav-item">
+        <a href="/websites" class="lp-nav-link">
+          <span class="lp-nav-icon"><i class="bi bi-globe2"></i></span>
+          <span class="lp-nav-label">Websites</span>
+        </a>
+      </div>
+      <div class="lp-nav-item">
+        <a href="/databases" class="lp-nav-link">
+          <span class="lp-nav-icon"><i class="bi bi-database-fill"></i></span>
+          <span class="lp-nav-label">Databases</span>
+        </a>
+      </div>
+
+      <div class="lp-nav-section">Security</div>
+      <div class="lp-nav-item">
+        <a href="/firewall" class="lp-nav-link">
+          <span class="lp-nav-icon"><i class="bi bi-shield-fill-check"></i></span>
+          <span class="lp-nav-label">Firewall</span>
+        </a>
+      </div>
+      <div class="lp-nav-item">
+        <a href="/ssl" class="lp-nav-link">
+          <span class="lp-nav-icon"><i class="bi bi-lock-fill"></i></span>
+          <span class="lp-nav-label">SSL</span>
+        </a>
+      </div>
+
+      <div class="lp-nav-section">Administration</div>
+      <div class="lp-nav-item">
+        <a href="/settings/users" class="lp-nav-link">
+          <span class="lp-nav-icon"><i class="bi bi-people-fill"></i></span>
+          <span class="lp-nav-label">Users</span>
+        </a>
+      </div>
+      <div class="lp-nav-item">
+        <a href="/settings/roles" class="lp-nav-link">
+          <span class="lp-nav-icon"><i class="bi bi-key-fill"></i></span>
+          <span class="lp-nav-label">Roles & Permissions</span>
+        </a>
+      </div>
+    </nav>
+
+    <!-- Sidebar footer — user info -->
+    <div class="lp-sidebar-footer">
+      <div style="display:flex;align-items:center;gap:10px;padding:4px 0;">
+        <div class="lp-user-avatar lp-user-initials" style="width:32px;height:32px;font-size:12px;">A</div>
+        <div style="overflow:hidden; transition: all 0.4s;">
+          <div class="lp-user-name" style="font-size:13px;font-weight:500;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">Loading...</div>
+          <div class="lp-user-role" style="font-size:11px;color:var(--text-muted);">—</div>
+        </div>
+        <button onclick="LP.logout()" style="margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;" title="Logout">
+          <i class="bi bi-box-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="lp-main" id="mainContent">
+    <!-- Topbar -->
+    <header class="lp-topbar">
+      <div class="lp-topbar-left">
+        <button class="lp-toggle-btn" id="sidebarToggle" title="Toggle sidebar">
+          <i class="bi bi-list"></i>
+        </button>
+        <button class="lp-toggle-btn d-md-none" id="mobileMenuBtn">
+          <i class="bi bi-layout-sidebar"></i>
+        </button>
+        <nav class="lp-breadcrumb" id="breadcrumb">
+          <span>Linux Panel</span>
+          <i class="bi bi-chevron-right" style="font-size:10px"></i>
+          <span class="current">{{PAGE_NAME}}</span>
+        </nav>
+      </div>
+
+      <div class="lp-topbar-right">
+        <!-- Server status -->
+        <div class="lp-status lp-status-online" id="serverStatus" style="font-size:12px;margin-right:8px;">
+          <div class="lp-status-dot"></div>
+          Online
+        </div>
+
+        <!-- Notifications -->
+        <button class="lp-icon-btn" id="notifBtn" title="Notifications">
+          <i class="bi bi-bell"></i>
+          <span class="badge-dot" id="notifDot" style="display:none"></span>
+        </button>
+
+        <!-- Settings -->
+        <a href="/settings/profile" class="lp-icon-btn" title="Profile">
+          <i class="bi bi-person-circle"></i>
+        </a>
+
+        <!-- User avatar dropdown -->
+        <div class="dropdown">
+          <div class="lp-user-avatar lp-user-initials" data-bs-toggle="dropdown" style="cursor:pointer">A</div>
+          <ul class="dropdown-menu dropdown-menu-end" style="background:var(--bg-secondary);border:1px solid var(--border-color);min-width:200px;">
+            <li style="padding:12px 16px;border-bottom:1px solid var(--border-color)">
+              <div class="lp-user-name" style="font-size:13px;font-weight:600;color:var(--text-primary)">Loading...</div>
+              <div class="lp-user-role" style="font-size:11px;color:var(--text-muted)">—</div>
+            </li>
+            <li><a class="dropdown-item" href="/settings/profile" style="color:var(--text-secondary);font-size:13px;padding:8px 16px"><i class="bi bi-person me-2"></i>Profile</a></li>
+            <li><a class="dropdown-item" href="/settings/profile#security" style="color:var(--text-secondary);font-size:13px;padding:8px 16px"><i class="bi bi-shield me-2"></i>Security</a></li>
+            <li><hr class="dropdown-divider" style="border-color:var(--border-color);margin:4px 0"></li>
+            <li><button class="dropdown-item" onclick="LP.logout()" style="color:var(--accent-danger);font-size:13px;padding:8px 16px"><i class="bi bi-box-arrow-right me-2"></i>Logout</button></li>
+          </ul>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Content goes here -->
+    <main class="lp-content" id="pageContent">
+      {{PAGE_CONTENT}}
+    </main>
+  </div>
+</div>
+
+<!-- Floating Terminal shortcut -->
+<a href="/terminal" class="lp-float-terminal" title="Quick Terminal">
+  <i class="bi bi-terminal"></i>
+  <span>Terminal</span>
+</a>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

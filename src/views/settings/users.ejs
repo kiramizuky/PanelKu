@@ -1,0 +1,85 @@
+<div class="row g-4">
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-0">
+      <div class="lp-card-body p-0">
+        <div class="list-group list-group-flush" style="border-radius:16px;overflow:hidden">
+          <a href="/settings/profile" class="list-group-item list-group-item-action" style="background:transparent;color:var(--text-secondary);border-bottom:1px solid var(--glass-border);padding:15px 20px;">My Profile</a>
+          <a href="/settings/users" class="list-group-item list-group-item-action" style="background:var(--accent-primary);color:#fff;border-bottom:1px solid var(--glass-border);padding:15px 20px;">Users</a>
+          <a href="/settings/roles" class="list-group-item list-group-item-action" style="background:transparent;color:var(--text-secondary);border:none;padding:15px 20px;">Roles & Permissions</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-9">
+    <div class="lp-glass-card">
+      <div class="lp-card-header" style="border-bottom:1px solid var(--glass-border);display:flex;justify-content:space-between;align-items:center;padding-bottom:15px;margin-bottom:15px;">
+        <h3 class="lp-card-title m-0">User Management</h3>
+        <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="UsersPage.showCreateModal()"><i class="bi bi-person-plus"></i> Add User</button>
+      </div>
+      <div class="lp-card-body" style="padding:0;overflow-x:auto;">
+        <table class="lp-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th style="text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody">
+            <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit User Modal -->
+<div class="modal fade" id="userModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" id="userModalTitle" style="font-size:14px">Add User</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="userForm" onsubmit="UsersPage.saveUser(event)">
+        <div class="modal-body">
+          <input type="hidden" id="userId">
+          <div class="lp-form-group">
+            <label class="lp-label">Username</label>
+            <input type="text" id="username" class="lp-input" required>
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Email</label>
+            <input type="email" id="email" class="lp-input" required>
+          </div>
+          <div class="lp-form-group" id="passwordGroup">
+            <label class="lp-label">Password</label>
+            <input type="password" id="password" class="lp-input">
+            <small class="text-muted" style="font-size:11px" id="passwordHelp"></small>
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Role</label>
+            <select id="role" class="lp-input" required></select>
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Status</label>
+            <select id="status" class="lp-input">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lp btn-lp-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/js/settings/users.js"></script>

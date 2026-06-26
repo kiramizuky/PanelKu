@@ -1,0 +1,109 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">DNS Management</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage Cloudflare DNS Zones & Records</p>
+  </div>
+  <button class="btn-lp btn-lp-primary" onclick="DNSPage.showAddRecordModal()" id="addRecordBtn" style="display:none"><i class="bi bi-plus-lg"></i> Add Record</button>
+</div>
+
+<!-- API Token Setup -->
+<div class="lp-glass-card mb-4" id="tokenSetupCard">
+  <h3 style="font-size:16px;margin-bottom:15px;display:flex;align-items:center;gap:8px;">
+    <i class="bi bi-cloud-check text-info"></i> Cloudflare Integration
+  </h3>
+  <div class="lp-form-group">
+    <label class="lp-label">Cloudflare API Token</label>
+    <div style="display:flex;gap:10px;">
+      <input type="password" id="cfTokenInput" class="lp-input" placeholder="Enter your Cloudflare API Token (Edit Zone DNS permissions)" style="flex:1">
+      <button class="btn-lp btn-lp-primary" onclick="DNSPage.saveToken()">Connect</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-muted);margin-top:8px;">
+      Your token is stored locally in your browser. It must have <strong>Zone.Zone (Read)</strong> and <strong>Zone.DNS (Edit)</strong> permissions.
+    </p>
+  </div>
+</div>
+
+<div class="row g-4" id="dnsWorkspace" style="display:none;">
+  <!-- Zones List -->
+  <div class="col-12 col-md-4">
+    <div class="lp-glass-card" style="height:100%">
+      <h3 style="font-size:14px;margin-bottom:15px;color:var(--text-muted);text-transform:uppercase;">Select Zone</h3>
+      <div id="zonesList" style="display:flex;flex-direction:column;gap:8px;">
+        <div style="color:var(--text-muted)">Loading zones...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Records Table -->
+  <div class="col-12 col-md-8">
+    <div class="lp-glass-card" style="padding:0;overflow-x:auto;height:100%">
+      <div style="padding:20px;border-bottom:1px solid var(--glass-border)">
+        <h3 id="currentZoneName" style="font-size:18px;margin:0;">No Zone Selected</h3>
+      </div>
+      <table class="lp-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Name</th>
+            <th>Content</th>
+            <th>Proxy</th>
+            <th style="text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="recordsTableBody">
+          <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Select a zone to view records</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add Record Modal -->
+<div class="modal fade" id="addRecordModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:14px">Add DNS Record</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="addRecordForm" onsubmit="DNSPage.addRecord(event)">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-4">
+              <div class="lp-form-group">
+                <label class="lp-label">Type</label>
+                <select id="recordType" class="lp-input" required>
+                  <option value="A">A</option>
+                  <option value="AAAA">AAAA</option>
+                  <option value="CNAME">CNAME</option>
+                  <option value="TXT">TXT</option>
+                  <option value="MX">MX</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-8">
+              <div class="lp-form-group">
+                <label class="lp-label">Name</label>
+                <input type="text" id="recordName" class="lp-input" placeholder="@ or sub" required>
+              </div>
+            </div>
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Content</label>
+            <input type="text" id="recordContent" class="lp-input" placeholder="192.168.1.100" required>
+          </div>
+          <div class="form-check form-switch mt-3">
+            <input class="form-check-input" type="checkbox" id="recordProxied" checked>
+            <label class="form-check-label" for="recordProxied">Proxied (Cloudflare CDN)</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lp btn-lp-primary">Add Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/js/dns.js"></script>

@@ -1,0 +1,14 @@
+node_modules/
+.env
+storage/logs/*.log
+storage/uploads/*
+storage/backups/*
+storage/temp/*
+!storage/uploads/.gitkeep
+!storage/backups/.gitkeep
+!storage/logs/.gitkeep
+!storage/temp/.gitkeep
+*.sqlite
+dist/
+coverage/
+.nyc_output/

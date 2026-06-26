@@ -1,0 +1,62 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Scheduled Tasks (Cron)</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage background automated tasks</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-primary" onclick="CronPage.showCreateModal()"><i class="bi bi-clock-history"></i> Add Cron Job</button>
+  </div>
+</div>
+
+<div class="lp-glass-card" style="padding:0;overflow-x:auto;">
+  <table class="lp-table">
+    <thead>
+      <tr>
+        <th>Task Name</th>
+        <th>Schedule</th>
+        <th>Command</th>
+        <th>Last Run</th>
+        <th>Status</th>
+        <th style="text-align:right">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="cronTableBody">
+      <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Create Modal -->
+<div class="modal fade" id="createCronModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:14px">Add Cron Job</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="createCronForm" onsubmit="CronPage.createTask(event)">
+        <div class="modal-body">
+          <div class="lp-form-group">
+            <label class="lp-label">Task Name</label>
+            <input type="text" id="cronName" class="lp-input" placeholder="e.g. Daily Backup" required>
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Cron Expression</label>
+            <input type="text" id="cronSchedule" class="lp-input font-mono" placeholder="0 0 * * *" required>
+            <small class="text-muted" style="font-size:11px; margin-top:4px; display:block;">Format: minute hour day month day-of-week (e.g. 0 0 * * * for daily at midnight)</small>
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Command script</label>
+            <input type="text" id="cronCommand" class="lp-input font-mono" placeholder="/path/to/script.sh" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lp btn-lp-primary">Add Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cron.js"></script>

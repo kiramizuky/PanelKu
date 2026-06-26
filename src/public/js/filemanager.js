@@ -1,0 +1,345 @@
+/**
+ * Linux Panel — filemanager.js
+ * Full-featured file manager with grid/list view, context menu, upload, etc.
+ */
+
+const FM = (() => {
+  let currentPath = '/';
+  let selectedItem = null;
+  let viewMode = localStorage.getItem('lp_fm_view') || 'grid';
+  let clipboard = null;
+
+  const FILE_ICONS = {
+    dir: '📁',
+    // Images
+    jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', svg: '🖼️', webp: '🖼️',
+    // Video
+    mp4: '🎬', avi: '🎬', mkv: '🎬', mov: '🎬',
+    // Audio
+    mp3: '🎵', wav: '🎵', ogg: '🎵',
+    // Code
+    js: '📜', ts: '📜', py: '🐍', php: '🐘', html: '🌐', css: '🎨',
+    json: '📋', yaml: '📋', yml: '📋', xml: '📋',
+    sh: '⚙️', bash: '⚙️', zsh: '⚙️',
+    // Archives
+    zip: '📦', tar: '📦', gz: '📦', bz2: '📦',
+    // Docs
+    pdf: '📄', doc: '📄', docx: '📄', txt: '📄', md: '📄',
+    // DB
+    sql: '🗄️', db: '🗄️', sqlite: '🗄️',
+    // Default
+    default: '📄',
+  };
+
+  function getIcon(item) {
+    if (item.type === 'dir') return FILE_ICONS.dir;
+    const ext = item.name.split('.').pop()?.toLowerCase();
+    return FILE_ICONS[ext] || FILE_ICONS.default;
+  }
+
+  // ── Navigation ────────────────────────────────────
+  async function navigate(path) {
+    try {
+      const res = await LP.get(`/filemanager/list?path=${encodeURIComponent(path)}`);
+      if (!res?.success) {
+        LP.toast(res?.message || 'Failed to list directory', 'error');
+        return;
+      }
+
+      currentPath = path;
+      document.getElementById('currentPath').textContent = path;
+      document.getElementById('upBtn').disabled = path === '/';
+      selectedItem = null;
+
+      renderItems(res.data.items || []);
+    } catch (err) {
+      LP.toast('Navigation failed: ' + err.message, 'error');
+    }
+  }
+
+  function renderItems(items) {
+    const grid = document.getElementById('fmGrid');
+    const wrapper = document.getElementById('fmFiles');
+
+    // Set view class
+    if (viewMode === 'list') {
+      document.getElementById('fmWrapper').classList.add('fm-list-view');
+    } else {
+      document.getElementById('fmWrapper').classList.remove('fm-list-view');
+    }
+
+    if (!items.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-muted)"><i class="bi bi-folder-x" style="font-size:40px;display:block;margin-bottom:8px"></i>Empty directory</div>';
+      return;
+    }
+
+    grid.innerHTML = items.map(item => `
+      <div class="fm-item fade-in"
+        data-path="${escHtml(item.path)}"
+        data-type="${item.type}"
+        data-name="${escHtml(item.name)}"
+        onclick="FM.selectItem(this)"
+        ondblclick="FM.openItem(this)"
+        oncontextmenu="FM.showContextMenu(event, this)"
+        title="${escHtml(item.path)}">
+        <div class="fm-item-icon">${getIcon(item)}</div>
+        <div class="fm-item-name">${escHtml(item.name)}</div>
+        <div class="fm-item-size">${item.type === 'dir' ? 'Folder' : LP.formatBytes(item.size)}</div>
+      </div>
+    `).join('');
+  }
+
+  // ── Context Menu ──────────────────────────────────
+  function showContextMenu(e, el) {
+    e.preventDefault();
+    selectItem(el);
+
+    const menu = document.getElementById('contextMenu');
+    menu.style.display = 'block';
+    menu.style.left = Math.min(e.pageX, window.innerWidth - 200) + 'px';
+    menu.style.top = Math.min(e.pageY, window.innerHeight - 200) + 'px';
+
+    document.addEventListener('click', () => { menu.style.display = 'none'; }, { once: true });
+  }
+
+  function selectItem(el) {
+    document.querySelectorAll('.fm-item.selected').forEach(i => i.classList.remove('selected'));
+    if (el) {
+      el.classList.add('selected');
+      selectedItem = {
+        path: el.dataset.path,
+        type: el.dataset.type,
+        name: el.dataset.name,
+        el,
+      };
+    }
+  }
+
+  // ── Actions ───────────────────────────────────────
+  async function openItem(el = null) {
+    const item = el ? {
+      path: el.dataset.path,
+      type: el.dataset.type,
+    } : selectedItem;
+
+    if (!item) return;
+
+    if (item.type === 'dir') {
+      navigate(item.path);
+    } else {
+      await openFileEditor(item.path);
+    }
+  }
+
+  async function openFileEditor(path) {
+    const res = await LP.get(`/filemanager/read?path=${encodeURIComponent(path)}`);
+    if (!res?.success) { LP.toast('Cannot read file: ' + res?.message, 'error'); return; }
+
+    const content = res.data.content;
+    const modal = document.createElement('div');
+    const id = 'file_editor_' + Date.now();
+    modal.innerHTML = `
+      <div class="modal fade" id="${id}" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+          <div class="modal-content" style="background:var(--bg-secondary);border:1px solid var(--border-color);color:var(--text-primary)">
+            <div class="modal-header" style="border-color:var(--border-color)">
+              <h5 class="modal-title font-mono" style="font-size:13px">${escHtml(path)}</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding:0">
+              <textarea id="${id}_ta" style="width:100%;height:500px;background:#0a0e1a;color:#e2e8f0;border:none;padding:16px;font-family:'JetBrains Mono',monospace;font-size:13px;resize:none;outline:none;line-height:1.6">${escHtml(content)}</textarea>
+            </div>
+            <div class="modal-footer" style="border-color:var(--border-color)">
+              <button class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+              <button class="btn-lp btn-lp-primary" onclick="FM._saveFile('${escHtml(path)}', '${id}')">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(document.getElementById(id));
+    bsModal.show();
+    document.getElementById(id).addEventListener('hidden.bs.modal', () => modal.remove());
+  }
+
+  async function _saveFile(path, modalId) {
+    const content = document.getElementById(`${modalId}_ta`).value;
+    const res = await LP.post('/filemanager/write', { path, content });
+    if (res?.success) {
+      LP.toast('File saved successfully', 'success');
+      bootstrap.Modal.getInstance(document.getElementById(modalId))?.hide();
+    } else {
+      LP.toast('Failed to save: ' + res?.message, 'error');
+    }
+  }
+
+  async function renameSelected() {
+    if (!selectedItem) return;
+    const newName = prompt('New name:', selectedItem.name);
+    if (!newName || newName === selectedItem.name) return;
+
+    const res = await LP.post('/filemanager/rename', { path: selectedItem.path, newName });
+    if (res?.success) {
+      LP.toast('Renamed successfully', 'success');
+      refresh();
+    } else {
+      LP.toast(res?.message || 'Rename failed', 'error');
+    }
+  }
+
+  async function deleteSelected() {
+    if (!selectedItem) return;
+    const confirmed = await LP.confirm(`Delete <strong>${escHtml(selectedItem.name)}</strong>?<br><small class="text-danger">This action cannot be undone.</small>`, 'Delete File');
+    if (!confirmed) return;
+
+    const res = await LP.del('/filemanager/delete', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${LP.state.accessToken}` },
+      body: JSON.stringify({ path: selectedItem.path }),
+    });
+
+    // Custom delete call (LP.del wraps body issue)
+    const delRes = await fetch('/api/filemanager/delete', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${LP.state.accessToken}` },
+      credentials: 'include',
+      body: JSON.stringify({ path: selectedItem.path }),
+    }).then(r => r.json());
+
+    if (delRes?.success) {
+      LP.toast('Deleted', 'success');
+      refresh();
+    } else {
+      LP.toast(delRes?.message || 'Delete failed', 'error');
+    }
+  }
+
+  function copySelected() {
+    if (!selectedItem) return;
+    clipboard = { ...selectedItem, action: 'copy' };
+    LP.toast(`${selectedItem.name} copied to clipboard`, 'info');
+  }
+
+  function moveSelected() {
+    if (!selectedItem) return;
+    clipboard = { ...selectedItem, action: 'move' };
+    LP.toast(`${selectedItem.name} cut to clipboard`, 'info');
+  }
+
+  async function mkdir() {
+    const name = prompt('New folder name:');
+    if (!name) return;
+    const res = await LP.post('/filemanager/mkdir', { path: currentPath + '/' + name });
+    if (res?.success) { LP.toast('Folder created', 'success'); refresh(); }
+    else LP.toast(res?.message || 'Failed', 'error');
+  }
+
+  async function upload(files) {
+    if (!files?.length) return;
+    const formData = new FormData();
+    for (const file of files) formData.append('files', file);
+    formData.append('path', currentPath);
+
+    LP.toast(`Uploading ${files.length} file(s)...`, 'info', null, 2000);
+
+    const res = await fetch(`/api/filemanager/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${LP.state.accessToken}` },
+      credentials: 'include',
+      body: formData,
+    }).then(r => r.json());
+
+    if (res?.success) { LP.toast(`Uploaded ${files.length} file(s)`, 'success'); refresh(); }
+    else LP.toast(res?.message || 'Upload failed', 'error');
+  }
+
+  async function downloadSelected() {
+    if (!selectedItem) return;
+    window.open(`/api/filemanager/download?path=${encodeURIComponent(selectedItem.path)}&token=${LP.state.accessToken}`, '_blank');
+  }
+
+  async function zipSelected() {
+    if (!selectedItem) return;
+    const output = currentPath + '/' + selectedItem.name + '.zip';
+    const res = await LP.post('/filemanager/zip', { path: selectedItem.path, output });
+    if (res?.success) { LP.toast('Zipped: ' + output, 'success'); refresh(); }
+    else LP.toast(res?.message || 'Zip failed', 'error');
+  }
+
+  async function search() {
+    const query = document.getElementById('searchInput').value.trim();
+    if (!query) return;
+
+    const res = await LP.get(`/filemanager/search?path=${encodeURIComponent(currentPath)}&query=${encodeURIComponent(query)}`);
+    if (!res?.success) { LP.toast('Search failed', 'error'); return; }
+
+    renderItems(res.data.results || []);
+    LP.toast(`Found ${res.data.results.length} result(s)`, 'info');
+  }
+
+  function toggleView() {
+    viewMode = viewMode === 'grid' ? 'list' : 'grid';
+    localStorage.setItem('lp_fm_view', viewMode);
+    const btn = document.getElementById('viewToggle');
+    btn.innerHTML = viewMode === 'grid' ? '<i class="bi bi-grid-3x3-gap"></i>' : '<i class="bi bi-list-ul"></i>';
+    refresh();
+  }
+
+  function refresh() { navigate(currentPath); }
+
+  function goUp() {
+    const parts = currentPath.split('/').filter(Boolean);
+    if (!parts.length) return;
+    parts.pop();
+    navigate('/' + parts.join('/') || '/');
+  }
+
+  // ── Drag & Drop ───────────────────────────────────
+  function initDragDrop() {
+    const overlay = document.getElementById('dropOverlay');
+    const zone = document.getElementById('fmFiles');
+
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); overlay.classList.add('visible'); });
+    zone.addEventListener('dragleave', () => overlay.classList.remove('visible'));
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      overlay.classList.remove('visible');
+      if (e.dataTransfer.files.length) upload(e.dataTransfer.files);
+    });
+  }
+
+  function escHtml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ── Public ────────────────────────────────────────
+  return {
+    async init() {
+      await LP.init();
+      if (!LP.state.accessToken) return;
+      initDragDrop();
+      navigate('/');
+    },
+
+    navigate,
+    refresh,
+    goUp,
+    toggleView,
+    selectItem,
+    openItem,
+    renameSelected,
+    deleteSelected,
+    copySelected,
+    moveSelected,
+    mkdir,
+    upload,
+    downloadSelected,
+    zipSelected,
+    search,
+    showContextMenu,
+    _saveFile,
+  };
+})();
+
+document.addEventListener('DOMContentLoaded', () => FM.init());
+window.FM = FM;

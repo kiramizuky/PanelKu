@@ -1,0 +1,72 @@
+<div class="row g-4">
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-0">
+      <div class="lp-card-body p-0">
+        <div class="list-group list-group-flush" style="border-radius:16px;overflow:hidden">
+          <a href="/settings/profile" class="list-group-item list-group-item-action" style="background:transparent;color:var(--text-secondary);border-bottom:1px solid var(--glass-border);padding:15px 20px;">My Profile</a>
+          <a href="/settings/users" class="list-group-item list-group-item-action" style="background:transparent;color:var(--text-secondary);border-bottom:1px solid var(--glass-border);padding:15px 20px;">Users</a>
+          <a href="/settings/roles" class="list-group-item list-group-item-action" style="background:var(--accent-primary);color:#fff;border:none;padding:15px 20px;">Roles & Permissions</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-9">
+    <div class="lp-glass-card">
+      <div class="lp-card-header" style="border-bottom:1px solid var(--glass-border);display:flex;justify-content:space-between;align-items:center;padding-bottom:15px;margin-bottom:15px;">
+        <h3 class="lp-card-title m-0">Roles Management</h3>
+        <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="RolesPage.showCreateModal()"><i class="bi bi-shield-plus"></i> Add Role</button>
+      </div>
+      <div class="lp-card-body" style="padding:0;overflow-x:auto;">
+        <table class="lp-table">
+          <thead>
+            <tr>
+              <th>Role Name</th>
+              <th>Description</th>
+              <th style="text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rolesTableBody">
+            <tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:20px;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Role Modal -->
+<div class="modal fade" id="roleModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" id="roleModalTitle" style="font-size:14px">Add Role</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="roleForm" onsubmit="RolesPage.saveRole(event)">
+        <div class="modal-body">
+          <input type="hidden" id="roleId">
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="lp-label">Role Name</label>
+              <input type="text" id="roleName" class="lp-input" placeholder="e.g. support" required>
+            </div>
+            <div class="col-md-6">
+              <label class="lp-label">Description</label>
+              <input type="text" id="roleDesc" class="lp-input" placeholder="Role description">
+            </div>
+          </div>
+          
+          <h6 style="font-weight:600;margin-bottom:15px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--glass-border);padding-bottom:8px;">Permissions Map</h6>
+          <div id="permissionsContainer"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lp btn-lp-primary">Save Role</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/js/settings/roles.js"></script>

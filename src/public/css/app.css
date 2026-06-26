@@ -1,0 +1,353 @@
+/**
+ * Linux Panel - Premium Glassmorphic Styles
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap');
+
+:root {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.85);
+  --text-muted: rgba(255, 255, 255, 0.6);
+  
+  --glass-bg: rgba(20, 25, 40, 0.45);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-hover: rgba(255, 255, 255, 0.25);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-danger: #ef4444;
+  --accent-info: #0ea5e9;
+}
+
+:root.light-mode {
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --glass-border-hover: rgba(0, 0, 0, 0.2);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+
+  --accent-primary: #2563eb;
+  --accent-hover: #1d4ed8;
+  --bg-color: #f3f4f6;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--bg-color, #0b0f19);
+  background-image: url('/images/bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Top Navbar Container */
+.lp-top-navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  background: rgba(10, 15, 30, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.lp-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #fff;
+  text-decoration: none;
+}
+
+.lp-nav-links {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.lp-nav-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.lp-nav-link:hover, .lp-nav-link.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.lp-user-menu {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Dropdown Menu Overrides */
+.dropdown-menu {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid var(--glass-border) !important;
+}
+
+.dropdown-item {
+  color: var(--text-primary) !important;
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+
+/* Glass Card */
+.lp-glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--glass-shadow);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  height: 100%;
+}
+
+.lp-glass-card:hover {
+  border-color: var(--glass-border-hover);
+}
+
+.lp-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Page Layout */
+.lp-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 30px 20px;
+}
+
+/* Dashboard App Icons */
+.lp-app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 20px;
+}
+
+.lp-app-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: #fff;
+  height: 140px;
+}
+
+.lp-app-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-4px);
+  border-color: var(--glass-border-hover);
+}
+
+.lp-app-icon {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+
+/* Tables over Glass */
+.lp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.lp-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--glass-border);
+}
+.lp-table td {
+  padding: 14px 16px;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.lp-table tr:last-child td {
+  border-bottom: none;
+}
+.lp-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Buttons */
+.btn-lp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+.btn-lp-primary {
+  background: var(--accent-primary);
+  color: #fff;
+}
+.btn-lp-primary:hover {
+  background: var(--accent-hover);
+}
+.btn-lp-ghost {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+}
+.btn-lp-ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.btn-lp-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* Typography */
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Inputs inside Glass */
+.lp-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--glass-border);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+.lp-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+.lp-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.lp-form-group {
+  margin-bottom: 20px;
+}
+
+/* Badges */
+.lp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.1);
+}
+.lp-badge-success { color: var(--accent-success); background: rgba(16, 185, 129, 0.1); }
+.lp-badge-warning { color: var(--accent-warning); background: rgba(245, 158, 11, 0.1); }
+.lp-badge-danger { color: var(--accent-danger); background: rgba(239, 68, 68, 0.1); }
+.lp-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Modal Glass Overrides */
+.modal-content {
+  background: rgba(15, 20, 30, 0.85) !important;
+  backdrop-filter: blur(25px);
+  border: 1px solid var(--glass-border) !important;
+  color: #fff;
+}
+.modal-header, .modal-footer {
+  border-color: var(--glass-border) !important;
+}
+
+/* Overriding Xterm Background */
+.xterm-viewport {
+  background-color: transparent !important;
+}
+.xterm-screen {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+/* Circular Chart SVG Helpers */
+.circular-chart {
+  display: block;
+  margin: 10px auto;
+  max-width: 80%;
+  max-height: 250px;
+}
+.circle-bg {
+  fill: none;
+  stroke: rgba(255,255,255,0.1);
+  stroke-width: 3.8;
+}
+.circle {
+  fill: none;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.5s ease;
+}
+.circle-cpu { stroke: var(--accent-success); }
+.circle-ram { stroke: var(--accent-info); }
+.percentage {
+  fill: #fff;
+  font-family: var(--font-sans);
+  font-size: 0.5em;
+  text-anchor: middle;
+  font-weight: bold;
+}

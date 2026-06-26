@@ -1,0 +1,72 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">System</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage host services and updates</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-md-8">
+    <div class="lp-glass-card" style="padding:0;overflow-x:auto;">
+      <div class="lp-card-title" style="padding: 20px 20px 0;">Host Services</div>
+      <table class="lp-table">
+        <thead>
+          <tr>
+            <th>Service Name</th>
+            <th>Status</th>
+            <th style="text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="servicesTableBody">
+          <tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="lp-glass-card mb-4">
+      <div class="lp-card-title">Package Manager (APT)</div>
+      <p style="color:var(--text-muted);font-size:13px;">Update the system package repository and install available upgrades.</p>
+      
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;">
+        <span style="font-size:13px;font-weight:500;">Auto-Update System</span>
+        <div class="form-check form-switch" style="margin:0;">
+          <input class="form-check-input" type="checkbox" id="autoUpdateToggle" onchange="SystemPage.toggleAutoUpdate()" style="cursor:pointer;">
+        </div>
+      </div>
+
+      <button class="btn-lp btn-lp-primary w-100 mb-2" id="btnUpdate" onclick="SystemPage.runApt('update')">
+        <i class="bi bi-arrow-repeat"></i> Run APT Update
+      </button>
+      <button class="btn-lp btn-lp-primary w-100" id="btnUpgrade" onclick="SystemPage.runApt('upgrade')" style="background:var(--accent-info);">
+        <i class="bi bi-download"></i> Run APT Upgrade
+      </button>
+    </div>
+
+    <div class="lp-glass-card">
+      <div class="lp-card-title">Power Management</div>
+      <p style="color:var(--text-muted);font-size:13px;">Reboot the server. This will disconnect you temporarily.</p>
+      <button class="btn-lp w-100" onclick="SystemPage.reboot()" style="background:var(--accent-danger);color:white;border-radius:10px;padding:10px;">
+        <i class="bi bi-power"></i> Reboot Server
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal for APT Logs -->
+<div class="modal fade" id="aptLogModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:14px">APT Log</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <pre id="aptLogContent" style="background:#0a0a0a;color:#a3e635;padding:15px;border-radius:8px;font-size:12px;max-height:400px;overflow-y:auto;"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/system.js"></script>

@@ -1,0 +1,79 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Plugins & Marketplace</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Extend your panel functionality</p>
+  </div>
+</div>
+
+<div class="row" id="pluginsContainer">
+  <!-- Rendered via JS -->
+</div>
+
+<script>
+  const PluginsPage = (() => {
+    async function loadData() {
+      try {
+        const res = await LP.get('/plugins');
+        if (res?.success) {
+          renderPlugins(res.data || []);
+        }
+      } catch (e) {
+        console.error(e);
+        LP.toast('Failed to load plugins', 'error');
+      }
+    }
+
+    function renderPlugins(plugins) {
+      const container = document.getElementById('pluginsContainer');
+      container.innerHTML = plugins.map(p => `
+        <div class="col-md-4 mb-4">
+          <div class="lp-glass-card h-100 d-flex flex-column" style="padding:20px">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 style="margin:0;font-weight:600;color:var(--text-primary)">${p.name}</h5>
+              <span class="lp-badge lp-badge-info" style="font-size:11px">v${p.version}</span>
+            </div>
+            <p style="color:var(--text-muted);font-size:13px;flex-grow:1">${p.description}</p>
+            <div style="margin-top:15px">
+              ${p.installed 
+                ? `<button class="btn-lp btn-lp-danger w-100" onclick="PluginsPage.uninstall('${p.id}')">Uninstall</button>`
+                : `<button class="btn-lp btn-lp-primary w-100" onclick="PluginsPage.install('${p.id}')">Install</button>`
+              }
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function install(id) {
+      try {
+        const res = await LP.post('/plugins/install', { id });
+        if (res?.success) {
+          LP.toast(res.message, 'success');
+          loadData();
+        } else {
+          LP.toast(res?.message || 'Failed to install plugin', 'error');
+        }
+      } catch (err) {
+        LP.toast('Installation error', 'error');
+      }
+    }
+
+    async function uninstall(id) {
+      try {
+        const res = await LP.post('/plugins/uninstall', { id });
+        if (res?.success) {
+          LP.toast(res.message, 'success');
+          loadData();
+        } else {
+          LP.toast(res?.message || 'Failed to uninstall plugin', 'error');
+        }
+      } catch (err) {
+        LP.toast('Uninstallation error', 'error');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadData);
+
+    return { install, uninstall };
+  })();
+</script>

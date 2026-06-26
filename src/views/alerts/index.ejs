@@ -1,0 +1,176 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Notification Alerts</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Configure Telegram and Email notifications for system events</p>
+  </div>
+  <button class="btn-lp btn-lp-primary" onclick="AlertsPage.testAlert()"><i class="bi bi-bell-fill"></i> Test Alert</button>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-md-6">
+    <div class="lp-glass-card">
+      <h3 style="font-size:16px;margin-bottom:15px;display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-telegram text-info"></i> Telegram Configuration
+      </h3>
+      <form id="telegramForm" onsubmit="AlertsPage.saveConfig(event)">
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="telegramEnabled">
+          <label class="form-check-label" for="telegramEnabled">Enable Telegram Alerts</label>
+        </div>
+        <div class="lp-form-group">
+          <label class="lp-label">Bot Token</label>
+          <input type="text" id="botToken" class="lp-input" placeholder="123456789:ABCDefGHIJKlmNOPQrsTUVwxyZ">
+        </div>
+        <div class="lp-form-group">
+          <label class="lp-label">Chat ID</label>
+          <input type="text" id="chatId" class="lp-input" placeholder="-100123456789">
+        </div>
+        <button type="submit" class="btn-lp btn-lp-primary w-100">Save Telegram Settings</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6">
+    <div class="lp-glass-card">
+      <h3 style="font-size:16px;margin-bottom:15px;display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-envelope-fill text-warning"></i> Email (SMTP) Configuration
+      </h3>
+      <form id="emailForm" onsubmit="AlertsPage.saveConfig(event)">
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="emailEnabled">
+          <label class="form-check-label" for="emailEnabled">Enable Email Alerts</label>
+        </div>
+        <div class="row">
+          <div class="col-8">
+            <div class="lp-form-group">
+              <label class="lp-label">SMTP Host</label>
+              <input type="text" id="smtpHost" class="lp-input" placeholder="smtp.gmail.com">
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="lp-form-group">
+              <label class="lp-label">Port</label>
+              <input type="number" id="smtpPort" class="lp-input" placeholder="587">
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-6">
+            <div class="lp-form-group">
+              <label class="lp-label">SMTP Username</label>
+              <input type="text" id="smtpUser" class="lp-input">
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="lp-form-group">
+              <label class="lp-label">SMTP Password</label>
+              <input type="password" id="smtpPass" class="lp-input">
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-6">
+            <div class="lp-form-group">
+              <label class="lp-label">From Address</label>
+              <input type="text" id="fromAddress" class="lp-input" placeholder="noreply@domain.com">
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="lp-form-group">
+              <label class="lp-label">To Address</label>
+              <input type="text" id="toAddress" class="lp-input" placeholder="admin@domain.com">
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn-lp btn-lp-primary w-100">Save Email Settings</button>
+      </form>
+    </div>
+  <div class="col-12 col-md-6">
+    <div class="lp-glass-card">
+      <h3 style="font-size:16px;margin-bottom:15px;display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-discord text-primary"></i> Discord Configuration
+      </h3>
+      <form id="discordForm" onsubmit="AlertsPage.saveConfig(event)">
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="discordEnabled">
+          <label class="form-check-label" for="discordEnabled">Enable Discord Alerts</label>
+        </div>
+        <div class="lp-form-group">
+          <label class="lp-label">Webhook URL</label>
+          <input type="text" id="discordWebhookUrl" class="lp-input" placeholder="https://discord.com/api/webhooks/...">
+        </div>
+        <button type="submit" class="btn-lp btn-lp-primary w-100">Save Discord Settings</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6">
+    <div class="lp-glass-card">
+      <h3 style="font-size:16px;margin-bottom:15px;display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-slack" style="color:#e01e5a"></i> Slack Configuration
+      </h3>
+      <form id="slackForm" onsubmit="AlertsPage.saveConfig(event)">
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="slackEnabled">
+          <label class="form-check-label" for="slackEnabled">Enable Slack Alerts</label>
+        </div>
+        <div class="lp-form-group">
+          <label class="lp-label">Webhook URL</label>
+          <input type="text" id="slackWebhookUrl" class="lp-input" placeholder="https://hooks.slack.com/services/...">
+        </div>
+        <button type="submit" class="btn-lp btn-lp-primary w-100">Save Slack Settings</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-12">
+    <div class="lp-glass-card">
+      <h3 style="font-size:16px;margin-bottom:15px;display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-link-45deg"></i> Custom Webhook Configuration
+      </h3>
+      <form id="webhookForm" onsubmit="AlertsPage.saveConfig(event)">
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="webhookEnabled">
+          <label class="form-check-label" for="webhookEnabled">Enable Custom Webhook</label>
+        </div>
+        <div class="lp-form-group">
+          <label class="lp-label">Webhook URL</label>
+          <input type="text" id="customWebhookUrl" class="lp-input" placeholder="https://your-domain.com/webhook/endpoint">
+        </div>
+        <button type="submit" class="btn-lp btn-lp-primary">Save Webhook Settings</button>
+      </form>
+    </div>
+  </div>
+    <div class="lp-glass-card">
+      <h3 style="font-size:16px;margin-bottom:15px;display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-sliders"></i> Alert Thresholds
+      </h3>
+      <form id="thresholdsForm" onsubmit="AlertsPage.saveConfig(event)">
+        <div class="row">
+          <div class="col-4">
+            <div class="lp-form-group">
+              <label class="lp-label">CPU Usage (%)</label>
+              <input type="number" id="cpuPercent" class="lp-input" min="50" max="100" value="90">
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="lp-form-group">
+              <label class="lp-label">RAM Usage (%)</label>
+              <input type="number" id="ramPercent" class="lp-input" min="50" max="100" value="90">
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="lp-form-group">
+              <label class="lp-label">Disk Usage (%)</label>
+              <input type="number" id="diskPercent" class="lp-input" min="50" max="100" value="90">
+            </div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted)">Alerts will trigger if usage remains above the threshold for 2 consecutive monitor ticks.</p>
+        <button type="submit" class="btn-lp btn-lp-primary">Save Thresholds</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/js/alerts.js"></script>

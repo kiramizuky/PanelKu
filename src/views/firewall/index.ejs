@@ -1,0 +1,71 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Firewall</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage UFW rules and server access</p>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <div class="form-check form-switch" style="margin:0;padding-right:15px;border-right:1px solid var(--glass-border);">
+      <input class="form-check-input" type="checkbox" id="firewallToggle" onchange="FirewallPage.toggleFirewall(this)" style="cursor:pointer;width:40px;height:20px;">
+      <label class="form-check-label" for="firewallToggle" id="firewallStatusText" style="margin-left:10px;color:var(--text-muted);">Disabled</label>
+    </div>
+    <button class="btn-lp btn-lp-primary" onclick="FirewallPage.showAddModal()"><i class="bi bi-plus-lg"></i> Add Rule</button>
+  </div>
+</div>
+
+<div class="lp-glass-card" style="padding:0;overflow-x:auto;">
+  <table class="lp-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>To Port</th>
+        <th>Action</th>
+        <th>From IP</th>
+        <th style="text-align:right">Options</th>
+      </tr>
+    </thead>
+    <tbody id="firewallTableBody">
+      <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Add Rule Modal -->
+<div class="modal fade" id="addRuleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:14px">Add Firewall Rule</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="addRuleForm" onsubmit="FirewallPage.addRule(event)">
+        <div class="modal-body">
+          <div class="lp-form-group">
+            <label class="lp-label">Port</label>
+            <input type="number" id="rulePort" class="lp-input" placeholder="e.g. 8080" required>
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Protocol</label>
+            <select id="ruleProtocol" class="lp-input" required>
+              <option value="tcp">TCP</option>
+              <option value="udp">UDP</option>
+              <option value="any">Any (TCP/UDP)</option>
+            </select>
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Action</label>
+            <select id="ruleAction" class="lp-input" required>
+              <option value="allow">Allow</option>
+              <option value="deny">Deny</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lp btn-lp-primary">Add Rule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/js/firewall.js"></script>

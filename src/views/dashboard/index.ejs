@@ -1,0 +1,221 @@
+<!-- Dashboard EJS -->
+<div class="row g-4">
+  <!-- Left Column -->
+  <div class="col-12 col-lg-4">
+    <!-- Time Widget -->
+    <div class="lp-glass-card mb-2 text-center" style="background: rgba(20,25,40,0.6); padding: 10px 15px; height: 150px;">
+      <h1 id="currentTime" style="font-size: 1.8rem; font-weight: 700; margin-bottom: 0; font-family: var(--font-mono); line-height: 1;">--:--</h1>
+      <p id="currentDate" style="color: var(--text-muted); font-size: 0.8rem; margin: 2px 0 0 0;">Loading date...</p>
+    </div>
+
+    <!-- System Status Widget -->
+    <div class="lp-glass-card mb-2" style="padding: 10px 15px; height: 150px;">
+      <div class="lp-card-title" style="margin-bottom: 5px; font-size: 13px;">System status <i class="bi bi-chevron-right float-end" style="font-size: 12px; color: var(--text-muted); cursor: pointer;" onclick="window.location='/monitor'"></i></div>
+      
+      <div class="d-flex justify-content-around align-items-center mt-1">
+        <!-- CPU Gauge -->
+        <div class="text-center" style="width: 100px;">
+          <svg viewBox="0 0 36 36" class="circular-chart">
+            <path class="circle-bg"
+              d="M18 2.0845
+                a 15.9155 15.9155 0 0 1 0 31.831
+                a 15.9155 15.9155 0 0 1 0 -31.831"
+            />
+            <path class="circle circle-cpu" id="cpuCircle"
+              stroke-dasharray="0, 100"
+              d="M18 2.0845
+                a 15.9155 15.9155 0 0 1 0 31.831
+                a 15.9155 15.9155 0 0 1 0 -31.831"
+            />
+            <text x="18" y="19" class="percentage" id="cpuText" style="font-size: 8px;">0%</text>
+            <text x="18" y="24" class="percentage" style="font-size: 3.5px; fill: var(--text-muted);">CPU</text>
+          </svg>
+        </div>
+        
+        <!-- RAM Gauge -->
+        <div class="text-center" style="width: 100px;">
+          <svg viewBox="0 0 36 36" class="circular-chart">
+            <path class="circle-bg"
+              d="M18 2.0845
+                a 15.9155 15.9155 0 0 1 0 31.831
+                a 15.9155 15.9155 0 0 1 0 -31.831"
+            />
+            <path class="circle circle-ram" id="ramCircle"
+              stroke-dasharray="0, 100"
+              d="M18 2.0845
+                a 15.9155 15.9155 0 0 1 0 31.831
+                a 15.9155 15.9155 0 0 1 0 -31.831"
+            />
+            <text x="18" y="19" class="percentage" id="ramText" style="font-size: 8px;">0%</text>
+            <text x="18" y="24" class="percentage" style="font-size: 3.5px; fill: var(--text-muted);">RAM</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Storage Widget -->
+    <div class="lp-glass-card mb-2" style="padding: 10px 15px; height: 150px;">
+      <div class="lp-card-title" style="margin-bottom: 5px; font-size: 13px;">Storage <i class="bi bi-gear float-end" style="font-size: 12px; color: var(--text-muted);"></i></div>
+      <div class="d-flex align-items-center mt-1">
+        <i class="bi bi-hdd-network" style="font-size: 1.4rem; color: var(--accent-primary); margin-right: 12px;"></i>
+        <div style="flex: 1;">
+          <div class="d-flex justify-content-between" style="font-size: 11px; margin-bottom: 4px;">
+            <span class="lp-badge lp-badge-success" style="font-size: 9px; padding: 2px 6px;">Healthy</span>
+            <span style="color: var(--text-muted);" class="font-mono" id="storageText">Loading...</span>
+          </div>
+          <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+            <div id="storageBar" style="width: 0%; height: 100%; background: var(--accent-primary); transition: width 0.5s ease;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <!-- Right Column (Banners & Apps) -->
+  <div class="col-12 col-lg-8">
+    
+    <!-- Top Banners -->
+    <div class="row g-4 mb-4">
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card" style="background: linear-gradient(135deg, rgba(14,165,233,0.3), rgba(37,99,235,0.2));">
+          <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 10px;">Sync your data</div>
+          <div class="d-flex justify-content-between align-items-center">
+            <p style="font-size: 12px; color: var(--text-secondary); margin: 0; max-width: 60%;">Use Syncthing to sync your files between multiple devices</p>
+            <i class="bi bi-arrow-repeat" style="font-size: 2.5rem; color: #fff; opacity: 0.8;"></i>
+          </div>
+          <div class="mt-3 text-end">
+            <button class="btn-lp btn-lp-primary btn-lp-sm" style="border-radius: 20px; font-size: 11px;">Install</button>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card" style="background: linear-gradient(135deg, rgba(16,185,129,0.3), rgba(14,165,233,0.2));">
+          <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 10px;">Smarten up your home</div>
+          <div class="d-flex justify-content-between align-items-center">
+            <p style="font-size: 12px; color: var(--text-secondary); margin: 0; max-width: 60%;">We want to give you a smart home experience with privacy, high speed, and localized storage.</p>
+            <i class="bi bi-house-door-fill" style="font-size: 2.5rem; color: #fff; opacity: 0.8;"></i>
+          </div>
+          <div class="mt-3 text-end">
+            <button class="btn-lp btn-lp-primary btn-lp-sm" style="background: var(--accent-info); border-radius: 20px; font-size: 11px;">Stay tuned</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Apps Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="d-flex align-items-center gap-2">
+        <h3 style="font-size: 1.2rem; margin: 0; font-weight: 600;">App</h3>
+        <span style="background: rgba(0,0,0,0.4); padding: 4px 10px; border-radius: 6px; font-size: 11px; color: var(--text-muted);">Drag icons to sort. <i class="bi bi-x" style="cursor:pointer"></i></span>
+      </div>
+      <button style="background: none; border: none; color: #fff; font-size: 1.5rem;"><i class="bi bi-plus"></i></button>
+    </div>
+
+    <!-- App Grid -->
+    <div class="lp-app-grid">
+      <a href="/filemanager" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #60a5fa;"><i class="bi bi-folder-fill"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">Files</div>
+      </a>
+      <a href="/docker" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #38bdf8;"><i class="bi bi-box-seam-fill"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">Docker</div>
+      </a>
+      <a href="/terminal" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #a78bfa;"><i class="bi bi-terminal-fill"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">Terminal</div>
+      </a>
+      <a href="/websites" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #34d399;"><i class="bi bi-globe"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">Websites</div>
+      </a>
+      <a href="/database" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #f472b6;"><i class="bi bi-database-fill"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">Databases</div>
+      </a>
+      <a href="/backup" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #60a5fa;"><i class="bi bi-cloud-arrow-down-fill"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">Backups</div>
+      </a>
+      <a href="/cron" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #fca5a5;"><i class="bi bi-clock-history"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">Cron</div>
+      </a>
+      <a href="/monitor" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #fbbf24;"><i class="bi bi-activity"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">Monitoring</div>
+      </a>
+      <a href="/firewall" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #ef4444;"><i class="bi bi-shield-lock-fill"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">Firewall</div>
+      </a>
+      <a href="/system" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #6366f1;"><i class="bi bi-cpu-fill"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">System</div>
+      </a>
+      <a href="/ssl" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #10b981;"><i class="bi bi-shield-check"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">SSL</div>
+      </a>
+      <a href="/waf" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #f43f5e;"><i class="bi bi-shield-slash-fill"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">WAF</div>
+      </a>
+      <a href="/dns" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #0ea5e9;"><i class="bi bi-globe"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">DNS</div>
+      </a>
+      <a href="/alerts" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #f59e0b;"><i class="bi bi-bell-fill"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">Alerts</div>
+      </a>
+      <a href="/settings/profile" class="lp-app-item">
+        <div class="lp-app-icon" style="color: #94a3b8;"><i class="bi bi-gear-fill"></i></div>
+        <div style="font-size: 13px; font-weight: 500;">Settings</div>
+      </a>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function updateTime() {
+    const now = new Date();
+    document.getElementById('currentTime').textContent = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'});
+  }
+  setInterval(updateTime, 1000);
+  updateTime();
+
+  async function loadDashboardData() {
+    try {
+      const res = await LP.get('/dashboard/metrics');
+      if(res?.success) {
+        // CPU Gauge
+        const cpu = Math.round(res.data.cpu.usage);
+        document.getElementById('cpuCircle').style.strokeDasharray = `${cpu}, 100`;
+        document.getElementById('cpuText').textContent = `${cpu}%`;
+        
+        // RAM Gauge
+        const ram = Math.round((res.data.memory.used / res.data.memory.total) * 100);
+        document.getElementById('ramCircle').style.strokeDasharray = `${ram}, 100`;
+        document.getElementById('ramText').textContent = `${ram}%`;
+        
+        // Storage
+        const disk = res.data.disk[0];
+        if (disk) {
+          const usedPct = disk.usedPercent || ((disk.used / disk.total) * 100);
+          document.getElementById('storageBar').style.width = `${usedPct}%`;
+          document.getElementById('storageText').textContent = `${LP.formatBytes(disk.used)} / ${LP.formatBytes(disk.total)}`;
+        }
+      }
+    } catch(err) { console.error(err); }
+  }
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    await LP.init();
+    loadDashboardData();
+    setInterval(loadDashboardData, 3000); // Poll every 3s
+  });
+</script>

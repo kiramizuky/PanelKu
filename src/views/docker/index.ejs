@@ -1,0 +1,107 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Docker Management</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage containers, images, and stacks</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-ghost" onclick="DockerPage.loadData()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-3 text-center">
+      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Total Containers</div>
+      <div style="font-size:28px;font-weight:700" id="statTotal">—</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-3 text-center">
+      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Running</div>
+      <div style="font-size:28px;font-weight:700;color:var(--accent-success)" id="statRunning">—</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-3 text-center">
+      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Stopped</div>
+      <div style="font-size:28px;font-weight:700;color:var(--accent-danger)" id="statStopped">—</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-3 text-center">
+      <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Images</div>
+      <div style="font-size:28px;font-weight:700;color:var(--accent-info)" id="statImages">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" style="border-bottom: 1px solid var(--glass-border);">
+  <li class="nav-item"><a class="nav-link active" style="color:var(--text-primary); background:transparent; border-color:var(--glass-border) var(--glass-border) transparent;" data-bs-toggle="tab" href="#containers">Containers</a></li>
+  <li class="nav-item"><a class="nav-link" style="color:var(--text-muted); background:transparent; border:none;" data-bs-toggle="tab" href="#images">Images</a></li>
+</ul>
+
+<!-- Tab Content -->
+<div class="tab-content">
+  <!-- Containers Tab -->
+  <div class="tab-pane fade show active" id="containers">
+    <div class="lp-glass-card" style="padding:0;overflow-x:auto;">
+      <table class="lp-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>State</th>
+            <th>Image</th>
+            <th>Ports</th>
+            <th>Created</th>
+            <th style="text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="containersTableBody">
+          <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Images Tab -->
+  <div class="tab-pane fade" id="images">
+    <div class="lp-glass-card" style="padding:0;overflow-x:auto;">
+      <table class="lp-table">
+        <thead>
+          <tr>
+            <th>Repository:Tag</th>
+            <th>Image ID</th>
+            <th>Size</th>
+            <th>Created</th>
+            <th style="text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="imagesTableBody">
+          <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Log Viewer Modal -->
+<div class="modal fade" id="logModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:13px" id="logModalTitle">Container Logs</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="DockerPage.detachLogs()"></button>
+      </div>
+      <div class="modal-body" style="padding:0;background:rgba(0,0,0,0.5);">
+        <div id="logTerminal" style="width:100%;height:500px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<link href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+<script src="/js/docker.js"></script>

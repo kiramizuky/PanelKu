@@ -1,0 +1,89 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Local Backups</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Backup your databases and website files</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-primary" onclick="BackupPage.showCreateModal()"><i class="bi bi-cloud-arrow-down"></i> Create Backup</button>
+  </div>
+</div>
+
+<div class="lp-glass-card" style="padding:0;overflow-x:auto;">
+  <table class="lp-table">
+    <thead>
+      <tr>
+        <th>Filename</th>
+        <th>Size</th>
+        <th>Date Created</th>
+        <th style="text-align:right">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="backupTableBody">
+      <tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Create Modal -->
+<div class="modal fade" id="createBackupModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:14px">Create New Backup</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="createBackupForm" onsubmit="BackupPage.createBackup(event)">
+        <div class="modal-body">
+          <div class="lp-form-group">
+            <label class="lp-label">Backup Type</label>
+            <select id="backupType" class="lp-input" required>
+              <option value="mysql">MySQL Database</option>
+              <option value="postgres">PostgreSQL Database</option>
+              <option value="files">Website Files / Folder</option>
+            </select>
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Target Name / Path</label>
+            <input type="text" id="backupTarget" class="lp-input" placeholder="e.g. database_name or example.com" required>
+            <small class="text-muted" style="font-size:11px; margin-top:4px; display:block;">For files, specify the folder name inside /var/www</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lp btn-lp-primary" id="btnCreateBackup">Create Backup</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Restore Modal -->
+<div class="modal fade" id="restoreBackupModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:14px">Restore Backup</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="restoreBackupForm" onsubmit="BackupPage.restoreBackup(event)">
+        <div class="modal-body">
+          <div class="lp-form-group">
+            <label class="lp-label">Filename</label>
+            <input type="text" id="restoreFilename" class="lp-input" readonly>
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Target Database / Directory Path</label>
+            <input type="text" id="restoreTarget" class="lp-input" placeholder="e.g. database_name or /var/www/example.com" required>
+            <small class="text-muted" style="font-size:11px; margin-top:4px; display:block;">Be very careful! Existing data may be overwritten.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lp btn-lp-primary" id="btnRestoreBackup">Restore Backup</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/js/backup.js"></script>

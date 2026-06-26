@@ -1,0 +1,162 @@
+import { readdir, stat, rename, rm, mkdir, copyFile, writeFile, readFile } from 'fs/promises';
+import { createReadStream, createWriteStream } from 'fs';
+import { join, resolve, basename, extname, dirname } from 'path';
+import archiver from 'archiver';
+import unzipper from 'unzipper';
+import logger from '../../config/logger.js';
+
+// Base directory — restrict all operations to this root
+const BASE_DIR = process.env.FM_BASE_DIR || '/';
+
+class FileManagerService {
+  _resolvePath(userPath) {
+    const safe = resolve(join(BASE_DIR, userPath || '/'));
+    if (BASE_DIR !== '/' && !safe.startsWith(resolve(BASE_DIR))) {
+      throw Object.assign(new Error('Path traversal detected'), { statusCode: 403 });
+    }
+    return safe;
+  }
+
+  async list(dirPath) {
+    const full = this._resolvePath(dirPath);
+    const entries = await readdir(full, { withFileTypes: true });
+
+    const items = await Promise.all(
+      entries.map(async (entry) => {
+        const filePath = join(full, entry.name);
+        let stats;
+        try { stats = await stat(filePath); } catch { return null; }
+        return {
+          name: entry.name,
+          path: join(dirPath, entry.name).replace(/\\/g, '/'),
+          type: entry.isDirectory() ? 'dir' : 'file',
+          size: stats.size,
+          modified: stats.mtime,
+          permissions: stats.mode.toString(8).slice(-3),
+          isHidden: entry.name.startsWith('.'),
+        };
+      })
+    );
+
+    return items.filter(Boolean).sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  async getInfo(filePath) {
+    const full = this._resolvePath(filePath);
+    const stats = await stat(full);
+    return {
+      name: basename(full),
+      path: filePath,
+      size: stats.size,
+      modified: stats.mtime,
+      created: stats.birthtime,
+      permissions: stats.mode.toString(8).slice(-3),
+      isDirectory: stats.isDirectory(),
+    };
+  }
+
+  async readFile(filePath) {
+    const full = this._resolvePath(filePath);
+    const stats = await stat(full);
+    if (stats.size > 5 * 1024 * 1024) throw new Error('File too large to view (max 5MB)');
+    return readFile(full, 'utf8');
+  }
+
+  async writeFile(filePath, content) {
+    const full = this._resolvePath(filePath);
+    await writeFile(full, content, 'utf8');
+  }
+
+  async rename(oldPath, newName) {
+    const oldFull = this._resolvePath(oldPath);
+    const newFull = join(dirname(oldFull), newName);
+    await rename(oldFull, newFull);
+  }
+
+  async move(sourcePath, destPath) {
+    const src = this._resolvePath(sourcePath);
+    const dest = this._resolvePath(destPath);
+    await rename(src, dest);
+  }
+
+  async copy(sourcePath, destPath) {
+    const src = this._resolvePath(sourcePath);
+    const dest = this._resolvePath(destPath);
+    await copyFile(src, dest);
+  }
+
+  async delete(targetPath) {
+    const full = this._resolvePath(targetPath);
+    await rm(full, { recursive: true, force: true });
+  }
+
+  async mkdir(dirPath) {
+    const full = this._resolvePath(dirPath);
+    await mkdir(full, { recursive: true });
+  }
+
+  async zip(targetPath, outputPath) {
+    const src = this._resolvePath(targetPath);
+    const out = this._resolvePath(outputPath);
+    return new Promise((resolve, reject) => {
+      const output = createWriteStream(out);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      output.on('close', resolve);
+      archive.on('error', reject);
+      archive.pipe(output);
+      archive.glob('**', { cwd: src, ignore: [] });
+      archive.finalize();
+    });
+  }
+
+  async unzip(zipPath, destDir) {
+    const src = this._resolvePath(zipPath);
+    const dest = this._resolvePath(destDir);
+    await mkdir(dest, { recursive: true });
+    return new Promise((resolve, reject) => {
+      createReadStream(src)
+        .pipe(unzipper.Extract({ path: dest }))
+        .on('close', resolve)
+        .on('error', reject);
+    });
+  }
+
+  /**
+   * Search files matching name pattern within a directory.
+   */
+  async search(dirPath, query, maxResults = 100) {
+    const full = this._resolvePath(dirPath);
+    const results = [];
+    await this._searchRecursive(full, dirPath, query.toLowerCase(), results, maxResults);
+    return results;
+  }
+
+  async _searchRecursive(fullPath, relPath, query, results, maxResults) {
+    if (results.length >= maxResults) return;
+    let entries;
+    try { entries = await readdir(fullPath, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (results.length >= maxResults) break;
+      if (entry.name.toLowerCase().includes(query)) {
+        results.push({
+          name: entry.name,
+          path: join(relPath, entry.name).replace(/\\/g, '/'),
+          type: entry.isDirectory() ? 'dir' : 'file',
+        });
+      }
+      if (entry.isDirectory()) {
+        await this._searchRecursive(
+          join(fullPath, entry.name),
+          join(relPath, entry.name),
+          query, results, maxResults
+        );
+      }
+    }
+  }
+}
+
+const fileManagerService = new FileManagerService();
+export default fileManagerService;

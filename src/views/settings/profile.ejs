@@ -1,0 +1,57 @@
+<div class="row g-4">
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-0">
+      <div class="lp-card-body p-0">
+        <div class="list-group list-group-flush" style="border-radius:16px;overflow:hidden">
+          <a href="/settings/profile" class="list-group-item list-group-item-action" style="background:var(--accent-primary);color:#fff;border-bottom:1px solid var(--glass-border);padding:15px 20px;">My Profile</a>
+          <a href="/settings/users" class="list-group-item list-group-item-action" style="background:transparent;color:var(--text-secondary);border-bottom:1px solid var(--glass-border);padding:15px 20px;">Users</a>
+          <a href="/settings/roles" class="list-group-item list-group-item-action" style="background:transparent;color:var(--text-secondary);border:none;padding:15px 20px;">Roles & Permissions</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-9">
+    <div class="lp-glass-card">
+      <div class="lp-card-header" style="border-bottom:1px solid var(--glass-border);padding-bottom:15px;margin-bottom:20px;">
+        <h3 class="lp-card-title m-0">My Profile</h3>
+      </div>
+      <div class="lp-card-body" style="padding:0;">
+        <div style="max-width:500px">
+          <div class="lp-form-group">
+            <label class="lp-label">Username</label>
+            <input type="text" id="profUsername" class="lp-input" readonly style="opacity:0.7">
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Email</label>
+            <input type="email" id="profEmail" class="lp-input" readonly style="opacity:0.7">
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Role</label>
+            <input type="text" id="profRole" class="lp-input" readonly style="opacity:0.7;text-transform:uppercase;">
+          </div>
+          <div class="mt-4 pt-3" style="border-top:1px solid var(--glass-border)">
+            <h6 style="color:var(--text-primary);margin-bottom:15px">Change Password</h6>
+            <form onsubmit="ProfilePage.changePassword(event)">
+              <div class="lp-form-group">
+                <label class="lp-label">Current Password</label>
+                <input type="password" id="currentPassword" class="lp-input" required>
+              </div>
+              <div class="lp-form-group">
+                <label class="lp-label">New Password</label>
+                <input type="password" id="newPassword" class="lp-input" required minlength="8">
+              </div>
+              <div class="lp-form-group">
+                <label class="lp-label">Confirm New Password</label>
+                <input type="password" id="confirmPassword" class="lp-input" required minlength="8">
+              </div>
+              <button type="submit" class="btn-lp btn-lp-primary">Update Password</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/settings/profile.js"></script>
