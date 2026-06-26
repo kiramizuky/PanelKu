@@ -20,7 +20,7 @@ const DatabasePage = (() => {
   }
 
   async function installPackage(pkgName) {
-    if (!confirm(`Do you want to install ${pkgName}? This may take a few minutes.`)) return;
+    if (!(await LP.confirm(`Do you want to install ${pkgName}? This may take a few minutes.`, 'Install Database'))) return;
     
     // Show a global loading spinner
     const spinner = document.createElement('div');
@@ -156,7 +156,7 @@ const DatabasePage = (() => {
   }
 
   async function deleteDb(type, name) {
-    if (!confirm(`Are you sure you want to delete the ${type} database "${name}"? This action cannot be undone.`)) return;
+    if (!(await LP.confirm(`Are you sure you want to delete the ${type} database "${name}"? This action cannot be undone.`, 'Delete Database'))) return;
     try {
       const res = await LP.delete('/database', { type, name });
       if (res?.success) {

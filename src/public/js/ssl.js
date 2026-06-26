@@ -100,7 +100,7 @@ const SSLPage = {
   },
 
   async renewCertificate(id) {
-    if (!confirm('Attempt to renew this certificate?')) return;
+    if (!(await LP.confirm('Attempt to renew this certificate?', 'Renew SSL'))) return;
     LP.toast('Renewing certificate...', 'info');
     try {
       const res = await LP.post(`/ssl/renew/${id}`);

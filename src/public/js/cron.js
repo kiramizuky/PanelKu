@@ -79,7 +79,7 @@ const CronPage = (() => {
   }
 
   async function deleteTask(id) {
-    if (!confirm(`Are you sure you want to delete this task?`)) return;
+    if (!(await LP.confirm(`Are you sure you want to delete this task?`, 'Delete Task'))) return;
     try {
       const res = await LP.delete(`/cron/${id}`);
       if (res?.success) {

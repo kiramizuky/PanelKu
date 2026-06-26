@@ -138,7 +138,7 @@ const DNSPage = {
   },
 
   async deleteRecord(recordId) {
-    if (!confirm('Are you sure you want to delete this record?')) return;
+    if (!(await LP.confirm('Are you sure you want to delete this record?', 'Delete Record'))) return;
     
     try {
       const res = await fetch(`/api/dns/zones/${this.activeZoneId}/records/${recordId}`, {

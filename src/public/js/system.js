@@ -123,7 +123,7 @@ const SystemPage = {
   },
 
   async reboot() {
-    if (!confirm('WARNING: Are you sure you want to reboot the server? All services will go down temporarily.')) return;
+    if (!(await LP.confirm('WARNING: Are you sure you want to reboot the server? All services will go down temporarily.', 'Reboot System'))) return;
     
     try {
       const res = await LP.post('/system/reboot');

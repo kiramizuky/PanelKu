@@ -50,7 +50,16 @@ class SystemService {
   async isInstalled(pkgName) {
     if (!/^[a-zA-Z0-9_-]+$/.test(pkgName)) throw new Error('Invalid package name');
     try {
-      const out = await this.runCommand(`command -v ${pkgName} || dpkg -s ${pkgName}`);
+      const packageMap = {
+        mysql: { cmd: 'mysql', pkg: 'mysql-server' },
+        postgres: { cmd: 'psql', pkg: 'postgresql' },
+        docker: { cmd: 'docker', pkg: 'docker.io' },
+        nginx: { cmd: 'nginx', pkg: 'nginx' },
+        mongodb: { cmd: 'mongod', pkg: 'mongodb-org' }
+      };
+      
+      const mapped = packageMap[pkgName] || { cmd: pkgName, pkg: pkgName };
+      const out = await this.runCommand(`command -v ${mapped.cmd} || dpkg -s ${mapped.pkg}`);
       return out.trim().length > 0;
     } catch (e) {
       return false;

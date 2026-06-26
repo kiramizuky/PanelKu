@@ -165,9 +165,9 @@ const WebsitesPage = (() => {
       }
     },
 
-    showWebhook(id, token) {
+    async showWebhook(id, token) {
       const url = `${window.location.origin}/api/websites/${id}/deploy/${token}`;
-      LP.alert(`
+      await LP.alert(`
         <div class="text-start">
           <p>Configure this URL in your Git repository's Webhook settings (e.g. GitHub, GitLab). Set the content type to <code>application/json</code>.</p>
           <div class="input-group mt-2">
@@ -179,7 +179,7 @@ const WebsitesPage = (() => {
     },
 
     async installPackage(pkgName) {
-      if (!confirm(`Do you want to install ${pkgName}? This may take a few minutes.`)) return;
+      if (!(await LP.confirm(`Do you want to install ${pkgName}? This may take a few minutes.`, 'Install Nginx'))) return;
       
       const spinner = document.createElement('div');
       spinner.id = 'installSpinner';

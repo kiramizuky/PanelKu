@@ -297,6 +297,39 @@ const LP = {
     });
   },
 
+  alert(message, title = 'Info') {
+    return new Promise(resolve => {
+      const id = 'lp_alert_' + Date.now();
+      const modal = document.createElement('div');
+      modal.innerHTML = `
+        <div class="modal fade" id="${id}" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
+              <div class="modal-header border-0">
+                <h5 class="modal-title">${title}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">${message}</div>
+              <div class="modal-footer border-0">
+                <button class="btn-lp btn-lp-primary" id="${id}_ok">OK</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      const bsModal = new bootstrap.Modal(document.getElementById(id));
+      bsModal.show();
+      document.getElementById(`${id}_ok`).addEventListener('click', () => {
+        bsModal.hide();
+        resolve(true);
+      });
+      document.getElementById(id).addEventListener('hidden.bs.modal', () => {
+        modal.remove();
+        resolve(true);
+      });
+    });
+  },
+
   // Format numbers
   num(n) {
     return typeof n === 'number' ? n.toLocaleString() : n;

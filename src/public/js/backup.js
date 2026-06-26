@@ -69,7 +69,7 @@ const BackupPage = (() => {
   }
 
   async function deleteBackup(filename) {
-    if (!confirm(`Are you sure you want to delete the backup "${filename}"? This action cannot be undone.`)) return;
+    if (!(await LP.confirm(`Are you sure you want to delete the backup "${filename}"? This action cannot be undone.`, 'Delete Backup'))) return;
     try {
       const res = await LP.delete('/backup', { filename });
       if (res?.success) {
@@ -97,7 +97,7 @@ const BackupPage = (() => {
     const filename = document.getElementById('restoreFilename').value;
     const target = document.getElementById('restoreTarget').value;
     
-    if (!confirm(`WARNING: Restoring backup ${filename} to ${target} may OVERWRITE existing data. Continue?`)) return;
+    if (!(await LP.confirm(`WARNING: Restoring backup ${filename} to ${target} may OVERWRITE existing data. Continue?`, 'Restore Backup'))) return;
 
     const btn = document.getElementById('btnRestoreBackup');
     btn.disabled = true;

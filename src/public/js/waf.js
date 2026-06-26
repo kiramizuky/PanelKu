@@ -65,7 +65,7 @@ const WAFPage = {
   },
 
   async deleteRule(id) {
-    if (!confirm('Are you sure you want to delete this rule?')) return;
+    if (!(await LP.confirm('Are you sure you want to delete this rule?', 'Delete Rule'))) return;
     
     try {
       const res = await LP.delete(`/waf/rules/${id}`);

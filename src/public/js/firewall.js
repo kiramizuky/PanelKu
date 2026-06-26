@@ -56,7 +56,7 @@ const FirewallPage = {
 
   async toggleFirewall(el) {
     const enable = el.checked;
-    if (!confirm(`Are you sure you want to ${enable ? 'enable' : 'disable'} the firewall?`)) {
+    if (!(await LP.confirm(`Are you sure you want to ${enable ? 'enable' : 'disable'} the firewall?`, 'Toggle Firewall'))) {
       el.checked = !enable;
       return;
     }
@@ -97,7 +97,7 @@ const FirewallPage = {
   },
 
   async deleteRule(id) {
-    if (!confirm(`Are you sure you want to delete rule [${id}]?`)) return;
+    if (!(await LP.confirm(`Are you sure you want to delete rule [${id}]?`, 'Delete Rule'))) return;
     
     const res = await LP.delete(`/firewall/rules/${id}`);
     if (res?.success) {

@@ -212,7 +212,7 @@ const DockerPage = (() => {
   }
 
   async function installPackage(pkgName) {
-    if (!confirm(`Do you want to install ${pkgName}? This may take a few minutes.`)) return;
+    if (!(await LP.confirm(`Do you want to install ${pkgName}? This may take a few minutes.`, 'Install Docker'))) return;
     
     const spinner = document.createElement('div');
     spinner.id = 'installSpinner';
