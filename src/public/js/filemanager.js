@@ -150,7 +150,7 @@ const FMPage = (() => {
             </div>
             <div class="modal-footer" style="border-color:var(--border-color)">
               <button class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
-              <button class="btn-lp btn-lp-primary" onclick="FM._saveFile('${escHtml(path)}', '${id}')">Save</button>
+              <button class="btn-lp btn-lp-primary" onclick="FMPage._saveFile('${escHtml(path)}', '${id}')">Save</button>
             </div>
           </div>
         </div>
