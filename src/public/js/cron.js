@@ -111,22 +111,22 @@ const CronPage = (() => {
       
       if (type === 'n_jam') {
         const nJam = document.getElementById('inpNjam').value;
-        schedule = \`0 */\${nJam} * * *\`;
+        schedule = `0 */${nJam} * * *`;
       } else if (type === 'harian') {
-        schedule = \`\${min} \${hour} * * *\`;
+        schedule = `${min} ${hour} * * *`;
       } else if (type === 'n_hari') {
         const nHari = document.getElementById('inpNhari').value;
-        schedule = \`\${min} \${hour} */\${nHari} * *\`;
+        schedule = `${min} ${hour} */${nHari} * *`;
       } else if (type === 'mingguan') {
         const dow = document.getElementById('inpMingguan').value;
-        schedule = \`\${min} \${hour} * * \${dow}\`;
+        schedule = `${min} ${hour} * * ${dow}`;
       } else if (type === 'bulanan') {
         const tgl = document.getElementById('inpTanggal').value;
-        schedule = \`\${min} \${hour} \${tgl} * *\`;
+        schedule = `${min} ${hour} ${tgl} * *`;
       } else if (type === 'tanggal') {
         const tgl = document.getElementById('inpTanggal').value;
         const bln = document.getElementById('inpBulan').value;
-        schedule = \`\${min} \${hour} \${tgl} \${bln} *\`;
+        schedule = `${min} ${hour} ${tgl} ${bln} *`;
       }
     }
     
