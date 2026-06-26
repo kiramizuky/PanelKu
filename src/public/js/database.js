@@ -179,6 +179,7 @@ const DatabasePage = (() => {
     loadData,
     showCreateModal,
     createDatabase,
-    deleteDb
+    deleteDb,
+    installPackage
   };
 })();

@@ -22,6 +22,13 @@ const TerminalPage = (() => {
 
     socket.on('connect', () => {
       console.log('Terminal socket connected');
+      if (term) {
+        socket.emit('terminal:create', {
+          cols: term.cols,
+          rows: term.rows,
+          shell: 'bash'
+        });
+      }
     });
 
     socket.on('terminal:created', (data) => {
@@ -39,6 +46,11 @@ const TerminalPage = (() => {
         term.write(`\r\n\x1b[33m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
         sessionId = null;
       }
+    });
+
+    socket.on('terminal:error', (data) => {
+      console.error('Terminal Error:', data);
+      if (term) term.write(`\r\n\x1b[31mTerminal Error: ${data.message || 'Unknown error'}\x1b[0m\r\n`);
     });
 
     socket.on('disconnect', () => {
@@ -90,12 +102,13 @@ const TerminalPage = (() => {
       } catch (e) {}
     });
 
-    // Request terminal session
-    socket.emit('terminal:create', {
-      cols: term.cols,
-      rows: term.rows,
-      shell: 'bash'
-    });
+    if (socket && socket.connected) {
+      socket.emit('terminal:create', {
+        cols: term.cols,
+        rows: term.rows,
+        shell: 'bash'
+      });
+    }
   }
 
   return { init };
