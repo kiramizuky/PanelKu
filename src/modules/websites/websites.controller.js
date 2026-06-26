@@ -5,7 +5,7 @@ class WebsitesController {
   async listWebsites(req, res) {
     try {
       const websites = await websiteService.listWebsites();
-      return successResponse(res, 'Websites retrieved', { websites });
+      return successResponse(res, { websites }, 'Websites retrieved');
     } catch (error) {
       return errorResponse(res, 500, error.message);
     }
@@ -14,7 +14,7 @@ class WebsitesController {
   async getWebsite(req, res) {
     try {
       const website = await websiteService.getWebsite(req.params.id);
-      return successResponse(res, 'Website retrieved', { website });
+      return successResponse(res, { website }, 'Website retrieved');
     } catch (error) {
       return errorResponse(res, 404, error.message);
     }
@@ -29,7 +29,7 @@ class WebsitesController {
         domain, aliases, type, rootDirectory, port
       }, req.user._id);
 
-      return successResponse(res, 'Website created successfully', { website }, 201);
+      return successResponse(res, { website }, 'Website created successfully', 201);
     } catch (error) {
       return errorResponse(res, 400, error.message);
     }
@@ -38,7 +38,7 @@ class WebsitesController {
   async updateWebsite(req, res) {
     try {
       const website = await websiteService.updateWebsite(req.params.id, req.body);
-      return successResponse(res, 'Website updated', { website });
+      return successResponse(res, { website }, 'Website updated');
     } catch (error) {
       return errorResponse(res, 400, error.message);
     }
@@ -47,7 +47,7 @@ class WebsitesController {
   async deleteWebsite(req, res) {
     try {
       await websiteService.deleteWebsite(req.params.id);
-      return successResponse(res, 'Website deleted');
+      return successResponse(res, null, 'Website deleted');
     } catch (error) {
       return errorResponse(res, 400, error.message);
     }

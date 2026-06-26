@@ -6,7 +6,7 @@ class DockerController {
     try {
       const summary = await dockerService.getDashboardSummary();
       if (!summary) return errorResponse(res, 503, 'Docker daemon not reachable');
-      return successResponse(res, 'Docker summary retrieved', summary);
+      return successResponse(res, summary, 'Docker summary retrieved');
     } catch (error) {
       return errorResponse(res, 500, error.message);
     }
@@ -16,7 +16,7 @@ class DockerController {
     try {
       const all = req.query.all !== 'false';
       const containers = await dockerService.listContainers(all);
-      return successResponse(res, 'Containers retrieved', { containers });
+      return successResponse(res, { containers }, 'Containers retrieved');
     } catch (error) {
       return errorResponse(res, 500, error.message);
     }
@@ -25,7 +25,7 @@ class DockerController {
   async getContainer(req, res) {
     try {
       const info = await dockerService.getContainerInfo(req.params.id);
-      return successResponse(res, 'Container details retrieved', { container: info });
+      return successResponse(res, { container: info }, 'Container details retrieved');
     } catch (error) {
       return errorResponse(res, 404, error.message);
     }
@@ -34,7 +34,7 @@ class DockerController {
   async startContainer(req, res) {
     try {
       await dockerService.startContainer(req.params.id);
-      return successResponse(res, 'Container started');
+      return successResponse(res, null, 'Container started');
     } catch (error) {
       return errorResponse(res, 500, error.message);
     }
@@ -43,7 +43,7 @@ class DockerController {
   async stopContainer(req, res) {
     try {
       await dockerService.stopContainer(req.params.id);
-      return successResponse(res, 'Container stopped');
+      return successResponse(res, null, 'Container stopped');
     } catch (error) {
       return errorResponse(res, 500, error.message);
     }
@@ -52,7 +52,7 @@ class DockerController {
   async restartContainer(req, res) {
     try {
       await dockerService.restartContainer(req.params.id);
-      return successResponse(res, 'Container restarted');
+      return successResponse(res, null, 'Container restarted');
     } catch (error) {
       return errorResponse(res, 500, error.message);
     }
@@ -61,7 +61,7 @@ class DockerController {
   async killContainer(req, res) {
     try {
       await dockerService.killContainer(req.params.id);
-      return successResponse(res, 'Container killed');
+      return successResponse(res, null, 'Container killed');
     } catch (error) {
       return errorResponse(res, 500, error.message);
     }
@@ -71,7 +71,7 @@ class DockerController {
     try {
       const force = req.query.force === 'true';
       await dockerService.removeContainer(req.params.id, force);
-      return successResponse(res, 'Container removed');
+      return successResponse(res, null, 'Container removed');
     } catch (error) {
       return errorResponse(res, 500, error.message);
     }
@@ -80,7 +80,7 @@ class DockerController {
   async listImages(req, res) {
     try {
       const images = await dockerService.listImages();
-      return successResponse(res, 'Images retrieved', { images });
+      return successResponse(res, { images }, 'Images retrieved');
     } catch (error) {
       return errorResponse(res, 500, error.message);
     }
@@ -90,7 +90,7 @@ class DockerController {
     try {
       const force = req.query.force === 'true';
       await dockerService.removeImage(req.params.id, force);
-      return successResponse(res, 'Image removed');
+      return successResponse(res, null, 'Image removed');
     } catch (error) {
       return errorResponse(res, 500, error.message);
     }
