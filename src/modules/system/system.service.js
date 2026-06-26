@@ -60,13 +60,22 @@ class SystemService {
   async installPackage(pkgName) {
     if (!/^[a-zA-Z0-9_-]+$/.test(pkgName)) throw new Error('Invalid package name');
     logger.info(`Installing package: ${pkgName}`);
+    
+    // Configure MongoDB repository if installing mongodb
+    if (pkgName === 'mongodb') {
+      logger.info('Configuring MongoDB 8.0 repository...');
+      await this.runCommand(`if [ ! -f /usr/share/keyrings/mongodb-server-8.0.gpg ]; then curl -fsSL https://pgp.mongodb.com/server-8.0.asc | sudo gpg --yes -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor; fi`);
+      await this.runCommand(`if [ ! -f /etc/apt/sources.list.d/mongodb-org-8.0.list ]; then echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list; fi`);
+      await this.runCommand(`sudo apt-get update -y`);
+    }
+
     // Map command names to actual apt packages if needed
     const packageMap = {
       mysql: 'mysql-server',
       postgres: 'postgresql',
       docker: 'docker.io docker-compose',
       nginx: 'nginx',
-      mongodb: 'mongodb' // Or mongodb-org depending on repo, but mongodb is standard
+      mongodb: 'mongodb-org'
     };
     const aptPackage = packageMap[pkgName] || pkgName;
     return await this.runCommand(`sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ${aptPackage}`);
