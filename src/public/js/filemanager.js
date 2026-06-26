@@ -59,7 +59,6 @@ const FM = (() => {
 
   function renderItems(items) {
     const grid = document.getElementById('fmGrid');
-    const wrapper = document.getElementById('fmFiles');
 
     // Set view class
     if (viewMode === 'list') {
@@ -94,7 +93,7 @@ const FM = (() => {
     e.preventDefault();
     selectItem(el);
 
-    const menu = document.getElementById('contextMenu');
+    const menu = document.getElementById('fmContextMenu');
     menu.style.display = 'block';
     menu.style.left = Math.min(e.pageX, window.innerWidth - 200) + 'px';
     menu.style.top = Math.min(e.pageY, window.innerHeight - 200) + 'px';
@@ -266,22 +265,11 @@ const FM = (() => {
     else LP.toast(res?.message || 'Zip failed', 'error');
   }
 
-  async function search() {
-    const query = document.getElementById('searchInput').value.trim();
-    if (!query) return;
-
-    const res = await LP.get(`/filemanager/search?path=${encodeURIComponent(currentPath)}&query=${encodeURIComponent(query)}`);
-    if (!res?.success) { LP.toast('Search failed', 'error'); return; }
-
-    renderItems(res.data.results || []);
-    LP.toast(`Found ${res.data.results.length} result(s)`, 'info');
-  }
-
   function toggleView() {
     viewMode = viewMode === 'grid' ? 'list' : 'grid';
     localStorage.setItem('lp_fm_view', viewMode);
-    const btn = document.getElementById('viewToggle');
-    btn.innerHTML = viewMode === 'grid' ? '<i class="bi bi-grid-3x3-gap"></i>' : '<i class="bi bi-list-ul"></i>';
+    const btn = document.getElementById('toggleViewBtn');
+    if (btn) btn.innerHTML = viewMode === 'grid' ? '<i class="bi bi-grid"></i>' : '<i class="bi bi-list-ul"></i>';
     refresh();
   }
 
@@ -297,7 +285,6 @@ const FM = (() => {
   // ── Drag & Drop ───────────────────────────────────
   function initDragDrop() {
     const overlay = document.getElementById('dropOverlay');
-    const zone = document.getElementById('fileList'); // tbody where files are listed
     const container = document.querySelector('.lp-card-body'); // use parent container for drag
 
     if (!container) return; // guard: filemanager not on page
@@ -343,7 +330,6 @@ const FM = (() => {
     upload,
     downloadSelected,
     zipSelected,
-    search,
     showContextMenu,
     _saveFile,
   };
