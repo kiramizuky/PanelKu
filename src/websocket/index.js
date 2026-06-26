@@ -11,8 +11,7 @@ import logger from '../config/logger.js';
  * Initialize all Socket.IO namespaces and authenticate connections.
  */
 export const initWebSocket = (io) => {
-  // Global JWT auth middleware for Socket.IO
-  io.use(async (socket, next) => {
+  const authMiddleware = async (socket, next) => {
     try {
       const token =
         socket.handshake.auth?.token ||
@@ -32,7 +31,10 @@ export const initWebSocket = (io) => {
       logger.warn(`Socket auth failed: ${err.message}`);
       next(new Error('Authentication failed'));
     }
-  });
+  };
+
+  // Global JWT auth middleware for Socket.IO root namespace
+  io.use(authMiddleware);
 
   // Register namespaces
   const monitorNs = io.of('/monitor');
@@ -42,7 +44,7 @@ export const initWebSocket = (io) => {
 
   // Apply auth to namespaces
   [monitorNs, terminalNs, notifNs, dockerNs].forEach((ns) => {
-    ns.use(io.middleware || ((s, next) => next()));
+    ns.use(authMiddleware);
   });
 
   registerMonitorSocket(monitorNs);
