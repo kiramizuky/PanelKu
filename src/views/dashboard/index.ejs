@@ -195,6 +195,16 @@
         <div class="lp-app-icon" style="color: #25d366;"><i class="bi bi-whatsapp"></i></div>
         <div style="font-size: 13px; font-weight: 500;">WhatsApp</div>
       </a>
+
+      <!-- Dynamically loaded plugins -->
+      <% if (typeof loadedPlugins !== 'undefined' && loadedPlugins.length > 0) { %>
+        <% loadedPlugins.forEach(function(plugin) { %>
+          <a href="<%= plugin.path || '/plugins/' + plugin.name %>" class="lp-app-item">
+            <div class="lp-app-icon" style="color: <%= plugin.color || '#38bdf8' %>;"><i class="bi <%= plugin.icon || 'bi-plugin' %>"></i></div>
+            <div style="font-size: 13px; font-weight: 500;"><%= plugin.name %></div>
+          </a>
+        <% }); %>
+      <% } %>
     </div>
 
   </div>

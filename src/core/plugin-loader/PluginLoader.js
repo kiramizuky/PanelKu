@@ -28,9 +28,22 @@ class PluginLoader {
       return;
     }
 
+    // Load list of installed plugins from DB
+    let installedIds = [];
+    try {
+      const Setting = (await import('../../models/Setting.js')).default;
+      const installedStr = await Setting.get('installed_plugins') || '[]';
+      installedIds = JSON.parse(typeof installedStr === 'string' ? installedStr : JSON.stringify(installedStr));
+    } catch (e) {
+      logger.warn('PluginLoader: failed to query installed plugins from database:', e.message);
+    }
+
     for (const entry of dirs) {
       if (!entry.isDirectory()) continue;
-      await this._loadPlugin(entry.name, app, io);
+      // Only load if it's explicitly installed
+      if (installedIds.includes(entry.name)) {
+        await this._loadPlugin(entry.name, app, io);
+      }
     }
 
     logger.info(`PluginLoader: loaded ${this._plugins.size} plugin(s).`);

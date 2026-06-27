@@ -51,7 +51,7 @@
           <li><a class="dropdown-item" href="/firewall">Firewall</a></li>
           <li><a class="dropdown-item" href="/ssl">SSL Certificates</a></li>
           <li><a class="dropdown-item" href="/waf">WAF</a></li>
-          <li><a class="dropdown-item" href="/alerts">Alerts</a></li>
+          <li><a class="dropdown-item" href="/n8n">n8n Automation</a></li>
         </ul>
       </div>
 
@@ -60,8 +60,15 @@
         <a href="#" class="lp-nav-link dropdown-toggle" data-bs-toggle="dropdown">Tools</a>
         <ul class="dropdown-menu lp-dropdown" style="background:rgba(20,25,40,0.9); backdrop-filter:blur(15px); border:1px solid var(--glass-border);">
           <li><a class="dropdown-item" href="/backup">Backups</a></li>
-          <li><a class="dropdown-item" href="/dns">DNS</a></li>
+          <li><a class="dropdown-item" href="/cloudflare">Cloudflare Tunnel</a></li>
           <li><a class="dropdown-item" href="/plugins">Plugins</a></li>
+          <% if (typeof loadedPlugins !== 'undefined' && loadedPlugins.length > 0) { %>
+            <li><hr class="dropdown-divider" style="border-color: var(--glass-border);"></li>
+            <% loadedPlugins.forEach(function(plugin) { %>
+              <li><a class="dropdown-item" href="<%= plugin.path || '/plugins/' + plugin.name %>"><i class="bi <%= plugin.icon || 'bi-plugin' %> me-2"></i><%= plugin.name %></a></li>
+            <% }); %>
+          <% } %>
+          <li><hr class="dropdown-divider" style="border-color: var(--glass-border);"></li>
           <li><a class="dropdown-item" href="/settings/profile">Settings</a></li>
         </ul>
       </div>

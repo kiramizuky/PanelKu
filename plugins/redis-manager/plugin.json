@@ -1,0 +1,9 @@
+{
+  "name": "Redis Manager",
+  "version": "1.0.0",
+  "description": "Visual Redis dashboard and keys explorer",
+  "entry": "index.js",
+  "path": "/plugins/redis-manager",
+  "icon": "bi-database-fill-gear",
+  "color": "#a78bfa"
+}

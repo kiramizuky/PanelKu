@@ -14,6 +14,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { wafMiddleware, refreshWafCache } from './middleware/waf.middleware.js';
 
 import expressEjsLayouts from 'express-ejs-layouts';
+import pluginLoader from './core/plugin-loader/PluginLoader.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -82,6 +83,12 @@ const createApp = () => {
 
   // API routes
   app.use('/api', apiRoutes);
+
+  // Global locals middleware for EJS templates
+  app.use((req, res, next) => {
+    res.locals.loadedPlugins = pluginLoader.getAll();
+    next();
+  });
 
   // SPA / Page routes
   app.get('/', (req, res) => res.render('login/index', { layout: false }));
