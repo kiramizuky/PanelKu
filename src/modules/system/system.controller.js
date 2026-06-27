@@ -4,7 +4,7 @@ import { success, errorResponse } from '../../helpers/response.js';
 class SystemController {
   async getServicesStatus(req, res) {
     try {
-      const servicesToWatch = ['nginx', 'apache2', 'docker', 'mongodb', 'mysql', 'ssh', 'cron'];
+      const servicesToWatch = ['nginx', 'apache2', 'docker', 'mysql', 'ssh', 'cron'];
       const statuses = {};
       
       for (const svc of servicesToWatch) {
@@ -30,7 +30,7 @@ class SystemController {
 
   async getInstallStatus(req, res) {
     try {
-      const apps = ['mysql', 'postgres', 'docker', 'nginx', 'mongodb', 'syncthing'];
+      const apps = ['mysql', 'postgres', 'docker', 'nginx', 'syncthing'];
       const statuses = {};
       for (const app of apps) {
         statuses[app] = await systemService.isInstalled(app);

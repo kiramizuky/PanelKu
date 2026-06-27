@@ -54,15 +54,8 @@ install_dependencies() {
   info "Updating package list..."
   apt-get update -qq
 
-  if [ ! -f /usr/share/keyrings/mongodb-server-8.0.gpg ]; then
-    info "Configuring MongoDB repository..."
-    curl -fsSL https://pgp.mongodb.com/server-8.0.asc | gpg --yes -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
-    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-    apt-get update -qq
-  fi
-
   info "Installing dependencies..."
-  apt-get install -y -qq curl git build-essential python3 make g++ mongodb-org redis-server nginx docker.io docker-compose ufw
+  apt-get install -y -qq curl git build-essential python3 make g++ redis-server nginx docker.io docker-compose ufw
 
   # Install acme.sh for SSL
   if [ ! -d ~/.acme.sh ]; then

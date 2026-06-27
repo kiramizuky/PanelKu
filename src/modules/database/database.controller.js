@@ -6,13 +6,11 @@ class DatabaseController {
     try {
       const mysqlDbs = await databaseService.listMysqlDatabases();
       const pgDbs = await databaseService.listPgDatabases();
-      const mongoDbs = await databaseService.listMongoDatabases();
       const sqliteDbs = await databaseService.listSqliteDatabases();
       
       successResponse(res, {
         mysql: mysqlDbs,
         postgres: pgDbs,
-        mongodb: mongoDbs,
         sqlite: sqliteDbs
       });
     } catch (error) {

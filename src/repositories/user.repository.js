@@ -1,5 +1,6 @@
 import BaseRepository from './base.repository.js';
 import User from '../models/User.js';
+import { getDb, toJson, now } from '../core/db/sqlite.js';
 
 class UserRepository extends BaseRepository {
   constructor() {
@@ -7,52 +8,89 @@ class UserRepository extends BaseRepository {
   }
 
   async findByUsername(username, withPassword = false) {
-    const select = withPassword ? '+password +twoFactorSecret +apiKey' : undefined;
-    return User.findOne({ username: username.toLowerCase() }, select).populate('role');
+    const user = await User.findOne({ username: username.toLowerCase() });
+    if (!user) return null;
+    // Populate role
+    return this._populateRole(user);
   }
 
   async findByEmail(email, withPassword = false) {
-    const select = withPassword ? '+password +twoFactorSecret' : undefined;
-    return User.findOne({ email: email.toLowerCase() }, select).populate('role');
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return null;
+    return this._populateRole(user);
   }
 
   async findByApiKey(apiKey) {
-    return User.findOne({ apiKey, apiKeyEnabled: true, isActive: true }, '+apiKey').populate('role');
+    const db  = getDb();
+    const row = db.prepare('SELECT * FROM users WHERE api_key = ? AND api_key_enabled = 1 AND is_active = 1').get(apiKey);
+    if (!row) return null;
+    const user = await User.findById(row.id);
+    return this._populateRole(user);
   }
 
   async findWithRole(filter = {}) {
-    return User.find(filter).populate('role').sort({ createdAt: -1 });
+    const users = await User.find(filter);
+    return users.map(u => this._populateRole(u));
+  }
+
+  _populateRole(user) {
+    if (!user) return null;
+    if (user.role && typeof user.role === 'string') {
+      const db  = getDb();
+      const row = db.prepare('SELECT * FROM roles WHERE id = ?').get(user.role);
+      if (row) {
+        let perms = [];
+        try { perms = JSON.parse(row.permissions); } catch {}
+        user.role = {
+          _id: row.id, id: row.id, name: row.name, slug: row.slug,
+          permissions: perms, color: row.color,
+          isSystem: Boolean(row.is_system), isActive: Boolean(row.is_active),
+        };
+      }
+    }
+    return user;
   }
 
   async addSession(userId, sessionData) {
-    return User.findByIdAndUpdate(
-      userId,
-      { $push: { sessions: sessionData } },
-      { new: true }
+    const db  = getDb();
+    const row = db.prepare('SELECT sessions FROM users WHERE id = ?').get(userId);
+    if (!row) return null;
+    const sessions = (() => { try { return JSON.parse(row.sessions); } catch { return []; } })();
+    sessions.push(sessionData);
+    db.prepare('UPDATE users SET sessions = ?, updated_at = ? WHERE id = ?').run(
+      JSON.stringify(sessions), now(), userId
     );
+    return User.findById(userId);
   }
 
   async removeSession(userId, sessionId) {
-    return User.findByIdAndUpdate(
-      userId,
-      { $pull: { sessions: { _id: sessionId } } },
-      { new: true }
+    const db  = getDb();
+    const row = db.prepare('SELECT sessions FROM users WHERE id = ?').get(userId);
+    if (!row) return null;
+    let sessions = (() => { try { return JSON.parse(row.sessions); } catch { return []; } })();
+    sessions = sessions.filter(s => s._id !== sessionId && s.id !== sessionId);
+    db.prepare('UPDATE users SET sessions = ?, updated_at = ? WHERE id = ?').run(
+      JSON.stringify(sessions), now(), userId
     );
+    return User.findById(userId);
   }
 
   async deactivateAllSessions(userId) {
-    return User.findByIdAndUpdate(
-      userId,
-      { $set: { 'sessions.$[].isActive': false } },
-      { new: true }
+    const db  = getDb();
+    const row = db.prepare('SELECT sessions FROM users WHERE id = ?').get(userId);
+    if (!row) return null;
+    let sessions = (() => { try { return JSON.parse(row.sessions); } catch { return []; } })();
+    sessions = sessions.map(s => ({ ...s, isActive: false }));
+    db.prepare('UPDATE users SET sessions = ?, updated_at = ? WHERE id = ?').run(
+      JSON.stringify(sessions), now(), userId
     );
+    return User.findById(userId);
   }
 
   async updateLoginStats(userId, ip) {
     return User.findByIdAndUpdate(userId, {
-      lastLogin: new Date(),
-      lastLoginIp: ip,
-      $inc: { loginCount: 1 },
+      $set:  { lastLogin: new Date(), lastLoginIp: ip },
+      $inc:  { loginCount: 1 },
     });
   }
 }

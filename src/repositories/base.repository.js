@@ -1,6 +1,7 @@
 /**
- * Base Repository — generic CRUD operations for Mongoose models.
- * Extend this for model-specific repositories.
+ * Base Repository — generic CRUD for SQLite-backed models.
+ * All models expose the same static API (findById, find, create, etc.)
+ * so this base layer delegates to them directly.
  */
 export default class BaseRepository {
   constructor(model) {
@@ -8,44 +9,49 @@ export default class BaseRepository {
   }
 
   async findById(id, options = {}) {
-    return this.model.findById(id, options.select, options).populate(options.populate || []);
+    return this.model.findById(id);
   }
 
   async findOne(filter, options = {}) {
-    return this.model.findOne(filter, options.select, options).populate(options.populate || []);
+    return this.model.findOne(filter);
   }
 
   async findMany(filter = {}, options = {}) {
-    const query = this.model.find(filter, options.select);
-    if (options.populate) query.populate(options.populate);
-    if (options.sort) query.sort(options.sort);
-    if (options.limit) query.limit(parseInt(options.limit));
-    if (options.skip) query.skip(parseInt(options.skip));
-    return query.exec();
+    const rows = await this.model.find(filter, options.select);
+    let result = rows;
+    if (options.sort?.createdAt === -1 || options.sort?.created_at === -1) {
+      result = result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+    if (options.skip) result = result.slice(options.skip);
+    if (options.limit) result = result.slice(0, options.limit);
+    return result;
   }
 
   async paginate(filter = {}, page = 1, limit = 20, options = {}) {
-    page = parseInt(page);
+    page  = parseInt(page);
     limit = parseInt(limit);
-    const skip = (page - 1) * limit;
-    const [data, total] = await Promise.all([
-      this.findMany(filter, { ...options, limit, skip }),
-      this.model.countDocuments(filter),
-    ]);
+    const skip  = (page - 1) * limit;
+    const all   = await this.model.find(filter);
+    const total = all.length;
+    const data  = all.slice(skip, skip + limit);
     return { data, total, page, limit };
   }
 
   async create(data) {
-    const doc = new this.model(data);
-    return doc.save();
+    return this.model.create(data);
   }
 
-  async updateById(id, data, options = { new: true, runValidators: true }) {
-    return this.model.findByIdAndUpdate(id, data, options);
+  async updateById(id, data, options = {}) {
+    return this.model.findByIdAndUpdate(id, data, { new: true, ...options });
   }
 
-  async updateOne(filter, data, options = { new: true, runValidators: true }) {
-    return this.model.findOneAndUpdate(filter, data, options);
+  async updateOne(filter, data, options = {}) {
+    if (this.model.findOneAndUpdate) {
+      return this.model.findOneAndUpdate(filter, data, { new: true, ...options });
+    }
+    const doc = await this.model.findOne(filter);
+    if (!doc) return null;
+    return this.model.findByIdAndUpdate(doc._id, data, { new: true });
   }
 
   async deleteById(id) {
@@ -61,6 +67,7 @@ export default class BaseRepository {
   }
 
   async exists(filter) {
-    return this.model.exists(filter);
+    const doc = await this.model.findOne(filter);
+    return !!doc;
   }
 }

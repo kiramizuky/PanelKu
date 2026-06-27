@@ -1,11 +1,11 @@
-import mongoose from 'mongoose';
 import Redis from 'ioredis';
 import { Server as SocketIO } from 'socket.io';
-import dbConfig from './config/database.js';
+
 import redisConfig from './config/redis.js';
 import socketConfig from './config/socket.js';
 import appConfig from './config/app.js';
 import logger from './config/logger.js';
+import { getDb } from './core/db/sqlite.js';
 import { initWebSocket } from './websocket/index.js';
 import { startMonitorJob } from './jobs/monitor.job.js';
 import { startHealthJob } from './jobs/health.job.js';
@@ -20,13 +20,10 @@ import { mkdirSync } from 'fs';
 let redis;
 
 export const bootstrap = async (app, httpServer) => {
-  // 1. Connect MongoDB
-  logger.info('Connecting to MongoDB...');
-  await mongoose.connect(dbConfig.uri, dbConfig.options);
-  logger.info(`MongoDB connected: ${mongoose.connection.host}`);
-
-  mongoose.connection.on('error', (err) => logger.error('MongoDB error:', err));
-  mongoose.connection.on('disconnected', () => logger.warn('MongoDB disconnected'));
+  // 1. Initialize SQLite (auto-creates tables on first run)
+  logger.info('Initializing SQLite database...');
+  getDb(); // singleton — opens & creates schema
+  logger.info('SQLite database ready');
 
   // 2. Connect Redis
   logger.info('Connecting to Redis...');
@@ -61,7 +58,8 @@ export const bootstrap = async (app, httpServer) => {
 
 export const gracefulShutdown = async () => {
   logger.info('Graceful shutdown initiated...');
-  await mongoose.connection.close();
+  const { getDb } = await import('./core/db/sqlite.js');
+  getDb().close();
   if (redis) await redis.quit();
   logger.info('Shutdown complete');
   process.exit(0);
@@ -71,6 +69,7 @@ async function seedInitialData() {
   const Role = (await import('./models/Role.js')).default;
   const User = (await import('./models/User.js')).default;
   const { ROLES, RESOURCES, ACTIONS } = await import('./config/constants.js');
+  const bcrypt = (await import('bcryptjs')).default;
 
   // Create default roles if they don't exist
   const defaultRoles = [

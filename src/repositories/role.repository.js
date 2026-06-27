@@ -11,7 +11,7 @@ class RoleRepository extends BaseRepository {
   }
 
   async findActive() {
-    return Role.find({ isActive: true }).sort({ name: 1 });
+    return Role.find({ isActive: true });
   }
 
   async findWithPermissions(roleId) {

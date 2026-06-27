@@ -1,19 +1,15 @@
 import mysql from 'mysql2/promise';
 import pkg from 'pg';
 const { Client } = pkg;
-import { MongoClient } from 'mongodb';
 
 class DatabaseService {
   constructor() {
     this.mysqlPool = null;
     this.pgClient = null;
-    this.mongoClient = null;
     
     // Configurations should ideally come from user settings in DB
-    // For now, we will connect locally with default ports if possible
     this.mysqlConfig = { host: 'localhost', user: 'root', password: '' };
     this.pgConfig = { host: 'localhost', user: 'postgres', password: '' };
-    this.mongoUri = 'mongodb://127.0.0.1:27017';
   }
 
   async getMysqlConnection() {
@@ -34,14 +30,6 @@ class DatabaseService {
       }
     }
     return this.pgClient;
-  }
-
-  async getMongoConnection() {
-    if (!this.mongoClient) {
-      this.mongoClient = new MongoClient(this.mongoUri);
-      await this.mongoClient.connect();
-    }
-    return this.mongoClient;
   }
 
   async listMysqlDatabases() {
@@ -84,15 +72,6 @@ class DatabaseService {
     return true;
   }
 
-  async listMongoDatabases() {
-    try {
-      const client = await this.getMongoConnection();
-      const adminDb = client.db().admin();
-      const res = await adminDb.listDatabases();
-      return res.databases.map(db => db.name).filter(d => !['admin', 'local', 'config'].includes(d));
-    } catch (err) { return []; }
-  }
-
   async listSqliteDatabases() {
     try {
       const fs = (await import('fs/promises')).default;
@@ -113,7 +92,6 @@ class DatabaseService {
       const filename = name.endsWith('.sqlite') || name.endsWith('.db') ? name : `${name}.sqlite`;
       const dbPath = path.join(dbDir, filename);
       
-      // touch the file
       const handle = await fs.open(dbPath, 'w');
       await handle.close();
       return true;

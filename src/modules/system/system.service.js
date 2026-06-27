@@ -55,7 +55,6 @@ class SystemService {
         postgres: { cmd: 'psql', pkg: 'postgresql' },
         docker: { cmd: 'docker', pkg: 'docker.io' },
         nginx: { cmd: 'nginx', pkg: 'nginx' },
-        mongodb: { cmd: 'mongod', pkg: 'mongodb-org' },
         syncthing: { cmd: 'syncthing', pkg: 'syncthing' }
       };
       
@@ -70,14 +69,6 @@ class SystemService {
   async installPackage(pkgName) {
     if (!/^[a-zA-Z0-9_-]+$/.test(pkgName)) throw new Error('Invalid package name');
     logger.info(`Installing package: ${pkgName}`);
-    
-    // Configure MongoDB repository if installing mongodb
-    if (pkgName === 'mongodb') {
-      logger.info('Configuring MongoDB 8.0 repository...');
-      await this.runCommand(`if [ ! -f /usr/share/keyrings/mongodb-server-8.0.gpg ]; then curl -fsSL https://pgp.mongodb.com/server-8.0.asc | sudo gpg --yes -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor; fi`);
-      await this.runCommand(`if [ ! -f /etc/apt/sources.list.d/mongodb-org-8.0.list ]; then echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list; fi`);
-      await this.runCommand(`sudo apt-get update -y`);
-    }
 
     if (pkgName === 'syncthing') {
       logger.info('Installing and configuring Syncthing...');
@@ -103,8 +94,7 @@ class SystemService {
       mysql: 'mysql-server',
       postgres: 'postgresql',
       docker: 'docker.io docker-compose',
-      nginx: 'nginx',
-      mongodb: 'mongodb-org'
+      nginx: 'nginx'
     };
     const aptPackage = packageMap[pkgName] || pkgName;
     return await this.runCommand(`sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ${aptPackage}`);

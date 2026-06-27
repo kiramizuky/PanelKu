@@ -1,7 +1,7 @@
 import scheduler from '../core/scheduler/Scheduler.js';
 import logger from '../config/logger.js';
 import alertsService from '../modules/alerts/alerts.service.js';
-import Website from '../models/Website.js';
+import { getDb, fromJson } from '../core/db/sqlite.js';
 import { exec } from 'child_process';
 import util from 'util';
 
@@ -28,7 +28,12 @@ export const startHealthJob = () => {
 
       // 2. Check Websites and SSL
       try {
-        const websites = await Website.find({ status: 'active' });
+        const db = getDb();
+        const websites = db.prepare("SELECT * FROM websites WHERE status = 'active'").all().map(row => ({
+          domain:       row.domain,
+          ssl:          fromJson(row.ssl, {}),
+          rootDirectory: row.root_directory,
+        }));
         for (const site of websites) {
           // Website Health
           try {

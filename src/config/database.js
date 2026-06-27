@@ -1,9 +1,6 @@
 import 'dotenv/config';
+import { resolve } from 'path';
 
 export default {
-  uri: process.env.MONGO_URI || 'mongodb://localhost:27017/linux-panel',
-  options: {
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-  },
+  path: resolve(process.cwd(), 'storage', 'panelku.db'),
 };

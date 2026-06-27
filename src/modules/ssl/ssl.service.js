@@ -61,19 +61,15 @@ class SSLService {
 
     const sslData = await this.issueCertificate(website.domain, website.rootDirectory);
 
-    website.ssl = {
-      enabled: true,
-      provider: 'letsencrypt',
+    const updatedSsl = {
+      enabled:     true,
+      provider:    'letsencrypt',
       certificate: sslData.certificate,
-      privateKey: sslData.privateKey,
-      expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days roughly
+      privateKey:  sslData.privateKey,
+      expiresAt:   new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
     };
 
-    await website.save();
-
-    // In a full implementation, you would trigger the WebsiteService 
-    // to regenerate the Nginx conf with SSL directives here.
-    return website;
+    return Website.findByIdAndUpdate(websiteId, { ssl: updatedSsl });
   }
 }
 

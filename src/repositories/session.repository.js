@@ -7,12 +7,11 @@ class SessionRepository extends BaseRepository {
   }
 
   async findByRefreshToken(token) {
-    return Session.findOne({ refreshToken: token, isActive: true })
-      .populate('userId');
+    return Session.findOne({ refreshToken: token });
   }
 
   async findUserSessions(userId) {
-    return Session.find({ userId, isActive: true }).sort({ lastActive: -1 });
+    return Session.find({ userId, isActive: true });
   }
 
   async deactivate(sessionId) {

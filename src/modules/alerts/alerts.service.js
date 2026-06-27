@@ -6,28 +6,20 @@ import nodemailer from 'nodemailer';
 
 class AlertsService {
   async getConfig() {
-    let config = await AlertConfig.findOne({ singleton: 'global' });
-    if (!config) {
-      config = await AlertConfig.create({});
-    }
-    return config;
+    return AlertConfig.findOne({ singleton: 'global' });
   }
 
   async updateConfig(data) {
-    let config = await AlertConfig.findOne({ singleton: 'global' });
-    if (!config) {
-      config = new AlertConfig();
-    }
-    
-    if (data.telegram) config.telegram = { ...config.telegram, ...data.telegram };
-    if (data.email) config.email = { ...config.email, ...data.email };
-    if (data.discord) config.discord = { ...config.discord, ...data.discord };
-    if (data.slack) config.slack = { ...config.slack, ...data.slack };
-    if (data.webhook) config.webhook = { ...config.webhook, ...data.webhook };
-    if (data.thresholds) config.thresholds = { ...config.thresholds, ...data.thresholds };
-
-    await config.save();
-    return config;
+    const existing = await AlertConfig.findOne({ singleton: 'global' });
+    const merged = {
+      telegram:   data.telegram   ? { ...existing.telegram,   ...data.telegram   } : existing.telegram,
+      email:      data.email      ? { ...existing.email,      ...data.email      } : existing.email,
+      discord:    data.discord    ? { ...existing.discord,    ...data.discord    } : existing.discord,
+      slack:      data.slack      ? { ...existing.slack,      ...data.slack      } : existing.slack,
+      webhook:    data.webhook    ? { ...existing.webhook,    ...data.webhook    } : existing.webhook,
+      thresholds: data.thresholds ? { ...existing.thresholds, ...data.thresholds } : existing.thresholds,
+    };
+    return AlertConfig.findOneAndUpdate({ singleton: 'global' }, merged, { upsert: true, new: true });
   }
 
   async sendTelegram(message, config) {

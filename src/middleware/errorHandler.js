@@ -14,10 +14,10 @@ export const errorHandler = (err, req, res, next) => {
     stack: err.stack,
   });
 
-  // Mongoose validation error
+  // SQLite validation / constraint error
   if (err.name === 'ValidationError') {
-    const errors = Object.values(err.errors).map((e) => ({
-      field: e.path,
+    const errors = Object.values(err.errors || {}).map((e) => ({
+      field: e.path || 'unknown',
       message: e.message,
     }));
     return res.status(HTTP.UNPROCESSABLE).json({
@@ -27,12 +27,11 @@ export const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // Mongoose duplicate key
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyValue || {})[0] || 'field';
+  // SQLite duplicate key (SQLITE_CONSTRAINT_UNIQUE)
+  if (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'SQLITE_CONSTRAINT') {
     return res.status(HTTP.CONFLICT).json({
       success: false,
-      message: `Duplicate value for: ${field}`,
+      message: err.message || 'Database constraint violation',
     });
   }
 

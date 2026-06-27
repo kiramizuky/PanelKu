@@ -1,27 +1,56 @@
-import mongoose from 'mongoose';
+/**
+ * MonitorHistory model — SQLite adapter
+ * Capped at 10,000 rows via cleanup on insert.
+ */
+import { getDb, generateId, toJson, fromJson } from '../core/db/sqlite.js';
 
-const metricSchema = new mongoose.Schema({
-  cpu: Number,
-  cpuTemp: Number,
-  ramUsed: Number,
-  ramTotal: Number,
-  swapUsed: Number,
-  swapTotal: Number,
-  diskUsed: Number,
-  diskTotal: Number,
-  networkRx: Number, // bytes/s
-  networkTx: Number, // bytes/s
-  diskRead: Number,  // bytes/s
-  diskWrite: Number, // bytes/s
-  loadAvg: [Number],
-}, { _id: false });
+const MAX_ROWS = 10_000;
 
-const monitorHistorySchema = new mongoose.Schema({
-  timestamp: { type: Date, default: Date.now, index: true },
-  metrics: metricSchema,
-}, {
-  capped: { size: 10485760, max: 10000 }, // 10MB capped collection
-});
+function rowToHistory(row) {
+  if (!row) return null;
+  return {
+    _id:       row.id,
+    id:        row.id,
+    timestamp: new Date(row.timestamp),
+    metrics:   fromJson(row.metrics, {}),
+  };
+}
 
-const MonitorHistory = mongoose.model('MonitorHistory', monitorHistorySchema);
+const MonitorHistory = {
+  async find(filter = {}, options = {}) {
+    const db    = getDb();
+    const limit = options.limit || 1000;
+    const rows  = db.prepare('SELECT * FROM monitor_history ORDER BY timestamp DESC LIMIT ?').all(limit);
+    return rows.map(rowToHistory).reverse();
+  },
+
+  async create(data) {
+    const db = getDb();
+    const id = generateId();
+    const ts = data.timestamp instanceof Date
+      ? data.timestamp.toISOString()
+      : (data.timestamp || new Date().toISOString());
+
+    db.prepare('INSERT INTO monitor_history (id, timestamp, metrics) VALUES (?,?,?)').run(
+      id, ts, toJson(data.metrics || {})
+    );
+
+    // Cleanup: keep only last MAX_ROWS rows
+    const count = db.prepare('SELECT COUNT(*) as c FROM monitor_history').get().c;
+    if (count > MAX_ROWS) {
+      db.prepare(`
+        DELETE FROM monitor_history WHERE id IN (
+          SELECT id FROM monitor_history ORDER BY timestamp ASC LIMIT ?
+        )
+      `).run(count - MAX_ROWS);
+    }
+
+    return rowToHistory(db.prepare('SELECT * FROM monitor_history WHERE id = ?').get(id));
+  },
+
+  async deleteMany() {
+    getDb().prepare('DELETE FROM monitor_history').run();
+  },
+};
+
 export default MonitorHistory;

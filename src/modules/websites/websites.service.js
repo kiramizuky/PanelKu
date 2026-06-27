@@ -46,8 +46,6 @@ server {
 
 class WebsiteService {
   constructor() {
-    // In Debian/Ubuntu typically /etc/nginx/sites-available
-    // For simplicity, we'll write to conf.d assuming it's included
     this.nginxConfDir = '/etc/nginx/conf.d';
   }
 
@@ -56,7 +54,6 @@ class WebsiteService {
       await execAsync('systemctl reload nginx');
       return true;
     } catch (error) {
-      // Don't crash if nginx isn't installed/running, just log it
       console.error('Failed to reload nginx:', error.message);
       return false;
     }
@@ -67,7 +64,7 @@ class WebsiteService {
     
     let conf = template
       .replace(/{{domain}}/g, website.domain)
-      .replace(/{{aliases}}/g, website.aliases.join(' '))
+      .replace(/{{aliases}}/g, (website.aliases || []).join(' '))
       .replace(/{{rootDirectory}}/g, website.rootDirectory)
       .replace(/{{port}}/g, website.port || 8080);
 
@@ -78,8 +75,6 @@ class WebsiteService {
       await this.reloadNginx();
     } catch (error) {
       console.error(`Failed to write nginx config for ${website.domain}:`, error.message);
-      // In a real scenario we might fail the website creation if we can't write the conf
-      // but for testing locally where nginx might not be installed, we allow it.
     }
   }
 
@@ -94,38 +89,39 @@ class WebsiteService {
   }
 
   async listWebsites() {
-    return Website.find({}).sort({ createdAt: -1 });
+    return Website.find({});
   }
 
   async createWebsite(data, userId) {
-    // Check if domain exists
     const exists = await Website.findOne({ domain: data.domain });
     if (exists) throw new Error('Domain already configured');
 
-    const website = new Website({
-      domain: data.domain,
-      aliases: data.aliases || [],
-      type: data.type || 'static',
+    const webhookToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+    const website = await Website.create({
+      domain:        data.domain,
+      aliases:       data.aliases || [],
+      type:          data.type || 'static',
       rootDirectory: data.rootDirectory || `/var/www/${data.domain}`,
-      port: data.port,
-      owner: userId,
-      webhookToken: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+      port:          data.port || null,
+      owner:         userId,
+      webhookToken,
     });
 
-    // Create root directory if it doesn't exist
     try {
       await fs.mkdir(website.rootDirectory, { recursive: true });
-      // Write a default index.html
       if (website.type === 'static') {
-        await fs.writeFile(path.join(website.rootDirectory, 'index.html'), `<h1>Welcome to ${website.domain}</h1><p>Created via Linux Panel</p>`, 'utf8');
+        await fs.writeFile(
+          path.join(website.rootDirectory, 'index.html'),
+          `<h1>Welcome to ${website.domain}</h1><p>Created via Linux Panel</p>`,
+          'utf8'
+        );
       }
     } catch (error) {
       console.error('Failed to create document root:', error.message);
     }
 
-    await website.save();
     await this.generateNginxConfig(website);
-    
     return website;
   }
 
@@ -139,29 +135,25 @@ class WebsiteService {
     const website = await Website.findById(id);
     if (!website) throw new Error('Website not found');
 
-    if (data.aliases) website.aliases = data.aliases;
-    if (data.type) website.type = data.type;
-    if (data.rootDirectory) website.rootDirectory = data.rootDirectory;
-    if (data.port) website.port = data.port;
-    if (data.status) website.status = data.status;
-    if (data.gitRepo !== undefined) website.gitRepo = data.gitRepo;
-    if (data.autoDeploy !== undefined) website.autoDeploy = data.autoDeploy;
-    if (data.phpVersion) website.phpVersion = data.phpVersion;
+    const updated = await Website.findByIdAndUpdate(id, {
+      aliases:       data.aliases       ?? website.aliases,
+      type:          data.type          ?? website.type,
+      rootDirectory: data.rootDirectory ?? website.rootDirectory,
+      port:          data.port          ?? website.port,
+      status:        data.status        ?? website.status,
+      gitRepo:       data.gitRepo       !== undefined ? data.gitRepo       : website.gitRepo,
+      autoDeploy:    data.autoDeploy    !== undefined ? data.autoDeploy    : website.autoDeploy,
+      phpVersion:    data.phpVersion    ?? website.phpVersion,
+      webhookToken:  website.webhookToken || (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)),
+    });
 
-    if (!website.webhookToken) {
-      website.webhookToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    }
-
-    await website.save();
-    
-    // Regenerate config if active
-    if (website.status === 'active') {
-      await this.generateNginxConfig(website);
+    if (updated.status === 'active') {
+      await this.generateNginxConfig(updated);
     } else {
-      await this.removeNginxConfig(website.domain);
+      await this.removeNginxConfig(updated.domain);
     }
 
-    return website;
+    return updated;
   }
 
   async deployGit(id) {
@@ -169,15 +161,11 @@ class WebsiteService {
     if (!website || !website.gitRepo) throw new Error('Website or Git Repo not found');
     
     try {
-      // Check if .git exists
       const gitDir = path.join(website.rootDirectory, '.git');
       try {
         await fs.access(gitDir);
-        // Exists, pull
         await execAsync(`cd ${website.rootDirectory} && git pull`, { timeout: 60000 });
       } catch {
-        // Does not exist, clone
-        // We might need to empty the directory first or clone into a temp and move
         await execAsync(`rm -rf ${website.rootDirectory}/*`);
         await execAsync(`git clone ${website.gitRepo} ${website.rootDirectory}`, { timeout: 60000 });
       }
@@ -193,7 +181,7 @@ class WebsiteService {
     if (!website) throw new Error('Website not found');
 
     await this.removeNginxConfig(website.domain);
-    await website.deleteOne();
+    await Website.findByIdAndDelete(id);
     return true;
   }
 }

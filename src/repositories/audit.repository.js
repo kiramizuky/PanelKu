@@ -11,11 +11,11 @@ class AuditRepository extends BaseRepository {
   }
 
   async getUserActivity(userId, limit = 50) {
-    return AuditLog.find({ userId }).sort({ createdAt: -1 }).limit(limit);
+    return AuditLog.find({ userId }, { limit });
   }
 
   async getRecent(limit = 100) {
-    return AuditLog.find().sort({ createdAt: -1 }).limit(limit).populate('userId', 'username');
+    return AuditLog.findWithUser({}, limit);
   }
 }
 

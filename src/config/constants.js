@@ -32,7 +32,6 @@ export const RESOURCES = {
   PYTHON: 'python',
   MYSQL: 'mysql',
   POSTGRES: 'postgres',
-  MONGODB: 'mongodb',
   REDIS: 'redis',
   FIREWALL: 'firewall',
   WAF: 'waf',

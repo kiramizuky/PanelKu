@@ -4,34 +4,51 @@ import permissionManager from '../../core/permissions/PermissionManager.js';
 import { generateApiKey } from '../../helpers/crypto.js';
 import { toSlug } from '../../helpers/validate.js';
 import eventBus, { EVENTS } from '../../core/events/EventBus.js';
+import bcrypt from 'bcryptjs';
+import { getDb } from '../../core/db/sqlite.js';
 
 class UsersService {
   async list(page = 1, limit = 20, search = '') {
-    const filter = search
-      ? { $or: [{ username: new RegExp(search, 'i') }, { email: new RegExp(search, 'i') }] }
-      : {};
-    const result = await userRepository.paginate(filter, page, limit, { populate: 'role', sort: { createdAt: -1 } });
-    return result;
+    // SQLite doesn't support $or, do filtering manually
+    const all = await userRepository.findWithRole({});
+    let filtered = all;
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = all.filter(u =>
+        u.username.includes(q) || (u.email || '').includes(q)
+      );
+    }
+    const total = filtered.length;
+    page  = parseInt(page);
+    limit = parseInt(limit);
+    const data = filtered.slice((page - 1) * limit, page * limit);
+    return { data, total, page, limit };
   }
 
   async getById(id) {
-    const user = await userRepository.findById(id, { populate: 'role' });
-    if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
-    return user;
+    const db = getDb();
+    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    if (!row) throw Object.assign(new Error('User not found'), { statusCode: 404 });
+
+    const User = (await import('../../models/User.js')).default;
+    const user = await User.findById(id);
+    return userRepository._populateRole(user);
   }
 
   async create(data) {
-    const existing = await userRepository.findOne({
-      $or: [{ username: data.username }, { email: data.email }],
-    });
-    if (existing) throw Object.assign(new Error('Username or email already exists'), { statusCode: 409 });
+    const db = getDb();
+    const existingUsername = db.prepare('SELECT id FROM users WHERE username = ?').get(data.username?.toLowerCase());
+    const existingEmail    = db.prepare('SELECT id FROM users WHERE email = ?').get(data.email?.toLowerCase());
+    if (existingUsername || existingEmail) {
+      throw Object.assign(new Error('Username or email already exists'), { statusCode: 409 });
+    }
 
     const role = await roleRepository.findBySlug(data.role || 'read_only');
     if (!role) throw Object.assign(new Error('Role not found'), { statusCode: 400 });
 
     const user = await userRepository.create({ ...data, role: role._id });
     eventBus.publish(EVENTS.USER_CREATED, { userId: user._id, username: user.username });
-    return userRepository.findById(user._id, { populate: 'role' });
+    return userRepository._populateRole(user);
   }
 
   async update(id, data) {
@@ -42,22 +59,25 @@ class UsersService {
       if (role) rest.role = role._id;
     }
 
-    const user = await userRepository.updateById(id, rest, { new: true, runValidators: true });
+    const user = await userRepository.updateById(id, rest);
     if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
 
     eventBus.publish(EVENTS.USER_UPDATED, { userId: id });
-    return userRepository.findById(id, { populate: 'role' });
+    return userRepository._populateRole(user);
   }
 
   async changePassword(id, currentPassword, newPassword) {
-    const user = await userRepository.findById(id, { select: '+password' });
-    if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
+    const db = getDb();
+    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    if (!row) throw Object.assign(new Error('User not found'), { statusCode: 404 });
 
-    const valid = await user.comparePassword(currentPassword);
+    const valid = await bcrypt.compare(currentPassword, row.password);
     if (!valid) throw Object.assign(new Error('Current password is incorrect'), { statusCode: 400 });
 
-    user.password = newPassword;
-    await user.save();
+    const hashed = await bcrypt.hash(newPassword, 12);
+    db.prepare('UPDATE users SET password = ?, updated_at = ? WHERE id = ?').run(
+      hashed, new Date().toISOString(), id
+    );
   }
 
   async delete(id, requestingUserId) {

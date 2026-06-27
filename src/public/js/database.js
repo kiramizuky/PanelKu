@@ -10,7 +10,6 @@ const DatabasePage = (() => {
       if (res?.success) {
         renderMysql(res.data.mysql || [], statuses.mysql);
         renderPostgres(res.data.postgres || [], statuses.postgres);
-        renderMongo(res.data.mongodb || [], statuses.mongodb);
         renderSqlite(res.data.sqlite || []);
       }
     } catch (e) {
@@ -84,22 +83,6 @@ const DatabasePage = (() => {
         </td>
       </tr>
     `, 'No PostgreSQL databases found', 2);
-  }
-
-  function renderMongo(dbs, isInstalled) {
-    const tbody = document.getElementById('mongoTableBody');
-    if (isInstalled === false) {
-      tbody.innerHTML = `<tr><td style="text-align:center;padding:40px;">
-        <h4 style="margin-bottom:15px;">MongoDB is not installed</h4>
-        <button class="btn-lp btn-lp-primary" onclick="DatabasePage.installPackage('mongodb')"><i class="bi bi-download"></i> Install MongoDB</button>
-      </td></tr>`;
-      return;
-    }
-    LP.paginate(dbs, 10, 'mongoTableBody', 'mongoPagination', db => `
-      <tr>
-        <td class="font-mono"><strong>${db}</strong></td>
-      </tr>
-    `, 'No MongoDB databases found', 1);
   }
 
   function renderSqlite(dbs) {
