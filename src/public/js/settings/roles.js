@@ -32,11 +32,11 @@ const RolesPage = (() => {
 
     let html = `
       <div class="table-responsive">
-        <table class="table table-borderless table-sm mb-0">
+        <table class="table table-borderless table-sm mb-0" style="color: var(--text-primary);">
           <thead>
             <tr>
-              <th style="color:var(--text-secondary);font-weight:600;font-size:12px;">Resource</th>
-              ${ACTIONS.map(a => `<th style="text-align:center;color:var(--text-secondary);font-weight:600;font-size:12px;text-transform:capitalize">${a}</th>`).join('')}
+              <th style="color:var(--text-secondary);font-weight:600;font-size:12px;padding-bottom:15px;">Resource</th>
+              ${ACTIONS.map(a => `<th style="text-align:center;color:var(--text-secondary);font-weight:600;font-size:12px;text-transform:capitalize;padding-bottom:15px;">${a}</th>`).join('')}
             </tr>
           </thead>
           <tbody>
@@ -44,8 +44,8 @@ const RolesPage = (() => {
 
     allResources.forEach(res => {
       html += `<tr>
-        <td style="font-weight:500;font-size:13px;color:var(--text-primary);padding:10px 0;">
-          <span style="display:inline-block;padding:2px 8px;background:var(--accent-primary);background-opacity:0.1;color:var(--accent-primary);border-radius:4px;font-size:11px;font-weight:600">${res.resource.toUpperCase()}</span>
+        <td style="padding:8px 0;">
+          <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size:11px;font-weight:600;letter-spacing:0.5px;">${res.resource.toUpperCase()}</span>
         </td>`;
       
       ACTIONS.forEach(action => {
