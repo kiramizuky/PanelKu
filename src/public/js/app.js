@@ -75,6 +75,7 @@ const LP = {
   put: (url, data, opts) => LP.api('PUT', url, data, opts),
   patch: (url, data, opts) => LP.api('PATCH', url, data, opts),
   del: (url, opts) => LP.api('DELETE', url, null, opts),
+  delete: (url, opts) => LP.api('DELETE', url, null, opts),
 
   // ── Auth ──────────────────────────────────────────────
   async login(username, password) {

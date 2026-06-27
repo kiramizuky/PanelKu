@@ -48,6 +48,7 @@ export const RESOURCES = {
   PERMISSIONS: 'permissions',
   SETTINGS: 'settings',
   AUDIT: 'audit',
+  SYSTEM: 'system',
 };
 
 // Token types
