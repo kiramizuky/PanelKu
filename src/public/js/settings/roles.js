@@ -18,7 +18,7 @@ const RolesPage = (() => {
 
   async function fetchResources() {
     try {
-      const res = await LP.api.get('/roles/resources');
+      const res = await LP.get('/roles/resources');
       allResources = res.data?.resources || [];
       renderPermissionsMatrix();
     } catch (err) {
@@ -67,7 +67,7 @@ const RolesPage = (() => {
 
   async function fetchRoles() {
     try {
-      const res = await LP.api.get('/roles');
+      const res = await LP.get('/roles');
       const roles = res.data?.roles || [];
       const tbody = document.getElementById('rolesTableBody');
       
@@ -116,7 +116,7 @@ const RolesPage = (() => {
 
   async function editRole(id) {
     try {
-      const res = await LP.api.get(`/roles/${id}`);
+      const res = await LP.get(`/roles/${id}`);
       const role = res.data?.role;
       if (!role) throw new Error('Role not found');
 
@@ -167,10 +167,10 @@ const RolesPage = (() => {
 
     try {
       if (id) {
-        await LP.api.put(`/roles/${id}`, payload);
+        await LP.put(`/roles/${id}`, payload);
         LP.toast('Role updated successfully', 'success');
       } else {
-        await LP.api.post('/roles', payload);
+        await LP.post('/roles', payload);
         LP.toast('Role created successfully', 'success');
       }
       roleModal.hide();
@@ -183,7 +183,7 @@ const RolesPage = (() => {
   async function deleteRole(id) {
     if (await LP.confirm('Are you sure you want to delete this role?')) {
       try {
-        await LP.api.delete(`/roles/${id}`);
+        await LP.delete(`/roles/${id}`);
         LP.toast('Role deleted successfully', 'success');
         fetchRoles();
       } catch (err) {

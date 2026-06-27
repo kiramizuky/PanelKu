@@ -17,7 +17,7 @@ const UsersPage = (() => {
 
   async function fetchRoles() {
     try {
-      const res = await LP.api.get('/roles');
+      const res = await LP.get('/roles');
       if (res.data && res.data.roles) {
         allRoles = res.data.roles;
         const roleSelect = document.getElementById('role');
@@ -30,7 +30,7 @@ const UsersPage = (() => {
 
   async function fetchUsers() {
     try {
-      const res = await LP.api.get('/users');
+      const res = await LP.get('/users');
       const users = res.data?.users || [];
       
       LP.paginate(users, 10, 'usersPagination', (pageData) => {
@@ -80,7 +80,7 @@ const UsersPage = (() => {
 
   async function editUser(id) {
     try {
-      const res = await LP.api.get(`/users/${id}`);
+      const res = await LP.get(`/users/${id}`);
       const user = res.data?.user;
       if (!user) throw new Error('User not found');
 
@@ -119,10 +119,10 @@ const UsersPage = (() => {
 
     try {
       if (id) {
-        await LP.api.put(`/users/${id}`, payload);
+        await LP.put(`/users/${id}`, payload);
         LP.toast('User updated successfully', 'success');
       } else {
-        await LP.api.post('/users', payload);
+        await LP.post('/users', payload);
         LP.toast('User created successfully', 'success');
       }
       userModal.hide();
@@ -135,7 +135,7 @@ const UsersPage = (() => {
   async function deleteUser(id) {
     if (await LP.confirm('Are you sure you want to delete this user?')) {
       try {
-        await LP.api.delete(`/users/${id}`);
+        await LP.delete(`/users/${id}`);
         LP.toast('User deleted successfully', 'success');
         fetchUsers();
       } catch (err) {
@@ -146,7 +146,7 @@ const UsersPage = (() => {
 
   async function toggleStatus(id, newStatus) {
     try {
-      await LP.api.patch(`/users/${id}/toggle`, { status: newStatus });
+      await LP.patch(`/users/${id}/toggle`, { status: newStatus });
       LP.toast('User status updated', 'success');
       fetchUsers();
     } catch (err) {

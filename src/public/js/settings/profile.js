@@ -10,7 +10,7 @@ const ProfilePage = (() => {
 
   async function loadProfile() {
     try {
-      const res = await LP.api.get('/auth/profile');
+      const res = await LP.get('/auth/profile');
       if (res.data) {
         document.getElementById('profUsername').value = res.data.username || '';
         document.getElementById('profEmail').value = res.data.email || '';
@@ -33,7 +33,7 @@ const ProfilePage = (() => {
     }
 
     try {
-      const res = await LP.api.post('/users/me/password', {
+      const res = await LP.post('/users/me/password', {
         currentPassword,
         newPassword
       });
