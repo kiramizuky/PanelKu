@@ -66,7 +66,14 @@ const N8nPage = (() => {
         const openLinkArea = document.getElementById('openLinkArea');
         const n8nWebLink = document.getElementById('n8nWebLink');
 
-        if (status === 'running') {
+        if (status === 'docker_not_running') {
+          statusText.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Docker Service Offline</span>';
+          containerInfo.textContent = 'Please make sure Docker is installed and running on your system.';
+          btnInstall.style.display = 'none';
+          btnStop.style.display = 'none';
+          btnUninstall.style.display = 'none';
+          openLinkArea.style.display = 'none';
+        } else if (status === 'running') {
           statusText.innerHTML = '<span class="text-success"><i class="bi bi-check-circle-fill"></i> Active / Running</span>';
           containerInfo.textContent = `Running container: ${info.id} (${info.status})`;
           btnInstall.style.display = 'none';

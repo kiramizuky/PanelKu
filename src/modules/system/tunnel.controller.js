@@ -1,7 +1,8 @@
 import Docker from 'dockerode';
 import { successResponse, errorResponse } from '../../helpers/response.js';
 
-const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+const isWindows = process.platform === 'win32';
+const docker = new Docker(isWindows ? { socketPath: '//./pipe/docker_engine' } : { socketPath: '/var/run/docker.sock' });
 
 class TunnelAndAppsController {
   // --- Cloudflare Tunnel ---
@@ -23,7 +24,8 @@ class TunnelAndAppsController {
         }
       });
     } catch (error) {
-      return errorResponse(res, error.message, 500);
+      console.warn('Docker daemon not reachable in getCloudflareStatus:', error.message);
+      return successResponse(res, { status: 'docker_not_running', info: null });
     }
   }
 
@@ -113,7 +115,8 @@ class TunnelAndAppsController {
         }
       });
     } catch (error) {
-      return errorResponse(res, error.message, 500);
+      console.warn('Docker daemon not reachable in getN8nStatus:', error.message);
+      return successResponse(res, { status: 'docker_not_running', info: null });
     }
   }
 

@@ -60,7 +60,11 @@ const CloudflarePage = (() => {
         const containerInfo = document.getElementById('tunnelContainerInfo');
         const btnStop = document.getElementById('btnStop');
 
-        if (status === 'running') {
+        if (status === 'docker_not_running') {
+          statusText.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Docker Service Offline</span>';
+          containerInfo.textContent = 'Please make sure Docker is installed and running on your system.';
+          btnStop.style.display = 'none';
+        } else if (status === 'running') {
           statusText.innerHTML = '<span class="text-success"><i class="bi bi-check-circle-fill"></i> Connected</span>';
           containerInfo.textContent = `Running container: ${info.id} (${info.status})`;
           btnStop.style.display = 'block';

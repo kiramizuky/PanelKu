@@ -4,7 +4,8 @@ import logger from '../../config/logger.js';
 
 class DockerService {
   constructor() {
-    this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
+    const isWindows = process.platform === 'win32';
+    this.docker = new Docker(isWindows ? { socketPath: '//./pipe/docker_engine' } : { socketPath: '/var/run/docker.sock' });
   }
 
   async getInfo() {
