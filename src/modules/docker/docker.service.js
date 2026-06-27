@@ -1,4 +1,6 @@
 import Docker from 'dockerode';
+import logger from '../../config/logger.js';
+
 
 class DockerService {
   constructor() {
@@ -157,6 +159,34 @@ class DockerService {
 
   async createContainer(data) {
     try {
+      // 1. Ensure the image is present locally, pull if not
+      let imageExists = false;
+      try {
+        await this.docker.getImage(data.image).inspect();
+        imageExists = true;
+      } catch (err) {
+        // Image not found locally
+      }
+
+      if (!imageExists) {
+        logger.info(`Image ${data.image} not found locally. Pulling from Docker Hub...`);
+        // Pull image stream helper
+        await new Promise((resolve, reject) => {
+          this.docker.pull(data.image, (err, stream) => {
+            if (err) return reject(err);
+            this.docker.modem.followProgress(stream, onFinished, onProgress);
+
+            function onFinished(err, output) {
+              if (err) return reject(err);
+              resolve(output);
+            }
+            function onProgress(event) {
+              // Can log progress
+            }
+          });
+        });
+      }
+
       // Map ports
       const PortBindings = {};
       const ExposedPorts = {};
