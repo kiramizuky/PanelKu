@@ -1,0 +1,162 @@
+/**
+ * Settings - Users logic
+ */
+
+const UsersPage = (() => {
+  let userModal = null;
+  let allRoles = [];
+
+  async function init() {
+    await LP.init();
+    
+    userModal = new bootstrap.Modal(document.getElementById('userModal'));
+    
+    await fetchRoles();
+    await fetchUsers();
+  }
+
+  async function fetchRoles() {
+    try {
+      const res = await LP.api.get('/roles');
+      if (res.data && res.data.roles) {
+        allRoles = res.data.roles;
+        const roleSelect = document.getElementById('role');
+        roleSelect.innerHTML = allRoles.map(r => `<option value="${r._id}">${r.name}</option>`).join('');
+      }
+    } catch (err) {
+      console.error('Failed to load roles', err);
+    }
+  }
+
+  async function fetchUsers() {
+    try {
+      const res = await LP.api.get('/users');
+      const users = res.data?.users || [];
+      
+      LP.paginate(users, 10, 'usersPagination', (pageData) => {
+        const tbody = document.getElementById('usersTableBody');
+        if (pageData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No users found</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = pageData.map(u => {
+          const statusBadge = u.status === 'active' 
+            ? '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Active</span>'
+            : '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">Inactive</span>';
+
+          const toggleBtn = u.status === 'active'
+            ? `<button class="btn-lp btn-lp-ghost text-warning" onclick="UsersPage.toggleStatus('${u._id}', 'inactive')" title="Deactivate"><i class="bi bi-pause-circle"></i></button>`
+            : `<button class="btn-lp btn-lp-ghost text-success" onclick="UsersPage.toggleStatus('${u._id}', 'active')" title="Activate"><i class="bi bi-play-circle"></i></button>`;
+
+          return `
+            <tr>
+              <td>${u.username}</td>
+              <td>${u.email}</td>
+              <td><span style="text-transform:uppercase;font-size:12px;font-weight:600;color:var(--accent-primary)">${u.role?.name || '-'}</span></td>
+              <td>${statusBadge}</td>
+              <td class="text-end" style="white-space:nowrap">
+                ${toggleBtn}
+                <button class="btn-lp btn-lp-ghost text-primary" onclick="UsersPage.editUser('${u._id}')" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn-lp btn-lp-ghost text-danger" onclick="UsersPage.deleteUser('${u._id}')" title="Delete"><i class="bi bi-trash"></i></button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      });
+    } catch (err) {
+      LP.toast(err.message || 'Failed to load users', 'error');
+    }
+  }
+
+  function showCreateModal() {
+    document.getElementById('userForm').reset();
+    document.getElementById('userId').value = '';
+    document.getElementById('userModalTitle').innerText = 'Add User';
+    document.getElementById('password').required = true;
+    document.getElementById('passwordHelp').innerText = 'Password is required for new users.';
+    userModal.show();
+  }
+
+  async function editUser(id) {
+    try {
+      const res = await LP.api.get(`/users/${id}`);
+      const user = res.data?.user;
+      if (!user) throw new Error('User not found');
+
+      document.getElementById('userId').value = user._id;
+      document.getElementById('username').value = user.username;
+      document.getElementById('email').value = user.email;
+      document.getElementById('role').value = user.role?._id || user.role;
+      document.getElementById('status').value = user.status;
+      
+      document.getElementById('userModalTitle').innerText = 'Edit User';
+      document.getElementById('password').required = false;
+      document.getElementById('password').value = '';
+      document.getElementById('passwordHelp').innerText = 'Leave blank to keep current password.';
+
+      userModal.show();
+    } catch (err) {
+      LP.toast(err.message || 'Failed to load user', 'error');
+    }
+  }
+
+  async function saveUser(e) {
+    e.preventDefault();
+    const id = document.getElementById('userId').value;
+    
+    const payload = {
+      username: document.getElementById('username').value,
+      email: document.getElementById('email').value,
+      role: document.getElementById('role').value,
+      status: document.getElementById('status').value
+    };
+
+    const password = document.getElementById('password').value;
+    if (password) {
+      payload.password = password;
+    }
+
+    try {
+      if (id) {
+        await LP.api.put(`/users/${id}`, payload);
+        LP.toast('User updated successfully', 'success');
+      } else {
+        await LP.api.post('/users', payload);
+        LP.toast('User created successfully', 'success');
+      }
+      userModal.hide();
+      fetchUsers();
+    } catch (err) {
+      LP.toast(err.message || 'Failed to save user', 'error');
+    }
+  }
+
+  async function deleteUser(id) {
+    if (await LP.confirm('Are you sure you want to delete this user?')) {
+      try {
+        await LP.api.delete(`/users/${id}`);
+        LP.toast('User deleted successfully', 'success');
+        fetchUsers();
+      } catch (err) {
+        LP.toast(err.message || 'Failed to delete user', 'error');
+      }
+    }
+  }
+
+  async function toggleStatus(id, newStatus) {
+    try {
+      await LP.api.patch(`/users/${id}/toggle`, { status: newStatus });
+      LP.toast('User status updated', 'success');
+      fetchUsers();
+    } catch (err) {
+      LP.toast(err.message || 'Failed to update user status', 'error');
+    }
+  }
+
+  return { init, showCreateModal, editUser, saveUser, deleteUser, toggleStatus };
+})();
+
+document.addEventListener('DOMContentLoaded', () => {
+  UsersPage.init();
+});
