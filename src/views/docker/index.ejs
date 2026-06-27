@@ -10,25 +10,25 @@
 
 <!-- Stats -->
 <div class="row g-3 mb-4">
-  <div class="col-12 col-md-3">
+  <div class="col-6 col-md-3">
     <div class="lp-glass-card p-3 text-center">
       <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Total Containers</div>
       <div style="font-size:28px;font-weight:700" id="statTotal">—</div>
     </div>
   </div>
-  <div class="col-12 col-md-3">
+  <div class="col-6 col-md-3">
     <div class="lp-glass-card p-3 text-center">
       <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Running</div>
       <div style="font-size:28px;font-weight:700;color:var(--accent-success)" id="statRunning">—</div>
     </div>
   </div>
-  <div class="col-12 col-md-3">
+  <div class="col-6 col-md-3">
     <div class="lp-glass-card p-3 text-center">
       <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Stopped</div>
       <div style="font-size:28px;font-weight:700;color:var(--accent-danger)" id="statStopped">—</div>
     </div>
   </div>
-  <div class="col-12 col-md-3">
+  <div class="col-6 col-md-3">
     <div class="lp-glass-card p-3 text-center">
       <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Images</div>
       <div style="font-size:28px;font-weight:700;color:var(--accent-info)" id="statImages">—</div>
@@ -46,11 +46,14 @@
     border: 1px solid var(--glass-border); 
     border-bottom-color: transparent; 
   }
+  .dynamic-row { display: flex; gap: 10px; margin-bottom: 10px; }
 </style>
 
 <ul class="nav nav-tabs mb-4 dk-tabs">
   <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#containers">Containers</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#images">Images</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#create-container">Create Container</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#docker-compose">Docker Compose</a></li>
 </ul>
 
 <!-- Tab Content -->
@@ -100,6 +103,114 @@
         </tbody>
       </table>
       <div id="imagesPagination" style="padding: 0 15px 15px 15px;"></div>
+    </div>
+  </div>
+
+  <!-- Create Container Tab -->
+  <div class="tab-pane fade" id="create-container">
+    <div class="row g-4">
+      <div class="col-12 col-lg-8">
+        <div class="lp-glass-card p-4">
+          <h4 style="margin-bottom:20px; font-size:16px; font-weight:600">Create Container</h4>
+          <form id="createContainerForm" onsubmit="DockerPage.submitContainer(event)">
+            <div class="row g-3">
+              <div class="col-12 col-md-6">
+                <div class="lp-form-group">
+                  <label class="lp-label">Container Name</label>
+                  <input type="text" class="lp-input" id="cName" placeholder="my-app" required>
+                </div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="lp-form-group">
+                  <label class="lp-label">Image Name</label>
+                  <input type="text" class="lp-input" id="cImage" placeholder="nginx:alpine" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="lp-form-group mt-3">
+              <label class="lp-label" style="display:flex; justify-content:space-between">
+                <span>Port Mappings</span>
+                <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" style="padding:2px 8px" onclick="DockerPage.addPortRow()">+ Add</button>
+              </label>
+              <div id="portMappingsContainer">
+                <div class="dynamic-row">
+                  <input type="number" class="lp-input" placeholder="Host Port (e.g. 8080)" data-type="host">
+                  <input type="number" class="lp-input" placeholder="Container Port (e.g. 80)" data-type="container">
+                </div>
+              </div>
+            </div>
+
+            <div class="lp-form-group mt-3">
+              <label class="lp-label" style="display:flex; justify-content:space-between">
+                <span>Volume Mappings</span>
+                <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" style="padding:2px 8px" onclick="DockerPage.addVolumeRow()">+ Add</button>
+              </label>
+              <div id="volumeMappingsContainer"></div>
+            </div>
+
+            <div class="lp-form-group mt-3">
+              <label class="lp-label" style="display:flex; justify-content:space-between">
+                <span>Environment Variables</span>
+                <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" style="padding:2px 8px" onclick="DockerPage.addEnvRow()">+ Add</button>
+              </label>
+              <div id="envContainer"></div>
+            </div>
+
+            <div class="lp-form-group mt-3">
+              <label class="lp-label">Restart Policy</label>
+              <select class="lp-input" id="cRestart">
+                <option value="unless-stopped">Unless Stopped</option>
+                <option value="always">Always</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+
+            <div class="form-check mt-3">
+              <input class="form-check-input" type="checkbox" id="cStart" checked>
+              <label class="form-check-label text-white" for="cStart">Start container immediately after creation</label>
+            </div>
+
+            <button type="submit" class="btn-lp btn-lp-primary mt-4 w-100">Create & Deploy Container</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-4">
+        <div class="lp-glass-card p-4">
+          <h4 style="margin-bottom:20px; font-size:16px; font-weight:600">Search Docker Hub</h4>
+          <div class="input-group">
+            <input type="text" id="dockerSearchTerm" class="lp-input" placeholder="e.g. redis, node...">
+            <button class="btn-lp btn-lp-primary" onclick="DockerPage.searchOnline()">Search</button>
+          </div>
+          <div id="onlineSearchResults" class="mt-3" style="max-height: 400px; overflow-y: auto;">
+            <p class="text-muted text-center" style="font-size:12px">Search results will appear here</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Docker Compose Tab -->
+  <div class="tab-pane fade" id="docker-compose">
+    <div class="lp-glass-card p-4">
+      <h4 style="margin-bottom:20px; font-size:16px; font-weight:600">Deploy with Docker Compose</h4>
+      <form onsubmit="DockerPage.deployCompose(event)">
+        <div class="lp-form-group">
+          <label class="lp-label">Project Name</label>
+          <input type="text" id="composeProjectName" class="lp-input" placeholder="my-stack" required>
+        </div>
+        <div class="lp-form-group mt-3">
+          <label class="lp-label">compose.yml content</label>
+          <textarea id="composeYaml" class="lp-input font-mono" rows="15" placeholder="version: '3.8'
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - '8080:80'" style="resize: vertical" required></textarea>
+        </div>
+        <button type="submit" class="btn-lp btn-lp-primary mt-3 w-100">Deploy Stack</button>
+      </form>
     </div>
   </div>
 </div>

@@ -1,6 +1,6 @@
 /**
  * Linux Panel — docker.js
- * Docker frontend management
+ * Docker frontend management with search, create container, and compose deployment
  */
 
 const DockerPage = (() => {
@@ -167,6 +167,153 @@ const DockerPage = (() => {
     }
   }
 
+  // --- Search, Create Container, and Compose Logic ---
+
+  function addPortRow() {
+    const container = document.getElementById('portMappingsContainer');
+    const row = document.createElement('div');
+    row.className = 'dynamic-row';
+    row.innerHTML = `
+      <input type="number" class="lp-input" placeholder="Host Port (e.g. 8080)" data-type="host">
+      <input type="number" class="lp-input" placeholder="Container Port (e.g. 80)" data-type="container">
+      <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="this.parentElement.remove()">X</button>
+    `;
+    container.appendChild(row);
+  }
+
+  function addVolumeRow() {
+    const container = document.getElementById('volumeMappingsContainer');
+    const row = document.createElement('div');
+    row.className = 'dynamic-row';
+    row.innerHTML = `
+      <input type="text" class="lp-input" placeholder="Host Path (e.g. /opt/data)" data-type="host-path">
+      <input type="text" class="lp-input" placeholder="Container Path (e.g. /app/data)" data-type="container-path">
+      <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="this.parentElement.remove()">X</button>
+    `;
+    container.appendChild(row);
+  }
+
+  function addEnvRow() {
+    const container = document.getElementById('envContainer');
+    const row = document.createElement('div');
+    row.className = 'dynamic-row';
+    row.innerHTML = `
+      <input type="text" class="lp-input" placeholder="Variable Name (e.g. NODE_ENV)" data-type="env-key">
+      <input type="text" class="lp-input" placeholder="Value" data-type="env-value">
+      <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="this.parentElement.remove()">X</button>
+    `;
+    container.appendChild(row);
+  }
+
+  async function submitContainer(e) {
+    e.preventDefault();
+
+    const name = document.getElementById('cName').value.trim();
+    const image = document.getElementById('cImage').value.trim();
+    const restart = document.getElementById('cRestart').value;
+    const startAfterCreate = document.getElementById('cStart').checked;
+
+    // Fetch port mappings
+    const ports = [];
+    document.querySelectorAll('#portMappingsContainer .dynamic-row').forEach(row => {
+      const hostVal = row.querySelector('[data-type="host"]').value;
+      const containerVal = row.querySelector('[data-type="container"]').value;
+      if (hostVal && containerVal) {
+        ports.push({ hostPort: parseInt(hostVal), containerPort: parseInt(containerVal) });
+      }
+    });
+
+    // Fetch volume mappings
+    const volumes = [];
+    document.querySelectorAll('#volumeMappingsContainer .dynamic-row').forEach(row => {
+      const hostPath = row.querySelector('[data-type="host-path"]').value.trim();
+      const containerPath = row.querySelector('[data-type="container-path"]').value.trim();
+      if (hostPath && containerPath) {
+        volumes.push({ hostPath, containerPath });
+      }
+    });
+
+    // Fetch envs
+    const env = [];
+    document.querySelectorAll('#envContainer .dynamic-row').forEach(row => {
+      const key = row.querySelector('[data-type="env-key"]').value.trim();
+      const value = row.querySelector('[data-type="env-value"]').value.trim();
+      if (key && value) {
+        env.push({ key, value });
+      }
+    });
+
+    LP.toast('Creating container...', 'info');
+
+    const res = await LP.post('/docker/containers', {
+      name, image, restart, startAfterCreate, ports, volumes, env
+    });
+
+    if (res?.success) {
+      LP.toast('Container deployed successfully!', 'success');
+      document.getElementById('createContainerForm').reset();
+      document.getElementById('portMappingsContainer').innerHTML = '';
+      document.getElementById('volumeMappingsContainer').innerHTML = '';
+      document.getElementById('envContainer').innerHTML = '';
+      loadData();
+    } else {
+      LP.toast(`Failed to create container: ${res?.message}`, 'error');
+    }
+  }
+
+  async function searchOnline() {
+    const term = document.getElementById('dockerSearchTerm').value.trim();
+    if (!term) return;
+
+    const resultsContainer = document.getElementById('onlineSearchResults');
+    resultsContainer.innerHTML = `<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Searching...</div>`;
+
+    const res = await LP.get(`/docker/images/search?term=${encodeURIComponent(term)}`);
+    if (res?.success && res.data.results) {
+      if (res.data.results.length === 0) {
+        resultsContainer.innerHTML = `<p class="text-muted text-center py-3">No images found for "${term}"</p>`;
+        return;
+      }
+
+      resultsContainer.innerHTML = res.data.results.map(img => `
+        <div style="padding:10px; border-bottom:1px solid var(--glass-border); display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div class="font-mono" style="font-weight:600; font-size:12px; color:var(--text-primary)">${img.name}</div>
+            <div style="font-size:10px; color:var(--text-muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${img.description || 'No description'}</div>
+            <div style="font-size:10px; color:var(--accent-info)">★ ${img.star_count} stars | Official: ${img.is_official ? 'Yes' : 'No'}</div>
+          </div>
+          <button class="btn-lp btn-lp-primary btn-lp-sm" style="padding: 2px 8px;" onclick="DockerPage.selectOnlineImage('${img.name}')">Select</button>
+        </div>
+      `).join('');
+    } else {
+      resultsContainer.innerHTML = `<p class="text-danger text-center py-3">Error searching Docker Hub</p>`;
+    }
+  }
+
+  function selectOnlineImage(imageName) {
+    document.getElementById('cImage').value = imageName;
+    LP.toast(`Selected image: ${imageName}`, 'success');
+  }
+
+  async function deployCompose(e) {
+    e.preventDefault();
+
+    const projectName = document.getElementById('composeProjectName').value.trim();
+    const yaml = document.getElementById('composeYaml').value;
+
+    LP.toast('Deploying Compose Stack...', 'info');
+
+    const res = await LP.post('/docker/compose', { projectName, yaml });
+    if (res?.success) {
+      LP.toast('Compose Stack deployed successfully!', 'success');
+      loadData();
+    } else {
+      LP.toast(`Deployment failed: ${res?.message}`, 'error');
+    }
+  }
+
+  // --- Log Terminal Logic ---
+
   function initSocket() {
     const token = localStorage.getItem('lp_token');
     if (!token) return;
@@ -198,84 +345,54 @@ const DockerPage = (() => {
   function viewLogs(id, name) {
     document.getElementById('logModalTitle').textContent = `Logs: ${name}`;
     const modal = new bootstrap.Modal(document.getElementById('logModal'));
-    
     modal.show();
-    
+
     setTimeout(() => {
-      fitAddon.fit();
-      term.clear();
-      if (socket?.connected) {
-        socket.emit('logs:attach', { containerId: id });
-      }
-    }, 200);
+      if (!term) initTerminal();
+      else term.clear();
+      if (fitAddon) fitAddon.fit();
+      
+      if (!socket) initSocket();
+      socket.emit('logs:attach', id);
+    }, 300);
   }
 
   function detachLogs() {
-    if (socket?.connected) {
-      socket.emit('detach');
+    if (socket) {
+      socket.emit('logs:detach');
     }
-    term?.clear();
   }
 
   async function loadData() {
     try {
       const statusRes = await LP.get('/system/check-install');
-      const isInstalled = statusRes?.success ? statusRes.data.docker : true;
+      const statuses = statusRes?.success ? statusRes.data : {};
       
-      if (isInstalled) loadSummary();
-      loadContainers(isInstalled);
-      loadImages(isInstalled);
+      loadSummary();
+      loadContainers(statuses.docker);
+      loadImages(statuses.docker);
     } catch (e) {
-      console.error('Failed to load docker data', e);
-    }
-  }
-
-  async function installPackage(pkgName) {
-    if (!(await LP.confirm(`Do you want to install ${pkgName}? This may take a few minutes.`, 'Install Docker'))) return;
-    
-    const spinner = document.createElement('div');
-    spinner.id = 'installSpinner';
-    spinner.innerHTML = `
-      <div style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-        <h4 style="color:#fff; margin-top:20px;">Installing ${pkgName}... Please wait.</h4>
-      </div>
-    `;
-    document.body.appendChild(spinner);
-
-    try {
-      const res = await LP.post('/system/install', { package: pkgName });
-      if (res?.success) {
-        LP.toast(`${pkgName} installed successfully!`, 'success');
-        loadData();
-      } else {
-        LP.toast(`Failed to install ${pkgName}: ${res?.message}`, 'error');
-      }
-    } catch (e) {
-      LP.toast(`Error installing ${pkgName}`, 'error');
-    } finally {
-      document.getElementById('installSpinner')?.remove();
+      LP.toast('Failed to load docker summary', 'error');
     }
   }
 
   return {
-    async init() {
-      await LP.init();
-      if (!LP.state.accessToken) return;
-      
-      initSocket();
-      initTerminal();
-      loadData();
-    },
     loadData,
     action,
     deleteImage,
     pruneImages,
     viewLogs,
     detachLogs,
-    installPackage
+    addPortRow,
+    addVolumeRow,
+    addEnvRow,
+    submitContainer,
+    searchOnline,
+    selectOnlineImage,
+    deployCompose
   };
 })();
 
-window.DockerPage = DockerPage;
-document.addEventListener('DOMContentLoaded', () => DockerPage.init());
+document.addEventListener('DOMContentLoaded', () => {
+  DockerPage.loadData();
+});

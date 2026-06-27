@@ -140,11 +140,97 @@ class DockerService {
 
   async pruneImages() {
     try {
-      // filters: dangling=false removes all unused images, not just dangling ones
       const res = await this.docker.pruneImages({ filters: { dangling: ['false'] } });
       return res;
     } catch (error) {
       throw new Error(`Failed to prune unused images: ${error.message}`);
+    }
+  }
+
+  async searchImages(term) {
+    try {
+      return await this.docker.searchImages({ term });
+    } catch (error) {
+      throw new Error(`Failed to search images: ${error.message}`);
+    }
+  }
+
+  async createContainer(data) {
+    try {
+      // Map ports
+      const PortBindings = {};
+      const ExposedPorts = {};
+      if (data.ports && Array.isArray(data.ports)) {
+        data.ports.forEach(p => {
+          if (p.containerPort && p.hostPort) {
+            const containerPortProto = `${p.containerPort}/tcp`;
+            ExposedPorts[containerPortProto] = {};
+            PortBindings[containerPortProto] = [{ HostPort: String(p.hostPort) }];
+          }
+        });
+      }
+
+      // Map volumes
+      const Binds = [];
+      if (data.volumes && Array.isArray(data.volumes)) {
+        data.volumes.forEach(v => {
+          if (v.hostPath && v.containerPath) {
+            Binds.push(`${v.hostPath}:${v.containerPath}`);
+          }
+        });
+      }
+
+      // Map envs
+      const Env = [];
+      if (data.env && Array.isArray(data.env)) {
+        data.env.forEach(e => {
+          if (e.key && e.value) {
+            Env.push(`${e.key}=${e.value}`);
+          }
+        });
+      }
+
+      const optsf = {
+        Image: data.image,
+        name: data.name,
+        ExposedPorts,
+        HostConfig: {
+          PortBindings,
+          Binds,
+          RestartPolicy: { Name: data.restart || 'unless-stopped' }
+        },
+        Env
+      };
+
+      const container = await this.docker.createContainer(optsf);
+      if (data.startAfterCreate) {
+        await container.start();
+      }
+      return { id: container.id.substring(0, 12) };
+    } catch (error) {
+      throw new Error(`Failed to create container: ${error.message}`);
+    }
+  }
+
+  async deployCompose(projectName, composeYaml) {
+    try {
+      const fs = (await import('fs/promises')).default;
+      const path = (await import('path')).default;
+      const { exec } = await import('child_process');
+      const util = (await import('util')).default;
+      const execAsync = util.promisify(exec);
+
+      const composeDir = path.resolve('storage', 'docker-compose', projectName);
+      await fs.mkdir(composeDir, { recursive: true });
+
+      const composePath = path.join(composeDir, 'docker-compose.yml');
+      await fs.writeFile(composePath, composeYaml, 'utf-8');
+
+      // Run docker-compose up
+      const { stdout, stderr } = await execAsync(`docker compose -p ${projectName} -f "${composePath}" up -d`);
+      return { success: true, log: stdout || stderr };
+    } catch (error) {
+      throw new Error(`Failed to deploy Docker Compose: ${error.message}`);
     }
   }
 }

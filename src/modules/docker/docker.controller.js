@@ -5,10 +5,10 @@ class DockerController {
   async getSummary(req, res) {
     try {
       const summary = await dockerService.getDashboardSummary();
-      if (!summary) return errorResponse(res, 503, 'Docker daemon not reachable');
+      if (!summary) return errorResponse(res, 'Docker daemon not reachable', 503);
       return successResponse(res, summary, 'Docker summary retrieved');
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -18,7 +18,7 @@ class DockerController {
       const containers = await dockerService.listContainers(all);
       return successResponse(res, { containers }, 'Containers retrieved');
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -27,7 +27,7 @@ class DockerController {
       const info = await dockerService.getContainerInfo(req.params.id);
       return successResponse(res, { container: info }, 'Container details retrieved');
     } catch (error) {
-      return errorResponse(res, 404, error.message);
+      return errorResponse(res, error.message, 404);
     }
   }
 
@@ -36,7 +36,7 @@ class DockerController {
       await dockerService.startContainer(req.params.id);
       return successResponse(res, null, 'Container started');
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -45,7 +45,7 @@ class DockerController {
       await dockerService.stopContainer(req.params.id);
       return successResponse(res, null, 'Container stopped');
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -54,7 +54,7 @@ class DockerController {
       await dockerService.restartContainer(req.params.id);
       return successResponse(res, null, 'Container restarted');
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -63,7 +63,7 @@ class DockerController {
       await dockerService.killContainer(req.params.id);
       return successResponse(res, null, 'Container killed');
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -73,7 +73,7 @@ class DockerController {
       await dockerService.removeContainer(req.params.id, force);
       return successResponse(res, null, 'Container removed');
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -82,7 +82,7 @@ class DockerController {
       const images = await dockerService.listImages();
       return successResponse(res, { images }, 'Images retrieved');
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -92,7 +92,7 @@ class DockerController {
       await dockerService.removeImage(req.params.id, force);
       return successResponse(res, null, 'Image removed');
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -102,6 +102,37 @@ class DockerController {
       const count = result?.ImagesDeleted?.length || 0;
       const reclaimed = result?.SpaceReclaimed || 0;
       return successResponse(res, { count, reclaimed }, `Pruned ${count} unused images`);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async searchImages(req, res) {
+    try {
+      const { term } = req.query;
+      if (!term) return errorResponse(res, 400, 'Search term is required');
+      const results = await dockerService.searchImages(term);
+      return successResponse(res, { results }, 'Images search results');
+    } catch (error) {
+      return errorResponse(res, 500, error.message);
+    }
+  }
+
+  async createContainer(req, res) {
+    try {
+      const result = await dockerService.createContainer(req.body);
+      return successResponse(res, result, 'Container created successfully');
+    } catch (error) {
+      return errorResponse(res, 500, error.message);
+    }
+  }
+
+  async deployCompose(req, res) {
+    try {
+      const { projectName, yaml } = req.body;
+      if (!projectName || !yaml) return errorResponse(res, 400, 'Project name and docker-compose YAML are required');
+      const result = await dockerService.deployCompose(projectName, yaml);
+      return successResponse(res, result, 'Docker Compose deployed successfully');
     } catch (error) {
       return errorResponse(res, 500, error.message);
     }

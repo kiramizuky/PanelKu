@@ -11,6 +11,7 @@ router.use(requirePermission('docker_manage', 'read'));
 
 router.get('/summary', dockerController.getSummary);
 router.get('/containers', dockerController.listContainers);
+router.post('/containers', requirePermission('docker_manage', 'execute'), dockerController.createContainer);
 router.get('/containers/:id', dockerController.getContainer);
 router.post('/containers/:id/start', requirePermission('docker_manage', 'execute'), dockerController.startContainer);
 router.post('/containers/:id/stop', requirePermission('docker_manage', 'execute'), dockerController.stopContainer);
@@ -18,8 +19,11 @@ router.post('/containers/:id/restart', requirePermission('docker_manage', 'execu
 router.post('/containers/:id/kill', requirePermission('docker_manage', 'execute'), dockerController.killContainer);
 router.delete('/containers/:id', requirePermission('docker_manage', 'delete'), dockerController.removeContainer);
 
+router.get('/images/search', dockerController.searchImages);
 router.get('/images', dockerController.listImages);
 router.post('/images/prune', requirePermission('docker_manage', 'delete'), dockerController.pruneImages);
 router.delete('/images/:id', requirePermission('docker_manage', 'delete'), dockerController.removeImage);
+
+router.post('/compose', requirePermission('docker_manage', 'execute'), dockerController.deployCompose);
 
 export default router;
