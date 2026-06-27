@@ -9,6 +9,9 @@ storage/temp/*
 !storage/logs/.gitkeep
 !storage/temp/.gitkeep
 *.sqlite
+storage/*.db
+storage/*.db-shm
+storage/*.db-wal
 dist/
 coverage/
 .nyc_output/
