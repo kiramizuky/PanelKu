@@ -33,14 +33,12 @@ const UsersPage = (() => {
       const res = await LP.get('/users');
       const users = Array.isArray(res.data) ? res.data : (res.data?.users || []);
       
-      LP.paginate(users, 10, 'usersPagination', (pageData) => {
-        const tbody = document.getElementById('usersTableBody');
-        if (pageData.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No users found</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = pageData.map(u => {
+      LP.paginate(
+        users, 
+        10, 
+        'usersTableBody', 
+        'usersPagination', 
+        (u) => {
           const statusBadge = u.status === 'active' 
             ? '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Active</span>'
             : '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">Inactive</span>';
@@ -62,8 +60,10 @@ const UsersPage = (() => {
               </td>
             </tr>
           `;
-        }).join('');
-      });
+        },
+        'No users found',
+        5
+      );
     } catch (err) {
       LP.toast(err.message || 'Failed to load users', 'error');
     }
