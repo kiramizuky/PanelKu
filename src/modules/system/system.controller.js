@@ -30,7 +30,7 @@ class SystemController {
 
   async getInstallStatus(req, res) {
     try {
-      const apps = ['mysql', 'postgres', 'docker', 'nginx', 'mongodb'];
+      const apps = ['mysql', 'postgres', 'docker', 'nginx', 'mongodb', 'syncthing'];
       const statuses = {};
       for (const app of apps) {
         statuses[app] = await systemService.isInstalled(app);

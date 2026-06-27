@@ -55,7 +55,8 @@ class SystemService {
         postgres: { cmd: 'psql', pkg: 'postgresql' },
         docker: { cmd: 'docker', pkg: 'docker.io' },
         nginx: { cmd: 'nginx', pkg: 'nginx' },
-        mongodb: { cmd: 'mongod', pkg: 'mongodb-org' }
+        mongodb: { cmd: 'mongod', pkg: 'mongodb-org' },
+        syncthing: { cmd: 'syncthing', pkg: 'syncthing' }
       };
       
       const mapped = packageMap[pkgName] || { cmd: pkgName, pkg: pkgName };
@@ -76,6 +77,25 @@ class SystemService {
       await this.runCommand(`if [ ! -f /usr/share/keyrings/mongodb-server-8.0.gpg ]; then curl -fsSL https://pgp.mongodb.com/server-8.0.asc | sudo gpg --yes -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor; fi`);
       await this.runCommand(`if [ ! -f /etc/apt/sources.list.d/mongodb-org-8.0.list ]; then echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list; fi`);
       await this.runCommand(`sudo apt-get update -y`);
+    }
+
+    if (pkgName === 'syncthing') {
+      logger.info('Installing and configuring Syncthing...');
+      await this.runCommand(`sudo DEBIAN_FRONTEND=noninteractive apt-get install -y syncthing`);
+      
+      // Start syncthing service once so it creates configuration files
+      await this.runCommand('systemctl enable syncthing@root && systemctl start syncthing@root').catch(() => {});
+      
+      // Wait a moment for config.xml to be generated
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Update binding address from 127.0.0.1:8384 to 0.0.0.0:8384 to allow external access
+      const configPath = '/root/.config/syncthing/config.xml';
+      await this.runCommand(`if [ -f ${configPath} ]; then sed -i 's/127.0.0.1:8384/0.0.0.0:8384/g' ${configPath}; fi`).catch(() => {});
+      
+      // Restart syncthing to apply changes
+      await this.runCommand('systemctl restart syncthing@root').catch(() => {});
+      return 'Syncthing installed and configured successfully.';
     }
 
     // Map command names to actual apt packages if needed

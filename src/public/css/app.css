@@ -187,6 +187,17 @@ body {
   border-color: var(--glass-border-hover);
 }
 
+.lp-app-item.dragging {
+  opacity: 0.4 !important;
+  border: 1px dashed var(--accent-primary) !important;
+}
+
+.lp-app-item.drag-over {
+  background: rgba(255, 255, 255, 0.4) !important;
+  border-color: var(--accent-primary) !important;
+  transform: scale(1.05);
+}
+
 .lp-app-icon {
   font-size: 2.5rem;
   margin-bottom: 10px;
