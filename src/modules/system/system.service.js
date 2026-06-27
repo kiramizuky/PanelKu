@@ -139,6 +139,124 @@ class SystemService {
 
     return true;
   }
+
+  // ── Panel Update Methods ─────────────────────────────────
+
+  async getPanelVersion() {
+    const fs = (await import('fs/promises')).default;
+    const path = (await import('path')).default;
+
+    // Read from package.json
+    let current = '1.0.0';
+    let lastUpdated = null;
+    try {
+      const pkg = JSON.parse(await fs.readFile(path.resolve('package.json'), 'utf8'));
+      current = pkg.version || '1.0.0';
+    } catch {}
+
+    // Read last updated from storage
+    try {
+      const data = JSON.parse(await fs.readFile(path.resolve('storage', 'panel.json'), 'utf8'));
+      lastUpdated = data.lastUpdated || null;
+    } catch {}
+
+    return { current, lastUpdated };
+  }
+
+  async checkPanelUpdate() {
+    const { current } = await this.getPanelVersion();
+    let latest = current;
+    let hasUpdate = false;
+
+    try {
+      // Try to fetch the latest version from npm or git
+      const result = await this.runCommand('git fetch origin && git log HEAD..origin/main --oneline 2>/dev/null | wc -l');
+      const behindCount = parseInt(result.trim()) || 0;
+      hasUpdate = behindCount > 0;
+
+      if (hasUpdate) {
+        // Try to read version from remote package.json
+        const remoteVer = await this.runCommand("git show origin/main:package.json 2>/dev/null | python3 -c \"import sys,json; print(json.load(sys.stdin).get('version',''))\" 2>/dev/null").catch(() => '');
+        latest = remoteVer.trim() || `${current}+${behindCount}`;
+      }
+    } catch {
+      // If git not available, just return current
+    }
+
+    return { current, latest, hasUpdate };
+  }
+
+  async runPanelUpdate(method = 'git', branch = 'main') {
+    let log = '';
+
+    if (method === 'git') {
+      log += await this.runCommand(`git pull origin ${branch} 2>&1`).catch(e => e.message);
+      log += '\n';
+      log += await this.runCommand('npm install --production 2>&1').catch(e => e.message);
+    } else if (method === 'npm') {
+      log += await this.runCommand('npm install --production 2>&1').catch(e => e.message);
+    }
+
+    // Save last updated timestamp
+    const fs = (await import('fs/promises')).default;
+    const path = (await import('path')).default;
+    const filePath = path.resolve('storage', 'panel.json');
+    let data = {};
+    try { data = JSON.parse(await fs.readFile(filePath, 'utf8')); } catch {}
+    data.lastUpdated = new Date().toISOString();
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2)).catch(() => {});
+
+    logger.info('Panel updated via ' + method);
+
+    // Restart via PM2 or process exit for nodemon
+    setTimeout(async () => {
+      try {
+        await this.runCommand('pm2 restart linux-panel 2>/dev/null || pm2 restart all 2>/dev/null');
+      } catch {
+        process.exit(0); // nodemon/pm2 will restart
+      }
+    }, 2000);
+
+    return log;
+  }
+
+  async restartPanel() {
+    logger.info('Panel restart initiated via Settings');
+    setTimeout(async () => {
+      try {
+        await this.runCommand('pm2 restart linux-panel 2>/dev/null');
+      } catch {
+        process.exit(0);
+      }
+    }, 1500);
+    return true;
+  }
+
+  async getPanelAutoUpdate() {
+    const fs = (await import('fs/promises')).default;
+    const path = (await import('path')).default;
+    try {
+      const data = JSON.parse(await fs.readFile(path.resolve('storage', 'panel.json'), 'utf8'));
+      return {
+        enabled: data.autoUpdate?.enabled || false,
+        frequency: data.autoUpdate?.frequency || 'daily',
+      };
+    } catch {
+      return { enabled: false, frequency: 'daily' };
+    }
+  }
+
+  async setPanelAutoUpdate(config) {
+    const fs = (await import('fs/promises')).default;
+    const path = (await import('path')).default;
+    const filePath = path.resolve('storage', 'panel.json');
+    let data = {};
+    try { data = JSON.parse(await fs.readFile(filePath, 'utf8')); } catch {}
+    data.autoUpdate = { enabled: config.enabled, frequency: config.frequency };
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+    logger.info(`Panel auto-update set to: enabled=${config.enabled} freq=${config.frequency}`);
+    return true;
+  }
 }
 
 export default new SystemService();

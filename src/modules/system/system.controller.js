@@ -100,6 +100,64 @@ class SystemController {
       return errorResponse(res, error, 500);
     }
   }
+
+  // ── Panel Update ───────────────────────────────────
+
+  async getPanelVersion(req, res) {
+    try {
+      const data = await systemService.getPanelVersion();
+      return success(res, data);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async checkPanelUpdate(req, res) {
+    try {
+      const data = await systemService.checkPanelUpdate();
+      return success(res, data);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async runPanelUpdate(req, res) {
+    try {
+      const { method = 'git', branch = 'main' } = req.body;
+      const log = await systemService.runPanelUpdate(method, branch);
+      return success(res, { log }, 'Panel update started');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async restartPanel(req, res) {
+    try {
+      await systemService.restartPanel();
+      return success(res, null, 'Panel is restarting');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async getPanelAutoUpdate(req, res) {
+    try {
+      const data = await systemService.getPanelAutoUpdate();
+      return success(res, data);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async setPanelAutoUpdate(req, res) {
+    try {
+      const { enabled, frequency } = req.body;
+      await systemService.setPanelAutoUpdate({ enabled: !!enabled, frequency: frequency || 'daily' });
+      return success(res, null, `Panel auto-update ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
 }
 
 export default new SystemController();

@@ -104,6 +104,7 @@ const createApp = () => {
   app.get('/settings/users', (req, res) => res.render('settings/users', { title: 'Users' }));
   app.get('/settings/roles', (req, res) => res.render('settings/roles', { title: 'Roles' }));
   app.get('/settings/profile', (req, res) => res.render('settings/profile', { title: 'Profile' }));
+  app.get('/settings/panel', (req, res) => res.render('settings/panel', { title: 'Panel Update' }));
 
   // Error handlers (must be last)
   app.use(notFoundHandler);

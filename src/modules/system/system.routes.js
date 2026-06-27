@@ -21,5 +21,13 @@ router.post('/apt/upgrade', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemContr
 router.post('/reboot', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.reboot.bind(systemController));
 router.post('/auto-update', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.setAutoUpdate.bind(systemController));
 
+// Panel self-update routes
+router.get('/panel/version', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getPanelVersion.bind(systemController));
+router.get('/panel/check-update', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.checkPanelUpdate.bind(systemController));
+router.get('/panel/auto-update', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getPanelAutoUpdate.bind(systemController));
+router.post('/panel/update', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.runPanelUpdate.bind(systemController));
+router.post('/panel/restart', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.restartPanel.bind(systemController));
+router.post('/panel/auto-update', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.setPanelAutoUpdate.bind(systemController));
+
 export default router;
 

@@ -1,0 +1,129 @@
+<div class="row g-4">
+  <!-- Sidebar -->
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-0">
+      <div class="lp-card-body p-0">
+        <div class="list-group list-group-flush" style="border-radius:16px;overflow:hidden">
+          <a href="/settings/profile" class="list-group-item list-group-item-action" style="background:transparent;color:var(--text-secondary);border-bottom:1px solid var(--glass-border);padding:15px 20px;">My Profile</a>
+          <a href="/settings/users" class="list-group-item list-group-item-action" style="background:transparent;color:var(--text-secondary);border-bottom:1px solid var(--glass-border);padding:15px 20px;">Users</a>
+          <a href="/settings/roles" class="list-group-item list-group-item-action" style="background:transparent;color:var(--text-secondary);border-bottom:1px solid var(--glass-border);padding:15px 20px;">Roles & Permissions</a>
+          <a href="/settings/panel" class="list-group-item list-group-item-action" style="background:var(--accent-primary);color:#fff;border:none;padding:15px 20px;">Panel Update</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="col-12 col-md-9">
+
+    <!-- Current Version Card -->
+    <div class="lp-glass-card mb-4">
+      <div class="lp-card-header" style="border-bottom:1px solid var(--glass-border);padding-bottom:15px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h3 class="lp-card-title m-0">Panel Version</h3>
+          <p style="color:var(--text-secondary);font-size:13px;margin:4px 0 0;">Current installation info</p>
+        </div>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="PanelPage.checkUpdate()" id="btnCheckUpdate">
+          <i class="bi bi-arrow-repeat"></i> Check for Updates
+        </button>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div style="background:var(--bg-tertiary);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Current Version</div>
+            <div id="currentVersion" style="font-size:24px;font-weight:700;color:var(--accent-primary);font-family:monospace;">—</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div style="background:var(--bg-tertiary);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Latest Version</div>
+            <div id="latestVersion" style="font-size:24px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div style="background:var(--bg-tertiary);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Status</div>
+            <div id="updateStatus" style="font-size:15px;font-weight:600;margin-top:4px;">
+              <span class="lp-badge lp-badge-warning"><span class="lp-badge-dot"></span>Not Checked</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Update Action Card -->
+    <div class="lp-glass-card mb-4">
+      <div class="lp-card-header" style="border-bottom:1px solid var(--glass-border);padding-bottom:15px;margin-bottom:20px;">
+        <h3 class="lp-card-title m-0">Panel Update</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin:4px 0 0;">Pull latest changes and restart the panel</p>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:250px;">
+          <div class="lp-form-group">
+            <label class="lp-label">Update Method</label>
+            <select id="updateMethod" class="lp-input">
+              <option value="git">Git Pull (Recommended)</option>
+              <option value="npm">NPM Update Only</option>
+            </select>
+          </div>
+          <div class="lp-form-group">
+            <label class="lp-label">Branch</label>
+            <input type="text" id="updateBranch" class="lp-input" value="main" placeholder="main">
+          </div>
+          <div style="display:flex;gap:10px;margin-top:5px;">
+            <button class="btn-lp btn-lp-primary" onclick="PanelPage.runUpdate()" id="btnUpdate">
+              <i class="bi bi-cloud-download"></i> Update Panel
+            </button>
+            <button class="btn-lp btn-lp-ghost" onclick="PanelPage.restartPanel()" id="btnRestart">
+              <i class="bi bi-arrow-clockwise"></i> Restart Only
+            </button>
+          </div>
+        </div>
+
+        <div style="flex:2;min-width:300px;">
+          <label class="lp-label">Update Log</label>
+          <div id="updateLog" style="background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:10px;padding:14px;font-family:monospace;font-size:12px;color:var(--text-secondary);min-height:150px;max-height:300px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;">
+Ready. Click "Update Panel" to start.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auto-Update Schedule Card -->
+    <div class="lp-glass-card">
+      <div class="lp-card-header" style="border-bottom:1px solid var(--glass-border);padding-bottom:15px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h3 class="lp-card-title m-0">Auto-Update Schedule</h3>
+          <p style="color:var(--text-secondary);font-size:13px;margin:4px 0 0;">Automatically check & apply panel updates</p>
+        </div>
+        <div class="form-check form-switch m-0">
+          <input class="form-check-input" type="checkbox" id="autoUpdateToggle" onchange="PanelPage.toggleAutoUpdate()" style="width:42px;height:22px;cursor:pointer;">
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="lp-form-group">
+            <label class="lp-label">Update Frequency</label>
+            <select id="autoUpdateFreq" class="lp-input" onchange="PanelPage.saveAutoUpdateConfig()">
+              <option value="daily">Daily (at midnight)</option>
+              <option value="weekly">Weekly (Sunday midnight)</option>
+              <option value="manual">Manual Only</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="lp-form-group">
+            <label class="lp-label">Last Updated</label>
+            <input type="text" id="lastUpdatedAt" class="lp-input" readonly style="opacity:0.7;" value="—">
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/js/settings/panel.js"></script>
