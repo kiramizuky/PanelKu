@@ -113,8 +113,14 @@ setup_panel() {
     log "Generated secure secrets"
   fi
 
+  info "Setting up storage permissions..."
+  mkdir -p storage
+  chmod -R 777 storage
+
+
   info "Installing npm packages..."
   npm install --production -q
+  npm rebuild better-sqlite3
 
   info "Starting panel with PM2..."
   pm2 start ecosystem.config.cjs --env production
