@@ -11,7 +11,11 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please slow down.' },
   skip: (req) => {
-    if (req.ip === '127.0.0.1') return true;
+    // Bypass localhost/loopbacks and private local IPs
+    const ip = req.ip || req.connection.remoteAddress;
+    if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return true;
+    if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) return true;
+    
     if (req.path.startsWith('/dashboard/metrics') || req.path.startsWith('/dashboard/info')) return true;
     return false;
   },
