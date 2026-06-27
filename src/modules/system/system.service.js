@@ -190,11 +190,13 @@ class SystemService {
     let log = '';
 
     if (method === 'git') {
-      log += await this.runCommand(`git pull origin ${branch} 2>&1`).catch(e => e.message);
+      // Mark directory safe for root (required when running as root via systemd)
+      log += await this.runCommand('git config --global --add safe.directory $(pwd) 2>&1').catch(() => '');
+      log += await this.runCommand(`git pull origin ${branch} 2>&1`).catch(e => `[git pull error] ${e.message}`);
       log += '\n';
-      log += await this.runCommand('npm install --production 2>&1').catch(e => e.message);
+      log += await this.runCommand('npm install --production 2>&1').catch(e => `[npm install error] ${e.message}`);
     } else if (method === 'npm') {
-      log += await this.runCommand('npm install --production 2>&1').catch(e => e.message);
+      log += await this.runCommand('npm install --production 2>&1').catch(e => `[npm install error] ${e.message}`);
     }
 
     // Save last updated timestamp
@@ -208,27 +210,35 @@ class SystemService {
 
     logger.info('Panel updated via ' + method);
 
-    // Restart via PM2 or process exit for nodemon
+    // Schedule restart AFTER response is sent (3s delay).
+    // Uses systemctl restart panelku (service runs as root, no sudo needed).
+    // Falls back to process.exit(0) for dev mode (node --watch will restart).
     setTimeout(async () => {
+      logger.info('Panel restarting after update via systemctl...');
       try {
-        await this.runCommand('pm2 restart linux-panel 2>/dev/null || pm2 restart all 2>/dev/null');
+        await this.runCommand('systemctl restart panelku');
       } catch {
-        process.exit(0); // nodemon/pm2 will restart
+        logger.warn('systemctl restart failed, falling back to process.exit(0)');
+        process.exit(0);
       }
-    }, 2000);
+    }, 3000);
 
     return log;
   }
 
   async restartPanel() {
     logger.info('Panel restart initiated via Settings');
+    // Delay to ensure the HTTP response is fully sent first.
+    // Uses systemctl restart panelku; falls back to process.exit(0) in dev mode.
     setTimeout(async () => {
+      logger.info('Panel exiting for restart via systemctl...');
       try {
-        await this.runCommand('pm2 restart linux-panel 2>/dev/null');
+        await this.runCommand('systemctl restart panelku');
       } catch {
+        logger.warn('systemctl restart failed, falling back to process.exit(0)');
         process.exit(0);
       }
-    }, 1500);
+    }, 2000);
     return true;
   }
 

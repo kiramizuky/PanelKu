@@ -73,15 +73,13 @@ const PanelPage = (() => {
       const res = await LP.post('/system/panel/update', { method, branch });
       if (res?.success) {
         logEl.textContent += res.data?.log || 'Update completed.\n';
-        logEl.textContent += '\n✅ Panel updated successfully. Restarting...';
+        logEl.textContent += '\n✅ Panel updated successfully.';
+        logEl.textContent += '\n⏳ Waiting for panel to restart (this may take 10-20 seconds)...';
         logEl.scrollTop = logEl.scrollHeight;
-        LP.toast('Panel updated! Restarting...', 'success');
+        LP.toast('Panel updated! Waiting for restart...', 'success');
 
-        // Reload after a few seconds
-        setTimeout(() => {
-          logEl.textContent += '\n🔄 Reconnecting...';
-          window.location.reload();
-        }, 5000);
+        // Poll until server is back up, then reload
+        startReconnectPolling(logEl);
       } else {
         logEl.textContent += `\n❌ Error: ${res?.message || 'Unknown error'}`;
         LP.toast(res?.message || 'Update failed', 'error');
@@ -103,15 +101,18 @@ const PanelPage = (() => {
     btn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Restarting...';
     btn.disabled = true;
 
+    const logEl = document.getElementById('updateLog');
+    logEl.textContent = '⏳ Sending restart signal...';
+
     try {
       await LP.post('/system/panel/restart');
-      LP.toast('Panel is restarting. Reconnecting in 10 seconds...', 'warning');
-      setTimeout(() => window.location.reload(), 10000);
-    } catch (err) {
-      // Expected — server restarted
-      LP.toast('Panel is restarting. Reconnecting in 10 seconds...', 'warning');
-      setTimeout(() => window.location.reload(), 10000);
+    } catch {
+      // Expected — server may close connection immediately
     }
+
+    logEl.textContent += '\n⏳ Waiting for panel to come back online...';
+    LP.toast('Panel is restarting...', 'warning');
+    startReconnectPolling(logEl);
   }
 
   async function loadAutoUpdateConfig() {
@@ -147,6 +148,46 @@ const PanelPage = (() => {
     } catch (err) {
       LP.toast('Failed to save auto-update config', 'error');
     }
+  }
+
+  /**
+   * Poll /api/health until the server responds, then reload.
+   * Waits up to 60 seconds before giving up.
+   */
+  function startReconnectPolling(logEl) {
+    const maxWait = 60000;   // 60s max
+    const interval = 2000;   // check every 2s
+    const start = Date.now();
+    let dots = 0;
+
+    const poll = setInterval(async () => {
+      dots++;
+      const elapsed = Math.round((Date.now() - start) / 1000);
+
+      if (Date.now() - start > maxWait) {
+        clearInterval(poll);
+        logEl.textContent += `\n❌ Server did not come back online after ${maxWait / 1000}s. Please check PM2/server logs.`;
+        return;
+      }
+
+      try {
+        const r = await fetch('/api/health', { signal: AbortSignal.timeout(3000) });
+        if (r.ok) {
+          clearInterval(poll);
+          logEl.textContent += `\n✅ Panel is back online after ${elapsed}s! Reloading...`;
+          if (logEl) logEl.scrollTop = logEl.scrollHeight;
+          setTimeout(() => window.location.reload(), 800);
+        }
+      } catch {
+        // Server still down — keep polling
+        if (logEl) {
+          const lastNl = logEl.textContent.lastIndexOf('\n');
+          const base = logEl.textContent.substring(0, lastNl + 1);
+          logEl.textContent = base + `🔄 Waiting for restart... ${elapsed}s`;
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+      }
+    }, interval);
   }
 
   return { init, checkUpdate, runUpdate, restartPanel, toggleAutoUpdate, saveAutoUpdateConfig };
