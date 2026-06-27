@@ -31,7 +31,7 @@ const UsersPage = (() => {
   async function fetchUsers() {
     try {
       const res = await LP.get('/users');
-      const users = res.data?.users || [];
+      const users = Array.isArray(res.data) ? res.data : (res.data?.users || []);
       
       LP.paginate(users, 10, 'usersPagination', (pageData) => {
         const tbody = document.getElementById('usersTableBody');

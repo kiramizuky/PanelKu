@@ -11,10 +11,10 @@ const ProfilePage = (() => {
   async function loadProfile() {
     try {
       const res = await LP.get('/auth/profile');
-      if (res.data) {
-        document.getElementById('profUsername').value = res.data.username || '';
-        document.getElementById('profEmail').value = res.data.email || '';
-        document.getElementById('profRole').value = (res.data.role?.name || '').toUpperCase();
+      if (res.data && res.data.user) {
+        document.getElementById('profUsername').value = res.data.user.username || '';
+        document.getElementById('profEmail').value = res.data.user.email || '';
+        document.getElementById('profRole').value = (res.data.user.role?.name || '').toUpperCase();
       }
     } catch (err) {
       LP.toast('Failed to load profile details.', 'error');
