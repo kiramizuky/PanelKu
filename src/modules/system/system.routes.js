@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import systemController from './system.controller.js';
+import tunnelController from './tunnel.controller.js';
 import { authenticate } from '../../middleware/auth.js';
 import { rbac } from '../../middleware/rbac.js';
 import { RESOURCES, ACTIONS } from '../../config/constants.js';
@@ -28,6 +29,17 @@ router.get('/panel/auto-update', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemCon
 router.post('/panel/update', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.runPanelUpdate.bind(systemController));
 router.post('/panel/restart', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.restartPanel.bind(systemController));
 router.post('/panel/auto-update', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.setPanelAutoUpdate.bind(systemController));
+
+// Cloudflare Tunnel endpoints
+router.get('/cloudflare', rbac(RESOURCES.SYSTEM, ACTIONS.READ), tunnelController.getCloudflareStatus);
+router.post('/cloudflare/start', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), tunnelController.startCloudflare);
+router.post('/cloudflare/stop', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), tunnelController.stopCloudflare);
+
+// n8n endpoints
+router.get('/n8n', rbac(RESOURCES.SYSTEM, ACTIONS.READ), tunnelController.getN8nStatus);
+router.post('/n8n/start', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), tunnelController.startN8n);
+router.post('/n8n/stop', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), tunnelController.stopN8n);
+router.post('/n8n/uninstall', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), tunnelController.uninstallN8n);
 
 export default router;
 

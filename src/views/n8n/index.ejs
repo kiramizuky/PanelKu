@@ -1,0 +1,141 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">n8n Automation</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Deploy and manage n8n Workflow Automation platform on your server</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-ghost" onclick="N8nPage.loadStatus()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Status & Deploy Manager -->
+  <div class="col-12 col-lg-7">
+    <div class="lp-glass-card p-4">
+      <h3 style="font-size:16px; font-weight:600; margin-bottom:20px;">Installation Management</h3>
+
+      <div id="n8nStatusArea" class="mb-4 p-3 rounded" style="background:rgba(255,255,255,0.05); border:1px solid var(--glass-border);">
+        <div style="font-size:12px; color:var(--text-muted);">Current Status:</div>
+        <div style="font-size:18px; font-weight:700; margin-top:5px;" id="n8nStatusText">Checking...</div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:5px;" id="n8nContainerInfo"></div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button class="btn-lp btn-lp-primary flex-fill" id="btnInstall" onclick="N8nPage.startN8n()">Deploy/Start n8n</button>
+        <button class="btn-lp btn-lp-ghost text-warning" id="btnStop" onclick="N8nPage.stopN8n()" style="display:none;"><i class="bi bi-stop-fill"></i> Stop</button>
+        <button class="btn-lp btn-lp-danger" id="btnUninstall" onclick="N8nPage.uninstallN8n()" style="display:none;"><i class="bi bi-trash"></i> Delete Container</button>
+      </div>
+
+      <div class="mt-4" id="openLinkArea" style="display:none;">
+        <hr style="border-color:var(--glass-border);">
+        <a href="" id="n8nWebLink" target="_blank" class="btn-lp btn-lp-primary w-100 text-center" style="background:var(--accent-success); border-color:var(--accent-success); display:block; padding:10px 0;"><i class="bi bi-box-arrow-up-right"></i> Open n8n Dashboard</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resource Optimization info -->
+  <div class="col-12 col-lg-5">
+    <div class="lp-glass-card p-4">
+      <h3 style="font-size:16px; font-weight:600; margin-bottom:15px;"><i class="bi bi-cpu text-warning"></i> Resource Optimization</h3>
+      <p style="font-size:12px; color:var(--text-secondary); line-height:1.6;">To support lightweight Armbian devices, n8n is automatically configured with a memory limit of <strong>256MB RAM</strong>. This prevents out-of-memory crashes on your STB while maintaining rapid workflow executions.</p>
+      
+      <div class="p-3 rounded mt-3" style="background:rgba(255,255,255,0.02); border:1px solid var(--glass-border); font-size:11px;">
+        <strong>Configuration Details:</strong>
+        <ul style="margin:5px 0 0 0; padding-left:15px; color:var(--text-muted);">
+          <li>Docker Container Name: <code>n8n-container</code></li>
+          <li>Port Binding: <code>5678:5678</code></li>
+          <li>Data Directory: <code>n8n-data</code> (Docker Volume)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const N8nPage = (() => {
+  async function loadStatus() {
+    try {
+      const res = await LP.get('/system/n8n');
+      if (res?.success) {
+        const { status, info } = res.data;
+        const statusText = document.getElementById('n8nStatusText');
+        const containerInfo = document.getElementById('n8nContainerInfo');
+        const btnInstall = document.getElementById('btnInstall');
+        const btnStop = document.getElementById('btnStop');
+        const btnUninstall = document.getElementById('btnUninstall');
+        const openLinkArea = document.getElementById('openLinkArea');
+        const n8nWebLink = document.getElementById('n8nWebLink');
+
+        if (status === 'running') {
+          statusText.innerHTML = '<span class="text-success"><i class="bi bi-check-circle-fill"></i> Active / Running</span>';
+          containerInfo.textContent = `Running container: ${info.id} (${info.status})`;
+          btnInstall.style.display = 'none';
+          btnStop.style.display = 'block';
+          btnUninstall.style.display = 'block';
+          openLinkArea.style.display = 'block';
+          n8nWebLink.href = `http://${window.location.hostname}:5678`;
+        } else if (status === 'not_installed') {
+          statusText.innerHTML = '<span class="text-muted"><i class="bi bi-x-circle"></i> Not Deployed</span>';
+          containerInfo.textContent = '';
+          btnInstall.style.display = 'block';
+          btnInstall.textContent = 'Deploy / Start n8n';
+          btnStop.style.display = 'none';
+          btnUninstall.style.display = 'none';
+          openLinkArea.style.display = 'none';
+        } else {
+          statusText.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-circle-fill"></i> Stopped (${status})</span>`;
+          containerInfo.textContent = info ? `Status: ${info.status}` : '';
+          btnInstall.style.display = 'block';
+          btnInstall.textContent = 'Start n8n';
+          btnStop.style.display = 'none';
+          btnUninstall.style.display = 'block';
+          openLinkArea.style.display = 'none';
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function startN8n() {
+    LP.toast('Deploying/Starting n8n...', 'info');
+    const res = await LP.post('/system/n8n/start');
+    if (res?.success) {
+      LP.toast('n8n started successfully!', 'success');
+      loadStatus();
+    } else {
+      LP.toast(res?.message || 'Deployment failed', 'error');
+    }
+  }
+
+  async function stopN8n() {
+    LP.toast('Stopping n8n...', 'info');
+    const res = await LP.post('/system/n8n/stop');
+    if (res?.success) {
+      LP.toast('n8n stopped successfully', 'success');
+      loadStatus();
+    } else {
+      LP.toast(res?.message || 'Failed to stop n8n', 'error');
+    }
+  }
+
+  async function uninstallN8n() {
+    if (!(await LP.confirm('This will delete the n8n container. Your workflow data volume will remain intact. Continue?', 'Delete Container'))) return;
+
+    LP.toast('Deleting container...', 'info');
+    const res = await LP.post('/system/n8n/uninstall');
+    if (res?.success) {
+      LP.toast('n8n container deleted successfully', 'success');
+      loadStatus();
+    } else {
+      LP.toast(res?.message || 'Failed to delete n8n', 'error');
+    }
+  }
+
+  return { loadStatus, startN8n, stopN8n, uninstallN8n };
+})();
+
+document.addEventListener('DOMContentLoaded', () => {
+  N8nPage.loadStatus();
+});
+</script>

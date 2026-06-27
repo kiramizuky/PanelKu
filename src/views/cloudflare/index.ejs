@@ -1,0 +1,117 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Cloudflare Tunnel</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Expose local servers securely to the internet without opening ports</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-ghost" onclick="CloudflarePage.loadStatus()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Status & Token Management -->
+  <div class="col-12 col-lg-6">
+    <div class="lp-glass-card p-4">
+      <h3 style="font-size:16px; font-weight:600; margin-bottom:20px;">Configure Tunnel Connection</h3>
+      
+      <div id="tunnelStatusArea" class="mb-4 p-3 rounded" style="background:rgba(255,255,255,0.05); border:1px solid var(--glass-border);">
+        <div style="font-size:12px; color:var(--text-muted);">Current Status:</div>
+        <div style="font-size:18px; font-weight:700; margin-top:5px;" id="tunnelStatusText">Checking...</div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:5px;" id="tunnelContainerInfo"></div>
+      </div>
+
+      <form id="cloudflareForm" onsubmit="CloudflarePage.startTunnel(event)">
+        <div class="lp-form-group">
+          <label class="lp-label">Cloudflare Tunnel Token</label>
+          <textarea id="cfToken" class="lp-input font-mono" rows="5" placeholder="Paste your Cloudflare Zero Trust Tunnel Token here..." required></textarea>
+        </div>
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn-lp btn-lp-primary flex-fill" id="btnStart">Connect Tunnel</button>
+          <button type="button" class="btn-lp btn-lp-danger" id="btnStop" onclick="CloudflarePage.stopTunnel()" style="display:none;">Disconnect</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="col-12 col-lg-6">
+    <div class="lp-glass-card p-4">
+      <h3 style="font-size:16px; font-weight:600; margin-bottom:15px;"><i class="bi bi-info-circle text-info"></i> How to setup Cloudflare Tunnel</h3>
+      <ol style="font-size:12px; color:var(--text-secondary); line-height:1.8; padding-left:15px;">
+        <li>Log in to your <strong>Cloudflare Zero Trust</strong> dashboard.</li>
+        <li>Go to <strong>Networks</strong> -> <strong>Tunnels</strong> and click <strong>Create a Tunnel</strong>.</li>
+        <li>Select <strong>cloudflared</strong> connector type.</li>
+        <li>Give your tunnel a name and save.</li>
+        <li>Under "Install and run a connector", copy the long token string (everything after <code>--token</code> flag).</li>
+        <li>Paste the token on this page and click <strong>Connect Tunnel</strong>.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<script>
+const CloudflarePage = (() => {
+  async function loadStatus() {
+    try {
+      const res = await LP.get('/system/cloudflare');
+      if (res?.success) {
+        const { status, info } = res.data;
+        const statusText = document.getElementById('tunnelStatusText');
+        const containerInfo = document.getElementById('tunnelContainerInfo');
+        const btnStop = document.getElementById('btnStop');
+
+        if (status === 'running') {
+          statusText.innerHTML = '<span class="text-success"><i class="bi bi-check-circle-fill"></i> Connected</span>';
+          containerInfo.textContent = `Running container: ${info.id} (${info.status})`;
+          btnStop.style.display = 'block';
+        } else if (status === 'not_installed') {
+          statusText.innerHTML = '<span class="text-muted"><i class="bi bi-x-circle"></i> Not Installed / Configured</span>';
+          containerInfo.textContent = '';
+          btnStop.style.display = 'none';
+        } else {
+          statusText.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-circle-fill"></i> ${status}</span>`;
+          containerInfo.textContent = info ? `Container status: ${info.status}` : '';
+          btnStop.style.display = 'block';
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function startTunnel(e) {
+    e.preventDefault();
+    const token = document.getElementById('cfToken').value.trim();
+    if (!token) return;
+
+    LP.toast('Deploying Tunnel Connector...', 'info');
+    const res = await LP.post('/system/cloudflare/start', { token });
+    if (res?.success) {
+      LP.toast('Cloudflare Tunnel started!', 'success');
+      document.getElementById('cfToken').value = '';
+      loadStatus();
+    } else {
+      LP.toast(res?.message || 'Connection failed', 'error');
+    }
+  }
+
+  async function stopTunnel() {
+    if (!(await LP.confirm('Are you sure you want to stop and delete the Cloudflare Tunnel?', 'Disconnect Tunnel'))) return;
+    
+    LP.toast('Disconnecting...', 'info');
+    const res = await LP.post('/system/cloudflare/stop');
+    if (res?.success) {
+      LP.toast('Cloudflare Tunnel stopped & removed', 'success');
+      loadStatus();
+    } else {
+      LP.toast(res?.message || 'Failed to stop tunnel', 'error');
+    }
+  }
+
+  return { loadStatus, startTunnel, stopTunnel };
+})();
+
+document.addEventListener('DOMContentLoaded', () => {
+  CloudflarePage.loadStatus();
+});
+</script>
