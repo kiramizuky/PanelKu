@@ -15,7 +15,7 @@ NC='\033[0m'
 
 PANEL_DIR="/opt/linux-panel"
 PANEL_PORT=3000
-NODE_VERSION=20
+NODE_VERSION=22
 
 print_banner() {
   echo -e "${CYAN}"
