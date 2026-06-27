@@ -1,0 +1,175 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">WhatsApp Multi-Account</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage multiple WhatsApp API accounts and webhook targets</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-primary" onclick="WhatsappPage.showCreateModal()"><i class="bi bi-plus-lg"></i> Add Account</button>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Accounts List -->
+  <div class="col-12 col-lg-8">
+    <div class="lp-glass-card" style="padding:0; overflow-x:auto;">
+      <table class="lp-table">
+        <thead>
+          <tr>
+            <th>Session Name</th>
+            <th>Status</th>
+            <th>Webhook URL</th>
+            <th style="text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="whatsappTableBody">
+          <tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted)">Loading accounts...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- API Docs / Swagger -->
+    <div class="lp-glass-card p-4 mt-4">
+      <h3 style="font-size:16px; font-weight:600; margin-bottom:15px;"><i class="bi bi-journal-code text-info"></i> API Integration Documentation</h3>
+      <p style="font-size:12px; color:var(--text-muted);">Integrate your scripts, bots, or apps using these endpoints. Authentication header: <code>Authorization: Bearer &lt;token&gt;</code> atau <code>X-API-Key: &lt;key&gt;</code>.</p>
+      
+      <div class="accordion" id="apiAccordion" style="--bs-accordion-bg: transparent; --bs-accordion-border-color: var(--glass-border);">
+        <div class="accordion-item" style="border: 1px solid var(--glass-border); background: rgba(0,0,0,0.1); margin-bottom:10px; border-radius:8px;">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed text-white font-mono" style="background: transparent;" type="button" data-bs-toggle="collapse" data-bs-target="#apiSend">
+              <span class="badge bg-success me-2">POST</span> /api/whatsapp/accounts/{name}/send
+            </button>
+          </h2>
+          <div id="apiSend" class="accordion-collapse collapse" data-bs-parent="#apiAccordion">
+            <div class="accordion-body font-mono" style="font-size:12px; color:var(--text-secondary)">
+              <strong>Request Body - Text (JSON):</strong>
+              <pre style="background:rgba(0,0,0,0.3); padding:10px; border-radius:5px; margin-top:5px; color:#a78bfa;">{
+  "to": "628123456789",
+  "message": "Halo dari Linux Panel!"
+}</pre>
+              <strong class="mt-2 d-block">Request Body - Media/File (JSON):</strong>
+              <pre style="background:rgba(0,0,0,0.3); padding:10px; border-radius:5px; margin-top:5px; color:#a78bfa;">{
+  "to": "628123456789",
+  "message": "Caption file (optional)",
+  "mediaUrl": "https://server.com/file.pdf",
+  "mediaType": "document",
+  "filename": "laporan.pdf",
+  "mimetype": "application/pdf"
+}</pre>
+              <div style="font-size: 10px; color: var(--text-muted); margin-top:5px;">
+                * mediaType options: <code>image</code>, <code>video</code>, <code>audio</code>, <code>document</code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion-item" style="border: 1px solid var(--glass-border); background: rgba(0,0,0,0.1); border-radius:8px;">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed text-white font-mono" style="background: transparent;" type="button" data-bs-toggle="collapse" data-bs-target="#apiWebhook">
+              <span class="badge bg-primary me-2">POST</span> /api/whatsapp/accounts/{name}/webhook
+            </button>
+          </h2>
+          <div id="apiWebhook" class="accordion-collapse collapse" data-bs-parent="#apiAccordion">
+            <div class="accordion-body font-mono" style="font-size:12px; color:var(--text-secondary)">
+              <strong>Request Body (JSON):</strong>
+              <pre style="background:rgba(0,0,0,0.3); padding:10px; border-radius:5px; margin-top:5px; color:#a78bfa;">{
+  "webhookUrl": "https://mywebsite.com/callback"
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR & Setup Side Panel -->
+  <div class="col-12 col-lg-4">
+    <div class="lp-glass-card p-4 text-center" id="qrContainer" style="display:none;">
+      <h3 style="font-size:16px; font-weight:600; margin-bottom:15px;" id="qrTitle">Scan QR Code</h3>
+      <div style="background:#fff; padding:15px; border-radius:10px; display:inline-block; margin-bottom:15px;">
+        <img id="qrImage" src="" style="width:200px; height:200px;" alt="QR Code">
+      </div>
+      <p style="font-size:12px; color:var(--text-muted)">Scan this QR code using WhatsApp Link Devices on your phone.</p>
+      <div class="spinner-border spinner-border-sm text-primary" role="status"></div> <span style="font-size:11px;" class="text-muted">Waiting for scan...</span>
+    </div>
+  </div>
+</div>
+
+<!-- Create Modal -->
+<div class="modal fade" id="createAccountModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:14px">Add WhatsApp Session</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="createAccountForm" onsubmit="WhatsappPage.createAccount(event)">
+        <div class="modal-body">
+          <div class="lp-form-group">
+            <label class="lp-label">Session Name (Unique)</label>
+            <input type="text" id="accName" class="lp-input" placeholder="e.g. cs-number, billing" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lp btn-lp-primary">Add Session</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Webhook Modal -->
+<div class="modal fade" id="webhookModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:14px" id="webhookModalTitle">Configure Webhook</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="webhookForm" onsubmit="WhatsappPage.submitWebhook(event)">
+        <input type="hidden" id="webhookSessionName">
+        <div class="modal-body">
+          <div class="lp-form-group">
+            <label class="lp-label">Webhook URL (Target HTTP POST)</label>
+            <input type="url" id="webhookUrlVal" class="lp-input" placeholder="https://api.mywebsite.com/wa-callback" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lp btn-lp-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Test Message Modal -->
+<div class="modal fade" id="testMsgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:14px">Test Send Message</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="testMsgForm" onsubmit="WhatsappPage.submitTestMessage(event)">
+        <input type="hidden" id="testSessionName">
+        <div class="modal-body">
+          <div class="lp-form-group">
+            <label class="lp-label">Phone Number (e.g. 628123456789)</label>
+            <input type="text" id="testTo" class="lp-input" required>
+          </div>
+          <div class="lp-form-group mt-3">
+            <label class="lp-label">Message Text</label>
+            <textarea id="testText" class="lp-input" rows="3" required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lp btn-lp-primary">Send Test</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/js/whatsapp.js"></script>

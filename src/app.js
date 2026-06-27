@@ -105,6 +105,8 @@ const createApp = () => {
   app.get('/settings/roles', (req, res) => res.render('settings/roles', { title: 'Roles' }));
   app.get('/settings/profile', (req, res) => res.render('settings/profile', { title: 'Profile' }));
   app.get('/settings/panel', (req, res) => res.render('settings/panel', { title: 'Panel Update' }));
+  app.get('/whatsapp', (req, res) => res.render('whatsapp/index', { title: 'WhatsApp API' }));
+
 
   // Error handlers (must be last)
   app.use(notFoundHandler);

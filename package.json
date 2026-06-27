@@ -13,6 +13,7 @@
     "test": "node --experimental-vm-modules node_modules/.bin/jest"
   },
   "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc13",
     "archiver": "^7.0.1",
     "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
@@ -38,6 +39,7 @@
     "node-pty": "^1.0.0",
     "nodemailer": "^9.0.1",
     "pg": "^8.22.0",
+    "pino": "^10.3.1",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.1",
     "speakeasy": "^2.0.0",

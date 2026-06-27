@@ -18,8 +18,10 @@ import wafRoutes from '../modules/waf/waf.routes.js';
 import alertsRoutes from '../modules/alerts/alerts.routes.js';
 import dnsRoutes from '../modules/dns/dns.routes.js';
 import pluginsRoutes from '../modules/plugins/plugins.routes.js';
+import whatsappRoutes from '../modules/whatsapp/whatsapp.routes.js';
 
 const router = Router();
+
 
 // Health check
 router.get('/health', (req, res) => {
@@ -50,5 +52,6 @@ router.use('/waf', wafRoutes);
 router.use('/alerts', alertsRoutes);
 router.use('/dns', dnsRoutes);
 router.use('/plugins', pluginsRoutes);
+router.use('/whatsapp', whatsappRoutes);
 
 export default router;

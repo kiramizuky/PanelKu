@@ -196,6 +196,16 @@ function initSchema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_notif_user_id ON notifications(user_id);
     CREATE INDEX IF NOT EXISTS idx_notif_read    ON notifications(is_read);
+
+    -- WhatsApp Sessions
+    CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+      id            TEXT PRIMARY KEY,
+      session_name  TEXT UNIQUE NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'disconnected',
+      webhook_url   TEXT,
+      created_at    TEXT NOT NULL,
+      updated_at    TEXT NOT NULL
+    );
   `);
 }
 
