@@ -114,7 +114,7 @@ for (const r of roles) {
 }
 
 // 5. Seed default admin user
-console.log("[→] Creating default admin user (username: admin, password: admin123)...");
+console.log("[→] Creating default admin user (username: admin, password: admin@123456)...");
 const adminRoleId = roles[0].id;
 const salt = bcrypt.genSaltSync(10);
 const passwordHash = bcrypt.hashSync('admin123', salt);
