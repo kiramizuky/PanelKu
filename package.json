@@ -9,6 +9,7 @@
     "dev": "node --watch src/server.js",
     "prod": "pm2 start ecosystem.config.cjs --env production",
     "setup": "bash scripts/install.sh",
+    "reset-db": "node scripts/reset-db.js",
     "lint": "eslint src/",
     "test": "node --experimental-vm-modules node_modules/.bin/jest"
   },

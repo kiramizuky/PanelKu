@@ -38,7 +38,7 @@ const ProfilePage = (() => {
         newPassword
       });
 
-      if (res.status === 'success') {
+      if (res.success) {
         LP.toast('Password updated successfully', 'success');
         e.target.reset(); // Clear the form
       } else {
