@@ -21,7 +21,7 @@ const UsersPage = (() => {
       if (res.data && res.data.roles) {
         allRoles = res.data.roles;
         const roleSelect = document.getElementById('role');
-        roleSelect.innerHTML = allRoles.map(r => `<option value="${r._id}">${r.name}</option>`).join('');
+        roleSelect.innerHTML = allRoles.map(r => `<option value="${r.slug}">${r.name}</option>`).join('');
       }
     } catch (err) {
       console.error('Failed to load roles', err);
@@ -87,7 +87,7 @@ const UsersPage = (() => {
       document.getElementById('userId').value = user._id;
       document.getElementById('username').value = user.username;
       document.getElementById('email').value = user.email;
-      document.getElementById('role').value = user.role?._id || user.role;
+      document.getElementById('role').value = user.role?.slug || user.role;
       document.getElementById('status').value = user.status;
       
       document.getElementById('userModalTitle').innerText = 'Edit User';

@@ -134,64 +134,64 @@
     </div>
 
     <!-- App Grid -->
-    <div class="lp-app-grid">
-      <a href="/filemanager" class="lp-app-item">
+    <div class="lp-app-grid" id="appGridContainer">
+      <a href="/filemanager" class="lp-app-item" draggable="true" data-id="filemanager">
         <div class="lp-app-icon" style="color: #60a5fa;"><i class="bi bi-folder-fill"></i></div>
         <div style="font-size: 13px; font-weight: 500;">Files</div>
       </a>
-      <a href="/docker" class="lp-app-item">
+      <a href="/docker" class="lp-app-item" draggable="true" data-id="docker">
         <div class="lp-app-icon" style="color: #38bdf8;"><i class="bi bi-box-seam-fill"></i></div>
         <div style="font-size: 13px; font-weight: 500;">Docker</div>
       </a>
-      <a href="/terminal" class="lp-app-item">
+      <a href="/terminal" class="lp-app-item" draggable="true" data-id="terminal">
         <div class="lp-app-icon" style="color: #a78bfa;"><i class="bi bi-terminal-fill"></i></div>
         <div style="font-size: 13px; font-weight: 500;">Terminal</div>
       </a>
-      <a href="/websites" class="lp-app-item">
+      <a href="/websites" class="lp-app-item" draggable="true" data-id="websites">
         <div class="lp-app-icon" style="color: #34d399;"><i class="bi bi-globe"></i></div>
         <div style="font-size: 13px; font-weight: 500;">Websites</div>
       </a>
-      <a href="/database" class="lp-app-item">
+      <a href="/database" class="lp-app-item" draggable="true" data-id="database">
         <div class="lp-app-icon" style="color: #f472b6;"><i class="bi bi-database-fill"></i></div>
         <div style="font-size: 13px; font-weight: 500;">Databases</div>
       </a>
-      <a href="/backup" class="lp-app-item">
+      <a href="/backup" class="lp-app-item" draggable="true" data-id="backup">
         <div class="lp-app-icon" style="color: #60a5fa;"><i class="bi bi-cloud-arrow-down-fill"></i></div>
         <div style="font-size: 13px; font-weight: 500;">Backups</div>
       </a>
-      <a href="/cron" class="lp-app-item">
+      <a href="/cron" class="lp-app-item" draggable="true" data-id="cron">
         <div class="lp-app-icon" style="color: #fca5a5;"><i class="bi bi-clock-history"></i></div>
         <div style="font-size: 13px; font-weight: 500;">Cron</div>
       </a>
-      <a href="/monitor" class="lp-app-item">
+      <a href="/monitor" class="lp-app-item" draggable="true" data-id="monitor">
         <div class="lp-app-icon" style="color: #fbbf24;"><i class="bi bi-activity"></i></div>
         <div style="font-size: 13px; font-weight: 500;">Monitoring</div>
       </a>
-      <a href="/firewall" class="lp-app-item">
+      <a href="/firewall" class="lp-app-item" draggable="true" data-id="firewall">
         <div class="lp-app-icon" style="color: #ef4444;"><i class="bi bi-shield-lock-fill"></i></div>
         <div style="font-size: 13px; font-weight: 500;">Firewall</div>
       </a>
-      <a href="/system" class="lp-app-item">
+      <a href="/system" class="lp-app-item" draggable="true" data-id="system">
         <div class="lp-app-icon" style="color: #6366f1;"><i class="bi bi-cpu-fill"></i></div>
         <div style="font-size: 13px; font-weight: 500;">System</div>
       </a>
-      <a href="/ssl" class="lp-app-item">
+      <a href="/ssl" class="lp-app-item" draggable="true" data-id="ssl">
         <div class="lp-app-icon" style="color: #10b981;"><i class="bi bi-shield-check"></i></div>
         <div style="font-size: 13px; font-weight: 500;">SSL</div>
       </a>
-      <a href="/waf" class="lp-app-item">
+      <a href="/waf" class="lp-app-item" draggable="true" data-id="waf">
         <div class="lp-app-icon" style="color: #f43f5e;"><i class="bi bi-shield-slash-fill"></i></div>
         <div style="font-size: 13px; font-weight: 500;">WAF</div>
       </a>
-      <a href="/cloudflare" class="lp-app-item">
+      <a href="/cloudflare" class="lp-app-item" draggable="true" data-id="cloudflare">
         <div class="lp-app-icon" style="color: #f38020;"><i class="bi bi-cloud-fill"></i></div>
         <div style="font-size: 13px; font-weight: 500;">Cloudflare</div>
       </a>
-      <a href="/n8n" class="lp-app-item">
+      <a href="/n8n" class="lp-app-item" draggable="true" data-id="n8n">
         <div class="lp-app-icon" style="color: #ff6c37;"><i class="bi bi-diagram-3-fill"></i></div>
         <div style="font-size: 13px; font-weight: 500;">n8n</div>
       </a>
-      <a href="/whatsapp" class="lp-app-item">
+      <a href="/whatsapp" class="lp-app-item" draggable="true" data-id="whatsapp">
         <div class="lp-app-icon" style="color: #25d366;"><i class="bi bi-whatsapp"></i></div>
         <div style="font-size: 13px; font-weight: 500;">WhatsApp</div>
       </a>
@@ -199,7 +199,7 @@
       <!-- Dynamically loaded plugins -->
       <% if (typeof loadedPlugins !== 'undefined' && loadedPlugins.length > 0) { %>
         <% loadedPlugins.forEach(function(plugin) { %>
-          <a href="<%= plugin.path || '/plugins/' + plugin.name %>" class="lp-app-item">
+          <a href="<%= plugin.path || '/plugins/' + plugin.name %>" class="lp-app-item" draggable="true" data-id="plugin-<%= plugin.name %>">
             <div class="lp-app-icon" style="color: <%= plugin.color || '#38bdf8' %>;"><i class="bi <%= plugin.icon || 'bi-plugin' %>"></i></div>
             <div style="font-size: 13px; font-weight: 500;"><%= plugin.name %></div>
           </a>
@@ -218,6 +218,62 @@
     document.getElementById('currentTime').textContent = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'});
   }
+
+  // --- Drag and Drop Sort Logic ---
+  document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('appGridContainer');
+    const items = [...container.querySelectorAll('.lp-app-item')];
+    let draggedItem = null;
+
+    // 1. Restore order from localStorage if exists
+    const savedOrder = JSON.parse(localStorage.getItem('dashboard_app_order') || '[]');
+    if (savedOrder.length > 0) {
+      const itemMap = new Map(items.map(item => [item.getAttribute('data-id'), item]));
+      // Append in sorted order
+      savedOrder.forEach(id => {
+        if (itemMap.has(id)) {
+          container.appendChild(itemMap.get(id));
+          itemMap.delete(id);
+        }
+      });
+      // Append any newly added items/plugins not yet saved in localStorage order
+      itemMap.forEach(item => container.appendChild(item));
+    }
+
+    // 2. Drag & Drop Event Listeners
+    container.addEventListener('dragstart', (e) => {
+      const item = e.target.closest('.lp-app-item');
+      if (item) {
+        draggedItem = item;
+        item.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+      }
+    });
+
+    container.addEventListener('dragend', (e) => {
+      if (draggedItem) {
+        draggedItem.style.opacity = '1';
+        draggedItem = null;
+      }
+      // Save new order to localStorage
+      const newOrder = [...container.querySelectorAll('.lp-app-item')].map(item => item.getAttribute('data-id'));
+      localStorage.setItem('dashboard_app_order', JSON.stringify(newOrder));
+    });
+
+    container.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const target = e.target.closest('.lp-app-item');
+      if (target && target !== draggedItem) {
+        const bounding = target.getBoundingClientRect();
+        const offset = e.clientX - bounding.left;
+        if (offset > bounding.width / 2) {
+          target.after(draggedItem);
+        } else {
+          target.before(draggedItem);
+        }
+      }
+    });
+  });
   setInterval(updateTime, 1000);
   updateTime();
 
