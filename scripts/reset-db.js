@@ -59,15 +59,35 @@ db.exec(`
     role_id             TEXT NOT NULL REFERENCES roles(id),
     first_name          TEXT,
     last_name           TEXT,
-    is_active           INTEGER NOT NULL DEFAULT 1,
-    is_two_factor_enabled INTEGER NOT NULL DEFAULT 0,
+    avatar              TEXT,
+    two_factor_enabled  INTEGER NOT NULL DEFAULT 0,
     two_factor_secret   TEXT,
-    two_factor_temp_secret TEXT,
-    login_attempts      INTEGER NOT NULL DEFAULT 0,
-    lock_until          TEXT,
+    api_key             TEXT,
+    api_key_enabled     INTEGER NOT NULL DEFAULT 0,
+    is_active           INTEGER NOT NULL DEFAULT 1,
+    is_super_admin      INTEGER NOT NULL DEFAULT 0,
+    sessions            TEXT NOT NULL DEFAULT '[]',
     last_login          TEXT,
+    last_login_ip       TEXT,
+    login_count         INTEGER NOT NULL DEFAULT 0,
+    reset_token         TEXT,
+    reset_token_expiry  TEXT,
     created_at          TEXT NOT NULL,
     updated_at          TEXT NOT NULL
+  );
+
+  -- Sessions (refresh tokens)
+  CREATE TABLE IF NOT EXISTS sessions (
+    id            TEXT PRIMARY KEY,
+    user_id       TEXT NOT NULL REFERENCES users(id),
+    refresh_token TEXT UNIQUE NOT NULL,
+    device_info   TEXT,
+    user_agent    TEXT,
+    ip            TEXT,
+    is_active     INTEGER NOT NULL DEFAULT 1,
+    last_active   TEXT,
+    expires_at    TEXT NOT NULL,
+    created_at    TEXT NOT NULL
   );
 
   -- Settings
@@ -117,7 +137,7 @@ for (const r of roles) {
 console.log("[→] Creating default admin user (username: admin, password: admin@123456)...");
 const adminRoleId = roles[0].id;
 const salt = bcrypt.genSaltSync(10);
-const passwordHash = bcrypt.hashSync('admin123', salt);
+const passwordHash = bcrypt.hashSync('admin@123456', salt);
 
 db.prepare(`
   INSERT INTO users (id, username, email, password, role_id, first_name, last_name, is_active, created_at, updated_at)
@@ -137,5 +157,5 @@ try {
 console.log("\n========================================================");
 console.log("[✓] Database reset successfully!                        ");
 console.log("    Username: admin                                     ");
-console.log("    Password: admin123                                  ");
+console.log("    Password: admin@123456                                  ");
 console.log("========================================================\n");
