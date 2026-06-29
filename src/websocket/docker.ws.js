@@ -16,10 +16,15 @@ export const registerDockerSocket = (namespace) => {
     let statsStream = null;
 
     // Attach to a container's logs
-    socket.on('logs:attach', async ({ containerId }) => {
+    socket.on('logs:attach', async (payload) => {
       try {
         if (logsStream) {
           logsStream.destroy();
+        }
+        
+        const containerId = typeof payload === 'string' ? payload : payload?.containerId;
+        if (!containerId) {
+          return socket.emit('logs:error', 'Container ID is required');
         }
         
         const container = dockerService.docker.getContainer(containerId);
