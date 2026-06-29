@@ -12,9 +12,15 @@ const ProfilePage = (() => {
     try {
       const res = await LP.get('/auth/profile');
       if (res.data && res.data.user) {
-        document.getElementById('profUsername').value = res.data.user.username || '';
-        document.getElementById('profEmail').value = res.data.user.email || '';
-        document.getElementById('profRole').value = (res.data.user.role?.name || '').toUpperCase();
+        const user = res.data.user;
+        document.getElementById('profUsername').value = user.username || '';
+        document.getElementById('profEmail').value = user.email || '';
+        document.getElementById('profRole').value = (user.role?.name || '').toUpperCase();
+
+        // Update live avatar card elements
+        document.getElementById('profileCardName').textContent = user.username || 'User';
+        document.getElementById('profileCardEmail').textContent = user.email || 'No email set';
+        document.getElementById('profileCardBadge').textContent = (user.role?.name || 'User').toUpperCase();
       }
     } catch (err) {
       LP.toast('Failed to load profile details.', 'error');
