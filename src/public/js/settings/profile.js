@@ -55,7 +55,77 @@ const ProfilePage = (() => {
     }
   }
 
-  return { init, changePassword };
+  let rawApiKey = '';
+
+  async function regenerateApiKey() {
+    if (!(await LP.confirm('Are you sure you want to generate a new API key? Any apps using the old key will lose access.', 'Generate API Key'))) return;
+    
+    const btn = document.getElementById('btnRegenApiKey');
+    const oldHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> ...';
+    btn.disabled = true;
+
+    try {
+      const res = await LP.post('/users/me/api-key');
+      if (res?.success && res.data?.apiKey) {
+        rawApiKey = res.data.apiKey;
+        
+        const input = document.getElementById('profApiKey');
+        input.value = rawApiKey;
+        input.type = 'text'; // Show it initially
+        
+        // Enable visibility and copy buttons
+        document.getElementById('btnToggleApiKey').disabled = false;
+        document.getElementById('btnCopyApiKey').disabled = false;
+        
+        // Update eye icon state
+        const eyeIcon = document.getElementById('btnToggleApiKey').querySelector('i');
+        eyeIcon.className = 'bi bi-eye-slash';
+
+        LP.toast('New API key generated successfully!', 'success');
+      } else {
+        LP.toast(res?.message || 'Failed to generate API key', 'error');
+      }
+    } catch (err) {
+      LP.toast('Error generating API key', 'error');
+    } finally {
+      btn.innerHTML = oldHtml;
+      btn.disabled = false;
+    }
+  }
+
+  function toggleApiKeyVisibility() {
+    const input = document.getElementById('profApiKey');
+    const eyeIcon = document.getElementById('btnToggleApiKey').querySelector('i');
+    
+    if (input.type === 'password') {
+      input.type = 'text';
+      input.value = rawApiKey;
+      eyeIcon.className = 'bi bi-eye-slash';
+    } else {
+      input.type = 'password';
+      input.value = '••••••••••••••••••••••••••••••••';
+      eyeIcon.className = 'bi bi-eye';
+    }
+  }
+
+  async function copyApiKey() {
+    if (!rawApiKey) return;
+    try {
+      await navigator.clipboard.writeText(rawApiKey);
+      const btn = document.getElementById('btnCopyApiKey');
+      const oldHtml = btn.innerHTML;
+      btn.innerHTML = '<i class="bi bi-check2"></i>';
+      LP.toast('API Key copied to clipboard', 'success');
+      setTimeout(() => {
+        btn.innerHTML = oldHtml;
+      }, 2000);
+    } catch (err) {
+      LP.toast('Failed to copy to clipboard', 'error');
+    }
+  }
+
+  return { init, changePassword, regenerateApiKey, toggleApiKeyVisibility, copyApiKey };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {

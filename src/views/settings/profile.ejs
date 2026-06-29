@@ -77,6 +77,23 @@
       </div>
     </div>
 
+    <!-- API Credentials Card -->
+    <div class="lp-glass-card mb-4" style="border-radius:16px; padding:30px;">
+      <div style="border-bottom:1px solid var(--glass-border); padding-bottom:15px; margin-bottom:25px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <h4 style="font-weight:700; margin:0; color:var(--text-primary);"><i class="bi bi-code-slash me-2 text-info"></i>API Credentials</h4>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="ProfilePage.regenerateApiKey()" id="btnRegenApiKey"><i class="bi bi-arrow-clockwise"></i> Generate Key</button>
+      </div>
+      <div class="lp-form-group" style="margin-bottom:0;">
+        <label class="lp-label" style="font-size:12px; font-weight:600; color:var(--text-muted);">X-API-Key Header Value</label>
+        <div style="display:flex; gap:10px;">
+          <input type="password" id="profApiKey" class="lp-input font-mono" readonly style="opacity:0.75; cursor:not-allowed;" value="••••••••••••••••••••••••••••••••">
+          <button class="btn-lp btn-lp-ghost" onclick="ProfilePage.toggleApiKeyVisibility()" id="btnToggleApiKey" title="Show/Hide" disabled><i class="bi bi-eye"></i></button>
+          <button class="btn-lp btn-lp-primary" onclick="ProfilePage.copyApiKey()" id="btnCopyApiKey" title="Copy" disabled><i class="bi bi-clipboard"></i></button>
+        </div>
+        <small class="text-muted mt-2 d-block" style="font-size:11px;">Note: For security, the key is hidden by default. Click "Generate Key" to create a new token.</small>
+      </div>
+    </div>
+
     <!-- Change Password Card -->
     <div class="lp-glass-card" style="border-radius:16px; padding:30px;">
       <div style="border-bottom:1px solid var(--glass-border); padding-bottom:15px; margin-bottom:25px;">
