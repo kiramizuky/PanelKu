@@ -103,8 +103,13 @@ class SystemService {
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       // Update binding address from 127.0.0.1:8384 to 0.0.0.0:8384 to allow external access
-      const configPath = '/root/.config/syncthing/config.xml';
-      await this.runCommand(`if [ -f ${configPath} ]; then sed -i 's/127.0.0.1:8384/0.0.0.0:8384/g' ${configPath}; fi`).catch(() => {});
+      const configPaths = [
+        '/root/.config/syncthing/config.xml',
+        '/root/.local/state/syncthing/config.xml'
+      ];
+      for (const configPath of configPaths) {
+        await this.runCommand(`if [ -f ${configPath} ]; then sed -i 's/127.0.0.1:8384/0.0.0.0:8384/g' ${configPath}; fi`).catch(() => {});
+      }
       
       // Restart syncthing to apply changes
       await this.runCommand('systemctl restart syncthing@root').catch(() => {});
