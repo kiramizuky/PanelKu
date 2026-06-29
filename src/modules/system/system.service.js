@@ -190,14 +190,14 @@ class SystemService {
     let hasUpdate = false;
 
     try {
-      // Try to fetch the latest version from npm or git
-      const result = await this.runCommand('git fetch origin && git log HEAD..origin/main --oneline 2>/dev/null | wc -l');
+      const activeBranch = (await this.runCommand('git rev-parse --abbrev-ref HEAD 2>/dev/null')).trim() || 'master';
+      const result = await this.runCommand(`git fetch origin && git log HEAD..origin/${activeBranch} --oneline 2>/dev/null | wc -l`);
       const behindCount = parseInt(result.trim()) || 0;
       hasUpdate = behindCount > 0;
 
       if (hasUpdate) {
         // Try to read version from remote package.json
-        const remoteVer = await this.runCommand("git show origin/main:package.json 2>/dev/null | python3 -c \"import sys,json; print(json.load(sys.stdin).get('version',''))\" 2>/dev/null").catch(() => '');
+        const remoteVer = await this.runCommand(`git show origin/${activeBranch}:package.json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version',''))" 2>/dev/null`).catch(() => '');
         latest = remoteVer.trim() || `${current}+${behindCount}`;
       }
     } catch {
@@ -211,9 +211,12 @@ class SystemService {
     let log = '';
 
     if (method === 'git') {
+      const localBranch = (await this.runCommand('git rev-parse --abbrev-ref HEAD 2>/dev/null')).trim() || 'master';
+      const targetBranch = branch === 'main' && localBranch !== 'main' ? localBranch : branch;
+
       // Mark directory safe for root
       log += await this.runCommand('git config --global --add safe.directory /opt/panelku 2>&1').catch(() => '');
-      log += await this.runCommand(`cd /opt/panelku && git pull origin ${branch} 2>&1`).catch(e => `[git pull error] ${e.message}`);
+      log += await this.runCommand(`cd /opt/panelku && git pull origin ${targetBranch} 2>&1`).catch(e => `[git pull error] ${e.message}`);
       log += '\n';
       log += await this.runCommand('cd /opt/panelku && npm install --production 2>&1').catch(e => `[npm install error] ${e.message}`);
     } else if (method === 'npm') {
