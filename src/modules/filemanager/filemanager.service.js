@@ -9,6 +9,48 @@ import logger from '../../config/logger.js';
 const BASE_DIR = process.env.FM_BASE_DIR || '/';
 
 class FileManagerService {
+  constructor() {
+    this.uidMap = {};
+    this.gidMap = {};
+    this.mapsInitialized = false;
+  }
+
+  async initMaps() {
+    if (this.mapsInitialized) return;
+    try {
+      if (process.platform !== 'win32') {
+        const passwd = await readFile('/etc/passwd', 'utf8').catch(() => '');
+        if (passwd) {
+          passwd.split('\n').forEach(line => {
+            const parts = line.split(':');
+            if (parts.length >= 3) {
+              this.uidMap[parts[2]] = parts[0];
+            }
+          });
+        }
+        const group = await readFile('/etc/group', 'utf8').catch(() => '');
+        if (group) {
+          group.split('\n').forEach(line => {
+            const parts = line.split(':');
+            if (parts.length >= 3) {
+              this.gidMap[parts[2]] = parts[0];
+            }
+          });
+        }
+      }
+    } catch (e) {
+      logger.error('Failed to init file owner maps: ' + e.message);
+    }
+    this.mapsInitialized = true;
+  }
+
+  async getOwnerString(uid, gid) {
+    await this.initMaps();
+    const user = this.uidMap[uid] || uid || 'root';
+    const group = this.gidMap[gid] || gid || 'root';
+    return `${user}:${group}`;
+  }
+
   _resolvePath(userPath) {
     const safe = resolve(join(BASE_DIR, userPath || '/'));
     if (BASE_DIR !== '/' && !safe.startsWith(resolve(BASE_DIR))) {
@@ -26,6 +68,9 @@ class FileManagerService {
         const filePath = join(full, entry.name);
         let stats;
         try { stats = await stat(filePath); } catch { return null; }
+        
+        const owner = await this.getOwnerString(stats.uid, stats.gid);
+
         return {
           name: entry.name,
           path: join(dirPath, entry.name).replace(/\\/g, '/'),
@@ -33,6 +78,7 @@ class FileManagerService {
           size: stats.size,
           modified: stats.mtime,
           permissions: stats.mode.toString(8).slice(-3),
+          owner: owner,
           isHidden: entry.name.startsWith('.'),
         };
       })

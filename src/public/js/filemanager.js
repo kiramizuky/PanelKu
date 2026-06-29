@@ -72,7 +72,20 @@ const FMPage = (() => {
       return;
     }
 
-    grid.innerHTML = items.map(item => `
+    let html = '';
+    if (viewMode === 'list') {
+      html += `
+        <div class="fm-header-row" style="display:flex; align-items:center; gap:12px; padding:6px 12px; border-bottom:1px solid var(--glass-border); font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">
+          <div style="width:18px;"></div>
+          <div style="flex:1;">Name</div>
+          <div style="width:80px;">Permissions</div>
+          <div style="width:120px;">Owner</div>
+          <div style="width:90px; text-align:right;">Size</div>
+        </div>
+      `;
+    }
+
+    html += items.map(item => `
       <div class="fm-item fade-in"
         data-path="${escHtml(item.path)}"
         data-type="${item.type}"
@@ -83,9 +96,13 @@ const FMPage = (() => {
         title="${escHtml(item.path)}">
         <div class="fm-item-icon">${getIcon(item)}</div>
         <div class="fm-item-name">${escHtml(item.name)}</div>
+        <div class="fm-item-permissions font-mono">${item.permissions || '-'}</div>
+        <div class="fm-item-owner">${item.owner || '-'}</div>
         <div class="fm-item-size">${item.type === 'dir' ? 'Folder' : LP.formatBytes(item.size)}</div>
       </div>
     `).join('');
+
+    grid.innerHTML = html;
   }
 
   // ── Context Menu ──────────────────────────────────
