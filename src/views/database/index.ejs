@@ -115,4 +115,30 @@
   </div>
 </div>
 
+<!-- Install Password Config Modal -->
+<div class="modal fade" id="installConfigModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog">
+    <div class="modal-content" style="background:var(--bg-primary); border:1px solid var(--glass-border);">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:14px" id="installConfigTitle">Configure Database</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="installConfigForm" onsubmit="DatabasePage.submitInstall(event)">
+        <input type="hidden" id="installPkgName">
+        <div class="modal-body">
+          <p id="installConfigDescription" class="text-muted" style="font-size:13px; margin-bottom:15px;"></p>
+          <div class="lp-form-group">
+            <label class="lp-label" id="installPasswordLabel">Root Password</label>
+            <input type="password" id="installPassword" class="lp-input" placeholder="Enter secure password" required minlength="4">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lp btn-lp-primary">Install & Configure</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script src="/js/database.js"></script>

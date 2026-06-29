@@ -43,12 +43,12 @@ class SystemController {
 
   async installPackage(req, res) {
     try {
-      const { package: pkgName } = req.body;
+      const { package: pkgName, password } = req.body;
       if (!pkgName) return errorResponse(res, new Error('Package name is required'), 400);
       
       // Fire and forget or wait. apt-get takes time.
       // We will wait for it so the frontend spinner stays active.
-      await systemService.installPackage(pkgName);
+      await systemService.installPackage(pkgName, password);
       return success(res, null, `${pkgName} installed successfully`);
     } catch (error) {
       return errorResponse(res, error, 500);

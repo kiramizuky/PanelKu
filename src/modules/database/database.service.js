@@ -7,9 +7,17 @@ class DatabaseService {
     this.mysqlPool = null;
     this.pgClient = null;
     
-    // Configurations should ideally come from user settings in DB
-    this.mysqlConfig = { host: 'localhost', user: 'root', password: '' };
-    this.pgConfig = { host: 'localhost', user: 'postgres', password: '' };
+    // Configurations loaded from environment variables
+    this.mysqlConfig = {
+      host: process.env.DB_MYSQL_HOST || 'localhost',
+      user: process.env.DB_MYSQL_USER || 'root',
+      password: process.env.DB_MYSQL_PASSWORD || ''
+    };
+    this.pgConfig = {
+      host: process.env.DB_PG_HOST || 'localhost',
+      user: process.env.DB_PG_USER || 'postgres',
+      password: process.env.DB_PG_PASSWORD || ''
+    };
   }
 
   async getMysqlConnection() {

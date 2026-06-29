@@ -18,9 +18,39 @@ const DatabasePage = (() => {
     }
   }
 
+  let installModal = null;
+
   async function installPackage(pkgName) {
-    if (!(await LP.confirm(`Do you want to install ${pkgName}? This may take a few minutes.`, 'Install Database'))) return;
+    if (pkgName === 'mysql' || pkgName === 'postgres') {
+      document.getElementById('installPkgName').value = pkgName;
+      document.getElementById('installConfigTitle').textContent = `Install & Configure ${pkgName === 'mysql' ? 'MySQL' : 'PostgreSQL'}`;
+      document.getElementById('installConfigDescription').textContent = `Set a secure password for the '${pkgName === 'mysql' ? 'root' : 'postgres'}' database administrator user. This password will also be automatically saved to Panelku configuration.`;
+      document.getElementById('installPasswordLabel').textContent = `${pkgName === 'mysql' ? 'Root' : 'Postgres'} Password`;
+      document.getElementById('installPassword').value = '';
+      
+      installModal = new bootstrap.Modal(document.getElementById('installConfigModal'));
+      installModal.show();
+    } else {
+      if (!(await LP.confirm(`Do you want to install ${pkgName}? This may take a few minutes.`, 'Install Package'))) return;
+      runInstall(pkgName);
+    }
+  }
+
+  async function submitInstall(e) {
+    e.preventDefault();
+    const pkgName = document.getElementById('installPkgName').value;
+    const password = document.getElementById('installPassword').value;
     
+    const modalEl = document.getElementById('installConfigModal');
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+    if (modalInstance) {
+      modalInstance.hide();
+    }
+    
+    await runInstall(pkgName, password);
+  }
+
+  async function runInstall(pkgName, password = '') {
     // Show a global loading spinner
     const spinner = document.createElement('div');
     spinner.id = 'installSpinner';
@@ -33,7 +63,7 @@ const DatabasePage = (() => {
     document.body.appendChild(spinner);
 
     try {
-      const res = await LP.post('/system/install', { package: pkgName });
+      const res = await LP.post('/system/install', { package: pkgName, password });
       if (res?.success) {
         LP.toast(`${pkgName} installed successfully!`, 'success');
         loadData();
@@ -155,7 +185,8 @@ const DatabasePage = (() => {
     showCreateModal,
     createDatabase,
     deleteDb,
-    installPackage
+    installPackage,
+    submitInstall
   };
 })();
 

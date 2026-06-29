@@ -64,7 +64,28 @@ class SystemService {
     }
   }
 
-  async installPackage(pkgName) {
+  async updateEnvVariable(key, value) {
+    try {
+      const fs = (await import('fs/promises')).default;
+      const path = (await import('path')).default;
+      const envPath = path.resolve('.env');
+      let content = await fs.readFile(envPath, 'utf8');
+      
+      const regex = new RegExp(`^${key}=.*`, 'm');
+      if (content.match(regex)) {
+        content = content.replace(regex, `${key}=${value}`);
+      } else {
+        content += `\n${key}=${value}`;
+      }
+      await fs.writeFile(envPath, content, 'utf8');
+      return true;
+    } catch (e) {
+      logger.error(`Failed to update .env variable ${key}: ${e.message}`);
+      return false;
+    }
+  }
+
+  async installPackage(pkgName, password = '') {
     if (!/^[a-zA-Z0-9_-]+$/.test(pkgName)) throw new Error('Invalid package name');
     logger.info(`Installing package: ${pkgName}`);
 
@@ -91,7 +112,34 @@ class SystemService {
     }
 
     const installCmd = packageManager.getInstallCommand(pkgName);
-    return await this.runCommand(installCmd);
+    const out = await this.runCommand(installCmd);
+
+    if (password) {
+      if (pkgName === 'mysql') {
+        logger.info('Configuring MySQL root password...');
+        const sqlCmds = [
+          `sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${password}'; FLUSH PRIVILEGES;"`,
+          `sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${password}'; FLUSH PRIVILEGES;"`
+        ];
+        for (const sql of sqlCmds) {
+          try {
+            await this.runCommand(sql);
+            break;
+          } catch (_) {}
+        }
+        await this.updateEnvVariable('DB_MYSQL_PASSWORD', password);
+      } else if (pkgName === 'postgres') {
+        logger.info('Configuring PostgreSQL postgres password...');
+        try {
+          await this.runCommand('sudo postgresql-setup --initdb || sudo postgresql-setup initdb || true').catch(() => {});
+          await this.runCommand('sudo systemctl enable postgresql && sudo systemctl start postgresql').catch(() => {});
+          await this.runCommand(`sudo -u postgres psql -c "ALTER USER postgres PASSWORD '${password}';"`);
+        } catch (_) {}
+        await this.updateEnvVariable('DB_PG_PASSWORD', password);
+      }
+    }
+
+    return out;
   }
 
   async getPackageManagerInfo() {
