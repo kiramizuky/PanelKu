@@ -242,7 +242,7 @@ class SystemService {
         logger.warn('systemctl restart failed, falling back to process.exit(0)');
         process.exit(0);
       }
-    }, 3000);
+    }, 5000);
 
     return log;
   }
