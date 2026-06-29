@@ -133,6 +133,14 @@ const LP = {
     document.querySelectorAll('.lp-user-initials').forEach(el => el.textContent = initials);
     document.querySelectorAll('.lp-user-name').forEach(el => el.textContent = user.username);
     document.querySelectorAll('.lp-user-role').forEach(el => el.textContent = user.role?.name || '');
+
+    // Automatically fill profile card headers if they exist in Settings views
+    const cardName = document.getElementById('profileCardName');
+    const cardEmail = document.getElementById('profileCardEmail');
+    const cardBadge = document.getElementById('profileCardBadge');
+    if (cardName) cardName.textContent = user.username || 'User';
+    if (cardEmail) cardEmail.textContent = user.email || 'No email set';
+    if (cardBadge) cardBadge.textContent = (user.role?.name || 'User').toUpperCase();
   },
 
   // ── Sidebar ───────────────────────────────────────────
