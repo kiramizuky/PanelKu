@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import util from 'util';
 import logger from '../../config/logger.js';
+import packageManager from './package-manager.js';
 
 const execAsync = util.promisify(exec);
 
@@ -23,8 +24,12 @@ class SystemService {
 
   mockCommand(cmd) {
     if (cmd.includes('is-active')) return 'active\n';
-    if (cmd.includes('apt update')) return 'Reading package lists... Done\nBuilding dependency tree... Done\nAll packages are up to date.\n';
-    if (cmd.includes('apt upgrade')) return 'Reading package lists... Done\n0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.\n';
+    if (cmd.includes('apt update') || cmd.includes('pacman -Sy') || cmd.includes('dnf check-update') || cmd.includes('emerge --sync') || cmd.includes('mock update')) {
+      return 'Reading package lists... Done\nBuilding dependency tree... Done\nAll packages are up to date.\n';
+    }
+    if (cmd.includes('apt upgrade') || cmd.includes('pacman -Syu') || cmd.includes('dnf upgrade') || cmd.includes('emerge -uDN') || cmd.includes('mock upgrade')) {
+      return 'Reading package lists... Done\n0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.\n';
+    }
     return 'Command executed successfully (mock)';
   }
 
@@ -50,16 +55,9 @@ class SystemService {
   async isInstalled(pkgName) {
     if (!/^[a-zA-Z0-9_-]+$/.test(pkgName)) throw new Error('Invalid package name');
     try {
-      const packageMap = {
-        mysql: { cmd: 'mysql', pkg: 'mysql-server' },
-        postgres: { cmd: 'psql', pkg: 'postgresql' },
-        docker: { cmd: 'docker', pkg: 'docker.io' },
-        nginx: { cmd: 'nginx', pkg: 'nginx' },
-        syncthing: { cmd: 'syncthing', pkg: 'syncthing' }
-      };
-      
-      const mapped = packageMap[pkgName] || { cmd: pkgName, pkg: pkgName };
-      const out = await this.runCommand(`command -v ${mapped.cmd} || dpkg -s ${mapped.pkg}`);
+      await packageManager.init();
+      const cmd = packageManager.getCheckInstalledCommand(pkgName);
+      const out = await this.runCommand(cmd);
       return out.trim().length > 0;
     } catch (e) {
       return false;
@@ -70,9 +68,12 @@ class SystemService {
     if (!/^[a-zA-Z0-9_-]+$/.test(pkgName)) throw new Error('Invalid package name');
     logger.info(`Installing package: ${pkgName}`);
 
+    await packageManager.init();
+
     if (pkgName === 'syncthing') {
       logger.info('Installing and configuring Syncthing...');
-      await this.runCommand(`sudo DEBIAN_FRONTEND=noninteractive apt-get install -y syncthing`);
+      const installCmd = packageManager.getInstallCommand('syncthing');
+      await this.runCommand(installCmd);
       
       // Start syncthing service once so it creates configuration files
       await this.runCommand('systemctl enable syncthing@root && systemctl start syncthing@root').catch(() => {});
@@ -89,23 +90,33 @@ class SystemService {
       return 'Syncthing installed and configured successfully.';
     }
 
-    // Map command names to actual apt packages if needed
-    const packageMap = {
-      mysql: 'mysql-server',
-      postgres: 'postgresql',
-      docker: 'docker.io docker-compose',
-      nginx: 'nginx'
-    };
-    const aptPackage = packageMap[pkgName] || pkgName;
-    return await this.runCommand(`sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ${aptPackage}`);
+    const installCmd = packageManager.getInstallCommand(pkgName);
+    return await this.runCommand(installCmd);
+  }
+
+  async getPackageManagerInfo() {
+    await packageManager.init();
+    return packageManager.getPMInfo();
+  }
+
+  async runUpdate() {
+    await packageManager.init();
+    const cmd = packageManager.getUpdateCommand();
+    return await this.runCommand(cmd);
+  }
+
+  async runUpgrade() {
+    await packageManager.init();
+    const cmd = packageManager.getUpgradeCommand();
+    return await this.runCommand(cmd);
   }
 
   async runAptUpdate() {
-    return await this.runCommand('sudo apt-get update -y');
+    return await this.runUpdate();
   }
 
   async runAptUpgrade() {
-    return await this.runCommand('sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y');
+    return await this.runUpgrade();
   }
 
   async reboot() {

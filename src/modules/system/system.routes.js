@@ -13,10 +13,13 @@ router.get('/services', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.g
 router.get('/services/status', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getServicesStatus.bind(systemController));
 router.get('/check-install', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getInstallStatus.bind(systemController));
 router.get('/auto-update', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getAutoUpdate.bind(systemController));
+router.get('/package-manager/info', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getPackageManagerInfo.bind(systemController));
 
 // Write/execute endpoints - require EXECUTE permission
 router.post('/services/manage', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.manageService.bind(systemController));
 router.post('/install', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.installPackage.bind(systemController));
+router.post('/package-manager/update', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.runUpdate.bind(systemController));
+router.post('/package-manager/upgrade', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.runUpgrade.bind(systemController));
 router.post('/apt/update', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.runAptUpdate.bind(systemController));
 router.post('/apt/upgrade', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.runAptUpgrade.bind(systemController));
 router.post('/reboot', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.reboot.bind(systemController));

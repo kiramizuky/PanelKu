@@ -2,6 +2,7 @@ const SystemPage = {
   async init() {
     await this.loadServices();
     await this.loadAutoUpdate();
+    await this.loadPMInfo();
   },
 
   async loadAutoUpdate() {
@@ -12,6 +13,22 @@ const SystemPage = {
       }
     } catch (e) {
       console.error('Failed to load auto-update setting');
+    }
+  },
+
+  async loadPMInfo() {
+    try {
+      const res = await LP.get('/system/package-manager/info');
+      if (res?.success) {
+        const info = res.data;
+        document.getElementById('pmTitle').textContent = `Package Manager (${info.name})`;
+        document.getElementById('btnUpdate').innerHTML = `<i class="bi bi-arrow-repeat"></i> ${info.updateName}`;
+        document.getElementById('btnUpgrade').innerHTML = `<i class="bi bi-download"></i> ${info.upgradeName}`;
+        document.getElementById('pmLogModalTitle').textContent = `${info.name} Log`;
+        this.pmInfo = info;
+      }
+    } catch (e) {
+      console.error('Failed to load package manager info');
     }
   },
 
@@ -99,18 +116,18 @@ const SystemPage = {
     }
   },
 
-  async runApt(action) {
+  async runPM(action) {
     const btn = document.getElementById(action === 'update' ? 'btnUpdate' : 'btnUpgrade');
     const oldHtml = btn.innerHTML;
     btn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> Running...';
     btn.disabled = true;
 
     try {
-      const res = await LP.post(`/system/apt/${action}`);
+      const res = await LP.post(`/system/package-manager/${action}`);
       if (res?.success) {
         document.getElementById('aptLogContent').textContent = res.data.log || 'No output';
         new bootstrap.Modal(document.getElementById('aptLogModal')).show();
-        LP.toast(`APT ${action} completed`, 'success');
+        LP.toast(`${this.pmInfo ? this.pmInfo.name : 'Package Manager'} ${action} completed`, 'success');
       } else {
         LP.toast(res.message, 'error');
       }
@@ -120,6 +137,10 @@ const SystemPage = {
       btn.innerHTML = oldHtml;
       btn.disabled = false;
     }
+  },
+
+  async runApt(action) {
+    return this.runPM(action);
   },
 
   async reboot() {

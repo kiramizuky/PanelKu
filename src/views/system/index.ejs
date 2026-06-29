@@ -26,7 +26,7 @@
 
   <div class="col-12 col-md-4">
     <div class="lp-glass-card mb-4" style="height:300px">
-      <div class="lp-card-title">Package Manager (APT)</div>
+      <div class="lp-card-title" id="pmTitle">Package Manager</div>
       <p style="color:var(--text-muted);font-size:13px;">Update the system package repository and install available upgrades.</p>
       
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;">
@@ -36,11 +36,11 @@
         </div>
       </div>
 
-      <button class="btn-lp btn-lp-primary w-100 mb-2" id="btnUpdate" onclick="SystemPage.runApt('update')">
-        <i class="bi bi-arrow-repeat"></i> Run APT Update
+      <button class="btn-lp btn-lp-primary w-100 mb-2" id="btnUpdate" onclick="SystemPage.runPM('update')">
+        <i class="bi bi-arrow-repeat"></i> Run Update
       </button>
-      <button class="btn-lp btn-lp-primary w-100" id="btnUpgrade" onclick="SystemPage.runApt('upgrade')" style="background:var(--accent-info);">
-        <i class="bi bi-download"></i> Run APT Upgrade
+      <button class="btn-lp btn-lp-primary w-100" id="btnUpgrade" onclick="SystemPage.runPM('upgrade')" style="background:var(--accent-info);">
+        <i class="bi bi-download"></i> Run Upgrade
       </button>
     </div>
 
@@ -54,12 +54,12 @@
   </div>
 </div>
 
-<!-- Modal for APT Logs -->
+<!-- Modal for Package Manager Logs -->
 <div class="modal fade" id="aptLogModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title font-mono" style="font-size:14px">APT Log</h5>
+        <h5 class="modal-title font-mono" style="font-size:14px" id="pmLogModalTitle">Package Manager Log</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">

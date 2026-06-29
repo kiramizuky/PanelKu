@@ -55,6 +55,33 @@ class SystemController {
     }
   }
 
+  async getPackageManagerInfo(req, res) {
+    try {
+      const info = await systemService.getPackageManagerInfo();
+      return success(res, info);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async runUpdate(req, res) {
+    try {
+      const log = await systemService.runUpdate();
+      return success(res, { log }, 'System update completed');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async runUpgrade(req, res) {
+    try {
+      const log = await systemService.runUpgrade();
+      return success(res, { log }, 'System upgrade completed');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
   async runAptUpdate(req, res) {
     try {
       const log = await systemService.runAptUpdate();
