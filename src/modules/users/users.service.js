@@ -52,18 +52,40 @@ class UsersService {
   }
 
   async update(id, data) {
-    const { password, role: roleName, ...rest } = data;
+    const { password, role: roleName, status, ...rest } = data;
+    const db = getDb();
+
+    const user = await userRepository.findById(id);
+    if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
 
     if (roleName) {
       const role = await roleRepository.findBySlug(roleName);
       if (role) rest.role = role._id;
     }
 
-    const user = await userRepository.updateById(id, rest);
-    if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
+    if (status !== undefined) {
+      const newActive = status === 'active';
+      if (user.isActive && !newActive) {
+        const activeUsers = db.prepare('SELECT COUNT(*) as count FROM users WHERE is_active = 1').get().count;
+        if (activeUsers <= 1) {
+          throw Object.assign(new Error('Cannot deactivate the only active account in the system'), { statusCode: 400 });
+        }
+
+        if (user.isSuperAdmin) {
+          const activeSuperAdmins = db.prepare('SELECT COUNT(*) as count FROM users WHERE is_super_admin = 1 AND is_active = 1').get().count;
+          if (activeSuperAdmins <= 1) {
+            throw Object.assign(new Error('Cannot deactivate the only active super admin account'), { statusCode: 400 });
+          }
+        }
+      }
+      rest.isActive = newActive;
+    }
+
+    const updatedUser = await userRepository.updateById(id, rest);
+    if (!updatedUser) throw Object.assign(new Error('User not found'), { statusCode: 404 });
 
     eventBus.publish(EVENTS.USER_UPDATED, { userId: id });
-    return userRepository._populateRole(user);
+    return userRepository._populateRole(updatedUser);
   }
 
   async changePassword(id, currentPassword, newPassword) {
@@ -84,9 +106,23 @@ class UsersService {
     if (String(id) === String(requestingUserId)) {
       throw Object.assign(new Error('Cannot delete your own account'), { statusCode: 400 });
     }
+    const db = getDb();
+    
+    // Check total accounts count
+    const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+    if (totalUsers <= 1) {
+      throw Object.assign(new Error('Cannot delete the only account in the system'), { statusCode: 400 });
+    }
+
     const user = await userRepository.findById(id);
     if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
-    if (user.isSuperAdmin) throw Object.assign(new Error('Cannot delete super admin'), { statusCode: 403 });
+
+    if (user.isSuperAdmin) {
+      const activeSuperAdmins = db.prepare('SELECT COUNT(*) as count FROM users WHERE is_super_admin = 1 AND is_active = 1').get().count;
+      if (activeSuperAdmins <= 1 && user.isActive) {
+        throw Object.assign(new Error('Cannot delete the only active super admin account'), { statusCode: 400 });
+      }
+    }
 
     await userRepository.deleteById(id);
     eventBus.publish(EVENTS.USER_DELETED, { userId: id });
@@ -95,7 +131,25 @@ class UsersService {
   async toggleStatus(id) {
     const user = await userRepository.findById(id);
     if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
-    return userRepository.updateById(id, { isActive: !user.isActive });
+
+    const db = getDb();
+    const newActive = !user.isActive;
+
+    if (!newActive) {
+      const activeUsers = db.prepare('SELECT COUNT(*) as count FROM users WHERE is_active = 1').get().count;
+      if (activeUsers <= 1) {
+        throw Object.assign(new Error('Cannot deactivate the only active account in the system'), { statusCode: 400 });
+      }
+
+      if (user.isSuperAdmin) {
+        const activeSuperAdmins = db.prepare('SELECT COUNT(*) as count FROM users WHERE is_super_admin = 1 AND is_active = 1').get().count;
+        if (activeSuperAdmins <= 1) {
+          throw Object.assign(new Error('Cannot deactivate the only active super admin account'), { statusCode: 400 });
+        }
+      }
+    }
+
+    return userRepository.updateById(id, { isActive: newActive });
   }
 
   async regenerateApiKey(userId) {
