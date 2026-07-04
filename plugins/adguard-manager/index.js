@@ -104,6 +104,11 @@ export default {
                         <input type="number" id="agPort" class="lp-input" value="3000" required min="80" max="65535">
                         <small class="text-muted mt-1 d-block" style="font-size:11px;">Specify the port to access AdGuard configuration interface (default 3000).</small>
                       </div>
+                      <div class="lp-form-group mt-3">
+                        <label class="lp-label">DNS Resolver Port</label>
+                        <input type="number" id="agDnsPort" class="lp-input" value="53" required min="13" max="65535">
+                        <small class="text-muted mt-1 d-block" style="font-size:11px;">Specify the DNS port (default 53). If port 53 is already in use by systemd-resolved, change this to another port (e.g. 5353).</small>
+                      </div>
                     </div>
                     <div class="modal-footer">
                       <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
@@ -126,6 +131,7 @@ export default {
                 async function deploy(e) {
                   e.preventDefault();
                   const port = document.getElementById('agPort').value;
+                  const dnsPort = document.getElementById('agDnsPort').value;
                   
                   if (modal) modal.hide();
                   
@@ -140,7 +146,7 @@ export default {
                   document.body.appendChild(spinner);
 
                   try {
-                    const res = await LP.post('/plugins/adguard-manager/deploy', { port });
+                    const res = await LP.post('/plugins/adguard-manager/deploy', { port, dnsPort });
                     if (res?.success) {
                       LP.toast('AdGuard Home deployed successfully!', 'success');
                       window.location.reload();
@@ -203,7 +209,7 @@ export default {
     // 2. Deploy API
     app.post('/plugins/adguard-manager/deploy', async (req, res) => {
       try {
-        const { port = 3000 } = req.body;
+        const { port = 3000, dnsPort = 53 } = req.body;
         
         // Define docker-compose yml
         const composeYaml = `
@@ -213,8 +219,8 @@ services:
     image: adguard/adguardhome:latest
     container_name: adguard-app
     ports:
-      - "53:53/tcp"
-      - "53:53/udp"
+      - "${dnsPort}:53/tcp"
+      - "${dnsPort}:53/udp"
       - "${port}:3000/tcp"
     volumes:
       - adguard_work:/opt/adguardhome/work
@@ -228,10 +234,10 @@ volumes:
         await dockerService.deployCompose('adguard', composeYaml);
         try {
           await firewallService.addRule(port, 'tcp');
-          await firewallService.addRule('53', 'tcp');
-          await firewallService.addRule('53', 'udp');
+          await firewallService.addRule(dnsPort, 'tcp');
+          await firewallService.addRule(dnsPort, 'udp');
         } catch (fwErr) {
-          console.warn('Firewall: failed to allow ports', port, fwErr.message);
+          console.warn('Firewall: failed to allow ports', port, dnsPort, fwErr.message);
         }
         return successResponse(res, null, 'AdGuard Home deployed successfully');
       } catch (error) {

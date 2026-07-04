@@ -54,6 +54,10 @@ body {
   overflow-x: hidden;
 }
 
+.text-muted {
+  color: var(--text-muted) !important;
+}
+
 /* Top Navbar Container */
 .lp-top-navbar {
   display: flex;
