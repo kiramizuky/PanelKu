@@ -1,0 +1,9 @@
+{
+  "name": "Uptime Kuma",
+  "version": "1.0.0",
+  "description": "Self-hosted monitoring tool for website, port, ping, and DNS status",
+  "entry": "index.js",
+  "path": "/plugins/uptime-kuma-manager",
+  "icon": "bi-heart-pulse-fill",
+  "color": "#22c55e"
+}
