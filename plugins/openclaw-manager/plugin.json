@@ -1,0 +1,9 @@
+{
+  "name": "OpenClaw AI",
+  "version": "1.0.0",
+  "description": "Autonomous AI agent platform and gateway orchestration service",
+  "entry": "index.js",
+  "path": "/plugins/openclaw-manager",
+  "icon": "bi-robot",
+  "color": "#3b82f6"
+}
