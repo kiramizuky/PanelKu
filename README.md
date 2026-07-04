@@ -10,13 +10,25 @@
 - 🔐 **JWT Authentication** — Access token, refresh token, 2FA (TOTP), session manager
 - 👥 **Dynamic RBAC** — Super Admin, Admin, Operator, Read Only with per-resource permissions
 - 📊 **Realtime Dashboard** — CPU, RAM, Disk, Temperature, Network via Socket.IO + Chart.js, featuring a **Real-Time Process Inspector** (sort by CPU/Memory)
+# Linux Server Control Panel
+
+> Lightweight, modern, realtime Linux server control panel — a blend of aaPanel, Portainer, CasaOS, and Cockpit, but far lighter.
+
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-green)](https://nodejs.org)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
+
+## Core Features
+
+- 🔐 **JWT Authentication** — Access token, refresh token, 2FA (TOTP), session manager
+- 👥 **Dynamic RBAC** — Super Admin, Admin, Operator, Read Only with per-resource permissions
+- 📊 **Realtime Dashboard** — CPU, RAM, Disk, Temperature, Network via Socket.IO + Chart.js, featuring a **Real-Time Process Inspector** (sort by CPU/Memory)
 - 📈 **Monitoring** — Historical metrics, disk health, network interfaces (with IP mapping), alert thresholds
 - 🖥️ **Web Terminal** — xterm.js + node-pty, multi-tab, bash/zsh/fish
 - 📁 **File Manager** — Browse, upload, download, edit, zip/unzip, rename, delete, search
 - 📱 **Responsive Design** — Fully mobile-friendly layout with a frosted-glass **Burger Sidebar Drawer** offcanvas navigation menu
 - 🔌 **Plugin Marketplace** — Install/uninstall extensions dynamically with hot route mounting
 - 🐳 **Docker & Compose Engine** — Start, stop, monitor telemetry, and deploy compose stacks (with automatic fallback to standalone `docker-compose`)
-- 📡 **Built-in Plugins** — OpenClaw AI, WireGuard VPN, Fail2ban Admin, PM2 Manager, S3/Rclone Backups, Redis, Nextcloud, AdGuard Home, MinIO S3 Server, Uptime Kuma, and Rclone Manager (featuring host-level dependencies auto-installers)
+- 📡 **Built-in Plugins** — DB Web Admin (phpMyAdmin, pgAdmin, Adminer), Smart Home Manager (Home Assistant, Mosquitto, Zigbee2MQTT), Media & Cloud Services (Jellyfin, qBittorrent), Realtime Log Analyzer, OpenClaw AI, WireGuard VPN, Fail2ban Admin, PM2 Manager, S3/Rclone Backups, Redis, Nextcloud, AdGuard Home, MinIO S3 Server, Uptime Kuma, and Rclone Manager (featuring host-level dependencies auto-installers)
 
 ## Requirements
 
@@ -101,22 +113,18 @@ src/
 | Phase 2 | ✅ Done | Docker, Websites, Domains, SSL |
 | Phase 3 | ✅ Done | Database Management, Backup, Cron |
 | Phase 4 | ✅ Done | Firewall, WAF, Security, Notifications |
-| Phase 5 | ✅ Done | Git Deploy, Auto Update, Plugin Marketplace, WireGuard VPN, Fail2ban, PM2, Rclone, OpenClaw AI |
+| Phase 5 | ✅ Done | Git Deploy, Auto Update, Plugin Marketplace, WireGuard VPN, Fail2ban, PM2, Rclone, OpenClaw AI, DB Web Admin, Smart Home, Media Services, Log Analyzer |
 
 ## Future Development & Upcoming Modules
 
 To expand Panelku's capabilities as a comprehensive server and home cloud administration tool, the following features and modules are planned for future development:
 
-### 1. 🏠 Smart Home Integration
-- **Home Assistant Module**: Visual controller for smart home integrations, logs, and home automation telemetry.
-- **Zigbee2MQTT Explorer**: Visual management panel for Zigbee devices, mappings, and local server integration.
+### 1. 🖧 Advanced Networking
+- **Tailscale Mesh-VPN**: One-click VPN setup to link servers privately.
+- **Visual SSL Cert Mapper**: Auto-renewal Let's Encrypt interface for custom domains.
 
 ### 2. 🛡️ Advanced Security & Audits
-- **Log Analyzer**: Realtime parser for `auth.log`, `syslog`, and Nginx access logs to detect anomaly signatures.
-
-### 3. 📦 Extended Cloud Services
-- **Jellyfin / Plex Media Server**: One-click media library deployment with hardware transcoding support configured automatically.
-- **Transmission / qBittorrent Client**: Integrated lightweight download manager connected to your local volume store.
+- **Active WAF Inspector**: Realtime firewall tracking dashboard to display blocked client signatures.
 
 ## License
 
