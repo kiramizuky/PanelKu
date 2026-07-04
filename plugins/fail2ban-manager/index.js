@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
+import { requireAuth } from '../../middleware/auth.js';
 
 const execAsync = promisify(exec);
 
@@ -88,7 +89,10 @@ export default {
                 <i class="bi bi-shield-slash-fill" style="font-size: 18px;"></i>
                 <strong>Fail2ban daemon is not installed or running.</strong>
               </div>
-              <p style="margin: 10px 0 0 28px; font-size: 13px;">Showing simulated data for demonstration. To use in production, please install Fail2ban on the host: <code>sudo apt install fail2ban</code></p>
+              <p style="margin: 10px 0 0 28px; font-size: 13px;">Showing simulated data for demonstration. To use in production, please install Fail2ban on the host.</p>
+              <div style="margin: 10px 0 0 28px;">
+                <button class="btn-lp btn-lp-primary btn-sm" id="btnInstallHost" onclick="Fail2banPage.installHost()"><i class="bi bi-download"></i> Auto-Install Fail2ban</button>
+              </div>
             </div>
           ` : ''}
 
@@ -203,7 +207,34 @@ export default {
                 }
               }
 
-              return { banIp, unbanIp };
+              async function installHost() {
+                const btn = document.getElementById('btnInstallHost');
+                if (btn) {
+                  btn.disabled = true;
+                  btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Installing...';
+                }
+                try {
+                  const res = await LP.post('/api/plugins/fail2ban/install-host');
+                  if (res?.success) {
+                    LP.toast('Fail2ban installed successfully!', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                  } else {
+                    LP.toast(res?.message || 'Installation failed', 'error');
+                    if (btn) {
+                      btn.disabled = false;
+                      btn.innerHTML = '<i class="bi bi-download"></i> Auto-Install Fail2ban';
+                    }
+                  }
+                } catch {
+                  LP.toast('Error triggering installation', 'error');
+                  if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-download"></i> Auto-Install Fail2ban';
+                  }
+                }
+              }
+
+              return { banIp, unbanIp, installHost };
             })();
           </script>
         `,
@@ -237,6 +268,20 @@ export default {
         res.json({ success: true, message: `IP ${ip} unbanned successfully on ${jail} (simulation)` });
       } catch (err) {
         res.json({ success: false, message: err.message });
+      }
+    });
+
+    // API: Auto-Install Fail2ban on host
+    app.post('/api/plugins/fail2ban/install-host', requireAuth, async (req, res) => {
+      try {
+        const packageManager = (await import('../../modules/system/package-manager.js')).default;
+        await packageManager.init();
+        const installCmd = packageManager.getInstallCommand('fail2ban');
+        
+        const { stdout, stderr } = await execAsync(installCmd);
+        res.json({ success: true, message: 'Fail2ban installation complete', data: stdout + stderr });
+      } catch (err) {
+        res.json({ success: false, message: `Installation failed: ${err.message}` });
       }
     });
   }

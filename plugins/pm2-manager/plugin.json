@@ -1,0 +1,9 @@
+{
+  "name": "PM2 Process Manager",
+  "version": "1.0.0",
+  "description": "Monitor and control Node.js processes running under PM2",
+  "entry": "index.js",
+  "path": "/plugins/pm2-manager",
+  "icon": "bi-cpu",
+  "color": "#4caf50"
+}

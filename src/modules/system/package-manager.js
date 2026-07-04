@@ -150,28 +150,44 @@ class PackageManager {
         postgres: { cmd: 'psql', pkg: 'postgresql' },
         docker: { cmd: 'docker', pkg: 'docker.io docker-compose' },
         nginx: { cmd: 'nginx', pkg: 'nginx' },
-        syncthing: { cmd: 'syncthing', pkg: 'syncthing' }
+        syncthing: { cmd: 'syncthing', pkg: 'syncthing' },
+        fail2ban: { cmd: 'fail2ban-client', pkg: 'fail2ban' },
+        wireguard: { cmd: 'wg', pkg: 'wireguard' },
+        rclone: { cmd: 'rclone', pkg: 'rclone' },
+        git: { cmd: 'git', pkg: 'git' }
       },
       pacman: {
         mysql: { cmd: 'mysql', pkg: 'mariadb' },
         postgres: { cmd: 'psql', pkg: 'postgresql' },
         docker: { cmd: 'docker', pkg: 'docker docker-compose' },
         nginx: { cmd: 'nginx', pkg: 'nginx' },
-        syncthing: { cmd: 'syncthing', pkg: 'syncthing' }
+        syncthing: { cmd: 'syncthing', pkg: 'syncthing' },
+        fail2ban: { cmd: 'fail2ban-client', pkg: 'fail2ban' },
+        wireguard: { cmd: 'wg', pkg: 'wireguard-tools' },
+        rclone: { cmd: 'rclone', pkg: 'rclone' },
+        git: { cmd: 'git', pkg: 'git' }
       },
       dnf: {
         mysql: { cmd: 'mysql', pkg: 'mariadb-server' },
         postgres: { cmd: 'psql', pkg: 'postgresql-server' },
         docker: { cmd: 'docker', pkg: 'moby-engine docker-compose' },
         nginx: { cmd: 'nginx', pkg: 'nginx' },
-        syncthing: { cmd: 'syncthing', pkg: 'syncthing' }
+        syncthing: { cmd: 'syncthing', pkg: 'syncthing' },
+        fail2ban: { cmd: 'fail2ban-client', pkg: 'fail2ban' },
+        wireguard: { cmd: 'wg', pkg: 'wireguard-tools' },
+        rclone: { cmd: 'rclone', pkg: 'rclone' },
+        git: { cmd: 'git', pkg: 'git' }
       },
       emerge: {
         mysql: { cmd: 'mysql', pkg: 'dev-db/mariadb' },
         postgres: { cmd: 'psql', pkg: 'dev-db/postgresql' },
         docker: { cmd: 'docker', pkg: 'app-containers/docker' },
         nginx: { cmd: 'nginx', pkg: 'www-servers/nginx' },
-        syncthing: { cmd: 'syncthing', pkg: 'net-p2p/syncthing' }
+        syncthing: { cmd: 'syncthing', pkg: 'net-p2p/syncthing' },
+        fail2ban: { cmd: 'fail2ban-client', pkg: 'net-analyzer/fail2ban' },
+        wireguard: { cmd: 'wg', pkg: 'net-vpn/wireguard-tools' },
+        rclone: { cmd: 'rclone', pkg: 'net-misc/rclone' },
+        git: { cmd: 'git', pkg: 'dev-vcs/git' }
       }
     };
 

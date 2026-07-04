@@ -125,7 +125,10 @@ export default {
                 <i class="bi bi-exclamation-triangle-fill" style="font-size: 18px;"></i>
                 <strong>WireGuard CLI is not installed or configured on this server.</strong>
               </div>
-              <p style="margin: 10px 0 0 28px; font-size: 13px;">Showing simulated data for demonstration. To use in production, please install WireGuard on the host: <code>sudo apt install wireguard</code></p>
+              <p style="margin: 10px 0 0 28px; font-size: 13px;">Showing simulated data for demonstration. To use in production, please install WireGuard on the host.</p>
+              <div style="margin: 10px 0 0 28px;">
+                <button class="btn-lp btn-lp-primary btn-sm" id="btnInstallHost" onclick="WgPage.installHost()"><i class="bi bi-download"></i> Auto-Install WireGuard</button>
+              </div>
             </div>
           ` : ''}
 
@@ -268,7 +271,7 @@ export default {
                 if (!qrModal) qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
                 
                 try {
-                  const res = await LP.get(\`/api/plugins/wireguard/qrcode?publicKey=\${encodeURIComponent(pubKey)}&allowedIps=\\${encodeURIComponent(allowedIps)}\`);
+                  const res = await LP.get(\`/api/plugins/wireguard/qrcode?publicKey=\${encodeURIComponent(pubKey)}&allowedIps=\${encodeURIComponent(allowedIps)}\`);
                   if (res?.success && res.data) {
                     document.getElementById('qrCodeContainer').innerHTML = \`<img src="\${res.data}" style="width:200px; height:200px;">\`;
                     qrModal.show();
@@ -295,7 +298,34 @@ export default {
                 }
               }
 
-              return { showAddPeerModal, addPeer, showQr, deletePeer };
+              async function installHost() {
+                const btn = document.getElementById('btnInstallHost');
+                if (btn) {
+                  btn.disabled = true;
+                  btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Installing...';
+                }
+                try {
+                  const res = await LP.post('/api/plugins/wireguard/install-host');
+                  if (res?.success) {
+                    LP.toast('WireGuard installed successfully!', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                  } else {
+                    LP.toast(res?.message || 'Installation failed', 'error');
+                    if (btn) {
+                      btn.disabled = false;
+                      btn.innerHTML = '<i class="bi bi-download"></i> Auto-Install WireGuard';
+                    }
+                  }
+                } catch {
+                  LP.toast('Error triggering installation', 'error');
+                  if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-download"></i> Auto-Install WireGuard';
+                  }
+                }
+              }
+
+              return { showAddPeerModal, addPeer, showQr, deletePeer, installHost };
             })();
           </script>
         `,
@@ -349,6 +379,20 @@ AllowedIPs = 0.0.0.0/0`;
         res.json({ success: true, data: qrDataUrl });
       } catch (err) {
         res.json({ success: false, message: 'Failed to generate QR Code' });
+      }
+    });
+
+    // API: Auto-Install WireGuard on host
+    app.post('/api/plugins/wireguard/install-host', requireAuth, async (req, res) => {
+      try {
+        const packageManager = (await import('../../modules/system/package-manager.js')).default;
+        await packageManager.init();
+        const installCmd = packageManager.getInstallCommand('wireguard');
+        
+        const { stdout, stderr } = await execAsync(installCmd);
+        res.json({ success: true, message: 'WireGuard installation complete', data: stdout + stderr });
+      } catch (err) {
+        res.json({ success: false, message: `Installation failed: ${err.message}` });
       }
     });
   }

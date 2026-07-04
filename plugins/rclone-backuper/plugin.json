@@ -1,0 +1,9 @@
+{
+  "name": "S3/Rclone Backups",
+  "version": "1.0.0",
+  "description": "Schedule and synchronize directory or database backups to S3 and remote cloud storage endpoints",
+  "entry": "index.js",
+  "path": "/plugins/rclone-backuper",
+  "icon": "bi-cloud-upload-fill",
+  "color": "#ff9800"
+}

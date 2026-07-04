@@ -1,0 +1,9 @@
+{
+  "name": "Git Auto-Deploy",
+  "version": "1.0.0",
+  "description": "Deploy applications automatically via Git webhook triggers",
+  "entry": "index.js",
+  "path": "/plugins/git-deployer",
+  "icon": "bi-git",
+  "color": "#f05032"
+}
