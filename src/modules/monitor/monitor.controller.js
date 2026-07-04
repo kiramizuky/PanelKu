@@ -61,6 +61,15 @@ class MonitorController {
       return error(res, err.message, 500);
     }
   }
+
+  async getProcesses(req, res) {
+    try {
+      const data = await monitorService.getProcesses();
+      return success(res, data);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
 }
 
 const monitorController = new MonitorController();

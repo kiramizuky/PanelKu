@@ -147,6 +147,80 @@ const MonitorPage = (() => {
     }
   }
 
+  let processesList = [];
+  let currentSortField = 'cpu';
+  let processesModalInstance = null;
+
+  async function openProcessesModal(sortField = 'cpu') {
+    currentSortField = sortField;
+    
+    if (!processesModalInstance) {
+      processesModalInstance = new bootstrap.Modal(document.getElementById('processesModal'));
+    }
+    
+    processesModalInstance.show();
+    await fetchProcesses();
+  }
+
+  async function fetchProcesses() {
+    const tbody = document.getElementById('processesTableBody');
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4"><span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading processes...</td></tr>`;
+    
+    try {
+      const res = await LP.get('/monitor/processes');
+      if (res?.success) {
+        processesList = res.data || [];
+        renderProcessesTable();
+      } else {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Failed to fetch processes: ${res?.message || 'Unknown error'}</td></tr>`;
+      }
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error loading processes.</td></tr>`;
+    }
+  }
+
+  function renderProcessesTable() {
+    const tbody = document.getElementById('processesTableBody');
+    if (!processesList.length) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No processes running</td></tr>`;
+      return;
+    }
+
+    const sorted = [...processesList].sort((a, b) => {
+      const valA = parseFloat(a[currentSortField]) || 0;
+      const valB = parseFloat(b[currentSortField]) || 0;
+      return valB - valA;
+    });
+
+    const btnSortCpu = document.getElementById('btnSortCpu');
+    const btnSortMem = document.getElementById('btnSortMem');
+    if (btnSortCpu && btnSortMem) {
+      if (currentSortField === 'cpu') {
+        btnSortCpu.className = 'btn btn-light btn-sm';
+        btnSortMem.className = 'btn btn-outline-light btn-sm';
+      } else {
+        btnSortCpu.className = 'btn btn-outline-light btn-sm';
+        btnSortMem.className = 'btn btn-light btn-sm';
+      }
+    }
+
+    tbody.innerHTML = sorted.map(p => `
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle;">
+        <td style="font-family: monospace; font-weight: 600; color: var(--text-muted);">${p.pid}</td>
+        <td style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 180px;" title="${p.name}">${p.name}</td>
+        <td class="font-mono ${currentSortField === 'cpu' ? 'text-success font-weight-bold' : ''}">${(p.cpu || 0).toFixed(1)}%</td>
+        <td class="font-mono ${currentSortField === 'mem' ? 'text-info font-weight-bold' : ''}">${(p.mem || 0).toFixed(1)}%</td>
+        <td style="color: var(--text-muted);">${p.user || 'root'}</td>
+        <td><span class="badge bg-dark text-muted" style="font-size:10px;">${p.state || 'running'}</span></td>
+      </tr>
+    `).join('');
+  }
+
+  function sortProcesses(field) {
+    currentSortField = field;
+    renderProcessesTable();
+  }
+
   let pollInterval;
 
   async function init() {
@@ -165,7 +239,7 @@ const MonitorPage = (() => {
     pollInterval = setInterval(pollMetrics, 3000);
   }
 
-  return { init };
+  return { init, openProcessesModal, sortProcesses };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {

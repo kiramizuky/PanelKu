@@ -11,7 +11,7 @@ class DashboardService {
    */
   async getMetrics() {
     try {
-      const [cpu, mem, disk, osInfo, time, network, temp, load] = await Promise.allSettled([
+      const [cpu, mem, disk, osInfo, time, network, temp, load, ifaces] = await Promise.allSettled([
         si.currentLoad(),
         si.mem(),
         si.fsSize(),
@@ -20,6 +20,7 @@ class DashboardService {
         si.networkStats(),
         si.cpuTemperature(),
         si.currentLoad(),
+        si.networkInterfaces(),
       ]);
 
       const cpuData = cpu.value || {};
@@ -27,9 +28,22 @@ class DashboardService {
       const diskData = disk.value || [];
       const osData = osInfo.value || {};
       const timeData = time.value || {};
-      const netData = (network.value || [])[0] || {};
+      const netStats = network.value || [];
+      const netInterfaces = ifaces.value || [];
       const tempData = temp.value || {};
       const loadData = load.value || {};
+
+      const networksMapped = netStats.map(stat => {
+        const info = netInterfaces.find(i => i.iface === stat.iface) || {};
+        return {
+          iface: stat.iface,
+          ip4: info.ip4 || 'No IP',
+          rxSec: stat.rx_sec || 0,
+          txSec: stat.tx_sec || 0,
+          rxTotal: stat.rx_bytes || 0,
+          txTotal: stat.tx_bytes || 0,
+        };
+      });
 
       return {
         cpu: {
@@ -69,13 +83,7 @@ class DashboardService {
           max: tempData.max || null,
           cores: tempData.cores || [],
         },
-        network: {
-          iface: netData.iface || '',
-          rxSec: netData.rx_sec || 0,
-          txSec: netData.tx_sec || 0,
-          rxTotal: netData.rx_bytes || 0,
-          txTotal: netData.tx_bytes || 0,
-        },
+        network: networksMapped,
         timestamp: Date.now(),
       };
     } catch (err) {

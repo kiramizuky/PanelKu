@@ -14,5 +14,6 @@ router.get('/sysinfo', monitorController.getSysInfo.bind(monitorController));
 router.get('/history', monitorController.getHistory.bind(monitorController));
 router.get('/disk', monitorController.getDiskHealth.bind(monitorController));
 router.get('/network', monitorController.getNetworkStats.bind(monitorController));
+router.get('/processes', monitorController.getProcesses.bind(monitorController));
 
 export default router;

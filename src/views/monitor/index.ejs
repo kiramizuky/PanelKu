@@ -30,9 +30,9 @@
   <div class="col-12 col-xl-8">
     <div class="row g-4">
       <div class="col-12 col-md-6">
-        <div class="lp-glass-card">
+        <div class="lp-glass-card" style="cursor: pointer; transition: all 0.2s;" onclick="MonitorPage.openProcessesModal('cpu')" title="Click to view running processes">
           <div class="lp-card-header" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-bottom: 15px;">
-            <h3 class="lp-card-title m-0" style="font-size:16px;">CPU Usage</h3>
+            <h3 class="lp-card-title m-0" style="font-size:16px;">CPU Usage <span class="badge bg-secondary ms-1" style="font-size: 10px; font-weight: normal;">Inspect</span></h3>
           </div>
           <div class="lp-card-body" style="padding:0; position:relative; height:200px;">
             <canvas id="cpuChart"></canvas>
@@ -41,9 +41,9 @@
         </div>
       </div>
       <div class="col-12 col-md-6">
-        <div class="lp-glass-card">
+        <div class="lp-glass-card" style="cursor: pointer; transition: all 0.2s;" onclick="MonitorPage.openProcessesModal('mem')" title="Click to view running processes">
           <div class="lp-card-header" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-bottom: 15px;">
-            <h3 class="lp-card-title m-0" style="font-size:16px;">Memory Usage</h3>
+            <h3 class="lp-card-title m-0" style="font-size:16px;">Memory Usage <span class="badge bg-secondary ms-1" style="font-size: 10px; font-weight: normal;">Inspect</span></h3>
           </div>
           <div class="lp-card-body" style="padding:0; position:relative; height:200px;">
             <canvas id="memChart"></canvas>
@@ -56,9 +56,9 @@
 
   <!-- Disks and Network -->
   <div class="col-12 col-lg-6">
-    <div class="lp-glass-card">
+    <div class="lp-glass-card" style="cursor: pointer; transition: all 0.2s;" onclick="window.location='/filemanager'" title="Click to open File Manager">
       <div class="lp-card-header" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-bottom: 15px;">
-        <h3 class="lp-card-title m-0" style="font-size:16px;">Disks</h3>
+        <h3 class="lp-card-title m-0" style="font-size:16px;">Disks <span class="badge bg-secondary ms-1" style="font-size: 10px; font-weight: normal;">File Manager</span></h3>
       </div>
       <div class="lp-card-body" style="padding:0;">
         <div id="disksContainer">
@@ -76,6 +76,46 @@
       <div class="lp-card-body" style="padding:0;">
         <div id="networkContainer">
           <div class="text-center text-muted py-3">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Processes Modal -->
+<div class="modal fade" id="processesModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content lp-glass-card">
+      <div class="modal-header">
+        <h5 class="modal-title" id="processesModalTitle"><i class="bi bi-cpu text-primary me-2"></i> System Processes</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#processesModal" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" style="max-height: 500px; overflow-y: auto; padding: 20px;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span style="font-size: 13px; color: var(--text-muted);">Click column headers to sort by CPU or RAM</span>
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-light btn-sm" id="btnSortCpu" onclick="MonitorPage.sortProcesses('cpu')">Sort by CPU</button>
+            <button class="btn btn-outline-light btn-sm" id="btnSortMem" onclick="MonitorPage.sortProcesses('mem')">Sort by RAM</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-dark table-borderless" style="background:transparent; --bs-table-bg:transparent; margin:0; font-size: 13px;">
+            <thead>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--text-muted); font-weight: 600;">
+                <th style="padding: 10px;">PID</th>
+                <th style="padding: 10px;">Name</th>
+                <th style="cursor:pointer; padding: 10px;" onclick="MonitorPage.sortProcesses('cpu')">CPU % <i class="bi bi-arrow-down-up ms-1" style="font-size: 10px;"></i></th>
+                <th style="cursor:pointer; padding: 10px;" onclick="MonitorPage.sortProcesses('mem')">RAM % <i class="bi bi-arrow-down-up ms-1" style="font-size: 10px;"></i></th>
+                <th style="padding: 10px;">User</th>
+                <th style="padding: 10px;">State</th>
+              </tr>
+            </thead>
+            <tbody id="processesTableBody">
+              <tr>
+                <td colspan="6" class="text-center py-4 text-muted">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

@@ -115,6 +115,26 @@ class MonitorService {
     if (metrics.diskPercent >= thresholds.disk) alerts.push({ type: 'disk', value: metrics.diskPercent, threshold: thresholds.disk });
     return alerts;
   }
+
+  /**
+   * Get running system processes.
+   */
+  async getProcesses() {
+    try {
+      const data = await si.processes();
+      return (data.list || []).map(p => ({
+        pid: p.pid,
+        name: p.name,
+        cpu: p.cpu,
+        mem: p.mem,
+        user: p.user,
+        state: p.state
+      }));
+    } catch (err) {
+      logger.error('MonitorService.getProcesses error:', err);
+      return [];
+    }
+  }
 }
 
 const monitorService = new MonitorService();
