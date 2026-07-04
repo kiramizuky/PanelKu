@@ -258,7 +258,25 @@ class DockerService {
       await fs.writeFile(composePath, composeYaml, 'utf-8');
 
       // Run docker-compose up
-      const { stdout, stderr } = await execAsync(`docker compose -p ${projectName} -f "${composePath}" up -d`);
+      let stdout, stderr;
+      try {
+        const res = await execAsync(`docker compose -p ${projectName} -f "${composePath}" up -d`);
+        stdout = res.stdout;
+        stderr = res.stderr;
+      } catch (err) {
+        if (err.message.includes('unknown shorthand flag') || err.message.includes('is not a docker command')) {
+          try {
+            logger.info('docker compose failed, trying fallback to docker-compose...');
+            const res = await execAsync(`docker-compose -p ${projectName} -f "${composePath}" up -d`);
+            stdout = res.stdout;
+            stderr = res.stderr;
+          } catch (fallbackErr) {
+            throw new Error(`Compose deployment failed on both 'docker compose' and 'docker-compose'. Fallback error: ${fallbackErr.message}`);
+          }
+        } else {
+          throw err;
+        }
+      }
       return { success: true, log: stdout || stderr };
     } catch (error) {
       throw new Error(`Failed to deploy Docker Compose: ${error.message}`);
