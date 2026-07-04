@@ -1,0 +1,9 @@
+{
+  "name": "WireGuard VPN",
+  "version": "1.0.0",
+  "description": "Configure interfaces, manage peers, and monitor VPN status",
+  "entry": "index.js",
+  "path": "/plugins/wireguard-manager",
+  "icon": "bi-shield-lock-fill",
+  "color": "#10b981"
+}

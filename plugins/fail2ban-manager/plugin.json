@@ -1,0 +1,9 @@
+{
+  "name": "Fail2ban Admin",
+  "version": "1.0.0",
+  "description": "Inspect active jails, manage banned IP addresses, and monitor security logs",
+  "entry": "index.js",
+  "path": "/plugins/fail2ban-manager",
+  "icon": "bi-firewall",
+  "color": "#ef4444"
+}
