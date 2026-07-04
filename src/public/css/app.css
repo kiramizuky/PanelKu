@@ -318,15 +318,61 @@ body {
   background: currentColor;
 }
 
-/* Modal Glass Overrides */
-.modal-content {
-  background: rgba(15, 20, 30, 0.85) !important;
-  backdrop-filter: blur(25px);
-  border: 1px solid var(--glass-border) !important;
-  color: #fff;
+/* Premium Modal Animations & Glass Effects */
+.modal.fade .modal-dialog {
+  transform: scale(0.92) translateY(20px) !important;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }
-.modal-header, .modal-footer {
-  border-color: var(--glass-border) !important;
+
+.modal.show .modal-dialog {
+  transform: scale(1) translateY(0) !important;
+}
+
+.modal-content {
+  background: rgba(15, 22, 36, 0.85) !important;
+  backdrop-filter: blur(25px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(25px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6), 0 0 100px rgba(59, 130, 246, 0.15) !important;
+  border-radius: 16px !important;
+  color: #fff;
+  transition: box-shadow 0.3s ease;
+}
+
+.modal-content:hover {
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.7), 0 0 120px rgba(59, 130, 246, 0.22) !important;
+}
+
+.modal-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  padding: 18px 24px !important;
+}
+
+.modal-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+  padding: 16px 24px !important;
+}
+
+.modal-body {
+  padding: 24px !important;
+}
+
+.modal-title {
+  font-weight: 700 !important;
+  letter-spacing: 0.3px;
+}
+
+/* Make inputs inside modals look extra premium */
+.modal-content .lp-input {
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  transition: all 0.25s ease !important;
+}
+
+.modal-content .lp-input:focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
+  background: rgba(0, 0, 0, 0.5) !important;
 }
 
 /* Overriding Xterm Background */

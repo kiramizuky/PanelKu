@@ -75,6 +75,10 @@
     </nav>
 
     <div class="lp-user-menu" style="display:flex;align-items:center;gap:15px;">
+      <!-- Mobile Burger Menu Trigger -->
+      <button class="btn-lp btn-lp-ghost d-md-none d-flex" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" style="width:36px; height:36px; padding:0; align-items:center; justify-content:center; border-radius:8px;" title="Open Menu">
+        <i class="bi bi-list" style="font-size:22px;"></i>
+      </button>
       <button class="btn-lp btn-lp-ghost btn-lp-sm" id="themeToggleBtn" onclick="LP.toggleTheme()" title="Toggle Dark/Light Mode" style="border-radius:50%;width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;">
         <i class="bi bi-moon-fill" id="themeIcon"></i>
       </button>
@@ -88,6 +92,70 @@
       </div>
     </div>
   </header>
+
+  <!-- Offcanvas Mobile Sidebar -->
+  <div class="offcanvas offcanvas-start lp-glass-card" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel" style="width: 280px; border-right: 1px solid var(--glass-border); border-top-right-radius: 16px; border-bottom-right-radius: 16px; background: rgba(15, 20, 30, 0.95); backdrop-filter: blur(25px); color: #fff;">
+    <div class="offcanvas-header" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding: 15px 20px;">
+      <h5 class="offcanvas-title font-mono" id="mobileSidebarLabel" style="color:var(--text-primary); font-size:16px; font-weight:600;"><i class="bi bi-grid-fill text-primary me-2"></i>Navigation</h5>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body" style="padding: 20px;">
+      <div class="d-flex flex-column gap-3">
+        <a href="/dashboard" class="lp-nav-link w-100 py-2 <%= typeof title !== 'undefined' && title === 'Dashboard' ? 'active' : '' %>" style="display: block;"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+        
+        <!-- Core Section -->
+        <div>
+          <span style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:8px;">Core</span>
+          <div class="d-flex flex-column gap-1" style="padding-left:10px;">
+            <a class="lp-nav-link py-2" href="/monitor"><i class="bi bi-cpu me-2"></i>Monitoring</a>
+            <a class="lp-nav-link py-2" href="/system"><i class="bi bi-gear-wide-connected me-2"></i>System</a>
+            <a class="lp-nav-link py-2" href="/terminal"><i class="bi bi-terminal me-2"></i>Terminal</a>
+            <a class="lp-nav-link py-2" href="/filemanager"><i class="bi bi-folder2-open me-2"></i>File Manager</a>
+          </div>
+        </div>
+
+        <!-- Services Section -->
+        <div>
+          <span style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:8px;">Services</span>
+          <div class="d-flex flex-column gap-1" style="padding-left:10px;">
+            <a class="lp-nav-link py-2" href="/docker"><i class="bi bi-box-seam me-2"></i>Docker</a>
+            <a class="lp-nav-link py-2" href="/websites"><i class="bi bi-globe2 me-2"></i>Websites</a>
+            <a class="lp-nav-link py-2" href="/database"><i class="bi bi-database me-2"></i>Databases</a>
+            <a class="lp-nav-link py-2" href="/cron"><i class="bi bi-calendar3 me-2"></i>Cron Jobs</a>
+          </div>
+        </div>
+
+        <!-- Security Section -->
+        <div>
+          <span style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:8px;">Security</span>
+          <div class="d-flex flex-column gap-1" style="padding-left:10px;">
+            <a class="lp-nav-link py-2" href="/firewall"><i class="bi bi-shield-lock me-2"></i>Firewall</a>
+            <a class="lp-nav-link py-2" href="/ssl"><i class="bi bi-safe me-2"></i>SSL Certificates</a>
+            <a class="lp-nav-link py-2" href="/waf"><i class="bi bi-shield-fill-exclamation me-2"></i>WAF</a>
+            <a class="lp-nav-link py-2" href="/n8n"><i class="bi bi-shuffle me-2"></i>n8n Automation</a>
+          </div>
+        </div>
+
+        <!-- Tools Section -->
+        <div>
+          <span style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:8px;">Tools</span>
+          <div class="d-flex flex-column gap-1" style="padding-left:10px;">
+            <a class="lp-nav-link py-2" href="/backup"><i class="bi bi-cloud-arrow-up me-2"></i>Backups</a>
+            <a class="lp-nav-link py-2" href="/cloudflare"><i class="bi bi-cloud me-2"></i>Cloudflare Tunnel</a>
+            <a class="lp-nav-link py-2" href="/plugins"><i class="bi bi-plugin me-2"></i>Plugins</a>
+            <% if (typeof loadedPlugins !== 'undefined' && loadedPlugins.length > 0) { %>
+              <div style="border-top: 1px solid rgba(255,255,255,0.05); margin: 6px 0;"></div>
+              <% loadedPlugins.forEach(function(plugin) { %>
+                <a class="lp-nav-link py-2" href="<%= plugin.path || '/plugins/' + plugin.name %>"><i class="bi <%= plugin.icon || 'bi-plugin' %> me-2"></i><%= plugin.name %></a>
+              <% }); %>
+            <% } %>
+            <div style="border-top: 1px solid rgba(255,255,255,0.05); margin: 6px 0;"></div>
+            <a class="lp-nav-link py-2" href="/settings/profile"><i class="bi bi-person-fill-gear me-2"></i>Settings</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Main Content Area -->
   <div class="lp-container">
