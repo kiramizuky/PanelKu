@@ -376,6 +376,34 @@ const DockerPage = (() => {
     }
   }
 
+  async function installPackage(pkgName) {
+    if (!(await LP.confirm(`Do you want to install ${pkgName}? This may take a few minutes.`, 'Install Package'))) return;
+    
+    const spinner = document.createElement('div');
+    spinner.id = 'installSpinner';
+    spinner.innerHTML = `
+      <div style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+        <h4 style="color:#fff; margin-top:20px;">Installing ${pkgName}... Please wait.</h4>
+      </div>
+    `;
+    document.body.appendChild(spinner);
+
+    try {
+      const res = await LP.post('/system/install', { package: pkgName });
+      if (res?.success) {
+        LP.toast(`${pkgName} installed successfully!`, 'success');
+        loadData();
+      } else {
+        LP.toast(`Failed to install ${pkgName}: ${res?.message}`, 'error');
+      }
+    } catch (e) {
+      LP.toast(`Error installing ${pkgName}`, 'error');
+    } finally {
+      document.getElementById('installSpinner')?.remove();
+    }
+  }
+
   return {
     loadData,
     action,
@@ -389,9 +417,12 @@ const DockerPage = (() => {
     submitContainer,
     searchOnline,
     selectOnlineImage,
-    deployCompose
+    deployCompose,
+    installPackage
   };
 })();
+
+window.DockerPage = DockerPage;
 
 document.addEventListener('DOMContentLoaded', () => {
   DockerPage.loadData();
