@@ -31,6 +31,9 @@ class PluginsController {
             name: manifest.name || entry.name,
             description: manifest.description || '',
             version: manifest.version || '1.0.0',
+            path: manifest.path || `/plugins/${entry.name}`,
+            icon: manifest.icon || 'bi-plugin',
+            color: manifest.color || '#38bdf8',
             installed: installedIds.includes(entry.name)
           });
         } catch (e) {

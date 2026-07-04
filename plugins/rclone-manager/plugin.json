@@ -1,0 +1,9 @@
+{
+  "name": "Rclone Manager",
+  "version": "1.0.0",
+  "description": "Sync and backup directories to 40+ cloud storage providers",
+  "entry": "index.js",
+  "path": "/plugins/rclone-manager",
+  "icon": "bi-cloud-upload-fill",
+  "color": "#f59e0b"
+}

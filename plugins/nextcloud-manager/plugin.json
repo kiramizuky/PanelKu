@@ -1,0 +1,9 @@
+{
+  "name": "Nextcloud Manager",
+  "version": "1.0.0",
+  "description": "Deploy and manage your own Nextcloud Cloud Storage server",
+  "entry": "index.js",
+  "path": "/plugins/nextcloud-manager",
+  "icon": "bi-cloud-fill",
+  "color": "#0ea5e9"
+}

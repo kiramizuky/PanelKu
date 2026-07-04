@@ -1,0 +1,9 @@
+{
+  "name": "AdGuard Home",
+  "version": "1.0.0",
+  "description": "Network-wide DNS server for blocking ads & tracking",
+  "entry": "index.js",
+  "path": "/plugins/adguard-manager",
+  "icon": "bi-shield-fill-check",
+  "color": "#10b981"
+}

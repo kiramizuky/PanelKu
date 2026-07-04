@@ -1,0 +1,9 @@
+{
+  "name": "MinIO Server",
+  "version": "1.0.0",
+  "description": "High-performance, S3-compatible self-hosted object storage",
+  "entry": "index.js",
+  "path": "/plugins/minio-manager",
+  "icon": "bi-box-fill",
+  "color": "#ec4899"
+}
