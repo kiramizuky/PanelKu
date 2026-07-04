@@ -56,7 +56,7 @@ export default {
                   <div style="display:flex; flex-direction:column; gap:10px;">
                     ${containerState === 'running'
                       ? `
-                        <a href="http://\${req.hostname}:\${portMapped}" target="_blank" class="btn-lp btn-lp-primary w-100"><i class="bi bi-box-arrow-up-right me-1"></i> Open Nextcloud</a>
+                        <a href="http://${req.hostname}:${portMapped}" target="_blank" class="btn-lp btn-lp-primary w-100"><i class="bi bi-box-arrow-up-right me-1"></i> Open Nextcloud</a>
                         <button class="btn-lp btn-lp-ghost text-danger w-100" onclick="NextcloudPage.stop()"><i class="bi bi-stop-circle me-1"></i> Stop Service</button>
                       `
                       : containerState === 'exited'

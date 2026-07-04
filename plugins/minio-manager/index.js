@@ -57,7 +57,7 @@ export default {
                   <div style="display:flex; flex-direction:column; gap:10px;">
                     ${containerState === 'running'
                       ? `
-                        <a href="http://\${req.hostname}:\${consolePort}" target="_blank" class="btn-lp btn-lp-primary w-100"><i class="bi bi-box-arrow-up-right me-1"></i> Open Console Panel</a>
+                        <a href="http://${req.hostname}:${consolePort}" target="_blank" class="btn-lp btn-lp-primary w-100"><i class="bi bi-box-arrow-up-right me-1"></i> Open Console Panel</a>
                         <button class="btn-lp btn-lp-ghost text-danger w-100" onclick="MinioPage.stop()"><i class="bi bi-stop-circle me-1"></i> Stop Service</button>
                       `
                       : containerState === 'exited'
@@ -86,8 +86,8 @@ export default {
                       <div class="mt-4 p-3 rounded" style="background:rgba(0,0,0,0.2); border:1px solid var(--glass-border);">
                         <h6 class="font-mono text-warning" style="font-size:13px; font-weight:600; margin-bottom:10px;">Connection Details</h6>
                         <ul class="text-slate-400 font-mono" style="font-size:11px; line-height:1.8; list-style-type:none; padding-left:0;">
-                          <li>S3 API Endpoint: <strong>http://\${req.hostname}:\${apiPort}</strong></li>
-                          <li>Console Web Panel: <strong>http://\${req.hostname}:\${consolePort}</strong></li>
+                          <li>S3 API Endpoint: <strong>http://${req.hostname}:${apiPort}</strong></li>
+                          <li>Console Web Panel: <strong>http://${req.hostname}:${consolePort}</strong></li>
                         </ul>
                       </div>
                     `
