@@ -117,6 +117,7 @@ const createApp = () => {
 
   // Dynamic plugins router (loaded before 404 handler)
   app.use(pluginLoader.router);
+  app.use('/api', pluginLoader.router);
 
   // Error handlers (must be last)
   app.use(notFoundHandler);
