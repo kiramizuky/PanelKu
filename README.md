@@ -5,7 +5,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green)](https://nodejs.org)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-## Features (Phase 1)
+## Core Features
 
 - 🔐 **JWT Authentication** — Access token, refresh token, 2FA (TOTP), session manager
 - 👥 **Dynamic RBAC** — Super Admin, Admin, Operator, Read Only with per-resource permissions
@@ -13,6 +13,9 @@
 - 📈 **Monitoring** — Historical metrics, disk health, network interfaces, alert thresholds
 - 🖥️ **Web Terminal** — xterm.js + node-pty, multi-tab, bash/zsh/fish
 - 📁 **File Manager** — Browse, upload, download, edit, zip/unzip, rename, delete, search
+- 🔌 **Plugin Marketplace** — Install/uninstall extensions dynamically with hot route mounting
+- 🐳 **Docker & Compose Engine** — Start, stop, monitor telemetry, and deploy compose stacks
+- 📡 **Built-in Plugins** — Redis, Nextcloud, AdGuard Home, MinIO S3 Server, Uptime Kuma, and Rclone Manager
 
 ## Requirements
 
@@ -98,6 +101,26 @@ src/
 | Phase 3 | ✅ Done | Database Management, Backup, Cron |
 | Phase 4 | ✅ Done | Firewall, WAF, Security, Notifications |
 | Phase 5 | ✅ Done | Git Deploy, Auto Update, Plugin Marketplace |
+
+## Future Development & Upcoming Modules
+
+To expand Panelku's capabilities as a comprehensive server and home cloud administration tool, the following features and modules are planned for future development:
+
+### 1. 🖧 Advanced Networking & VPN
+- **Tailscale / WireGuard VPN**: One-click VPN setup for secure private network communication without opening public ports.
+- **Reverse Proxy Dashboard**: Visual manager for SSL certificates and domain mappings directly pointing to docker containers.
+
+### 2. 🏠 Smart Home Integration
+- **Home Assistant Module**: Visual controller for smart home integrations, logs, and home automation telemetry.
+- **Zigbee2MQTT Explorer**: Visual management panel for Zigbee devices, mappings, and local server integration.
+
+### 3. 🛡️ Advanced Security & Audits
+- **Fail2ban Panel**: Visual login attempt monitoring, IP banning logs, and instant push notification alerts for brute-force attempts.
+- **Log Analyzer**: Realtime parser for `auth.log`, `syslog`, and Nginx access logs to detect anomaly signatures.
+
+### 4. 📦 Extended Cloud Services
+- **Jellyfin / Plex Media Server**: One-click media library deployment with hardware transcoding support configured automatically.
+- **Transmission / qBittorrent Client**: Integrated lightweight download manager connected to your local volume store.
 
 ## License
 
