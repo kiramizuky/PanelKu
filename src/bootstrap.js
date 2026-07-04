@@ -28,9 +28,13 @@ export const bootstrap = async (app, httpServer) => {
   // 2. Connect Redis
   logger.info('Connecting to Redis...');
   redis = new Redis(redisConfig);
-  await redis.connect();
-  redis.on('error', (err) => logger.warn('Redis error:', err));
+  redis.on('error', (err) => logger.warn('Redis error: ' + err.message));
   redis.on('ready', () => logger.info('Redis connected'));
+  try {
+    await redis.connect();
+  } catch (err) {
+    logger.warn(`Failed to connect to Redis: ${err.message}. Panel will run without active background queues.`);
+  }
 
   // 3. Seed initial data (roles, super admin)
   await seedInitialData();
