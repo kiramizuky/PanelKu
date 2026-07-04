@@ -1,0 +1,9 @@
+{
+  "name": "Smart Home Manager",
+  "version": "1.0.0",
+  "description": "Deploy Home Assistant, Mosquitto broker, and Zigbee2MQTT stacks via Docker Compose",
+  "entry": "index.js",
+  "path": "/plugins/home-assistant-manager",
+  "icon": "bi-house-gear",
+  "color": "#f97316"
+}

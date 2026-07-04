@@ -1,0 +1,9 @@
+{
+  "name": "Media & Cloud Services",
+  "version": "1.0.0",
+  "description": "Deploy Jellyfin media servers and qBittorrent client downloaders via Docker Compose",
+  "entry": "index.js",
+  "path": "/plugins/media-cloud-manager",
+  "icon": "bi-tv",
+  "color": "#ef4444"
+}

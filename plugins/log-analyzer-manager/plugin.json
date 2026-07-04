@@ -1,0 +1,9 @@
+{
+  "name": "Log Analyzer",
+  "version": "1.0.0",
+  "description": "Stream and analyze host log records (auth.log, syslog) to locate and alert threat anomalies",
+  "entry": "index.js",
+  "path": "/plugins/log-analyzer-manager",
+  "icon": "bi-shield-check",
+  "color": "#8b5cf6"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "DB Web Admin",
+  "version": "1.0.0",
+  "description": "Deploy phpMyAdmin, pgAdmin, or Adminer via Docker Compose stacks",
+  "entry": "index.js",
+  "path": "/plugins/db-admin-manager",
+  "icon": "bi-database-fill-gear",
+  "color": "#10b981"
+}
