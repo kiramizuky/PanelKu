@@ -115,6 +115,9 @@ const createApp = () => {
   app.get('/whatsapp', (req, res) => res.render('whatsapp/index', { title: 'WhatsApp API' }));
 
 
+  // Dynamic plugins router (loaded before 404 handler)
+  app.use(pluginLoader.router);
+
   // Error handlers (must be last)
   app.use(notFoundHandler);
   app.use(errorHandler);

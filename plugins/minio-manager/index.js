@@ -1,4 +1,5 @@
 import dockerService from '../../src/modules/docker/docker.service.js';
+import firewallService from '../../src/modules/firewall/firewall.service.js';
 import { successResponse, errorResponse } from '../../src/helpers/response.js';
 
 export default {
@@ -250,6 +251,12 @@ volumes:
   minio_data:
 `;
         await dockerService.deployCompose('minio', composeYaml);
+        try {
+          await firewallService.addRule(port, 'tcp');
+          await firewallService.addRule(consolePort, 'tcp');
+        } catch (fwErr) {
+          console.warn('Firewall: failed to allow ports', port, consolePort, fwErr.message);
+        }
         return successResponse(res, null, 'MinIO deployed successfully');
       } catch (error) {
         return errorResponse(res, error.message, 500);

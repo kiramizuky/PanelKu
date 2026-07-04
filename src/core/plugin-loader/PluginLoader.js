@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { pathToFileURL } from 'url';
+import { Router } from 'express';
 import logger from '../../config/logger.js';
 
 /**
@@ -12,6 +13,7 @@ class PluginLoader {
   constructor() {
     this._plugins = new Map();
     this._pluginsDir = resolve('./plugins');
+    this.router = Router();
   }
 
   /**
@@ -55,6 +57,19 @@ class PluginLoader {
       const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 
       const entryPath = join(this._pluginsDir, name, manifest.entry || 'index.js');
+      const wrappedApp = new Proxy(app, {
+        get: (target, prop) => {
+          if (['get', 'post', 'put', 'delete', 'patch'].includes(prop)) {
+            return (...args) => this.router[prop](...args);
+          }
+          const val = target[prop];
+          if (typeof val === 'function') {
+            return val.bind(target);
+          }
+          return val;
+        }
+      });
+
       const { default: plugin } = await import(pathToFileURL(entryPath).href);
 
       if (typeof plugin.register !== 'function') {
@@ -62,7 +77,7 @@ class PluginLoader {
         return;
       }
 
-      await plugin.register(app, io);
+      await plugin.register(wrappedApp, io);
       this._plugins.set(name, { ...manifest, status: 'active' });
       logger.info(`PluginLoader: plugin [${name}] v${manifest.version} loaded.`);
     } catch (err) {

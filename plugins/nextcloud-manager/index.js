@@ -1,4 +1,5 @@
 import dockerService from '../../src/modules/docker/docker.service.js';
+import firewallService from '../../src/modules/firewall/firewall.service.js';
 import { successResponse, errorResponse } from '../../src/helpers/response.js';
 
 export default {
@@ -222,6 +223,11 @@ volumes:
   nextcloud_data:
 `;
         await dockerService.deployCompose('nextcloud', composeYaml);
+        try {
+          await firewallService.addRule(port, 'tcp');
+        } catch (fwErr) {
+          console.warn('Firewall: failed to allow port', port, fwErr.message);
+        }
         return successResponse(res, null, 'Nextcloud deployed successfully');
       } catch (error) {
         return errorResponse(res, error.message, 500);
