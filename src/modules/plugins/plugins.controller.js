@@ -20,6 +20,10 @@ class PluginsController {
       const installedStr = await Setting.get('installed_plugins') || '[]';
       const installedIds = JSON.parse(typeof installedStr === 'string' ? installedStr : JSON.stringify(installedStr));
 
+      // Load installed plugin proxies from database
+      const proxiesStr = await Setting.get('plugin_proxies') || '{}';
+      const proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
+
       const pluginsList = [];
       for (const entry of dirs) {
         if (!entry.isDirectory()) continue;
@@ -34,7 +38,8 @@ class PluginsController {
             path: manifest.path || `/plugins/${entry.name}`,
             icon: manifest.icon || 'bi-plugin',
             color: manifest.color || '#38bdf8',
-            installed: installedIds.includes(entry.name)
+            installed: installedIds.includes(entry.name),
+            proxyUrl: proxies[entry.name] || ''
           });
         } catch (e) {
           // Skip invalid plugin folders
@@ -49,7 +54,7 @@ class PluginsController {
 
   async installPlugin(req, res) {
     try {
-      const { id } = req.body;
+      const { id, proxyUrl } = req.body;
       if (!id) return errorResponse(res, 'Plugin ID is required', 400);
 
       // Verify directory exists
@@ -69,10 +74,46 @@ class PluginsController {
         await Setting.set('installed_plugins', JSON.stringify(installedIds), 'json');
       }
 
+      // Save proxyUrl if provided
+      if (proxyUrl !== undefined) {
+        const proxiesStr = await Setting.get('plugin_proxies') || '{}';
+        const proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
+        if (proxyUrl) {
+          proxies[id] = proxyUrl.trim();
+        } else {
+          delete proxies[id];
+        }
+        await Setting.set('plugin_proxies', JSON.stringify(proxies), 'json');
+        pluginLoader.setProxy(id, proxyUrl);
+      }
+
       // Load it dynamically into memory
       await pluginLoader._loadPlugin(id, req.app, req.app.get('io'));
 
       return successResponse(res, null, `Plugin ${id} installed successfully`);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async updateProxy(req, res) {
+    try {
+      const { id, proxyUrl } = req.body;
+      if (!id) return errorResponse(res, 'Plugin ID is required', 400);
+
+      const proxiesStr = await Setting.get('plugin_proxies') || '{}';
+      const proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
+
+      if (proxyUrl) {
+        proxies[id] = proxyUrl.trim();
+      } else {
+        delete proxies[id];
+      }
+
+      await Setting.set('plugin_proxies', JSON.stringify(proxies), 'json');
+      pluginLoader.setProxy(id, proxyUrl);
+
+      return successResponse(res, null, `Plugin ${id} proxy updated successfully`);
     } catch (error) {
       return errorResponse(res, error.message, 500);
     }
@@ -92,6 +133,15 @@ class PluginsController {
         installedIds.splice(index, 1);
         await Setting.set('installed_plugins', JSON.stringify(installedIds), 'json');
       }
+
+      // Remove from proxies
+      const proxiesStr = await Setting.get('plugin_proxies') || '{}';
+      const proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
+      if (proxies[id]) {
+        delete proxies[id];
+        await Setting.set('plugin_proxies', JSON.stringify(proxies), 'json');
+      }
+      pluginLoader.setProxy(id, null);
 
       // Unload from memory
       pluginLoader._plugins.delete(id);

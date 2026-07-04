@@ -116,6 +116,7 @@ const createApp = () => {
 
 
   // Dynamic plugins router (loaded before 404 handler)
+  app.use((req, res, next) => pluginLoader.handleProxy(req, res, next));
   app.use(pluginLoader.router);
   app.use('/api', pluginLoader.router);
 

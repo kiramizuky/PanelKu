@@ -1,7 +1,9 @@
 import { readdir, readFile } from 'fs/promises';
 import { join, resolve } from 'path';
-import { pathToFileURL } from 'url';
+import { pathToFileURL, parse as parseUrl } from 'url';
 import { Router } from 'express';
+import http from 'http';
+import https from 'https';
 import logger from '../../config/logger.js';
 
 /**
@@ -12,6 +14,7 @@ import logger from '../../config/logger.js';
 class PluginLoader {
   constructor() {
     this._plugins = new Map();
+    this._proxies = new Map();
     this._pluginsDir = resolve('./plugins');
     this.router = Router();
   }
@@ -38,6 +41,20 @@ class PluginLoader {
       installedIds = JSON.parse(typeof installedStr === 'string' ? installedStr : JSON.stringify(installedStr));
     } catch (e) {
       logger.warn('PluginLoader: failed to query installed plugins from database:', e.message);
+    }
+
+    // Load plugin proxies from DB
+    try {
+      const Setting = (await import('../../models/Setting.js')).default;
+      const proxiesStr = await Setting.get('plugin_proxies') || '{}';
+      const proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
+      for (const [id, url] of Object.entries(proxies)) {
+        if (url) {
+          this._proxies.set(id, url);
+        }
+      }
+    } catch (e) {
+      logger.warn('PluginLoader: failed to query plugin proxies from database:', e.message);
     }
 
     for (const entry of dirs) {
@@ -86,11 +103,115 @@ class PluginLoader {
   }
 
   getAll() {
-    return [...this._plugins.entries()].map(([name, info]) => ({ name, ...info }));
+    return [...this._plugins.entries()].map(([name, info]) => {
+      const proxyUrl = this._proxies.get(name) || '';
+      return {
+        name,
+        ...info,
+        proxyUrl,
+        // Override path with proxy URL if set, so the frontend UI automatically opens it
+        path: proxyUrl || info.path || `/plugins/${name}`
+      };
+    });
   }
 
   isLoaded(name) {
     return this._plugins.has(name);
+  }
+
+  setProxy(id, proxyUrl) {
+    if (proxyUrl) {
+      this._proxies.set(id, proxyUrl.trim());
+    } else {
+      this._proxies.delete(id);
+    }
+  }
+
+  getProxy(id) {
+    return this._proxies.get(id);
+  }
+
+  /**
+   * Middleware to check and reverse-proxy requests targeting a proxied plugin.
+   */
+  handleProxy(req, res, next) {
+    const match = req.originalUrl.match(/^\/(api\/)?plugins\/([^\/?#]+)/);
+    if (!match) return next();
+
+    const pluginId = match[2];
+    const targetUrl = this.getProxy(pluginId);
+    if (!targetUrl) return next();
+
+    // Perform reverse proxying to targetUrl
+    try {
+      const parsedTarget = parseUrl(targetUrl);
+      let strippedPath = req.originalUrl;
+      if (match) {
+        strippedPath = req.originalUrl.slice(match[0].length);
+      }
+      if (!strippedPath.startsWith('/')) {
+        strippedPath = '/' + strippedPath;
+      }
+
+      let targetPath = parsedTarget.pathname || '';
+      if (targetPath.endsWith('/')) {
+        targetPath = targetPath.slice(0, -1);
+      }
+      const finalPath = targetPath + strippedPath;
+
+      const options = {
+        protocol: parsedTarget.protocol,
+        hostname: parsedTarget.hostname,
+        port: parsedTarget.port || (parsedTarget.protocol === 'https:' ? 443 : 80),
+        method: req.method,
+        path: finalPath,
+        headers: {
+          ...req.headers,
+        },
+        timeout: 30000,
+      };
+
+      // Set/override standard headers
+      delete options.headers['connection'];
+      delete options.headers['host'];
+      options.headers['Host'] = parsedTarget.host;
+
+      const transport = parsedTarget.protocol === 'https:' ? https : http;
+      const proxyReq = transport.request(options, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res);
+      });
+
+      proxyReq.on('error', (err) => {
+        logger.error(`PluginLoader Proxy error for ${targetUrl}: ${err.message}`);
+        if (!res.headersSent) {
+          res.status(502).send(`Bad Gateway: Failed to proxy request to plugin ${pluginId}. Error: ${err.message}`);
+        }
+      });
+
+      // Handle body if already parsed by global middleware
+      if (req.body && Object.keys(req.body).length > 0) {
+        const contentType = req.headers['content-type'] || '';
+        let bodyData;
+        if (contentType.includes('application/json')) {
+          bodyData = JSON.stringify(req.body);
+        } else if (contentType.includes('application/x-www-form-urlencoded')) {
+          bodyData = new URLSearchParams(req.body).toString();
+        }
+
+        if (bodyData) {
+          proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+          proxyReq.write(bodyData);
+          proxyReq.end();
+          return;
+        }
+      }
+
+      req.pipe(proxyReq);
+    } catch (err) {
+      logger.error(`PluginLoader Proxy initialization error: ${err.message}`);
+      res.status(500).send(`Internal Server Error: Proxy failed. ${err.message}`);
+    }
   }
 }
 
