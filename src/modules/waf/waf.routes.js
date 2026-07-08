@@ -12,5 +12,6 @@ router.use(rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE));
 router.get('/rules', wafController.getRules.bind(wafController));
 router.post('/rules', wafController.addRule.bind(wafController));
 router.delete('/rules/:id', wafController.deleteRule.bind(wafController));
+router.get('/fail2ban/logs', wafController.getFail2BanLogs.bind(wafController));
 
 export default router;

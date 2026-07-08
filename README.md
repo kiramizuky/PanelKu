@@ -7,28 +7,20 @@
 
 ## Core Features
 
-- 🔐 **JWT Authentication** — Access token, refresh token, 2FA (TOTP), session manager
-- 👥 **Dynamic RBAC** — Super Admin, Admin, Operator, Read Only with per-resource permissions
-- 📊 **Realtime Dashboard** — CPU, RAM, Disk, Temperature, Network via Socket.IO + Chart.js, featuring a **Real-Time Process Inspector** (sort by CPU/Memory)
-# Linux Server Control Panel
-
-> Lightweight, modern, realtime Linux server control panel — a blend of aaPanel, Portainer, CasaOS, and Cockpit, but far lighter.
-
-[![Node.js](https://img.shields.io/badge/Node.js-20%2B-green)](https://nodejs.org)
-[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
-
-## Core Features
-
-- 🔐 **JWT Authentication** — Access token, refresh token, 2FA (TOTP), session manager
+- 🔐 **Multi-Factor Authentication (MFA / 2FA)** — Access token, refresh token, TOTP (Google Authenticator/Authy) session management
 - 👥 **Dynamic RBAC** — Super Admin, Admin, Operator, Read Only with per-resource permissions
 - 📊 **Realtime Dashboard** — CPU, RAM, Disk, Temperature, Network via Socket.IO + Chart.js, featuring a **Real-Time Process Inspector** (sort by CPU/Memory)
 - 📈 **Monitoring** — Historical metrics, disk health, network interfaces (with IP mapping), alert thresholds
 - 🖥️ **Web Terminal** — xterm.js + node-pty, multi-tab, bash/zsh/fish
 - 📁 **File Manager** — Browse, upload, download, edit, zip/unzip, rename, delete, search
-- 📱 **Responsive Design** — Fully mobile-friendly layout with a frosted-glass **Burger Sidebar Drawer** offcanvas navigation menu
-- 🔌 **Plugin Marketplace** — Install/uninstall extensions dynamically with hot route mounting
+- 🛡️ **Security & SSH Key Manager** — Dedicated UI to manage SSH keys (`authorized_keys`), SSH port, Password Authentication toggle, and live Fail2Ban intrusion logs dashboard
+- 🔌 **Plugin Marketplace & SDK** — Install/uninstall extensions dynamically with hot route mounting
+- 🐘 **PHP Manager Plugin** — Complete control panel for multiple PHP versions (8.1 - 8.4) with FPM service actions and custom `php.ini` config values
 - 🐳 **Docker & Compose Engine** — Start, stop, monitor telemetry, and deploy compose stacks (with automatic fallback to standalone `docker-compose`)
-- 📡 **Built-in Plugins** — DB Web Admin (phpMyAdmin, pgAdmin, Adminer), Smart Home Manager (Home Assistant, Mosquitto, Zigbee2MQTT), Media & Cloud Services (Jellyfin, qBittorrent), Realtime Log Analyzer, OpenClaw AI, WireGuard VPN, Fail2ban Admin, PM2 Manager, S3/Rclone Backups, Redis, Nextcloud, AdGuard Home, MinIO S3 Server, Uptime Kuma, and Rclone Manager (featuring host-level dependencies auto-installers)
+- 🔒 **Let's Encrypt Auto-Renewal** — Automatic SSL certificate request and renewal scheduler built into the panel health system
+- ⚙️ **Distro-Aware Auto-Updates** — Dynamically writes daily update/upgrade cron scripts tailored to native package managers (APT, DNF, Pacman, Emerge)
+- 📱 **Responsive Design** — Fully mobile-friendly layout with a frosted-glass **Burger Sidebar Drawer** offcanvas navigation menu
+- 📡 **Built-in Plugins** — DB Web Admin (phpMyAdmin, pgAdmin, Adminer), Smart Home Manager (Home Assistant, Mosquitto, Zigbee2MQTT), Media & Cloud Services (Jellyfin, qBottorrent), Realtime Log Analyzer, OpenClaw AI, WireGuard VPN, Fail2ban Admin, PM2 Manager, S3/Rclone Backups, Redis, Nextcloud, AdGuard Home, MinIO S3 Server, Uptime Kuma, and Rclone Manager (featuring host-level dependencies auto-installers)
 
 ## Requirements
 
@@ -117,14 +109,20 @@ src/
 
 ## Future Development & Upcoming Modules
 
-To expand Panelku's capabilities as a comprehensive server and home cloud administration tool, the following features and modules are planned for future development:
+Untuk memperluas kapabilitas Panelku sebagai sistem administrasi server yang komprehensif, fitur berikut direncanakan untuk pengembangan selanjutnya (lihat [rencana.md](file:///e:/Proyek/homeserver/rencana.md)):
 
-### 1. 🖧 Advanced Networking
-- **Tailscale Mesh-VPN**: One-click VPN setup to link servers privately.
-- **Visual SSL Cert Mapper**: Auto-renewal Let's Encrypt interface for custom domains.
+### 1. ⚙️ Core Architecture & Performance
+- **Multi-Node Cluster**: Mengelola beberapa server *agent* dari satu dashboard utama.
+- **SQLite WAL Mode & Auto-Backup**: Mode Write-Ahead Logging dan pencadangan terenkripsi otomatis ke S3/Rclone.
+- **Web Terminal Audit Logs**: Pencatatan audit aktivitas shell admin.
 
-### 2. 🛡️ Advanced Security & Audits
-- **Active WAF Inspector**: Realtime firewall tracking dashboard to display blocked client signatures.
+### 2. 🗄️ Service & Plugin Enhancements
+- **PHP FPM Pools & Version Selector**: Pembagian pool server PHP-FPM dan pemilih PHP per-website.
+- **Database Explorer & Console**: MySQL/PostgreSQL/SQLite Client internal yang visual.
+
+### 3. 🔔 Watchdog & Recovery
+- **Service Watchdog**: Auto-restart daemon jika Nginx, Docker, PHP, atau MySQL mengalami kendala/mati.
+- **Auto-Rollback**: Pemulihan otomatis jika pembaruan panel mengalami error/gagal.
 
 ## License
 

@@ -34,6 +34,15 @@ class WafController {
       return errorResponse(res, error, 500);
     }
   }
+
+  async getFail2BanLogs(req, res) {
+    try {
+      const logs = await wafService.getFail2BanLogs();
+      return success(res, logs);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
 }
 
 export default new WafController();

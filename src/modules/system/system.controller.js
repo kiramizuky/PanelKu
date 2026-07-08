@@ -1,4 +1,5 @@
 import systemService from './system.service.js';
+import sshService from './ssh.service.js';
 import { success, errorResponse } from '../../helpers/response.js';
 
 class SystemController {
@@ -183,6 +184,54 @@ class SystemController {
       const { enabled, frequency } = req.body;
       await systemService.setPanelAutoUpdate({ enabled: !!enabled, frequency: frequency || 'daily' });
       return success(res, null, `Panel auto-update ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async getSSHKeys(req, res) {
+    try {
+      const keys = await sshService.getKeys();
+      return success(res, keys);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async addSSHKey(req, res) {
+    try {
+      const { key } = req.body;
+      await sshService.addKey(key);
+      return success(res, null, 'SSH key added successfully');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async deleteSSHKey(req, res) {
+    try {
+      const { id } = req.body;
+      await sshService.deleteKey(id);
+      return success(res, null, 'SSH key deleted successfully');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async getSSHConfig(req, res) {
+    try {
+      const config = await sshService.getSSHConfig();
+      return success(res, config);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async updateSSHConfig(req, res) {
+    try {
+      const { port, passwordAuth } = req.body;
+      await sshService.updateSSHConfig({ port, passwordAuth });
+      return success(res, null, 'SSH configuration updated successfully');
     } catch (error) {
       return errorResponse(res, error, 500);
     }

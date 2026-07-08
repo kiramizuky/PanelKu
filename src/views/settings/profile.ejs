@@ -93,6 +93,41 @@
         </div>
       </div>
 
+      <!-- Two-Factor Authentication (2FA) Card -->
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card h-100 mb-0" style="border-radius:16px; padding:25px; display:flex; flex-direction:column;">
+          <div style="border-bottom:1px solid var(--glass-border); padding-bottom:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+            <h5 style="font-weight:700; margin:0; color:var(--text-primary);"><i class="bi bi-shield-lock-fill me-2 text-success"></i>Two-Factor Auth (2FA)</h5>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:15px; flex:1; justify-content:center;">
+            <div id="2faStatusContainer" class="d-flex align-items-center justify-content-between p-3 rounded" style="background:rgba(0,0,0,0.2); border:1px solid var(--glass-border);">
+              <div>
+                <span class="d-block" style="font-size:12px; font-weight:600; color:var(--text-primary);">Status 2FA</span>
+                <span id="2faBadge" class="lp-badge lp-badge-danger mt-1" style="font-size:10px;">Disabled</span>
+              </div>
+              <button id="btnToggle2FA" class="btn-lp btn-lp-primary" onclick="ProfilePage.toggle2FA()" style="font-size:12px; padding:6px 12px;">Enable 2FA</button>
+            </div>
+            
+            <!-- Setup container (hidden by default) -->
+            <div id="2faSetupContainer" style="display:none; background:rgba(0,0,0,0.2); padding:15px; border-radius:10px; border:1px solid var(--glass-border);">
+              <p class="text-muted" style="font-size:11px; margin-bottom:10px;">Scan the QR code or enter the secret key manually in your authenticator app (Google Authenticator, Authy, etc.):</p>
+              <div class="text-center mb-3">
+                <img id="2faQrCode" src="" alt="2FA QR Code" style="background:white; padding:8px; border-radius:8px; display:inline-block; width:120px; height:120px; margin: 0 auto;">
+              </div>
+              <div class="mb-3">
+                <label class="lp-label" style="font-size:11px;">Manual Secret Key</label>
+                <input type="text" id="2faSecretKey" class="lp-input font-mono" readonly style="font-size:12px; text-align:center; background: rgba(0,0,0,0.2); height: 32px; padding: 0;">
+              </div>
+              <div class="mb-3">
+                <label class="lp-label" style="font-size:11px;">Enter Authenticator Code</label>
+                <input type="text" id="2faOtpCode" class="lp-input font-mono" placeholder="123456" style="text-align:center; height:32px;">
+              </div>
+              <button class="btn-lp btn-lp-primary w-100" onclick="ProfilePage.confirmEnable2FA()" style="font-size:12px; height:36px; padding:0;">Confirm & Enable</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Change Password Card -->
       <div class="col-12">
         <div class="lp-glass-card" style="border-radius:16px; padding:25px;">

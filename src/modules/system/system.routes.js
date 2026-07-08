@@ -44,5 +44,12 @@ router.post('/n8n/start', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), tunnelControl
 router.post('/n8n/stop', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), tunnelController.stopN8n);
 router.post('/n8n/uninstall', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), tunnelController.uninstallN8n);
 
+// SSH Key Manager endpoints
+router.get('/ssh/keys', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getSSHKeys.bind(systemController));
+router.post('/ssh/keys', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.addSSHKey.bind(systemController));
+router.post('/ssh/keys/delete', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.deleteSSHKey.bind(systemController));
+router.get('/ssh/config', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getSSHConfig.bind(systemController));
+router.post('/ssh/config', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.updateSSHConfig.bind(systemController));
+
 export default router;
 

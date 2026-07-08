@@ -306,6 +306,44 @@ const LP = {
     });
   },
 
+  prompt(message, type = 'text', title = 'Input Required') {
+    return new Promise(resolve => {
+      const id = 'lp_prompt_' + Date.now();
+      const modal = document.createElement('div');
+      modal.innerHTML = `
+        <div class="modal fade" id="${id}" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius:12px;">
+              <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title font-sans" style="font-size:15px; font-weight:600;">${title}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body pb-0">
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">${message}</p>
+                <input type="${type}" id="${id}_input" class="lp-input w-100" style="height:38px;">
+              </div>
+              <div class="modal-footer border-0">
+                <button class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn-lp btn-lp-primary" id="${id}_ok">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      const bsModal = new bootstrap.Modal(document.getElementById(id));
+      bsModal.show();
+      document.getElementById(`${id}_ok`).addEventListener('click', () => {
+        const val = document.getElementById(`${id}_input`).value;
+        bsModal.hide();
+        resolve(val);
+      });
+      document.getElementById(id).addEventListener('hidden.bs.modal', () => {
+        modal.remove();
+        resolve(null);
+      });
+    });
+  },
+
   alert(message, title = 'Info') {
     return new Promise(resolve => {
       const id = 'lp_alert_' + Date.now();

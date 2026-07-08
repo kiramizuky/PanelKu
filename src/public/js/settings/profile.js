@@ -21,6 +21,25 @@ const ProfilePage = (() => {
         document.getElementById('profileCardName').textContent = user.username || 'User';
         document.getElementById('profileCardEmail').textContent = user.email || 'No email set';
         document.getElementById('profileCardBadge').textContent = (user.role?.name || 'User').toUpperCase();
+
+        // Update 2FA state
+        const badge = document.getElementById('2faBadge');
+        const btnToggle = document.getElementById('btnToggle2FA');
+        const setupContainer = document.getElementById('2faSetupContainer');
+        
+        if (user.twoFactorEnabled) {
+          badge.textContent = 'Enabled';
+          badge.className = 'lp-badge lp-badge-success mt-1';
+          btnToggle.textContent = 'Disable 2FA';
+          btnToggle.className = 'btn-lp btn-lp-ghost text-danger';
+          setupContainer.style.display = 'none';
+        } else {
+          badge.textContent = 'Disabled';
+          badge.className = 'lp-badge lp-badge-danger mt-1';
+          btnToggle.textContent = 'Enable 2FA';
+          btnToggle.className = 'btn-lp btn-lp-primary';
+        }
+        ProfilePage.twoFactorEnabled = user.twoFactorEnabled;
       }
     } catch (err) {
       LP.toast('Failed to load profile details.', 'error');
@@ -125,7 +144,66 @@ const ProfilePage = (() => {
     }
   }
 
-  return { init, changePassword, regenerateApiKey, toggleApiKeyVisibility, copyApiKey };
+  async function toggle2FA() {
+    const setupContainer = document.getElementById('2faSetupContainer');
+    
+    if (ProfilePage.twoFactorEnabled) {
+      const password = await LP.prompt('Enter your current password to disable 2FA:', 'password', 'Disable 2FA');
+      if (!password) return;
+      
+      try {
+        const res = await LP.post('/auth/2fa/disable', { password });
+        if (res?.success) {
+          LP.toast('2FA has been disabled.', 'success');
+          loadProfile();
+        } else {
+          LP.toast(res?.message || 'Failed to disable 2FA', 'error');
+        }
+      } catch (err) {
+        LP.toast('Error disabling 2FA', 'error');
+      }
+    } else {
+      if (setupContainer.style.display === 'none') {
+        try {
+          const res = await LP.post('/auth/2fa/setup');
+          if (res?.success && res.data) {
+            document.getElementById('2faQrCode').src = res.data.qrCode;
+            document.getElementById('2faSecretKey').value = res.data.secret;
+            setupContainer.style.display = 'block';
+          } else {
+            LP.toast(res?.message || 'Failed to initiate 2FA setup', 'error');
+          }
+        } catch (err) {
+          LP.toast('Error initiating 2FA setup', 'error');
+        }
+      } else {
+        setupContainer.style.display = 'none';
+      }
+    }
+  }
+
+  async function confirmEnable2FA() {
+    const otp = document.getElementById('2faOtpCode').value.trim();
+    if (!otp) {
+      LP.toast('Please enter the authenticator OTP code.', 'error');
+      return;
+    }
+    
+    try {
+      const res = await LP.post('/auth/2fa/enable', { otp });
+      if (res?.success) {
+        LP.toast('2FA has been successfully enabled!', 'success');
+        document.getElementById('2faOtpCode').value = '';
+        loadProfile();
+      } else {
+        LP.toast(res?.message || 'Failed to verify OTP', 'error');
+      }
+    } catch (err) {
+      LP.toast('Error verifying OTP', 'error');
+    }
+  }
+
+  return { init, changePassword, regenerateApiKey, toggleApiKeyVisibility, copyApiKey, toggle2FA, confirmEnable2FA };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -1,6 +1,7 @@
 const WAFPage = {
   async init() {
     await this.loadRules();
+    await this.loadFail2BanLogs();
   },
 
   async loadRules() {
@@ -72,6 +73,21 @@ const WAFPage = {
       }
     } catch (err) {
       LP.toast('Connection error', 'error');
+    }
+  },
+
+  async loadFail2BanLogs() {
+    const logsEl = document.getElementById('fail2banLogs');
+    logsEl.textContent = 'Loading Fail2Ban logs...';
+    try {
+      const res = await LP.get('/waf/fail2ban/logs');
+      if (res?.success && Array.isArray(res.data)) {
+        logsEl.textContent = res.data.join('\n');
+      } else {
+        logsEl.textContent = 'Failed to load Fail2Ban logs.';
+      }
+    } catch {
+      logsEl.textContent = 'Error loading Fail2Ban logs.';
     }
   }
 };

@@ -30,6 +30,7 @@ export const startHealthJob = () => {
       try {
         const db = getDb();
         const websites = db.prepare("SELECT * FROM websites WHERE status = 'active'").all().map(row => ({
+          id:            row.id,
           domain:       row.domain,
           ssl:          fromJson(row.ssl, {}),
           rootDirectory: row.root_directory,
@@ -50,14 +51,22 @@ export const startHealthJob = () => {
             }
           }
 
-          // SSL Expiration
+          // SSL Expiration & Auto-Renewal
           if (site.ssl && site.ssl.enabled && site.ssl.expiresAt) {
             const now = new Date();
             const expires = new Date(site.ssl.expiresAt);
             const daysLeft = Math.floor((expires - now) / (1000 * 60 * 60 * 24));
             
-            // Alert if it expires in exactly 7, 3, or 1 days
-            if (daysLeft === 7 || daysLeft === 3 || daysLeft === 1) {
+            if (site.ssl.provider === 'letsencrypt' && daysLeft <= 30) {
+              logger.info(`SSL for ${site.domain} is expiring in ${daysLeft} days. Triggering auto-renewal...`);
+              try {
+                const sslService = (await import('../modules/ssl/ssl.service.js')).default;
+                await sslService.configureWebsiteSSL(site.id);
+                logger.info(`SSL for ${site.domain} renewed successfully`);
+              } catch (e) {
+                logger.error(`SSL renewal failed for ${site.domain}: ${e.message}`);
+              }
+            } else if (daysLeft === 7 || daysLeft === 3 || daysLeft === 1) {
               logger.warn(`SSL for ${site.domain} expiring in ${daysLeft} days`);
               alertsService.triggerAlert('SSL Expiry Alert', `The SSL certificate for ${site.domain} will expire in ${daysLeft} days.`);
             }
