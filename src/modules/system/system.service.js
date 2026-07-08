@@ -269,6 +269,7 @@ class SystemService {
 
       // Mark directory safe for root
       log += await this.runCommand('git config --global --add safe.directory /opt/panelku 2>&1').catch(() => '');
+      log += await this.runCommand('cd /opt/panelku && git checkout package-lock.json 2>&1').catch(() => '');
       log += await this.runCommand(`cd /opt/panelku && git pull origin ${targetBranch} 2>&1`).catch(e => `[git pull error] ${e.message}`);
       log += '\n';
       log += await this.runCommand('cd /opt/panelku && npm install --production 2>&1').catch(e => `[npm install error] ${e.message}`);
