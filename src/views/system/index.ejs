@@ -44,12 +44,19 @@
       </button>
     </div>
 
-    <div class="lp-glass-card" style="height:300px">
-      <div class="lp-card-title">Power Management</div>
-      <p style="color:var(--text-muted);font-size:13px;">Reboot the server. This will disconnect you temporarily.</p>
-      <button class="btn-lp w-100" onclick="SystemPage.reboot()" style="background:var(--accent-danger);color:white;border-radius:10px;padding:10px;">
-        <i class="bi bi-power"></i> Reboot Server
-      </button>
+    <div class="lp-glass-card d-flex flex-column justify-content-between" style="height:300px">
+      <div>
+        <div class="lp-card-title">Power & Maintenance</div>
+        <p style="color:var(--text-muted);font-size:13px;">Manage server power state or restart the panel application.</p>
+      </div>
+      <div>
+        <button class="btn-lp w-100 mb-2" onclick="SystemPage.restartPanel()" style="background:rgba(56, 189, 248, 0.2);color:#38bdf8;border:1px solid rgba(56, 189, 248, 0.3);border-radius:10px;padding:10px;font-weight:600;">
+          <i class="bi bi-arrow-clockwise"></i> Restart Panel
+        </button>
+        <button class="btn-lp w-100" onclick="SystemPage.reboot()" style="background:var(--accent-danger);color:white;border-radius:10px;padding:10px;font-weight:600;">
+          <i class="bi bi-power"></i> Reboot Server
+        </button>
+      </div>
     </div>
   </div>
 </div>

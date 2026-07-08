@@ -143,6 +143,24 @@ const SystemPage = {
     return this.runPM(action);
   },
 
+  async restartPanel() {
+    if (!(await LP.confirm('Are you sure you want to restart the panel? Operations will pause briefly.', 'Restart Panel'))) return;
+
+    try {
+      const res = await LP.post('/system/panel/restart');
+      if (res?.success) {
+        LP.toast('Panel is restarting. Page will reload automatically...', 'warning');
+        setTimeout(() => window.location.reload(), 4000);
+      } else {
+        LP.toast(res.message, 'error');
+      }
+    } catch (err) {
+      // Net connection drops are expected during restart
+      LP.toast('Restart initiated. Reloading page...', 'warning');
+      setTimeout(() => window.location.reload(), 4000);
+    }
+  },
+
   async reboot() {
     if (!(await LP.confirm('WARNING: Are you sure you want to reboot the server? All services will go down temporarily.', 'Reboot System'))) return;
     

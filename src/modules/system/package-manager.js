@@ -71,13 +71,13 @@ class PackageManager {
 
   getPMInfo() {
     const config = {
-      apt: { name: 'APT (Debian/Ubuntu)', updateName: 'APT Update', upgradeName: 'APT Upgrade' },
-      pacman: { name: 'Pacman (Arch Linux)', updateName: 'Sync Databases', upgradeName: 'System Upgrade' },
-      dnf: { name: 'DNF (Fedora/RHEL)', updateName: 'DNF Check-Update', upgradeName: 'DNF Upgrade' },
-      emerge: { name: 'Emerge (Gentoo)', updateName: 'Sync Portage', upgradeName: 'Emerge Upgrade' },
+      apt: { name: 'APT (Debian/Ubuntu)', updateName: 'Update Packages', upgradeName: 'Upgrade Packages' },
+      pacman: { name: 'Pacman (Arch Linux)', updateName: 'Sync Databases', upgradeName: 'Upgrade System' },
+      dnf: { name: 'DNF (Fedora/RHEL)', updateName: 'Check Updates', upgradeName: 'Upgrade Packages' },
+      emerge: { name: 'Emerge (Gentoo)', updateName: 'Sync Portage', upgradeName: 'Upgrade System' },
       mock: { name: 'Mock Package Manager (Windows)', updateName: 'Mock Update', upgradeName: 'Mock Upgrade' }
     };
-    const info = config[this.pmType] || { name: 'Unknown Package Manager', updateName: 'Update', upgradeName: 'Upgrade' };
+    const info = config[this.pmType] || { name: 'Unknown Package Manager', updateName: 'Update Packages', upgradeName: 'Upgrade Packages' };
     return { ...info, arch: this.arch, distro: this.distro, pmType: this.pmType };
   }
 

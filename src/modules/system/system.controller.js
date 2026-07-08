@@ -84,8 +84,9 @@ class SystemController {
 
   async runAptUpdate(req, res) {
     try {
+      const info = await systemService.getPackageManagerInfo();
       const log = await systemService.runAptUpdate();
-      return success(res, { log }, 'APT Update completed');
+      return success(res, { log }, `${info.name} update completed`);
     } catch (error) {
       return errorResponse(res, error, 500);
     }
@@ -93,8 +94,9 @@ class SystemController {
 
   async runAptUpgrade(req, res) {
     try {
+      const info = await systemService.getPackageManagerInfo();
       const log = await systemService.runAptUpgrade();
-      return success(res, { log }, 'APT Upgrade completed');
+      return success(res, { log }, `${info.name} upgrade completed`);
     } catch (error) {
       return errorResponse(res, error, 500);
     }
