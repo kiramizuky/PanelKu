@@ -109,8 +109,6 @@ src/
 
 ## Future Development & Upcoming Modules
 
-Untuk memperluas kapabilitas Panelku sebagai sistem administrasi server yang komprehensif, fitur berikut direncanakan untuk pengembangan selanjutnya (lihat [rencana.md](file:///e:/Proyek/homeserver/rencana.md)):
-
 ### 1. ⚙️ Core Architecture & Performance
 - **Multi-Node Cluster**: Mengelola beberapa server *agent* dari satu dashboard utama.
 - **SQLite WAL Mode & Auto-Backup**: Mode Write-Ahead Logging dan pencadangan terenkripsi otomatis ke S3/Rclone.
