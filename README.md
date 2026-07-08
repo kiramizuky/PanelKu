@@ -35,7 +35,7 @@
 
 ```bash
 cp .env.example .env
-# Edit .env and set secure secrets
+# Edit .env and set secure secrets.
 docker compose up -d
 ```
 
