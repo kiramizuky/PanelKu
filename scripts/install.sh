@@ -48,6 +48,13 @@ detect_os() {
     error "Unsupported OS"
   fi
   [[ "$OS" != "ubuntu" && "$OS" != "debian" ]] && warn "Non-standard OS: $OS (may work anyway)"
+
+  ARCH=$(uname -m)
+  IS_64BIT=true
+  if [[ "$ARCH" != "x86_64" && "$ARCH" != "aarch64" && "$ARCH" != "arm64" ]]; then
+    IS_64BIT=false
+  fi
+  log "Architecture: $ARCH (64bit/ARM64: $IS_64BIT)"
 }
 
 install_dependencies() {
@@ -75,8 +82,13 @@ install_nodejs() {
   fi
 
   info "Installing Node.js $NODE_VERSION LTS..."
-  curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
-  apt-get install -y -qq nodejs
+  if [ "$IS_64BIT" = true ]; then
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
+    apt-get install -y -qq nodejs
+  else
+    warn "Non-64bit/ARM64 architecture. Installing standard nodejs package from repository..."
+    apt-get install -y -qq nodejs npm
+  fi
   log "Node.js $(node -v) installed"
 }
 

@@ -1,0 +1,9 @@
+{
+  "name": "PHP Manager",
+  "version": "1.0.0",
+  "description": "Install PHP versions, manage php.ini settings, restart PHP-FPM, and check status",
+  "entry": "index.js",
+  "path": "/plugins/php-manager",
+  "icon": "bi-code-slash",
+  "color": "#4f5b93"
+}

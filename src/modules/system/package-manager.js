@@ -1,15 +1,18 @@
 import fs from 'fs/promises';
+import os from 'os';
 import logger from '../../config/logger.js';
 
 class PackageManager {
   constructor() {
     this.distro = 'unknown';
     this.pmType = 'apt'; // default fallback
+    this.arch = 'unknown';
     this.initialized = false;
   }
 
   async init() {
     if (this.initialized) return;
+    this.arch = os.arch(); // 'x64', 'arm64', 'arm', 'ia32' etc.
     try {
       if (process.platform === 'win32') {
         this.distro = 'windows';
@@ -74,7 +77,8 @@ class PackageManager {
       emerge: { name: 'Emerge (Gentoo)', updateName: 'Sync Portage', upgradeName: 'Emerge Upgrade' },
       mock: { name: 'Mock Package Manager (Windows)', updateName: 'Mock Update', upgradeName: 'Mock Upgrade' }
     };
-    return config[this.pmType] || { name: 'Unknown Package Manager', updateName: 'Update', upgradeName: 'Upgrade' };
+    const info = config[this.pmType] || { name: 'Unknown Package Manager', updateName: 'Update', upgradeName: 'Upgrade' };
+    return { ...info, arch: this.arch, distro: this.distro, pmType: this.pmType };
   }
 
   getUpdateCommand() {
