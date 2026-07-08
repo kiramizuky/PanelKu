@@ -42,6 +42,18 @@ docker compose up -d
 Open: http://localhost:23456  
 Login: `admin` / `Admin@123456` (**change this immediately!**)
 
+### With Docker CLI
+
+```bash
+# Pull the latest image from Docker Hub
+docker pull mastarom/panelku:latest
+
+# Run the container
+docker run -d -p 23456:3000 --name panelku \
+  -v $(pwd)/storage:/app/storage \
+  mastarom/panelku:latest
+```
+
 ### Manual Install
 
 ```bash
