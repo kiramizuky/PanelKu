@@ -130,7 +130,7 @@ const LP = {
   updateUserUI() {
     const user = this.state.user;
     if (!user) return;
-    const initials = (user.firstName?.[0] || user.username[0]).toUpperCase();
+    const initials = (user.username?.[0] || user.firstName?.[0] || 'U').toUpperCase();
     document.querySelectorAll('.lp-user-initials').forEach(el => el.textContent = initials);
     document.querySelectorAll('.lp-user-name').forEach(el => el.textContent = user.username);
     document.querySelectorAll('.lp-user-role').forEach(el => el.textContent = user.role?.name || '');
@@ -437,10 +437,10 @@ const LP = {
 
       // 24 hours = 86400000 milliseconds
       if (now - lastCheck < 86400000 && lastCheck > 0) {
-        if (cachedHasUpdate) {
-          document.getElementById('panelUpdateNavbarBtn')?.classList.remove('d-none');
-          document.getElementById('panelUpdateMobileBtn')?.classList.remove('d-none');
-        }
+        const navBtn = document.getElementById('panelUpdateNavbarBtn');
+        const mobBtn = document.getElementById('panelUpdateMobileBtn');
+        if (navBtn) navBtn.style.setProperty('display', cachedHasUpdate ? 'flex' : 'none', cachedHasUpdate ? '' : 'important');
+        if (mobBtn) mobBtn.style.setProperty('display', cachedHasUpdate ? 'block' : 'none', cachedHasUpdate ? '' : 'important');
         return;
       }
 
@@ -451,13 +451,10 @@ const LP = {
         localStorage.setItem('lp_panel_update_last_check', now.toString());
         localStorage.setItem('lp_panel_has_update', hasUpdate.toString());
 
-        if (hasUpdate) {
-          document.getElementById('panelUpdateNavbarBtn')?.classList.remove('d-none');
-          document.getElementById('panelUpdateMobileBtn')?.classList.remove('d-none');
-        } else {
-          document.getElementById('panelUpdateNavbarBtn')?.classList.add('d-none');
-          document.getElementById('panelUpdateMobileBtn')?.classList.add('d-none');
-        }
+        const navBtn = document.getElementById('panelUpdateNavbarBtn');
+        const mobBtn = document.getElementById('panelUpdateMobileBtn');
+        if (navBtn) navBtn.style.setProperty('display', hasUpdate ? 'flex' : 'none', hasUpdate ? '' : 'important');
+        if (mobBtn) mobBtn.style.setProperty('display', hasUpdate ? 'block' : 'none', hasUpdate ? '' : 'important');
       }
     } catch (e) {
       console.warn('Failed to perform automated panel update check:', e);
