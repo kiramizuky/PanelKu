@@ -9,6 +9,7 @@ import { getDb } from './core/db/sqlite.js';
 import { initWebSocket } from './websocket/index.js';
 import { startMonitorJob } from './jobs/monitor.job.js';
 import { startHealthJob } from './jobs/health.job.js';
+import { startBackupJob } from './jobs/backup.job.js';
 import pluginLoader from './core/plugin-loader/PluginLoader.js';
 import { mkdirSync } from 'fs';
 
@@ -48,6 +49,7 @@ export const bootstrap = async (app, httpServer) => {
   // 5. Start background jobs
   startMonitorJob();
   startHealthJob();
+  startBackupJob();
 
   // 5.5 Load WAF cache
   const { refreshWafCache } = await import('./middleware/waf.middleware.js');

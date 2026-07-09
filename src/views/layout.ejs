@@ -62,6 +62,7 @@
           <li><a class="dropdown-item" href="/backup">Backups</a></li>
           <li><a class="dropdown-item" href="/cloudflare">Cloudflare Tunnel</a></li>
           <li><a class="dropdown-item" href="/plugins">Plugins</a></li>
+          <li><a class="dropdown-item" href="/cluster">Cluster Manager</a></li>
           <% if (typeof loadedPlugins !== 'undefined' && loadedPlugins.length > 0) { %>
             <li><hr class="dropdown-divider" style="border-color: var(--glass-border);"></li>
             <% loadedPlugins.forEach(function(plugin) { %>
@@ -143,6 +144,7 @@
             <a class="lp-nav-link py-2" href="/backup"><i class="bi bi-cloud-arrow-up me-2"></i>Backups</a>
             <a class="lp-nav-link py-2" href="/cloudflare"><i class="bi bi-cloud me-2"></i>Cloudflare Tunnel</a>
             <a class="lp-nav-link py-2" href="/plugins"><i class="bi bi-plugin me-2"></i>Plugins</a>
+            <a class="lp-nav-link py-2" href="/cluster"><i class="bi bi-diagram-3-fill me-2"></i>Cluster Manager</a>
             <% if (typeof loadedPlugins !== 'undefined' && loadedPlugins.length > 0) { %>
               <div style="border-top: 1px solid rgba(255,255,255,0.05); margin: 6px 0;"></div>
               <% loadedPlugins.forEach(function(plugin) { %>

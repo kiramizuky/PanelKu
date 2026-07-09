@@ -118,19 +118,15 @@ src/
 | Phase 3 | ✅ Done | Database Management, Backup, Cron |
 | Phase 4 | ✅ Done | Firewall, WAF, Security, Notifications |
 | Phase 5 | ✅ Done | Git Deploy, Auto Update, Plugin Marketplace, WireGuard VPN, Fail2ban, PM2, Rclone, OpenClaw AI, DB Web Admin, Smart Home, Media Services, Log Analyzer |
+| Phase 6 (v1.6.0) | ✅ Done | Multi-Node Cluster, SQLite Auto-Backups, PTY Terminal Command Audit Log, GitHub Actions Docker Hub Integration |
 
 ## Future Development & Upcoming Modules
 
-### 1. ⚙️ Core Architecture & Performance
-- **Multi-Node Cluster**: Mengelola beberapa server *agent* dari satu dashboard utama.
-- **SQLite WAL Mode & Auto-Backup**: Mode Write-Ahead Logging dan pencadangan terenkripsi otomatis ke S3/Rclone.
-- **Web Terminal Audit Logs**: Pencatatan audit aktivitas shell admin.
-
-### 2. 🗄️ Service & Plugin Enhancements
+### 1. 🗄️ Service & Plugin Enhancements
 - **PHP FPM Pools & Version Selector**: Pembagian pool server PHP-FPM dan pemilih PHP per-website.
 - **Database Explorer & Console**: MySQL/PostgreSQL/SQLite Client internal yang visual.
 
-### 3. 🔔 Watchdog & Recovery
+### 2. 🔔 Watchdog & Recovery
 - **Service Watchdog**: Auto-restart daemon jika Nginx, Docker, PHP, atau MySQL mengalami kendala/mati.
 - **Auto-Rollback**: Pemulihan otomatis jika pembaruan panel mengalami error/gagal.
 

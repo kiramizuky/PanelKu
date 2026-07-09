@@ -206,6 +206,18 @@ function initSchema(db) {
       created_at    TEXT NOT NULL,
       updated_at    TEXT NOT NULL
     );
+
+    -- Cluster Nodes (Agent Nodes)
+    CREATE TABLE IF NOT EXISTS cluster_nodes (
+      id            TEXT PRIMARY KEY,
+      name          TEXT UNIQUE NOT NULL,
+      ip_address    TEXT NOT NULL,
+      port          INTEGER NOT NULL DEFAULT 23456,
+      api_key       TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'offline',
+      created_at    TEXT NOT NULL,
+      updated_at    TEXT NOT NULL
+    );
   `);
 }
 

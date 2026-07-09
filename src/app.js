@@ -108,6 +108,7 @@ const createApp = () => {
   app.get('/cloudflare', (req, res) => res.render('cloudflare/index', { title: 'Cloudflare Tunnel' }));
   app.get('/n8n', (req, res) => res.render('n8n/index', { title: 'n8n Automation' }));
   app.get('/plugins', (req, res) => res.render('plugins/index', { title: 'Plugins' }));
+  app.get('/cluster', (req, res) => res.render('cluster/index', { title: 'Cluster Manager' }));
   app.get('/settings/users', (req, res) => res.render('settings/users', { title: 'Users' }));
   app.get('/settings/roles', (req, res) => res.render('settings/roles', { title: 'Roles' }));
   app.get('/settings/profile', (req, res) => res.render('settings/profile', { title: 'Profile' }));

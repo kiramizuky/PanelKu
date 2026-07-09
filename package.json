@@ -1,6 +1,6 @@
 {
   "name": "linux-panel",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Lightweight Linux Server Control Panel",
   "type": "module",
   "main": "src/server.js",
