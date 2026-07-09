@@ -61,7 +61,10 @@
           <div class="lp-glass-card h-100 d-flex flex-column" style="padding:20px">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <h5 style="margin:0;font-weight:600;color:var(--text-primary)"><i class="bi ${p.icon || 'bi-plugin'}" style="color:${p.color || '#38bdf8'}; margin-right:8px;"></i>${p.name}</h5>
-              <span class="lp-badge lp-badge-info" style="font-size:11px">v${p.version}</span>
+              <div class="d-flex align-items-center gap-1">
+                ${p.updateAvailable ? `<span class="lp-badge lp-badge-warning" style="font-size:9.5px; font-weight:700; text-transform:uppercase;">Update Available</span>` : ''}
+                <span class="lp-badge lp-badge-info" style="font-size:11px">v${p.version}</span>
+              </div>
             </div>
             <p style="color:var(--text-muted);font-size:13px;flex-grow:1;margin-bottom:8px;">${p.description}</p>
             ${p.proxyUrl 
@@ -73,7 +76,11 @@
             <div class="d-flex justify-content-end" style="margin-top:15px">
               ${p.installed 
                 ? `
-                  <div class="d-flex gap-2 w-100">
+                  <div class="d-flex gap-2 w-100 flex-wrap">
+                    ${p.updateAvailable 
+                      ? `<button class="btn-lp flex-grow-1 text-center" style="background-color: var(--accent-warning); color: #fff; font-size:13px; font-weight:600; border-radius:8px; height:36px; padding:0 10px; border:none; display:flex; align-items:center; justify-content:center; gap:5px;" onclick="PluginsPage.update('${p.id}', this)"><i class="bi bi-arrow-up-circle-fill"></i> Update</button>`
+                      : ''
+                    }
                     <a href="${p.path}" target="${p.proxyUrl ? '_blank' : '_self'}" class="btn-lp btn-lp-primary flex-grow-1 text-center" style="text-decoration:none; display:inline-block; line-height:36px; height:36px; padding:0 12px; font-size:14px; font-weight:600; border-radius:8px;">Open</a>
                     <button class="btn-lp btn-lp-ghost text-light" style="height:36px; width:36px; display:flex; align-items:center; justify-content:center; padding:0; border-radius:8px;" onclick="PluginsPage.showConfigModal('${p.id}', '${p.name}', '${p.proxyUrl}', 'update')" title="Configure Proxy"><i class="bi bi-gear"></i></button>
                     <button class="btn-lp btn-lp-ghost text-danger" style="height:36px; width:36px; display:flex; align-items:center; justify-content:center; padding:0; border-radius:8px;" onclick="PluginsPage.uninstall('${p.id}')" title="Uninstall"><i class="bi bi-trash"></i></button>
@@ -139,8 +146,29 @@
       }
     }
 
+    async function update(id, btn) {
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Updating...';
+      btn.disabled = true;
+
+      try {
+        const res = await LP.post('/plugins/update', { id });
+        if (res?.success) {
+          LP.toast(res.message, 'success');
+          loadData();
+        } else {
+          LP.toast(res?.message || 'Failed to update plugin', 'error');
+        }
+      } catch (err) {
+        LP.toast('Update error', 'error');
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', loadData);
 
-    return { showConfigModal, submitConfig, uninstall };
+    return { showConfigModal, submitConfig, uninstall, update };
   })();
 </script>

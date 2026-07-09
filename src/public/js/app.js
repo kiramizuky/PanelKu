@@ -31,6 +31,7 @@ const LP = {
       try {
         await this.fetchProfile();
         this.updateUserUI();
+        this.checkPanelUpdateDaily().catch(() => {});
       } catch {
         this.logout();
       }
@@ -426,6 +427,41 @@ const LP = {
     };
     
     LP._paginationState[paginationContainerId].render();
+  },
+
+  async checkPanelUpdateDaily() {
+    try {
+      const now = Date.now();
+      const lastCheck = parseInt(localStorage.getItem('lp_panel_update_last_check')) || 0;
+      const cachedHasUpdate = localStorage.getItem('lp_panel_has_update') === 'true';
+
+      // 24 hours = 86400000 milliseconds
+      if (now - lastCheck < 86400000 && lastCheck > 0) {
+        if (cachedHasUpdate) {
+          document.getElementById('panelUpdateNavbarBtn')?.classList.remove('d-none');
+          document.getElementById('panelUpdateMobileBtn')?.classList.remove('d-none');
+        }
+        return;
+      }
+
+      // Perform a fresh check
+      const res = await this.get('/system/panel/check-update');
+      if (res?.success && res.data) {
+        const hasUpdate = res.data.hasUpdate;
+        localStorage.setItem('lp_panel_update_last_check', now.toString());
+        localStorage.setItem('lp_panel_has_update', hasUpdate.toString());
+
+        if (hasUpdate) {
+          document.getElementById('panelUpdateNavbarBtn')?.classList.remove('d-none');
+          document.getElementById('panelUpdateMobileBtn')?.classList.remove('d-none');
+        } else {
+          document.getElementById('panelUpdateNavbarBtn')?.classList.add('d-none');
+          document.getElementById('panelUpdateMobileBtn')?.classList.add('d-none');
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to perform automated panel update check:', e);
+    }
   },
 
   _pageChange(containerId, dir) {
