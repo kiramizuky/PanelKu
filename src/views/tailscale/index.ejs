@@ -210,12 +210,12 @@
         const data = await LP.post('/system/tailscale/install');
 
         if (data && data.success) {
-          alert('Tailscale installation initiated successfully!');
+          await LP.alert('Tailscale installation initiated successfully!', 'Tailscale');
         } else {
-          alert('Error during installation: ' + ((data && data.message) || 'unknown error'));
+          await LP.alert('Error during installation: ' + ((data && data.message) || 'unknown error'), 'Tailscale Error');
         }
       } catch (err) {
-        alert('Failed to connect to the server');
+        await LP.alert('Failed to connect to the server', 'Connection Error');
       } finally {
         await this.refreshStatus();
       }
@@ -242,13 +242,13 @@
               authAlert.style.display = 'block';
             }
           } else {
-            alert('Tailscale connected successfully!');
+            await LP.alert('Tailscale connected successfully!', 'Tailscale');
           }
         } else {
-          alert('Failed to run Tailscale: ' + ((data && data.message) || 'unknown error'));
+          await LP.alert('Failed to run Tailscale: ' + ((data && data.message) || 'unknown error'), 'Tailscale Error');
         }
       } catch (err) {
-        alert('Connection error');
+        await LP.alert('Connection error', 'Error');
       } finally {
         if (btnConnect) {
           btnConnect.disabled = false;
@@ -259,18 +259,18 @@
     },
 
     async disconnect() {
-      if (!confirm('Are you sure you want to disconnect from Tailscale VPN?')) return;
+      if (!await LP.confirm('Are you sure you want to disconnect from Tailscale VPN?', 'Disconnect Tailscale')) return;
 
       try {
         const data = await LP.post('/system/tailscale/down');
 
         if (data && data.success) {
-          alert('Tailscale VPN disconnected successfully!');
+          await LP.alert('Tailscale VPN disconnected successfully!', 'Tailscale');
         } else {
-          alert('Error: ' + ((data && data.message) || 'unknown error'));
+          await LP.alert('Error: ' + ((data && data.message) || 'unknown error'), 'Tailscale Error');
         }
       } catch (err) {
-        alert('Connection error');
+        await LP.alert('Connection error', 'Error');
       } finally {
         await this.refreshStatus();
       }
