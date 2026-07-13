@@ -15,6 +15,10 @@ export const apiLimiter = rateLimit({
     // — private IP bypass can be spoofed via X-Forwarded-For if trust proxy is set.
     const ip = req.ip || req.socket?.remoteAddress || '';
     if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return true;
+    
+    // Exempt auth endpoints from general API limit (they are protected by authLimiter separately)
+    if (req.path === '/auth/login' || req.path === '/auth/2fa/verify') return true;
+    
     // Skip high-frequency dashboard polling endpoints
     if (req.path.startsWith('/dashboard/metrics') || req.path.startsWith('/dashboard/info')) return true;
     return false;
