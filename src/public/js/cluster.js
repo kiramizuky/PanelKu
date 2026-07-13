@@ -86,8 +86,32 @@ const ClusterPage = (() => {
 
       if (rows.length > 0) {
         metricsHtml = `
-          <div id="metrics-${node.id}" style="background:rgba(0,0,0,0.2); border-radius:10px; padding:12px 14px; margin-bottom:14px; display:flex; flex-direction:column; gap:8px; border:1px solid var(--glass-border);">
-            ${rows.join('')}
+          <div id="metrics-${node.id}" style="background:rgba(0,0,0,0.2); border-radius:10px; padding:12px 14px; margin-bottom:14px; display:grid; grid-template-columns: 1fr 1fr; gap:12px; border:1px solid var(--glass-border);">
+            <!-- CPU in its own block -->
+            <div style="grid-column: span 2; display:flex; flex-direction:column; gap:4px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+              <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); font-family:monospace; font-weight:700;">
+                <span>CPU UTILIZATION</span>
+              </div>
+              ${miniBar(cpuPct, usageColor(cpuPct))}
+            </div>
+
+            <!-- RAM in left col -->
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); font-family:monospace; font-weight:700;">
+                <span>RAM</span>
+              </div>
+              ${miniBar(ramPct, usageColor(ramPct))}
+              <div style="font-size:9px; color:var(--text-muted); margin-top:2px; font-family:monospace;">${ramUsed}/${ramTotal}</div>
+            </div>
+
+            <!-- Disk in right col -->
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); font-family:monospace; font-weight:700;">
+                <span>DISK</span>
+              </div>
+              ${miniBar(diskPct, usageColor(diskPct))}
+              <div style="font-size:9px; color:var(--text-muted); margin-top:2px; font-family:monospace;">${diskUsed}/${diskTotal}</div>
+            </div>
           </div>`;
       }
     } else if (isOnline) {
@@ -217,35 +241,38 @@ const ClusterPage = (() => {
       const el = document.getElementById(`metrics-${node.id}`);
       if (!el) return;
 
-      // Re-build metrics section
-      const cpuPct   = metrics?.cpu?.usage ?? null;
-      const ramPct   = metrics?.memory ? Math.round((metrics.memory.used / metrics.memory.total) * 100) : null;
-      const diskPct  = metrics?.disk?.length ? Math.round((metrics.disk[0].used / metrics.disk[0].total) * 100) : null;
-      const ramUsed  = metrics?.memory ? fmtBytes(metrics.memory.used) : null;
-      const ramTotal = metrics?.memory ? fmtBytes(metrics.memory.total) : null;
-      const diskUsed = metrics?.disk?.length ? fmtBytes(metrics.disk[0].used) : null;
-      const diskTotal= metrics?.disk?.length ? fmtBytes(metrics.disk[0].total) : null;
+      // Re-build metrics section (Grid 2 columns)
+      el.style.display = 'grid';
+      el.style.gridTemplateColumns = '1fr 1fr';
+      el.style.gap = '12px';
 
-      const rows = [];
-      if (cpuPct !== null) rows.push(`
-        <div style="display:grid; grid-template-columns: 52px 1fr; gap:6px; align-items:center;">
-          <span style="font-size:10px; color:var(--text-muted); font-family:monospace;">CPU</span>
+      el.innerHTML = `
+        <!-- CPU in its own block -->
+        <div style="grid-column: span 2; display:flex; flex-direction:column; gap:4px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); font-family:monospace; font-weight:700;">
+            <span>CPU UTILIZATION</span>
+          </div>
           ${miniBar(cpuPct, usageColor(cpuPct))}
-        </div>`);
-      if (ramPct !== null) rows.push(`
-        <div style="display:grid; grid-template-columns: 52px 1fr; gap:6px; align-items:center;">
-          <span style="font-size:10px; color:var(--text-muted); font-family:monospace;">RAM</span>
-          ${miniBar(ramPct, usageColor(ramPct))}
         </div>
-        <div style="font-size:9.5px; color:var(--text-muted); text-align:right; margin-top:-4px; margin-bottom:2px; padding-left:58px; font-family:monospace;">${ramUsed} / ${ramTotal}</div>`);
-      if (diskPct !== null) rows.push(`
-        <div style="display:grid; grid-template-columns: 52px 1fr; gap:6px; align-items:center;">
-          <span style="font-size:10px; color:var(--text-muted); font-family:monospace;">Disk</span>
-          ${miniBar(diskPct, usageColor(diskPct))}
-        </div>
-        <div style="font-size:9.5px; color:var(--text-muted); text-align:right; margin-top:-4px; padding-left:58px; font-family:monospace;">${diskUsed} / ${diskTotal}</div>`);
 
-      el.innerHTML = rows.length > 0 ? rows.join('') : '<span style="font-size:11px; color:var(--text-muted);">Metrics tidak tersedia</span>';
+        <!-- RAM in left col -->
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); font-family:monospace; font-weight:700;">
+            <span>RAM</span>
+          </div>
+          ${miniBar(ramPct, usageColor(ramPct))}
+          <div style="font-size:9px; color:var(--text-muted); margin-top:2px; font-family:monospace;">${ramUsed}/${ramTotal}</div>
+        </div>
+
+        <!-- Disk in right col -->
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); font-family:monospace; font-weight:700;">
+            <span>DISK</span>
+          </div>
+          ${miniBar(diskPct, usageColor(diskPct))}
+          <div style="font-size:9px; color:var(--text-muted); margin-top:2px; font-family:monospace;">${diskUsed}/${diskTotal}</div>
+        </div>
+      `;
     } catch { /* silently fail */ }
   }
 
