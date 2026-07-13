@@ -394,14 +394,16 @@ class SystemService {
   async getAuditStats() {
     const db = getDb();
     
+    // [FIX] Action name in requestLogger is logged as 'POST /login', not 'login'
     const logins = db.prepare(`
       SELECT date(created_at) as date, COUNT(*) as count 
       FROM audit_logs 
-      WHERE action = 'login' 
+      WHERE action LIKE '%/login' 
       GROUP BY date(created_at) 
       ORDER BY date(created_at) DESC 
       LIMIT 7
     `).all();
+
 
     const cmdCountByDate = {};
     const cmdFreq = {};
@@ -428,15 +430,19 @@ class SystemService {
     }
 
     const sortedDates = Object.keys(cmdCountByDate).sort().reverse().slice(0, 7);
-    const terminalCmds = sortedDates.map(d => ({ date: d, count: cmdCountByDate[d] }));
+    const terminalCmds = sortedDates.length > 0 
+      ? sortedDates.map(d => ({ date: d, count: cmdCountByDate[d] }))
+      : [{ date: new Date().toISOString().split('T')[0], count: 0 }]; // Safe placeholder for chart initialization
 
-    const topCommands = Object.entries(cmdFreq)
-      .map(([cmd, count]) => ({ cmd, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+    const topCommands = Object.entries(cmdFreq).length > 0
+      ? Object.entries(cmdFreq)
+          .map(([cmd, count]) => ({ cmd, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5)
+      : [{ cmd: 'No command yet', count: 0 }];
 
     return {
-      logins,
+      logins: logins.length > 0 ? logins : [{ date: new Date().toISOString().split('T')[0], count: 0 }],
       terminalCmds,
       topCommands
     };
