@@ -68,10 +68,22 @@ class PluginLoader {
     logger.info(`PluginLoader: loaded ${this._plugins.size} plugin(s).`);
   }
 
+  validateManifest(manifest, name) {
+    if (!manifest) throw new Error('Manifest is empty');
+    if (typeof manifest.name !== 'string' || !manifest.name.trim()) {
+      throw new Error(`Plugin [${name}] manifest missing a valid "name" property`);
+    }
+    if (typeof manifest.version !== 'string' || !/^\d+\.\d+\.\d+/.test(manifest.version)) {
+      throw new Error(`Plugin [${name}] manifest missing a valid "version" property (should be semver)`);
+    }
+    return true;
+  }
+
   async _loadPlugin(name, app, io) {
     try {
       const manifestPath = join(this._pluginsDir, name, 'plugin.json');
       const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+      this.validateManifest(manifest, name);
 
       const entryPath = join(this._pluginsDir, name, manifest.entry || 'index.js');
       const wrappedApp = new Proxy(app, {

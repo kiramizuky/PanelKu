@@ -90,6 +90,7 @@ const DatabasePage = (() => {
       <tr>
         <td class="font-mono"><strong>${db}</strong></td>
         <td style="text-align:right">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DatabasePage.openExplorer('mysql', '${db}')" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DatabasePage.deleteDb('mysql', '${db}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
@@ -109,6 +110,7 @@ const DatabasePage = (() => {
       <tr>
         <td class="font-mono"><strong>${db}</strong></td>
         <td style="text-align:right">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DatabasePage.openExplorer('postgres', '${db}')" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DatabasePage.deleteDb('postgres', '${db}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
@@ -121,6 +123,7 @@ const DatabasePage = (() => {
       <tr>
         <td class="font-mono"><strong>${db}</strong></td>
         <td style="text-align:right">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DatabasePage.openExplorer('sqlite', '${db}')" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DatabasePage.deleteDb('sqlite', '${db}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
@@ -175,6 +178,105 @@ const DatabasePage = (() => {
     }
   }
 
+  let activeExplorerType = null;
+  let activeExplorerName = null;
+
+  async function openExplorer(type, name) {
+    activeExplorerType = type;
+    activeExplorerName = name;
+    
+    document.getElementById('exploreDbTitle').textContent = `Database Explorer: ${name} (${type.toUpperCase()})`;
+    document.getElementById('dbQueryInput').value = '';
+    
+    document.getElementById('dbExplorerResultsHead').innerHTML = '<tr><th>Query results will be displayed here</th></tr>';
+    document.getElementById('dbExplorerResultsBody').innerHTML = '<tr><td class="text-muted">Execute a query or select a table to begin.</td></tr>';
+    
+    const modal = new bootstrap.Modal(document.getElementById('exploreDbModal'));
+    modal.show();
+
+    const listEl = document.getElementById('dbExplorerTablesList');
+    listEl.innerHTML = '<p class="text-muted" style="font-size:12px;">Loading tables...</p>';
+    
+    try {
+      const res = await LP.get(`/database/explore?type=${type}&name=${encodeURIComponent(name)}`);
+      if (res?.success && Array.isArray(res.data.tables)) {
+        if (res.data.tables.length === 0) {
+          listEl.innerHTML = '<p class="text-muted" style="font-size:12px;">No tables found</p>';
+        } else {
+          listEl.innerHTML = res.data.tables.map(tbl => `
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-start w-100 mb-1" style="padding: 4px 8px; font-size:12px;" onclick="DatabasePage.loadTablePreview('${tbl}')">
+              <i class="bi bi-table text-info me-1"></i> ${tbl}
+            </button>
+          `).join('');
+        }
+      } else {
+        listEl.innerHTML = '<p class="text-danger" style="font-size:12px;">Failed to load tables</p>';
+      }
+    } catch {
+      listEl.innerHTML = '<p class="text-danger" style="font-size:12px;">Error loading tables</p>';
+    }
+  }
+
+  async function runExplorerQuery(customQuery = null) {
+    const query = customQuery || document.getElementById('dbQueryInput').value.trim();
+    if (!query) {
+      LP.toast('Please enter a query', 'error');
+      return;
+    }
+
+    const statusEl = document.getElementById('dbQueryStatus');
+    statusEl.textContent = 'Running query...';
+    
+    try {
+      const res = await LP.post('/database/explore', {
+        type: activeExplorerType,
+        name: activeExplorerName,
+        query
+      });
+
+      if (res?.success && res.data.result) {
+        statusEl.textContent = 'Query executed successfully';
+        renderQueryResult(res.data.result);
+      } else {
+        statusEl.textContent = 'Failed to execute query';
+        LP.toast(res?.message || 'Query failed', 'error');
+      }
+    } catch (err) {
+      statusEl.textContent = 'Error: ' + err.message;
+      LP.toast('Connection error', 'error');
+    }
+  }
+
+  function loadTablePreview(tableName) {
+    const query = `SELECT * FROM \`${tableName}\` LIMIT 50;`;
+    document.getElementById('dbQueryInput').value = query;
+    runExplorerQuery(query);
+  }
+
+  function renderQueryResult(result) {
+    const head = document.getElementById('dbExplorerResultsHead');
+    const body = document.getElementById('dbExplorerResultsBody');
+
+    if (!Array.isArray(result) || result.length === 0) {
+      head.innerHTML = '<tr><th>Result</th></tr>';
+      body.innerHTML = `<tr><td class="text-muted">${JSON.stringify(result) || 'Query executed (no rows returned).'}</td></tr>`;
+      return;
+    }
+
+    const columns = Object.keys(result[0]);
+    head.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
+    
+    body.innerHTML = result.map(row => `
+      <tr>
+        ${columns.map(col => `<td>${row[col] !== null ? escHtml(row[col]) : '<span class="text-muted">NULL</span>'}</td>`).join('')}
+      </tr>
+    `).join('');
+  }
+
+  function escHtml(str) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   // Initialize
   document.addEventListener('DOMContentLoaded', () => {
     loadData();
@@ -186,8 +288,12 @@ const DatabasePage = (() => {
     createDatabase,
     deleteDb,
     installPackage,
-    submitInstall
+    submitInstall,
+    openExplorer,
+    loadTablePreview,
+    runExplorerQuery
   };
+  
 })();
 
 window.DatabasePage = DatabasePage;

@@ -14,15 +14,31 @@ export const startHealthJob = () => {
   scheduler.register(
     'health:check',
     async () => {
-      // 1. Check Docker Daemon
+      // 1. Check Docker Daemon & Auto-Heal
       try {
         await execPromise('docker info');
         dockerDownCount = 0;
       } catch (err) {
         dockerDownCount++;
         if (dockerDownCount === 2) {
-          logger.warn('Docker daemon is down');
-          alertsService.triggerAlert('Docker Down Alert', 'Docker daemon is unresponsive or not running on the server.');
+          logger.warn('Docker daemon is down. Attempting auto-restart...');
+          await execPromise('systemctl start docker').catch(() => {});
+          alertsService.triggerAlert('Docker Down Alert', 'Docker daemon was unresponsive. Auto-Healer attempted to restart it.');
+        }
+      }
+
+      // 1.5 Watchdog for core services (Nginx, MySQL, PostgreSQL, PHP-FPM)
+      const coreServices = ['nginx', 'mysql', 'postgresql', 'php8.2-fpm'];
+      for (const service of coreServices) {
+        try {
+          const status = await execPromise(`systemctl is-active ${service}`).catch(() => ({ stdout: 'inactive' }));
+          if (status.stdout.trim() !== 'active') {
+            logger.warn(`Watchdog: service ${service} is inactive. Attempting auto-restart...`);
+            await execPromise(`systemctl start ${service}`).catch(() => {});
+            alertsService.triggerAlert('Service Watchdog Alert', `Service ${service} was inactive. Auto-Healer has sent a start command.`);
+          }
+        } catch (e) {
+          // Ignore service check failures if service is not installed on host
         }
       }
 

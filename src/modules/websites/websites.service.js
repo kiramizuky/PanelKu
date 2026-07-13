@@ -44,6 +44,27 @@ server {
 }
 `;
 
+const NGINX_TEMPLATE_PHP = `
+server {
+    listen 80;
+    server_name {{domain}} {{aliases}};
+    root {{rootDirectory}};
+    index index.php index.html index.htm;
+
+    access_log /var/log/nginx/{{domain}}.access.log;
+    error_log /var/log/nginx/{{domain}}.error.log;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \\.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php{{phpVersion}}-fpm.sock;
+    }
+}
+`;
+
 class WebsiteService {
   constructor() {
     this.nginxConfDir = '/etc/nginx/conf.d';
@@ -60,13 +81,16 @@ class WebsiteService {
   }
 
   async generateNginxConfig(website) {
-    let template = website.type === 'static' ? NGINX_TEMPLATE_STATIC : NGINX_TEMPLATE_PROXY;
+    let template = NGINX_TEMPLATE_STATIC;
+    if (website.type === 'proxy') template = NGINX_TEMPLATE_PROXY;
+    else if (website.type === 'php') template = NGINX_TEMPLATE_PHP;
     
     let conf = template
       .replace(/{{domain}}/g, website.domain)
       .replace(/{{aliases}}/g, (website.aliases || []).join(' '))
       .replace(/{{rootDirectory}}/g, website.rootDirectory)
-      .replace(/{{port}}/g, website.port || 8080);
+      .replace(/{{port}}/g, website.port || 8080)
+      .replace(/{{phpVersion}}/g, website.phpVersion || '8.2');
 
     const confPath = path.join(this.nginxConfDir, `${website.domain}.conf`);
     
@@ -104,6 +128,7 @@ class WebsiteService {
       type:          data.type || 'static',
       rootDirectory: data.rootDirectory || `/var/www/${data.domain}`,
       port:          data.port || null,
+      phpVersion:    data.phpVersion || '8.2',
       owner:         userId,
       webhookToken,
     });

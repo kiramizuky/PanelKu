@@ -77,16 +77,40 @@ const WebsitesPage = (() => {
       createModal.show();
     },
 
-    toggleTypeFields() {
+    async toggleTypeFields() {
       const type = document.getElementById('cwType').value;
       const portGroup = document.getElementById('cwPortGroup');
       const phpGroup = document.getElementById('cwPhpGroup');
+      const dockerGroup = document.getElementById('cwDockerGroup');
       
       if (type === 'proxy' || type === 'node') {
         portGroup.style.display = 'block';
+        dockerGroup.style.display = 'block';
         document.getElementById('cwPort').required = true;
+
+        const dockerSelect = document.getElementById('cwDockerContainer');
+        dockerSelect.innerHTML = '<option value="">-- Don\'t map (Manual port config) --</option>';
+        try {
+          const res = await LP.get('/docker/containers');
+          if (res?.success && res.data?.containers) {
+            res.data.containers.forEach(c => {
+              const name = c.names[0] || c.id;
+              const portInfo = c.ports?.find(p => p.PublicPort);
+              const publicPort = portInfo ? portInfo.PublicPort : '';
+              if (publicPort) {
+                const opt = document.createElement('option');
+                opt.value = publicPort;
+                opt.textContent = `${name} (port ${publicPort})`;
+                dockerSelect.appendChild(opt);
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('Could not load Docker containers for mapping', e);
+        }
       } else {
         portGroup.style.display = 'none';
+        dockerGroup.style.display = 'none';
         document.getElementById('cwPort').required = false;
       }
       
@@ -94,6 +118,14 @@ const WebsitesPage = (() => {
         phpGroup.style.display = 'block';
       } else {
         phpGroup.style.display = 'none';
+      }
+    },
+
+    onDockerSelected() {
+      const select = document.getElementById('cwDockerContainer');
+      const portInput = document.getElementById('cwPort');
+      if (select.value) {
+        portInput.value = select.value;
       }
     },
 

@@ -157,17 +157,23 @@ const FMPage = (() => {
     modal.innerHTML = `
       <div class="modal fade" id="${id}" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
-          <div class="modal-content" style="background:var(--bg-secondary);border:1px solid var(--border-color);color:var(--text-primary)">
-            <div class="modal-header" style="border-color:var(--border-color)">
-              <h5 class="modal-title font-mono" style="font-size:13px">${escHtml(path)}</h5>
+          <div class="modal-content" style="background:#0b0f19; border:1px solid var(--glass-border); color:#fff;">
+            <div class="modal-header" style="border-bottom:1px solid var(--glass-border); padding: 12px 20px;">
+              <h6 class="modal-title font-mono" style="font-size:12px; color:var(--text-secondary);"><i class="bi bi-file-code-fill me-2 text-primary"></i>${escHtml(path)}</h6>
               <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" style="padding:0">
-              <textarea id="${id}_ta" style="width:100%;height:500px;background:#0a0e1a;color:#e2e8f0;border:none;padding:16px;font-family:'JetBrains Mono',monospace;font-size:13px;resize:none;outline:none;line-height:1.6">${escHtml(content)}</textarea>
+            <div class="modal-body" style="padding:0; display:flex; position:relative; overflow:hidden;">
+              <!-- Gutter Line Numbers -->
+              <div id="${id}_gutter" style="width:48px; background:#070a13; border-right:1px solid rgba(255,255,255,0.05); color:rgba(255,255,255,0.25); font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:16px 8px 16px 0; text-align:right; select:none; user-select:none; overflow:hidden; line-height:1.6; box-sizing:border-box;">
+                <div>1</div>
+              </div>
+              <!-- Text Area -->
+              <textarea id="${id}_ta" style="flex:1; height:500px; background:#0a0e1a; color:#e2e8f0; border:none; padding:16px; font-family:'JetBrains Mono',monospace; font-size:12.5px; resize:none; outline:none; line-height:1.6; overflow-y:auto; box-sizing:border-box; white-space:pre; word-wrap:normal;" wrap="off">${escHtml(content)}</textarea>
             </div>
-            <div class="modal-footer" style="border-color:var(--border-color)">
-              <button class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
-              <button class="btn-lp btn-lp-primary" onclick="FMPage._saveFile('${escHtml(path)}', '${id}')">Save</button>
+            <div class="modal-footer" style="border-top:1px solid var(--glass-border); padding: 12px 20px;">
+              <div class="me-auto font-mono" id="${id}_stats" style="font-size:11px; color:var(--text-muted);">Lines: 1 | Length: 0</div>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" data-bs-dismiss="modal">Cancel</button>
+              <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="FMPage._saveFile('${escHtml(path)}', '${id}')"><i class="bi bi-floppy me-1"></i> Save File</button>
             </div>
           </div>
         </div>
@@ -175,6 +181,35 @@ const FMPage = (() => {
     document.body.appendChild(modal);
     const bsModal = new bootstrap.Modal(document.getElementById(id));
     bsModal.show();
+
+    // Hook up Gutter Sync & Line stats
+    setTimeout(() => {
+      const ta = document.getElementById(`${id}_ta`);
+      const gutter = document.getElementById(`${id}_gutter`);
+      const stats = document.getElementById(`${id}_stats`);
+
+      function updateGutter() {
+        const value = ta.value;
+        const lineCount = value.split('\n').length;
+        let gutterHtml = '';
+        for (let i = 1; i <= lineCount; i++) {
+          gutterHtml += `<div>${i}</div>`;
+        }
+        gutter.innerHTML = gutterHtml;
+        stats.textContent = `Lines: ${lineCount} | Length: ${value.length}`;
+      }
+
+      // Synchronize Scroll
+      ta.addEventListener('scroll', () => {
+        gutter.scrollTop = ta.scrollTop;
+      });
+
+      ta.addEventListener('input', updateGutter);
+      
+      // Initial Gutter generation
+      updateGutter();
+    }, 200);
+
     document.getElementById(id).addEventListener('hidden.bs.modal', () => modal.remove());
   }
 

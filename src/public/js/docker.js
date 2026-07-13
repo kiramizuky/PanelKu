@@ -58,6 +58,7 @@ const DockerPage = (() => {
               : `<button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.action('start', '${c.id}')" title="Start"><i class="bi bi-play-fill text-success"></i></button>`
             }
             <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.viewLogs('${c.id}', '${c.names[0]}')" title="Logs"><i class="bi bi-justify-left"></i></button>
+            ${isRunning ? `<button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.viewConsole('${c.id}', '${c.names[0]}')" title="Terminal Console"><i class="bi bi-terminal"></i></button>` : ''}
             <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.action('delete', '${c.id}')" title="Delete"><i class="bi bi-trash"></i></button>
           </td>
         </tr>
@@ -314,6 +315,8 @@ const DockerPage = (() => {
 
   // --- Log Terminal Logic ---
 
+  let activeTerminalMode = null;
+
   function initSocket() {
     const token = localStorage.getItem('lp_token');
     if (!token) return;
@@ -321,11 +324,11 @@ const DockerPage = (() => {
     socket = io('/docker', { auth: { token }, transports: ['websocket'] });
     
     socket.on('logs:data', (data) => {
-      if (term) term.write(data + '\r\n');
+      if (term && activeTerminalMode === 'logs') term.write(data + '\r\n');
     });
     
     socket.on('logs:error', (err) => {
-      if (term) term.write(`\x1b[31m[Log Error: ${err}]\x1b[0m\r\n`);
+      if (term && activeTerminalMode === 'logs') term.write(`\x1b[31m[Log Error: ${err}]\x1b[0m\r\n`);
     });
   }
 
@@ -343,6 +346,7 @@ const DockerPage = (() => {
   }
 
   function viewLogs(id, name) {
+    activeTerminalMode = 'logs';
     document.getElementById('logModalTitle').textContent = `Logs: ${name}`;
     const modal = new bootstrap.Modal(document.getElementById('logModal'));
     modal.show();
@@ -352,15 +356,62 @@ const DockerPage = (() => {
       else term.clear();
       if (fitAddon) fitAddon.fit();
       
+      term.options.disableStdin = true;
+      
       if (!socket) initSocket();
       socket.emit('logs:attach', id);
     }, 300);
   }
 
+  function viewConsole(id, name) {
+    activeTerminalMode = 'console';
+    document.getElementById('logModalTitle').textContent = `Console: ${name}`;
+    const modal = new bootstrap.Modal(document.getElementById('logModal'));
+    modal.show();
+
+    setTimeout(() => {
+      if (!term) initTerminal();
+      else term.clear();
+      if (fitAddon) fitAddon.fit();
+      
+      term.options.disableStdin = false;
+      
+      if (!socket) initSocket();
+      
+      socket.off('exec:data');
+      socket.off('exec:end');
+      socket.off('exec:error');
+
+      socket.on('exec:data', (data) => {
+        if (term && activeTerminalMode === 'console') term.write(data);
+      });
+      socket.on('exec:error', (err) => {
+        if (term && activeTerminalMode === 'console') term.write(`\x1b[31m[Exec Error: ${err}]\x1b[0m\r\n`);
+      });
+      socket.on('exec:end', () => {
+        if (term && activeTerminalMode === 'console') term.write('\r\n\x1b[33m[Session Closed]\x1b[0m\r\n');
+      });
+
+      // Clear previous onData handlers to avoid double sending
+      if (term._onDataHandler) term._onDataHandler.dispose();
+      term._onDataHandler = term.onData((data) => {
+        if (socket && activeTerminalMode === 'console') {
+          socket.emit('exec:input', data);
+        }
+      });
+
+      socket.emit('exec:create', { containerId: id, shell: 'sh' });
+    }, 300);
+  }
+
   function detachLogs() {
     if (socket) {
-      socket.emit('logs:detach');
+      socket.emit('detach');
+      socket.off('exec:data');
+      socket.off('exec:end');
+      socket.off('exec:error');
     }
+    activeTerminalMode = null;
   }
 
   async function loadData() {
@@ -373,6 +424,97 @@ const DockerPage = (() => {
       loadImages(statuses.docker);
     } catch (e) {
       LP.toast('Failed to load docker summary', 'error');
+    }
+  }
+
+  const COMPOSE_TEMPLATES = {
+    wordpress: `version: '3.8'
+services:
+  wordpress:
+    image: wordpress:latest
+    ports:
+      - '8080:80'
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress_password
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wordpress_data:/var/www/html
+    depends_on:
+      - db
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress_password
+      MYSQL_RANDOM_ROOT_PASSWORD: '1'
+    volumes:
+      - db_data:/var/lib/mysql
+volumes:
+  wordpress_data:
+  db_data:`,
+
+    nextcloud: `version: '3.8'
+services:
+  nextcloud:
+    image: nextcloud:latest
+    ports:
+      - '8081:80'
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: nextcloud_password
+    volumes:
+      - nextcloud_data:/var/www/html
+    depends_on:
+      - db
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: nextcloud_password
+    volumes:
+      - db_data:/var/lib/postgresql/data
+volumes:
+  nextcloud_data:
+  db_data:`,
+
+    n8n: `version: '3.8'
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - '5678:5678'
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+    volumes:
+      - n8n_data:/home/node/.n8n
+volumes:
+  n8n_data:`,
+
+    'uptime-kuma': `version: '3.8'
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    ports:
+      - '3001:3001'
+    volumes:
+      - uptime_kuma_data:/app/data
+volumes:
+  uptime_kuma_data:`
+  };
+
+  function loadComposeTemplate() {
+    const val = document.getElementById('composeTemplateSelect').value;
+    if (val && COMPOSE_TEMPLATES[val]) {
+      document.getElementById('composeProjectName').value = val + '-stack';
+      document.getElementById('composeYaml').value = COMPOSE_TEMPLATES[val];
     }
   }
 
@@ -410,6 +552,7 @@ const DockerPage = (() => {
     deleteImage,
     pruneImages,
     viewLogs,
+    viewConsole,
     detachLogs,
     addPortRow,
     addVolumeRow,
@@ -418,6 +561,7 @@ const DockerPage = (() => {
     searchOnline,
     selectOnlineImage,
     deployCompose,
+    loadComposeTemplate,
     installPackage
   };
 })();

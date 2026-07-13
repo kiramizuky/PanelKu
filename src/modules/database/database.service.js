@@ -116,6 +116,78 @@ class DatabaseService {
       return true;
     } catch (err) { throw new Error('Failed to delete SQLite database: ' + err.message); }
   }
+
+  async getTables(type, name) {
+    if (type === 'sqlite') {
+      const path = (await import('path')).default;
+      const Database = (await import('better-sqlite3')).default;
+      const dbPath = path.resolve('storage', 'databases', name);
+      const db = new Database(dbPath);
+      const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().map(r => r.name);
+      db.close();
+      return tables;
+    } else if (type === 'mysql') {
+      const pool = await this.getMysqlConnection();
+      await pool.query(`USE \`${name}\``);
+      const [rows] = await pool.query('SHOW TABLES');
+      return rows.map(r => Object.values(r)[0]);
+    } else if (type === 'postgres') {
+      const pkg = (await import('pg')).default;
+      const client = new pkg.Client({
+        ...this.pgConfig,
+        database: name
+      });
+      await client.connect();
+      const res = await client.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public';");
+      await client.end();
+      return res.rows.map(r => r.table_name);
+    }
+    throw new Error('Unsupported database type');
+  }
+
+  async runQuery(type, name, query) {
+    const upper = query.trim().toUpperCase();
+    if (upper.startsWith('DROP') || upper.startsWith('TRUNCATE')) {
+      throw new Error('DROP or TRUNCATE operations are restricted via UI.');
+    }
+
+    if (type === 'sqlite') {
+      const path = (await import('path')).default;
+      const Database = (await import('better-sqlite3')).default;
+      const dbPath = path.resolve('storage', 'databases', name);
+      const db = new Database(dbPath);
+      try {
+        const stmt = db.prepare(query);
+        const rows = stmt.reader ? stmt.all() : stmt.run();
+        db.close();
+        return Array.isArray(rows) ? rows : [rows];
+      } catch (err) {
+        db.close();
+        throw err;
+      }
+    } else if (type === 'mysql') {
+      const pool = await this.getMysqlConnection();
+      await pool.query(`USE \`${name}\``);
+      const [rows] = await pool.query(query);
+      return Array.isArray(rows) ? rows : [rows];
+    } else if (type === 'postgres') {
+      const pkg = (await import('pg')).default;
+      const client = new pkg.Client({
+        ...this.pgConfig,
+        database: name
+      });
+      await client.connect();
+      try {
+        const res = await client.query(query);
+        await client.end();
+        return Array.isArray(res.rows) ? res.rows : [res.rows];
+      } catch (err) {
+        await client.end();
+        throw err;
+      }
+    }
+    throw new Error('Unsupported database type');
+  }
 }
 
 export default new DatabaseService();

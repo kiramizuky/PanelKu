@@ -287,6 +287,7 @@ class SystemService {
 
   async runPanelUpdate(method = 'git', branch = 'main') {
     let log = '';
+    const currentCommit = (await this.runCommand('git rev-parse HEAD 2>/dev/null').catch(() => '')).trim();
 
     if (method === 'git') {
       const localBranch = (await this.runCommand('git rev-parse --abbrev-ref HEAD 2>/dev/null')).trim() || 'master';
@@ -300,6 +301,23 @@ class SystemService {
       log += await this.runCommand('cd /opt/panelku && npm install --production 2>&1').catch(e => `[npm install error] ${e.message}`);
     } else if (method === 'npm') {
       log += await this.runCommand('cd /opt/panelku && npm install --production 2>&1').catch(e => `[npm install error] ${e.message}`);
+    }
+
+    // Verify syntax and boot of the new code (dry run check)
+    let syntaxCheckSuccess = false;
+    try {
+      if (process.platform !== 'win32') {
+        await execAsync('node --check src/app.js');
+      }
+      syntaxCheckSuccess = true;
+    } catch (err) {
+      log += `\n[Syntax verification failed] ${err.message}\nTriggering auto-rollback...\n`;
+    }
+
+    if (!syntaxCheckSuccess && currentCommit) {
+      log += await this.runCommand(`git reset --hard ${currentCommit} && npm install --production 2>&1`);
+      log += `\n[Rollback Complete] System restored to commit ${currentCommit}.\n`;
+      return log;
     }
 
     // Save last updated timestamp

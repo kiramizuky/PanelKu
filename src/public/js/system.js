@@ -5,6 +5,7 @@ const SystemPage = {
     await this.loadPMInfo();
     await this.loadSshKeys();
     await this.loadSshConfig();
+    await this.loadPHPConfig();
   },
 
   async loadAutoUpdate() {
@@ -265,6 +266,44 @@ const SystemPage = {
       }
     } catch {
       LP.toast('Error saving config', 'error');
+    }
+  },
+
+  async loadPHPConfig() {
+    try {
+      const res = await LP.get('/system/php-config');
+      if (res?.success) {
+        document.getElementById('phpMaxChildren').value = res.data.max_children;
+        document.getElementById('phpStartServers').value = res.data.start_servers;
+        document.getElementById('phpMinSpare').value = res.data.min_spare_servers;
+        document.getElementById('phpMaxSpare').value = res.data.max_spare_servers;
+      }
+    } catch {
+      console.error('Failed to load PHP FPM configuration');
+    }
+  },
+
+  async savePHPConfig() {
+    const max_children = parseInt(document.getElementById('phpMaxChildren').value);
+    const start_servers = parseInt(document.getElementById('phpStartServers').value);
+    const min_spare_servers = parseInt(document.getElementById('phpMinSpare').value);
+    const max_spare_servers = parseInt(document.getElementById('phpMaxSpare').value);
+
+    if (isNaN(max_children) || isNaN(start_servers) || isNaN(min_spare_servers) || isNaN(max_spare_servers)) {
+      LP.toast('Please enter valid numbers for all parameters.', 'error');
+      return;
+    }
+
+    try {
+      const res = await LP.post('/system/php-config', { max_children, start_servers, min_spare_servers, max_spare_servers });
+      if (res?.success) {
+        LP.toast('PHP-FPM pool configuration saved and reloaded.', 'success');
+        this.loadPHPConfig();
+      } else {
+        LP.toast(res.message || 'Failed to save config', 'error');
+      }
+    } catch {
+      LP.toast('Error saving PHP FPM config', 'error');
     }
   },
 

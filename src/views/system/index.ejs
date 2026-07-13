@@ -67,6 +67,32 @@
         </div>
       </div>
     </div>
+
+    <!-- PHP FPM Pool Manager Card -->
+    <div class="lp-glass-card mt-4" style="padding:25px; border-radius:16px;">
+      <div style="border-bottom:1px solid var(--glass-border); padding-bottom:12px; margin-bottom:20px;">
+        <h5 style="font-weight:700; margin:0; color:var(--text-primary);"><i class="bi bi-gear-wide-connected me-2 text-primary"></i>PHP-FPM Pool Manager</h5>
+      </div>
+      <div class="row g-3">
+        <div class="col-6 col-md-3">
+          <label class="lp-label" style="font-size:11px;">pm.max_children</label>
+          <input type="number" id="phpMaxChildren" class="lp-input" style="height:34px;">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="lp-label" style="font-size:11px;">pm.start_servers</label>
+          <input type="number" id="phpStartServers" class="lp-input" style="height:34px;">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="lp-label" style="font-size:11px;">pm.min_spare_servers</label>
+          <input type="number" id="phpMinSpare" class="lp-input" style="height:34px;">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="lp-label" style="font-size:11px;">pm.max_spare_servers</label>
+          <input type="number" id="phpMaxSpare" class="lp-input" style="height:34px;">
+        </div>
+      </div>
+      <button class="btn-lp btn-lp-primary mt-3 w-100" onclick="SystemPage.savePHPConfig()" style="font-size:12px; height:34px; padding:0;">Save PHP-FPM Config & Reload</button>
+    </div>
   </div>
 
   <div class="col-12 col-md-4">

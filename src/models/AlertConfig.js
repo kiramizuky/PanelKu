@@ -9,6 +9,7 @@ const DEFAULTS = {
   discord:    { enabled: false, webhookUrl: '' },
   slack:      { enabled: false, webhookUrl: '' },
   webhook:    { enabled: false, url: '' },
+  whatsapp:   { enabled: false, phoneNumber: '' },
   thresholds: { cpuPercent: 90, ramPercent: 90, diskPercent: 90 },
 };
 
@@ -23,6 +24,7 @@ function rowToConfig(row) {
     discord:    fromJson(row.discord, DEFAULTS.discord),
     slack:      fromJson(row.slack, DEFAULTS.slack),
     webhook:    fromJson(row.webhook, DEFAULTS.webhook),
+    whatsapp:   fromJson(row.whatsapp, DEFAULTS.whatsapp),
     thresholds: fromJson(row.thresholds, DEFAULTS.thresholds),
     createdAt:  new Date(row.created_at),
     updatedAt:  new Date(row.updated_at),
@@ -46,13 +48,13 @@ const AlertConfig = {
     const id = generateId();
     const ts = now();
     db.prepare(`
-      INSERT INTO alert_configs (id, singleton, telegram, email, discord, slack, webhook, thresholds, created_at, updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?)
+      INSERT INTO alert_configs (id, singleton, telegram, email, discord, slack, webhook, whatsapp, thresholds, created_at, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)
     `).run(
       id, 'global',
       toJson(DEFAULTS.telegram), toJson(DEFAULTS.email),
       toJson(DEFAULTS.discord), toJson(DEFAULTS.slack),
-      toJson(DEFAULTS.webhook), toJson(DEFAULTS.thresholds),
+      toJson(DEFAULTS.webhook), toJson(DEFAULTS.whatsapp), toJson(DEFAULTS.thresholds),
       ts, ts
     );
     return rowToConfig(db.prepare('SELECT * FROM alert_configs WHERE id = ?').get(id));
@@ -65,7 +67,7 @@ const AlertConfig = {
     if (!existing) return null;
 
     db.prepare(`
-      UPDATE alert_configs SET telegram=?, email=?, discord=?, slack=?, webhook=?, thresholds=?, updated_at=?
+      UPDATE alert_configs SET telegram=?, email=?, discord=?, slack=?, webhook=?, whatsapp=?, thresholds=?, updated_at=?
       WHERE id=?
     `).run(
       toJson(data.telegram   ?? existing.telegram),
@@ -73,6 +75,7 @@ const AlertConfig = {
       toJson(data.discord    ?? existing.discord),
       toJson(data.slack      ?? existing.slack),
       toJson(data.webhook    ?? existing.webhook),
+      toJson(data.whatsapp   ?? existing.whatsapp),
       toJson(data.thresholds ?? existing.thresholds),
       ts, existing.id
     );

@@ -17,6 +17,7 @@ class AlertsService {
       discord:    data.discord    ? { ...existing.discord,    ...data.discord    } : existing.discord,
       slack:      data.slack      ? { ...existing.slack,      ...data.slack      } : existing.slack,
       webhook:    data.webhook    ? { ...existing.webhook,    ...data.webhook    } : existing.webhook,
+      whatsapp:   data.whatsapp   ? { ...existing.whatsapp,   ...data.whatsapp   } : existing.whatsapp,
       thresholds: data.thresholds ? { ...existing.thresholds, ...data.thresholds } : existing.thresholds,
     };
     return AlertConfig.findOneAndUpdate({ singleton: 'global' }, merged, { upsert: true, new: true });
@@ -119,6 +120,18 @@ class AlertsService {
     }
   }
 
+  async sendWhatsApp(message, config) {
+    if (!config.whatsapp?.enabled || !config.whatsapp?.phoneNumber) return;
+    try {
+      const whatsappService = (await import('../whatsapp/whatsapp.service.js')).default;
+      const sessionName = 'default'; 
+      await whatsappService.sendMessage(sessionName, config.whatsapp.phoneNumber, `🚨 *Linux Panel Alert*\n\n${message}`);
+      logger.info('WhatsApp alert sent.');
+    } catch (error) {
+      logger.error('Failed to send WhatsApp alert:', error.message);
+    }
+  }
+
   async triggerAlert(subject, message) {
     const config = await this.getConfig();
     // Fire and forget
@@ -127,6 +140,7 @@ class AlertsService {
     this.sendDiscord(subject, message, config);
     this.sendSlack(subject, message, config);
     this.sendWebhook(subject, message, config);
+    this.sendWhatsApp(message, config);
   }
 }
 

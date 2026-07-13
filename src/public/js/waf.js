@@ -89,6 +89,11 @@ const WAFPage = {
     } catch {
       logsEl.textContent = 'Error loading Fail2Ban logs.';
     }
+  },
+
+  askAILog() {
+    const logs = document.getElementById('fail2banLogs').textContent;
+    window.askAI("Tolong jelaskan log Fail2Ban ini dan rekomendasinya.", { logType: 'fail2ban', logText: logs });
   }
 };
 

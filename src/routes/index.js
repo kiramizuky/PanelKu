@@ -20,6 +20,7 @@ import dnsRoutes from '../modules/dns/dns.routes.js';
 import pluginsRoutes from '../modules/plugins/plugins.routes.js';
 import whatsappRoutes from '../modules/whatsapp/whatsapp.routes.js';
 import clusterRoutes from '../modules/cluster/cluster.routes.js';
+import aiRoutes from '../modules/ai/ai.routes.js';
 
 const router = Router();
 
@@ -55,5 +56,6 @@ router.use('/dns', dnsRoutes);
 router.use('/plugins', pluginsRoutes);
 router.use('/whatsapp', whatsappRoutes);
 router.use('/cluster', clusterRoutes);
+router.use('/ai', aiRoutes);
 
 export default router;

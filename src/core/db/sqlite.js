@@ -219,6 +219,12 @@ function initSchema(db) {
       updated_at    TEXT NOT NULL
     );
   `);
+  
+  try {
+    db.exec("ALTER TABLE alert_configs ADD COLUMN whatsapp TEXT NOT NULL DEFAULT '{\"enabled\":false,\"phoneNumber\":\"\"}'");
+  } catch (e) {
+    // Column already exists
+  }
 }
 
 // ── Convenience helpers ────────────────────────────────────────────────────

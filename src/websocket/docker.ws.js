@@ -14,6 +14,46 @@ export const registerDockerSocket = (namespace) => {
 
     let logsStream = null;
     let statsStream = null;
+    let execStream = null;
+
+    // Exec terminal session inside a container
+    socket.on('exec:create', async ({ containerId, shell = 'sh' }) => {
+      try {
+        if (execStream) {
+          execStream.destroy();
+        }
+
+        const container = dockerService.docker.getContainer(containerId);
+        const execInstance = await container.exec({
+          Cmd: [shell],
+          AttachStdin: true,
+          AttachStdout: true,
+          AttachStderr: true,
+          Tty: true
+        });
+
+        execStream = await execInstance.start({ hijack: true, stdin: true });
+
+        // Stream output to client
+        execStream.on('data', (chunk) => {
+          socket.emit('exec:data', chunk.toString('utf8'));
+        });
+
+        execStream.on('end', () => {
+          socket.emit('exec:end');
+          execStream = null;
+        });
+
+      } catch (err) {
+        socket.emit('exec:error', err.message);
+      }
+    });
+
+    socket.on('exec:input', (data) => {
+      if (execStream && execStream.writable) {
+        execStream.write(data);
+      }
+    });
 
     // Attach to a container's logs
     socket.on('logs:attach', async (payload) => {
@@ -79,13 +119,16 @@ export const registerDockerSocket = (namespace) => {
     socket.on('detach', () => {
       if (logsStream) logsStream.destroy();
       if (statsStream) statsStream.destroy();
+      if (execStream) execStream.destroy();
       logsStream = null;
       statsStream = null;
+      execStream = null;
     });
 
     socket.on('disconnect', () => {
       if (logsStream) logsStream.destroy();
       if (statsStream) statsStream.destroy();
+      if (execStream) execStream.destroy();
     });
   });
 }

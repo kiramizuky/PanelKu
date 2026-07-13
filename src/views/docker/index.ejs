@@ -196,6 +196,16 @@
     <div class="lp-glass-card p-4">
       <h4 style="margin-bottom:20px; font-size:16px; font-weight:600">Deploy with Docker Compose</h4>
       <form onsubmit="DockerPage.deployCompose(event)">
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Select App Template (Optional)</label>
+          <select id="composeTemplateSelect" class="lp-input" onchange="DockerPage.loadComposeTemplate()">
+            <option value="">-- Choose a template to pre-fill --</option>
+            <option value="wordpress">WordPress + MySQL Database</option>
+            <option value="nextcloud">Nextcloud + PostgreSQL Database</option>
+            <option value="n8n">n8n Workflow Automation</option>
+            <option value="uptime-kuma">Uptime Kuma Monitoring</option>
+          </select>
+        </div>
         <div class="lp-form-group">
           <label class="lp-label">Project Name</label>
           <input type="text" id="composeProjectName" class="lp-input" placeholder="my-stack" required>

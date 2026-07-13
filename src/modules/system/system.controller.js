@@ -1,5 +1,6 @@
 import systemService from './system.service.js';
 import sshService from './ssh.service.js';
+import phpService from './php.service.js';
 import { success, errorResponse } from '../../helpers/response.js';
 
 class SystemController {
@@ -232,6 +233,24 @@ class SystemController {
       const { port, passwordAuth } = req.body;
       await sshService.updateSSHConfig({ port, passwordAuth });
       return success(res, null, 'SSH configuration updated successfully');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async getPHPConfig(req, res) {
+    try {
+      const config = await phpService.getConfig();
+      return success(res, config);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async updatePHPConfig(req, res) {
+    try {
+      await phpService.updateConfig(req.body);
+      return success(res, null, 'PHP-FPM configuration updated successfully');
     } catch (error) {
       return errorResponse(res, error, 500);
     }

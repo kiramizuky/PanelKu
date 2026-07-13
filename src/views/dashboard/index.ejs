@@ -91,6 +91,14 @@
       </div>
     </div>
     
+    <!-- Real-time Chart Widget -->
+    <div class="lp-glass-card mb-2" style="padding: 15px; height: 240px; background: rgba(20,25,40,0.6);">
+      <div class="lp-card-title" style="margin-bottom: 10px; font-size: 13px;">Real-time Performance</div>
+      <div style="height: 170px; width: 100%;">
+        <canvas id="performanceChart"></canvas>
+      </div>
+    </div>
+    
   </div>
 
   <!-- Right Column (Banners & Apps) -->
@@ -210,8 +218,87 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   let isSyncthingInstalled = false;
+  let performanceChart = null;
+
+  function initPerformanceChart() {
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    const maxDataPoints = 15;
+    const labels = Array(maxDataPoints).fill('');
+    const cpuData = Array(maxDataPoints).fill(0);
+    const ramData = Array(maxDataPoints).fill(0);
+
+    performanceChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'CPU (%)',
+            data: cpuData,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0
+          },
+          {
+            label: 'RAM (%)',
+            data: ramData,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            labels: {
+              color: 'rgba(255, 255, 255, 0.7)',
+              font: { size: 10 }
+            }
+          }
+        },
+        scales: {
+          x: {
+            display: false
+          },
+          y: {
+            min: 0,
+            max: 100,
+            grid: {
+              color: 'rgba(255, 255, 255, 0.05)'
+            },
+            ticks: {
+              color: 'rgba(255, 255, 255, 0.5)',
+              font: { size: 9 }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function updateChart(cpuVal, ramVal) {
+    if (!performanceChart) return;
+    performanceChart.data.datasets[0].data.shift();
+    performanceChart.data.datasets[0].data.push(cpuVal);
+
+    performanceChart.data.datasets[1].data.shift();
+    performanceChart.data.datasets[1].data.push(ramVal);
+
+    performanceChart.update('none');
+  }
 
   function updateTime() {
     const now = new Date();
@@ -417,6 +504,9 @@
           document.getElementById('storageBar').style.width = `${usedPct}%`;
           document.getElementById('storageText').textContent = `${LP.formatBytes(disk.used)} / ${LP.formatBytes(disk.total)}`;
         }
+        
+        // Update Chart
+        updateChart(cpu, ram);
       }
     } catch(err) { console.error(err); }
   }
@@ -462,6 +552,7 @@
 
   document.addEventListener('DOMContentLoaded', async () => {
     await LP.init();
+    initPerformanceChart();
     loadDashboardData();
     fetchWebserverStatus();
     checkSyncthingStatus();

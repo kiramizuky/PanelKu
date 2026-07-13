@@ -51,5 +51,9 @@ router.post('/ssh/keys/delete', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemC
 router.get('/ssh/config', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getSSHConfig.bind(systemController));
 router.post('/ssh/config', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.updateSSHConfig.bind(systemController));
 
+// PHP FPM configuration endpoints
+router.get('/php-config', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getPHPConfig.bind(systemController));
+router.post('/php-config', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.updatePHPConfig.bind(systemController));
+
 export default router;
 

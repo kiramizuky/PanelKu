@@ -22,11 +22,11 @@ class WebsitesController {
 
   async createWebsite(req, res) {
     try {
-      const { domain, aliases, type, rootDirectory, port } = req.body;
+      const { domain, aliases, type, rootDirectory, port, phpVersion } = req.body;
       if (!domain) return errorResponse(res, 400, 'Domain is required');
       
       const website = await websiteService.createWebsite({
-        domain, aliases, type, rootDirectory, port
+        domain, aliases, type, rootDirectory, port, phpVersion
       }, req.user._id);
 
       return successResponse(res, { website }, 'Website created successfully', 201);

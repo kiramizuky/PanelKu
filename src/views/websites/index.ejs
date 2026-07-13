@@ -47,6 +47,12 @@
               <option value="php">PHP</option>
             </select>
           </div>
+          <div class="lp-form-group" id="cwDockerGroup" style="display:none">
+            <label class="lp-label">Map to Docker Container (Optional)</label>
+            <select id="cwDockerContainer" class="lp-input" onchange="WebsitesPage.onDockerSelected()">
+              <option value="">-- Don't map (Manual port config) --</option>
+            </select>
+          </div>
           <div class="lp-form-group">
             <label class="lp-label">Document Root</label>
             <input type="text" id="cwRoot" class="lp-input" placeholder="/var/www/example.com">
