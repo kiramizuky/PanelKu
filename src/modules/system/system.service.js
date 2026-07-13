@@ -128,17 +128,31 @@ class SystemService {
     if (authkey) {
       cmd += ` --authkey=${authkey}`;
     }
+
+    if (process.platform === 'win32') {
+      const out = this.mockCommand(cmd);
+      if (out.includes('https://login.tailscale.com')) {
+        const match = out.match(/https:\/\/login\.tailscale\.com\S+/);
+        return { success: true, connected: false, loginUrl: match ? match[0] : null };
+      }
+      return { success: true, connected: true, loginUrl: null };
+    }
     
     try {
-      const out = await this.runCommand(cmd);
+      // Run with a 6-second timeout so it doesn't block the HTTP request if waiting for interactive web login
+      const { stdout, stderr } = await execAsync(cmd, { timeout: 6000 });
+      const out = stdout + '\n' + stderr;
       if (out.includes('https://login.tailscale.com')) {
         const match = out.match(/https:\/\/login\.tailscale\.com\S+/);
         return { success: true, connected: false, loginUrl: match ? match[0] : null };
       }
       return { success: true, connected: true, loginUrl: null };
     } catch (err) {
-      if (err.message.includes('https://login.tailscale.com')) {
-        const match = err.message.match(/https:\/\/login\.tailscale\.com\S+/);
+      // If the process was killed (timed out) or returned a non-zero status code,
+      // the authentication link may be printed in stdout, stderr, or error message.
+      const out = (err.stdout || '') + '\n' + (err.stderr || '') + '\n' + err.message;
+      if (out.includes('https://login.tailscale.com')) {
+        const match = out.match(/https:\/\/login\.tailscale\.com\S+/);
         return { success: true, connected: false, loginUrl: match ? match[0] : null };
       }
       throw err;
