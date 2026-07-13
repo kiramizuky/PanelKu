@@ -225,6 +225,11 @@ function initSchema(db) {
   } catch (e) {
     // Column already exists
   }
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN ai_settings TEXT NOT NULL DEFAULT '{\"provider\":\"openai\",\"apiKey\":\"\",\"model\":\"gpt-4o-mini\"}'");
+  } catch (e) {
+    // Column already exists
+  }
 }
 
 // ── Convenience helpers ────────────────────────────────────────────────────

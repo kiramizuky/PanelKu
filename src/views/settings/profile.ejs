@@ -128,6 +128,38 @@
         </div>
       </div>
 
+      <!-- OpenClaw AI Copilot Card -->
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card h-100 mb-0" style="border-radius:16px; padding:25px; display:flex; flex-direction:column;">
+          <div style="border-bottom:1px solid var(--glass-border); padding-bottom:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+            <h5 style="font-weight:700; margin:0; color:var(--text-primary);"><i class="bi bi-robot me-2 text-info"></i>OpenClaw AI Settings</h5>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:15px; flex:1; justify-content:center;">
+            <div class="lp-form-group mb-0">
+              <label class="lp-label" style="font-size:11px; font-weight:600; color:var(--text-muted);">AI Provider</label>
+              <select id="aiProvider" class="lp-input" onchange="ProfilePage.toggleAiFields()">
+                <option value="built-in">Built-in (Heuristics / Offline)</option>
+                <option value="openai">OpenAI API</option>
+                <option value="gemini">Google Gemini API</option>
+                <option value="openrouter">OpenRouter API</option>
+              </select>
+            </div>
+            
+            <div id="aiKeyGroup" class="lp-form-group mb-0" style="display:none;">
+              <label class="lp-label" style="font-size:11px; font-weight:600; color:var(--text-muted);">API Key</label>
+              <input type="password" id="aiApiKey" class="lp-input font-mono" placeholder="sk-...">
+            </div>
+
+            <div id="aiModelGroup" class="lp-form-group mb-0" style="display:none;">
+              <label class="lp-label" style="font-size:11px; font-weight:600; color:var(--text-muted);">AI Model</label>
+              <input type="text" id="aiModel" class="lp-input font-mono" placeholder="gpt-4o-mini">
+            </div>
+
+            <button class="btn-lp btn-lp-primary w-100" onclick="ProfilePage.saveAiSettings()" style="font-size:12px; height:36px; padding:0;">Save AI Settings</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Change Password Card -->
       <div class="col-12">
         <div class="lp-glass-card" style="border-radius:16px; padding:25px;">

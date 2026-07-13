@@ -6,6 +6,7 @@ const ProfilePage = (() => {
   async function init() {
     await LP.init();
     await loadProfile();
+    await loadAiSettings();
   }
 
   async function loadProfile() {
@@ -203,7 +204,63 @@ const ProfilePage = (() => {
     }
   }
 
-  return { init, changePassword, regenerateApiKey, toggleApiKeyVisibility, copyApiKey, toggle2FA, confirmEnable2FA };
+  async function loadAiSettings() {
+    try {
+      const res = await LP.get('/users/me/ai');
+      if (res?.success && res.data?.aiSettings) {
+        const settings = res.data.aiSettings;
+        document.getElementById('aiProvider').value = settings.provider || 'built-in';
+        document.getElementById('aiApiKey').value = settings.apiKey || '';
+        document.getElementById('aiModel').value = settings.model || '';
+        toggleAiFields();
+      }
+    } catch (e) {
+      console.error('Failed to load AI settings', e);
+    }
+  }
+
+  function toggleAiFields() {
+    const provider = document.getElementById('aiProvider').value;
+    const keyGroup = document.getElementById('aiKeyGroup');
+    const modelGroup = document.getElementById('aiModelGroup');
+
+    if (provider === 'built-in') {
+      keyGroup.style.display = 'none';
+      modelGroup.style.display = 'none';
+    } else {
+      keyGroup.style.display = 'block';
+      modelGroup.style.display = 'block';
+      
+      const modelInput = document.getElementById('aiModel');
+      if (provider === 'openai') {
+        modelInput.placeholder = 'gpt-4o-mini';
+      } else if (provider === 'gemini') {
+        modelInput.placeholder = 'gemini-1.5-flash';
+      } else if (provider === 'openrouter') {
+        modelInput.placeholder = 'google/gemini-2.5-flash';
+      }
+    }
+  }
+
+  async function saveAiSettings() {
+    const provider = document.getElementById('aiProvider').value;
+    const apiKey = document.getElementById('aiApiKey').value.trim();
+    const model = document.getElementById('aiModel').value.trim() || document.getElementById('aiModel').placeholder;
+
+    try {
+      const res = await LP.put('/users/me/ai', { provider, apiKey, model });
+      if (res?.success) {
+        LP.toast('AI settings saved successfully', 'success');
+        loadAiSettings();
+      } else {
+        LP.toast(res?.message || 'Failed to save settings', 'error');
+      }
+    } catch (err) {
+      LP.toast('Error saving AI settings', 'error');
+    }
+  }
+
+  return { init, changePassword, regenerateApiKey, toggleApiKeyVisibility, copyApiKey, toggle2FA, confirmEnable2FA, toggleAiFields, saveAiSettings, loadAiSettings };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {

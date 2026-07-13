@@ -84,6 +84,27 @@ class UsersController {
       return error(res, err.message, 500);
     }
   }
+
+  async getAiSettings(req, res) {
+    try {
+      const user = await usersService.getById(req.user._id);
+      return success(res, { aiSettings: user.aiSettings });
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async updateAiSettings(req, res) {
+    try {
+      const { provider, apiKey, model } = req.body;
+      const user = await usersService.update(req.user._id, {
+        aiSettings: { provider, apiKey, model }
+      });
+      return success(res, { aiSettings: user.aiSettings }, 'AI settings updated successfully');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
 }
 
 const usersController = new UsersController();

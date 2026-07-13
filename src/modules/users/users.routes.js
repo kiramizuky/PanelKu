@@ -19,5 +19,7 @@ router.patch('/:id/toggle', rbac(RESOURCES.USERS, ACTIONS.UPDATE), usersControll
 router.post('/me/password', usersController.changePassword.bind(usersController));
 router.post('/me/api-key', usersController.regenerateApiKey.bind(usersController));
 router.delete('/me/api-key', usersController.revokeApiKey.bind(usersController));
+router.get('/me/ai', usersController.getAiSettings.bind(usersController));
+router.put('/me/ai', usersController.updateAiSettings.bind(usersController));
 
 export default router;

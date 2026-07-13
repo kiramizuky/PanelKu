@@ -27,6 +27,7 @@ function rowToUser(row) {
     isActive:          Boolean(row.is_active),
     isSuperAdmin:      Boolean(row.is_super_admin),
     sessions:          fromJson(row.sessions, []),
+    aiSettings:        fromJson(row.ai_settings, { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' }),
     lastLogin:         row.last_login ? new Date(row.last_login) : null,
     lastLoginIp:       row.last_login_ip,
     loginCount:        row.login_count,
@@ -139,10 +140,10 @@ const User = {
       INSERT INTO users (
         id, username, email, password, role_id, first_name, last_name, avatar,
         two_factor_enabled, two_factor_secret, api_key, api_key_enabled,
-        is_active, is_super_admin, sessions, last_login, last_login_ip,
+        is_active, is_super_admin, sessions, ai_settings, last_login, last_login_ip,
         login_count, reset_token, reset_token_expiry, created_at, updated_at
       ) VALUES (
-        ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+        ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
       )
     `).run(
       id, data.username.toLowerCase(), data.email.toLowerCase(), hashedPw,
@@ -152,7 +153,9 @@ const User = {
       data.apiKey || null, data.apiKeyEnabled ? 1 : 0,
       data.isActive !== false ? 1 : 0,
       data.isSuperAdmin ? 1 : 0,
-      '[]', null, null, 0, null, null, ts, ts
+      '[]',
+      toJson(data.aiSettings || { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' }),
+      null, null, 0, null, null, ts, ts
     );
     return this.findById(id);
   },
@@ -175,6 +178,7 @@ const User = {
       sessions: 'sessions', lastLogin: 'last_login', lastLoginIp: 'last_login_ip',
       loginCount: 'login_count', resetToken: 'reset_token',
       resetTokenExpiry: 'reset_token_expiry', role: 'role_id',
+      aiSettings: 'ai_settings',
     };
 
     // Handle $set operator
@@ -186,7 +190,7 @@ const User = {
       sets.push(`${col} = ?`);
       if (key === 'twoFactorEnabled' || key === 'apiKeyEnabled' || key === 'isActive' || key === 'isSuperAdmin') {
         vals.push(val ? 1 : 0);
-      } else if (key === 'sessions') {
+      } else if (key === 'sessions' || key === 'aiSettings') {
         vals.push(toJson(val));
       } else if (val instanceof Date) {
         vals.push(val.toISOString());

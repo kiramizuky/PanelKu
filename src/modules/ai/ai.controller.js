@@ -8,6 +8,69 @@ class AIController {
       const { message, context = {} } = req.body;
       if (!message) return errorResponse(res, 'Message is required', 400);
 
+      // Check if user has AI settings configured with apiKey
+      const aiSettings = req.user?.aiSettings || { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
+      if (aiSettings.apiKey) {
+        try {
+          const provider = aiSettings.provider || 'openai';
+          const apiKey = aiSettings.apiKey;
+          const model = aiSettings.model || 'gpt-4o-mini';
+          
+          let responseText = '';
+          
+          if (provider === 'openai') {
+            const resApi = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify({
+                model: model,
+                messages: [{ role: 'user', content: message }]
+              })
+            });
+            const dataApi = await resApi.json();
+            responseText = dataApi.choices?.[0]?.message?.content || JSON.stringify(dataApi);
+          } else if (provider === 'gemini') {
+            const geminiModel = model.includes('/') ? model : `models/${model || 'gemini-1.5-flash'}`;
+            const resApi = await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiModel}:generateContent?key=${apiKey}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: message }] }]
+              })
+            });
+            const dataApi = await resApi.json();
+            responseText = dataApi.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(dataApi);
+          } else if (provider === 'openrouter') {
+            const resApi = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': 'https://github.com/kiramizuky/PanelKu',
+                'X-Title': 'Panelku'
+              },
+              body: JSON.stringify({
+                model: model || 'google/gemini-2.5-flash',
+                messages: [{ role: 'user', content: message }]
+              })
+            });
+            const dataApi = await resApi.json();
+            responseText = dataApi.choices?.[0]?.message?.content || JSON.stringify(dataApi);
+          } else {
+            throw new Error('Unsupported AI provider: ' + provider);
+          }
+          
+          return successResponse(res, { answer: responseText });
+        } catch (e) {
+          // Fallback to local heuristic
+        }
+      }
+
       const msg = message.toLowerCase();
       let response = '';
 
