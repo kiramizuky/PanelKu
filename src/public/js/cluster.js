@@ -241,6 +241,15 @@ const ClusterPage = (() => {
       const el = document.getElementById(`metrics-${node.id}`);
       if (!el) return;
 
+      // Extract variables properly from metrics object
+      const cpuPct   = metrics?.cpu?.usage ?? null;
+      const ramPct   = metrics?.memory ? Math.round((metrics.memory.used / metrics.memory.total) * 100) : null;
+      const diskPct  = metrics?.disk?.length ? Math.round((metrics.disk[0].used / metrics.disk[0].total) * 100) : null;
+      const ramUsed  = metrics?.memory ? fmtBytes(metrics.memory.used) : null;
+      const ramTotal = metrics?.memory ? fmtBytes(metrics.memory.total) : null;
+      const diskUsed = metrics?.disk?.length ? fmtBytes(metrics.disk[0].used) : null;
+      const diskTotal= metrics?.disk?.length ? fmtBytes(metrics.disk[0].total) : null;
+
       // Re-build metrics section (Grid 2 columns)
       el.style.display = 'grid';
       el.style.gridTemplateColumns = '1fr 1fr';
