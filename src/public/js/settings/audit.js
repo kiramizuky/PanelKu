@@ -66,15 +66,15 @@ const AuditPage = (() => {
 
     tbody.innerHTML = logs.map(log => `
       <tr>
-        <td class="font-mono text-muted" style="font-size: 11px;">${new Date(log.timestamp).toLocaleString()}</td>
-        <td class="font-mono"><strong>${log.username || 'system'}</strong></td>
+        <td class="font-mono text-muted" style="font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${new Date(log.timestamp).toLocaleString()}</td>
+        <td class="font-mono" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><strong>${log.username || 'system'}</strong></td>
         <td>
           <span class="lp-badge ${log.type === 'terminal' ? 'lp-badge-info' : 'lp-badge-success'}" style="font-size:10px;">
             ${log.type.toUpperCase()}
           </span>
         </td>
-        <td class="font-mono" style="font-size: 11px;">${log.action}</td>
-        <td class="text-truncate" style="max-width: 320px;" title="${escHtml(log.details)}">${escHtml(log.details)}</td>
+        <td class="font-mono" style="font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escHtml(log.action)}">${escHtml(log.action)}</td>
+        <td style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escHtml(log.details)}">${escHtml(log.details)}</td>
       </tr>
     `).join('');
   }
