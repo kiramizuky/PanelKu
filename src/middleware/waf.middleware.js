@@ -4,9 +4,18 @@ import WafRule from '../models/WafRule.js';
 // Simple lightweight WAF for Node.js Application level (protects the panel itself)
 // It detects common SQLi and XSS payloads in query string and body
 
-const SQLI_PATTERN = /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|OR|AND)\b)|(--\s)|\/\*/i;
-const XSS_PATTERN = /(<script.*?>.*?<\/script>)|(javascript:)|(onerror=)|(onload=)/i;
+// Strict SQLi: require actual SQL attack context, not plain English words like "or"/"and"
+// Matches: UNION SELECT, SELECT * FROM, 1=1, OR 1=, DROP TABLE, INSERT INTO, --<space>, /*
+const SQLI_PATTERN = /(UNION\s+SELECT|SELECT\s+\S+\s+FROM|INSERT\s+INTO|DROP\s+TABLE|UPDATE\s+\w+\s+SET|DELETE\s+FROM|;\s*(DROP|DELETE|INSERT|UPDATE|SELECT)|\bOR\s+[\d'"(]|--\s|\/\*\s)/i;
+const XSS_PATTERN = /(<script[\s>][\s\S]*?<\/script>)|(javascript\s*:)|(onerror\s*=)|(onload\s*=)/i;
 const DIR_TRAVERSAL = /(\.\.\/)|(\.\.\\)/;
+
+// Endpoints that may carry arbitrary log/text content — skip deep body scan
+const SKIP_BODY_SCAN_PATHS = [
+  '/api/ai/chat',
+  '/api/system/logs',
+  '/api/backup',
+];
 
 // Cache global rules to avoid DB hits on every request
 let globalRulesCache = {
@@ -55,10 +64,14 @@ export const wafMiddleware = (req, res, next) => {
     return res.status(403).send(`Forbidden: Suspected ${queryThreat}`);
   }
 
-  const bodyThreat = inspectPayload(req.body);
-  if (bodyThreat) {
-    logger.warn(`WAF Block (${bodyThreat} in Body): ${clientIp} -> ${req.originalUrl}`);
-    return res.status(403).send(`Forbidden: Suspected ${bodyThreat}`);
+  // Skip body inspection for endpoints that handle arbitrary text/log content
+  const skipBodyScan = SKIP_BODY_SCAN_PATHS.some(p => req.path.startsWith(p));
+  if (!skipBodyScan) {
+    const bodyThreat = inspectPayload(req.body);
+    if (bodyThreat) {
+      logger.warn(`WAF Block (${bodyThreat} in Body): ${clientIp} -> ${req.originalUrl}`);
+      return res.status(403).send(`Forbidden: Suspected ${bodyThreat}`);
+    }
   }
 
   next();
