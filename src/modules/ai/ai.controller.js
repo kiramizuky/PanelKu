@@ -1,6 +1,6 @@
 import { successResponse, errorResponse } from '../../helpers/response.js';
 import systemService from '../system/system.service.js';
-import dockerService from '../docker/docker.service.js';
+import logger from '../../config/logger.js';
 
 class AIController {
   async chat(req, res) {
@@ -100,8 +100,19 @@ Jika CPU terus-menerus mendekati 100%, Anda dapat membatasi resource CPU kontain
 1. Membuat kontainer baru dari Docker Hub via tab *Create Container*.
 2. Melakukan deployment multi-kontainer menggunakan *Docker Compose*.
 3. Masuk ke terminal kontainer secara instan menggunakan tombol *Terminal Console* di baris kontainer.`;
-      } else if (context.logType === 'fail2ban' || msg.includes('fail2ban') || msg.includes('blokir')) {
-        response = `Fail2Ban mendeteksi upaya login mencurigakan dan secara otomatis memblokir IP penyerang untuk melindungi port SSH Anda. Anda dapat melihat daftar IP terblokir di dashboard WAF dan melakukan unblock secara manual jika itu adalah IP Anda sendiri.`;
+      } else if (context.logType === 'fail2ban' || msg.includes('fail2ban') || msg.includes('blokir') || msg.includes('intrusion') || msg.includes('ban')) {
+        // Fail2Ban log analysis
+        const logSnippet = (context.logText || '').slice(0, 800);
+        const bannedIps = (context.logText || '').match(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/g) || [];
+        const uniqueIps = [...new Set(bannedIps)].slice(0, 5);
+        response = `**Analisis Log Fail2Ban:**
+Fail2Ban mendeteksi upaya login mencurigakan dan secara otomatis memblokir IP penyerang untuk melindungi port SSH dan layanan lainnya.
+
+${uniqueIps.length > 0 ? `**IP yang terdeteksi dalam log:**\n${uniqueIps.map(ip => '- ' + ip).join('\n')}\n\n` : ''}**Rekomendasi:**
+1. Periksa apakah IP yang diblokir adalah bot/scanner — jika ya, biarkan Fail2Ban bekerja.
+2. Jika IP yang terblokir adalah Anda sendiri, lakukan unban melalui terminal: \`fail2ban-client set sshd unbanip <IP>\`
+3. Tingkatkan keamanan SSH: gunakan key-based authentication dan nonaktifkan login password di \`/etc/ssh/sshd_config\`.
+4. Pertimbangkan mengurangi \`maxretry\` di konfigurasi Fail2Ban untuk respon lebih cepat terhadap brute-force.`;
       } else if (context.logText) {
         // Log Analyzer context helper
         const logText = context.logText.toLowerCase();
@@ -119,7 +130,7 @@ Layanan tidak memiliki izin akses (*Permission Denied*) ke berkas atau direktori
 2. Berikan izin baca-tulis menggunakan perintah \`chmod 755\` atau \`chmod 644\`.`;
         } else {
           response = `**Analisis Error AI:**
-Saya mendeteksi log masalah. Namun, error ini terlihat umum. Pastikan semua berkas konfigurasi sudah benar, hak akses direktori sudah sesuai, dan seluruh port yang diperlukan tidak saling bertabrakan.`;
+Saya mendeteksi log. Berdasarkan konten log yang diberikan, pastikan semua berkas konfigurasi sudah benar, hak akses direktori sudah sesuai, dan seluruh port yang diperlukan tidak saling bertabrakan.`;
         }
       } else {
         response = `Halo! Saya adalah **OpenClaw AI Copilot**. Saya siap membantu Anda mengelola server ini dengan mudah.
@@ -128,7 +139,8 @@ Anda bisa menanyakan status resource server (seperti RAM/CPU/Disk), cara deploy 
 
       return successResponse(res, { answer: response });
     } catch (error) {
-      return errorResponse(res, error.message, 500);
+      logger.error('AI chat error: ' + (error?.stack || error?.message || error));
+      return errorResponse(res, error.message || 'Internal AI error', 500);
     }
   }
 }
