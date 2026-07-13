@@ -97,6 +97,7 @@ const createApp = () => {
 
   // SPA / Page routes
   app.get('/', (req, res) => res.render('login/index', { layout: false }));
+  app.get('/login/2fa', (req, res) => res.render('login/2fa', { layout: false }));
   app.get('/dashboard', (req, res) => res.render('dashboard/index', { title: 'Dashboard' }));
   app.get('/monitor', (req, res) => res.render('monitor/index', { title: 'Monitoring' }));
   app.get('/terminal', (req, res) => res.render('terminal/index', { title: 'Terminal' }));

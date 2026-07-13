@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2FA Verification - Linux Panel</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/css/app.css" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      background-image: url('/images/bg.png');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      font-family: var(--font-sans);
+    }
+    .login-container {
+      min-height: 100vh;
+    }
+    .info-column {
+      background: rgba(10, 15, 30, 0.45);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border-right: 1px solid var(--glass-border);
+      padding: 4rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 100vh;
+    }
+    .form-column {
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      padding: 3rem 2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      border-left: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .login-card-right {
+      width: 100%;
+      max-width: 380px;
+      color: #fff;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+      margin-top: 40px;
+    }
+    .feature-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      padding: 24px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .feature-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(59, 130, 246, 0.3);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+    }
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--accent-primary), rgba(59, 130, 246, 0.3));
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-success);
+      border-radius: 50%;
+      margin-right: 8px;
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      }
+      70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+      }
+      100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container-fluid g-0 login-container">
+    <div class="row g-0 min-vh-100">
+      <!-- Left Column: Info & Details (3/4 screen on desktop) -->
+      <div class="col-lg-9 d-none d-lg-flex info-column text-white">
+        <div>
+          <div class="d-flex align-items-center mb-4">
+            <img src="/images/logo.png" alt="Panelku Logo" style="width: 42px; height: 42px; border-radius: 10px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.6); margin-right: 15px;">
+            <div>
+              <h4 class="mb-0" style="font-weight: 700; letter-spacing: 0.5px;">PanelKu</h4>
+              <div class="d-flex align-items-center" style="font-size: 11px; color: var(--text-muted);">
+                <span class="pulse-dot"></span> System Operational
+              </div>
+            </div>
+          </div>
+          
+          <div style="max-width: 700px; margin-top: 60px;">
+            <h1 style="font-size: 2.8rem; font-weight: 800; line-height: 1.2; margin-bottom: 20px; background: linear-gradient(120deg, #ffffff, #93c5fd); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+              Two-Factor Authentication
+            </h1>
+            <p style="color: var(--text-muted); font-size: 1.1rem; line-height: 1.6;">
+              Your account is protected by an additional security layer. Please enter your verification code to complete sign in.
+            </p>
+          </div>
+
+          <div class="feature-grid">
+            <div class="feature-card">
+              <div class="feature-icon">
+                <i class="bi bi-shield-check"></i>
+              </div>
+              <h5 style="font-weight: 600; font-size: 1.1rem; margin-bottom: 8px;">2FA Verification</h5>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0; line-height: 1.5;">
+                Enter the 6-digit verification code generated by your Authenticator app (e.g. Google Authenticator).
+              </p>
+            </div>
+            
+            <div class="feature-card">
+              <div class="feature-icon">
+                <i class="bi bi-key"></i>
+              </div>
+              <h5 style="font-weight: 600; font-size: 1.1rem; margin-bottom: 8px;">Session Protection</h5>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0; line-height: 1.5;">
+                Each session is protected by cryptographic tokens valid for only a short period.
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div style="font-size: 0.85rem; color: var(--text-muted);">
+          &copy; 2026 PanelKu Linux Panel. All rights reserved.
+        </div>
+      </div>
+
+      <!-- Right Column: Verification Form -->
+      <div class="col-lg-3 col-md-12 form-column">
+        <div class="login-card-right">
+          <div class="text-center mb-4">
+            <i class="bi bi-shield-lock-fill text-primary" style="font-size: 3.5rem;"></i>
+            <h2 style="font-weight:700; font-size:1.5rem; margin-bottom:5px; margin-top: 15px;">2FA Security</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem;">Enter 6-digit Authenticator OTP</p>
+          </div>
+
+          <form id="verifyForm">
+            <div id="errorMsg" class="alert alert-danger" style="display:none; background:rgba(239, 68, 68, 0.2); color:#fca5a5; border:1px solid rgba(239, 68, 68, 0.3); font-size:13px; padding:10px;"></div>
+            
+            <div class="lp-form-group mb-4">
+              <label class="lp-label">Verification Code</label>
+              <div class="input-group">
+                <span class="input-group-text" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); color:var(--text-muted); border-right:none;"><i class="bi bi-hash"></i></span>
+                <input type="text" id="otpCode" class="form-control font-monospace text-center" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); color:#fff; border-left:none; font-size: 18px; letter-spacing: 4px;" placeholder="000000" maxlength="6" pattern="[0-9]{6}" required autocomplete="one-time-code" autofocus>
+              </div>
+            </div>
+
+            <button type="submit" id="submitBtn" class="btn-lp btn-lp-primary w-100 d-flex align-items-center justify-content-center" style="padding:10px; font-size:15px; border-radius:10px;">
+              <span id="btnText">Verify &amp; Login</span>
+              <span id="btnSpinner" class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true" style="display: none;"></span>
+            </button>
+            
+            <div class="text-center mt-4">
+              <a href="/" style="color:var(--text-muted); font-size:12.5px; text-decoration:none;" onmouseover="this.style.color='var(--accent-primary)'" onmouseout="this.style.color='var(--text-muted)'">
+                <i class="bi bi-arrow-left me-1"></i> Back to Login
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    // Get temp token from query string
+    const urlParams = new URLSearchParams(window.location.search);
+    const tempToken = urlParams.get('token');
+
+    if (!tempToken) {
+      window.location.href = '/';
+    }
+
+    document.getElementById('verifyForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const otp = document.getElementById('otpCode').value.trim();
+      const err = document.getElementById('errorMsg');
+      
+      const submitBtn = document.getElementById('submitBtn');
+      const btnText = document.getElementById('btnText');
+      const btnSpinner = document.getElementById('btnSpinner');
+      const otpInput = document.getElementById('otpCode');
+
+      submitBtn.disabled = true;
+      otpInput.disabled = true;
+      btnText.textContent = 'Verifying...';
+      btnSpinner.style.display = 'inline-block';
+      err.style.display = 'none';
+
+      try {
+        const res = await LP.login2FA(tempToken, otp);
+        if (res && res.success) {
+          window.location.href = '/dashboard';
+        } else {
+          err.textContent = (res && res.message) ? res.message : 'Invalid code, please try again.';
+          err.style.display = 'block';
+          
+          submitBtn.disabled = false;
+          otpInput.disabled = false;
+          btnText.textContent = 'Verify & Login';
+          btnSpinner.style.display = 'none';
+          otpInput.value = '';
+          otpInput.focus();
+        }
+      } catch (e) {
+        console.error(e);
+        err.textContent = 'Connection error. Please try again.';
+        err.style.display = 'block';
+        
+        submitBtn.disabled = false;
+        otpInput.disabled = false;
+        btnText.textContent = 'Verify & Login';
+        btnSpinner.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>

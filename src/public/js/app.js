@@ -83,7 +83,7 @@ const LP = {
     const res = await this.post('/auth/login', { username, password });
     if (res?.success) {
       if (res.data.requiresTwoFactor) {
-        return { requiresTwoFactor: true, tempToken: res.data.tempToken };
+        return { success: true, requiresTwoFactor: true, tempToken: res.data.tempToken };
       }
       this.state.accessToken = res.data.accessToken;
       this.state.user = res.data.user;
@@ -91,6 +91,17 @@ const LP = {
       return { success: true };
     }
     return { success: false, message: res?.message || 'Login failed' };
+  },
+
+  async login2FA(tempToken, otp) {
+    const res = await this.post('/auth/2fa/verify', { tempToken, otp });
+    if (res?.success) {
+      this.state.accessToken = res.data.accessToken;
+      this.state.user = res.data.user;
+      localStorage.setItem('lp_token', res.data.accessToken);
+      return { success: true };
+    }
+    return { success: false, message: res?.message || 'Verification failed' };
   },
 
   async refreshToken() {
