@@ -8,7 +8,7 @@ import { dirname, join } from 'path';
 import appConfig from './config/app.js';
 import logger from './config/logger.js';
 import apiRoutes from './routes/index.js';
-import { apiLimiter } from './middleware/rateLimiter.js';
+import { apiLimiter, apiKeyLimiter } from './middleware/rateLimiter.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { wafMiddleware, refreshWafCache } from './middleware/waf.middleware.js';
@@ -20,6 +20,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const createApp = () => {
   const app = express();
+
+  // [HIGH-1 FIX] Trust exactly 1 reverse-proxy hop (nginx/caddy in front).
+  // This ensures req.ip reflects the real client IP from X-Forwarded-For,
+  // while preventing full X-Forwarded-For chain spoofing.
+  app.set('trust proxy', 1);
 
   // Template engine setup
   app.set('view engine', 'ejs');

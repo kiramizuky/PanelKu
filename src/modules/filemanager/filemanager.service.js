@@ -1,6 +1,6 @@
 import { readdir, stat, rename, rm, mkdir, copyFile, writeFile, readFile } from 'fs/promises';
 import { createReadStream, createWriteStream } from 'fs';
-import { join, resolve, basename, extname, dirname } from 'path';
+import { join, resolve, basename, extname, dirname, sep } from 'path';
 import archiver from 'archiver';
 import unzipper from 'unzipper';
 import logger from '../../config/logger.js';
@@ -52,8 +52,14 @@ class FileManagerService {
   }
 
   _resolvePath(userPath) {
+    const resolvedBase = resolve(BASE_DIR);
     const safe = resolve(join(BASE_DIR, userPath || '/'));
-    if (BASE_DIR !== '/' && !safe.startsWith(resolve(BASE_DIR))) {
+
+    // [MED-2 FIX] Always check path traversal, even when BASE_DIR is '/'.
+    // Without this, BASE_DIR='/' would skip the check entirely, allowing
+    // traversal to any path on the filesystem.
+    if (!safe.startsWith(resolvedBase + (resolvedBase.endsWith('/') || resolvedBase.endsWith('\\') ? '' : sep))
+        && safe !== resolvedBase) {
       throw Object.assign(new Error('Path traversal detected'), { statusCode: 403 });
     }
     return safe;

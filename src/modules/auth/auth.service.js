@@ -9,19 +9,45 @@ import { generateToken } from '../../helpers/crypto.js';
 import { getDeviceInfo } from '../../helpers/system.js';
 import eventBus, { EVENTS } from '../../core/events/EventBus.js';
 import logger from '../../config/logger.js';
+import auditRepository from '../../repositories/audit.repository.js';
 
 class AuthService {
   /**
    * Login with username/password
    */
   async login(username, password, req) {
+    const deviceInfo = getDeviceInfo(req);
+    const ip = deviceInfo?.ip || req?.ip || 'unknown';
     const user = await userRepository.findByUsername(username, true);
 
     if (!user || !(await user.comparePassword(password))) {
+      // [MED-5 FIX] Audit failed login attempts for forensics & brute-force detection
+      auditRepository.log({
+        userId:   user?._id || null,
+        username: username,
+        action:   'LOGIN_FAILED',
+        resource: 'auth',
+        details:  user ? 'Invalid password' : 'User not found',
+        ip,
+        userAgent: req?.headers?.['user-agent'] || '',
+        status:   'failure',
+      }).catch((e) => logger.error('Failed to write audit log: ' + e.message));
+
       throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
     }
 
     if (!user.isActive) {
+      auditRepository.log({
+        userId:   user._id,
+        username: user.username,
+        action:   'LOGIN_BLOCKED',
+        resource: 'auth',
+        details:  'Account is disabled',
+        ip,
+        userAgent: req?.headers?.['user-agent'] || '',
+        status:   'failure',
+      }).catch((e) => logger.error('Failed to write audit log: ' + e.message));
+
       throw Object.assign(new Error('Account is disabled'), { statusCode: 403 });
     }
 

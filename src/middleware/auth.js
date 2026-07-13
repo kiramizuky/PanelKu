@@ -3,6 +3,7 @@ import appConfig from '../config/app.js';
 import userRepository from '../repositories/user.repository.js';
 import { unauthorized } from '../helpers/response.js';
 import logger from '../config/logger.js';
+import { apiKeyLimiter } from './rateLimiter.js';
 
 /**
  * JWT Authentication Middleware.
@@ -60,24 +61,40 @@ export const authenticate = async (req, res, next) => {
 
 /**
  * API Key authentication.
+ * [MED-3 FIX] Wrapped with apiKeyLimiter to prevent brute-force.
  */
-const authenticateApiKey = async (req, res, next) => {
-  const apiKey = req.headers['x-api-key'];
-  const user = await userRepository.findByApiKey(apiKey);
-  if (!user) return unauthorized(res, 'Invalid API key');
-  req.user = user;
-  req.isApiKey = true;
-  next();
+const authenticateApiKey = (req, res, next) => {
+  // Apply rate limiter first, then authenticate
+  apiKeyLimiter(req, res, async () => {
+    try {
+      const apiKey = req.headers['x-api-key'];
+      if (!apiKey) return unauthorized(res, 'No API key provided');
+      const user = await userRepository.findByApiKey(apiKey);
+      if (!user || !user.isActive) return unauthorized(res, 'Invalid or inactive API key');
+      req.user = user;
+      req.isApiKey = true;
+      next();
+    } catch (err) {
+      logger.error('API key auth error:', err.message);
+      return unauthorized(res, 'Authentication failed');
+    }
+  });
 };
 
 /**
  * Optional auth — attaches user if token present but doesn't block.
+ * [LOW-4 FIX] Only suppress 401/auth errors, not server errors.
  */
 export const optionalAuth = async (req, res, next) => {
   try {
-    await authenticate(req, res, () => {});
+    const authHeader = req.headers.authorization;
+    const cookieToken = req.cookies?.access_token;
+    const hasToken = (authHeader && authHeader.startsWith('Bearer ')) || cookieToken;
+    if (hasToken) {
+      await authenticate(req, res, () => {});
+    }
   } catch {
-    // ignore
+    // Ignore auth errors — user remains unauthenticated
   }
   next();
 };

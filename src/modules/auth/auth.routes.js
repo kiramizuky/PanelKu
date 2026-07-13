@@ -8,7 +8,8 @@ const router = Router();
 // Public routes
 router.post('/login', authLimiter, authController.login.bind(authController));
 router.post('/2fa/verify', authLimiter, authController.verifyTwoFactor.bind(authController));
-router.post('/refresh', authController.refresh.bind(authController));
+// [HIGH-2 FIX] Apply rate limiter to /refresh to prevent token rotation attacks
+router.post('/refresh', authLimiter, authController.refresh.bind(authController));
 
 // Protected routes
 router.use(authenticate);

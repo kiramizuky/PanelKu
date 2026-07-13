@@ -5,9 +5,31 @@ import WafRule from '../models/WafRule.js';
 // It detects common SQLi and XSS payloads in query string and body
 
 // Strict SQLi: require actual SQL attack context, not plain English words like "or"/"and"
-// Matches: UNION SELECT, SELECT * FROM, 1=1, OR 1=, DROP TABLE, INSERT INTO, --<space>, /*
+// Matches: UNION SELECT, SELECT * FROM, OR 1=, DROP TABLE, INSERT INTO, --<space>, /* comment */
 const SQLI_PATTERN = /(UNION\s+SELECT|SELECT\s+\S+\s+FROM|INSERT\s+INTO|DROP\s+TABLE|UPDATE\s+\w+\s+SET|DELETE\s+FROM|;\s*(DROP|DELETE|INSERT|UPDATE|SELECT)|\bOR\s+[\d'"(]|--\s|\/\*\s)/i;
-const XSS_PATTERN = /(<script[\s>][\s\S]*?<\/script>)|(javascript\s*:)|(onerror\s*=)|(onload\s*=)/i;
+
+// [MED-4 FIX] Comprehensive XSS pattern covering:
+// - <script> tags (including encoded variants)
+// - javascript: URI scheme
+// - Inline event handlers (onerror, onload, onclick, onmouseover, etc.)
+// - <img>, <svg>, <iframe>, <object>, <embed> XSS vectors
+// - data:text/html execution
+// - expression() CSS injection (IE)
+// - HTML-encoded angle brackets (&#60; &#x3c;)
+const XSS_PATTERNS = [
+  /<script[\s\S]*?>[\s\S]*?<\/script\s*>/i,           // <script>...</script>
+  /<script[\s>]/i,                                      // <script src=...>
+  /javascript\s*:/i,                                    // javascript: URI
+  /data\s*:\s*text\s*\/\s*(html|javascript)/i,          // data:text/html or data:text/javascript
+  /on\w+\s*=\s*["']?\s*(javascript|eval|alert|document|window)/i, // onclick="javascript:..."
+  /\bon(?:error|load|click|mouseover|mouseout|focus|blur|submit|change|keyup|keydown|keypress|input|dblclick|contextmenu|drag|drop|resize|scroll|copy|cut|paste|select|abort|animationstart|animationend|canplay|ended|invalid|message|offline|online|open|pagehide|pageshow|popstate|reset|storage|toggle|touchstart|touchend|touchmove|unload|wheel)\s*=/i,
+  /<\s*(img|svg|iframe|object|embed|link|meta|base|form|input|button|select|textarea|details|summary)\s[^>]*\bon\w+\s*=/i, // <img onerror=...>
+  /<\s*iframe[^>]*src\s*=/i,                           // <iframe src=...>
+  /expression\s*\(/i,                                   // CSS expression()
+  /&#\s*[xX]?\s*[0-9a-fA-F]+\s*;.*?<\s*script/i,      // HTML entity encoded <script
+  /vbscript\s*:/i,                                      // vbscript: URI
+];
+
 const DIR_TRAVERSAL = /(\.\.\/)|(\.\.\\)/;
 
 // Endpoints that may carry arbitrary log/text content — skip deep body scan
@@ -35,7 +57,8 @@ export const refreshWafCache = async () => {
 };
 
 export const wafMiddleware = (req, res, next) => {
-  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  // Use req.ip which respects trust proxy setting — more reliable than raw header
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
   // 1. Check IP Whitelist (bypasses other checks)
   if (globalRulesCache.whitelistedIps.includes(clientIp)) {
@@ -53,7 +76,8 @@ export const wafMiddleware = (req, res, next) => {
     if (!payload) return false;
     const str = JSON.stringify(payload);
     if (SQLI_PATTERN.test(str)) return 'SQL Injection';
-    if (XSS_PATTERN.test(str)) return 'XSS';
+    // [MED-4 FIX] Check all XSS patterns
+    if (XSS_PATTERNS.some((p) => p.test(str))) return 'XSS';
     if (DIR_TRAVERSAL.test(str)) return 'Directory Traversal';
     return false;
   };

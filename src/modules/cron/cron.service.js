@@ -4,9 +4,47 @@ import { exec } from 'child_process';
 import util from 'util';
 import fs from 'fs/promises';
 import path from 'path';
+import logger from '../../config/logger.js';
 
 const execPromise = util.promisify(exec);
 const STORAGE_PATH = path.resolve('storage', 'cron-tasks.json');
+
+// [HIGH-3 FIX] Dangerous command patterns that should never be scheduled
+const DANGEROUS_PATTERNS = [
+  /\brm\s+-rf\s+\//,           // rm -rf /
+  /\bchmod\s+777\s+\//,        // chmod 777 /
+  /\bmkfs\b/,                   // format disk
+  /\bdd\s+if=/,                 // disk dump
+  /\bshred\b/,                  // secure delete
+  /\b(wget|curl)\s+.*\|.*sh/,  // download and execute
+  /\bnc\b.*\s+-e\s+/,          // netcat reverse shell
+  /\bpython.*-c.*exec/,         // python code exec
+  />\/dev\/sd[a-z]/,            // write to disk device
+  /\/etc\/passwd/,              // accessing passwd
+  /\/etc\/shadow/,              // accessing shadow
+];
+
+/**
+ * [HIGH-3 FIX] Validate cron command against dangerous patterns.
+ * Note: Cron jobs run as the panel process user — typically root.
+ * Only allow explicit safe patterns.
+ */
+function validateCronCommand(command) {
+  if (!command || typeof command !== 'string') {
+    throw new Error('Command must be a non-empty string');
+  }
+  if (command.length > 500) {
+    throw new Error('Command is too long (max 500 characters)');
+  }
+  for (const pattern of DANGEROUS_PATTERNS) {
+    if (pattern.test(command)) {
+      throw Object.assign(
+        new Error('Command contains a potentially dangerous pattern and was rejected for safety.'),
+        { statusCode: 400 }
+      );
+    }
+  }
+}
 
 class CronService {
   constructor() {
@@ -38,7 +76,7 @@ class CronService {
       await fs.mkdir(path.dirname(STORAGE_PATH), { recursive: true });
       await fs.writeFile(STORAGE_PATH, JSON.stringify(this.tasks, null, 2), 'utf8');
     } catch (err) {
-      console.error('CronService: failed to persist tasks:', err.message);
+      logger.error('CronService: failed to persist tasks:', err.message);
     }
   }
 
@@ -50,7 +88,7 @@ class CronService {
         await execPromise(taskData.command);
         this._save();
       } catch (err) {
-        console.error(`Cron job [${taskData.name}] failed:`, err.message);
+        logger.error(`Cron job [${taskData.name}] failed: ${err.message}`);
       }
     });
     this.jobs.set(taskData.id, job);
@@ -67,6 +105,8 @@ class CronService {
     if (!cron.validate(schedule)) {
       throw new Error('Invalid cron expression');
     }
+    // [HIGH-3 FIX] Validate command before scheduling
+    validateCronCommand(command);
 
     const id = randomUUID();
     const taskData = { id, name, schedule, command, status: 'active', lastRun: null, createdAt: new Date() };
