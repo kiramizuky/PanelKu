@@ -42,6 +42,7 @@
 
 /* Light mode specific element adjustments */
 .light-mode .lp-brand,
+.light-mode .lp-nav-link,
 .light-mode .lp-nav-link:hover,
 .light-mode .lp-nav-link.active,
 .light-mode .modal-title,
