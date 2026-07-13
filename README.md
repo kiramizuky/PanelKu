@@ -119,16 +119,7 @@ src/
 | Phase 4 | ✅ Done | Firewall, WAF, Security, Notifications |
 | Phase 5 | ✅ Done | Git Deploy, Auto Update, Plugin Marketplace, WireGuard VPN, Fail2ban, PM2, Rclone, OpenClaw AI, DB Web Admin, Smart Home, Media Services, Log Analyzer |
 | Phase 6 (v1.6.0) | ✅ Done | Multi-Node Cluster, SQLite Auto-Backups, PTY Terminal Command Audit Log, GitHub Actions Docker Hub Integration |
-
-## Future Development & Upcoming Modules
-
-### 1. 🗄️ Service & Plugin Enhancements
-- **PHP FPM Pools & Version Selector**: Pembagian pool server PHP-FPM dan pemilih PHP per-website.
-- **Database Explorer & Console**: MySQL/PostgreSQL/SQLite Client internal yang visual.
-
-### 2. 🔔 Watchdog & Recovery
-- **Service Watchdog**: Auto-restart daemon jika Nginx, Docker, PHP, atau MySQL mengalami kendala/mati.
-- **Auto-Rollback**: Pemulihan otomatis jika pembaruan panel mengalami error/gagal.
+| Phase 7 (v1.7.0) | ✅ Done | OpenClaw AI Copilot Floating Assistant, Nginx Reverse Proxy Docker Mapper, PHP Pool Configuration Manager, Database Visual Explorer/Console, WhatsApp Alerting, Service Watchdog Auto-Healer |
 
 ## License
 
