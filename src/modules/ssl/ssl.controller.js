@@ -5,13 +5,15 @@ import { success, errorResponse } from '../../helpers/response.js';
 class SSLController {
   async listCertificates(req, res) {
     try {
-      const websites = await Website.find({ 'ssl.enabled': true }).lean();
-      const certs = websites.map(w => ({
-        id: w._id,
-        domain: w.domain,
-        provider: w.ssl.provider,
-        expiresAt: w.ssl.expiresAt
-      }));
+      const websites = await Website.find();
+      const certs = websites
+        .filter(w => w.ssl && w.ssl.enabled)
+        .map(w => ({
+          id: w._id,
+          domain: w.domain,
+          provider: w.ssl.provider,
+          expiresAt: w.ssl.expiresAt
+        }));
       return success(res, certs);
     } catch (error) {
       return errorResponse(res, error, 500);
