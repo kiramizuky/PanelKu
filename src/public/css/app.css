@@ -31,13 +31,157 @@
   --text-muted: #6b7280;
   
   --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(0, 0, 0, 0.1);
-  --glass-border-hover: rgba(0, 0, 0, 0.2);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+  --glass-border: rgba(0, 0, 0, 0.12);
+  --glass-border-hover: rgba(0, 0, 0, 0.22);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.08);
 
   --accent-primary: #2563eb;
   --accent-hover: #1d4ed8;
   --bg-color: #f3f4f6;
+}
+
+/* Light mode specific element adjustments */
+.light-mode .lp-brand,
+.light-mode .lp-nav-link:hover,
+.light-mode .lp-nav-link.active,
+.light-mode .modal-title,
+.light-mode .lp-toast-title,
+.light-mode .lp-app-item {
+  color: #111827 !important;
+}
+
+.light-mode .lp-app-item {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.light-mode .lp-app-item:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.light-mode .modal-content {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #111827 !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.15), 0 0 100px rgba(59, 130, 246, 0.08) !important;
+}
+
+.light-mode .modal-content:hover {
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.2), 0 0 120px rgba(59, 130, 246, 0.12) !important;
+}
+
+.light-mode .modal-header,
+.light-mode .modal-footer {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.light-mode .modal-content .lp-input {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  color: #111827 !important;
+}
+
+.light-mode .modal-content .lp-input:focus {
+  background: rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+}
+
+.light-mode .lp-input {
+  background: rgba(255, 255, 255, 0.8);
+  color: #111827;
+}
+
+.light-mode .lp-table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.light-mode .lp-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.light-mode .settings-sidebar-header::before {
+  opacity: 0.03;
+}
+
+.light-mode .settings-avatar {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.light-mode .settings-nav-item {
+  border-top-color: rgba(0, 0, 0, 0.04);
+}
+
+.light-mode .settings-nav-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.light-mode .settings-section-header,
+.light-mode .audit-table-header {
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.light-mode .audit-filter-select,
+.light-mode .audit-filter-search {
+  background: rgba(255, 255, 255, 0.9);
+  color: #111827;
+}
+
+.light-mode .audit-data-table thead tr {
+  background: rgba(243, 244, 246, 0.98);
+}
+
+.light-mode .audit-data-table td {
+  border-bottom-color: rgba(0, 0, 0, 0.04);
+}
+
+.light-mode .audit-data-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.light-mode .audit-data-table tbody tr.audit-row-failed {
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.light-mode .btn-close {
+  filter: none;
+}
+
+.light-mode .dropdown-menu {
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+.light-mode .dropdown-item {
+  color: #111827 !important;
+}
+
+.light-mode .dropdown-item:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+.light-mode .offcanvas {
+  background: rgba(255, 255, 255, 0.98) !important;
+  color: #111827 !important;
+}
+
+.light-mode .offcanvas-header {
+  border-bottom-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.light-mode .btn-close-white {
+  filter: none !important;
+}
+
+.light-mode .lp-toasts .lp-toast {
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.light-mode .lp-toast-close {
+  color: var(--text-muted);
+}
+
+.light-mode .lp-toast-close:hover {
+  color: var(--text-primary);
 }
 
 body {
