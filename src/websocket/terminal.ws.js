@@ -56,12 +56,16 @@ export const registerTerminalSocket = (namespace) => {
         if (!activeSessions.has(sessionId)) return;
         terminalService.write(sessionId, data);
 
-        // Buffering for audit log
+        // Buffering for audit log (clean ANSI escape sequences first)
+        const logData = data.replace(/\x1b\[[0-9?]*[a-zA-Z~]/g, '');
         let buf = sessionBuffers.get(sessionId) || '';
-        for (let i = 0; i < data.length; i++) {
-          const char = data[i];
+        for (let i = 0; i < logData.length; i++) {
+          const char = logData[i];
           if (char === '\r' || char === '\n') {
-            logTerminalCommand(socket.user?.username || 'unknown', buf);
+            const cleanBuf = buf.trim();
+            if (cleanBuf) {
+              logTerminalCommand(socket.user?.username || 'unknown', cleanBuf);
+            }
             buf = '';
           } else if (char === '\x7f' || char === '\b') {
             if (buf.length > 0) buf = buf.slice(0, -1);
