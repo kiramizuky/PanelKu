@@ -10,62 +10,215 @@
   <link href="/css/app.css" rel="stylesheet">
   <style>
     body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
       margin: 0;
       background-image: url('/images/bg.png');
       background-size: cover;
       background-position: center;
+      background-attachment: fixed;
+      font-family: var(--font-sans);
     }
-    .login-card {
-      width: 100%;
-      max-width: 400px;
-      background: var(--glass-bg);
+    .login-container {
+      min-height: 100vh;
+    }
+    .info-column {
+      background: rgba(10, 15, 30, 0.45);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border-right: 1px solid var(--glass-border);
+      padding: 4rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 100vh;
+    }
+    .form-column {
+      background: rgba(15, 23, 42, 0.82);
       backdrop-filter: blur(25px);
       -webkit-backdrop-filter: blur(25px);
-      border: 1px solid var(--glass-border);
-      border-radius: 20px;
-      padding: 40px 30px;
-      box-shadow: var(--glass-shadow);
+      padding: 3rem 2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      border-left: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .login-card-right {
+      width: 100%;
+      max-width: 380px;
       color: #fff;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+      margin-top: 40px;
+    }
+    .feature-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 16px;
+      padding: 24px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .feature-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(59, 130, 246, 0.3);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+    }
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--accent-primary), rgba(59, 130, 246, 0.3));
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-success);
+      border-radius: 50%;
+      margin-right: 8px;
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      }
+      70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+      }
+      100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+      }
     }
   </style>
 </head>
 <body>
 
-  <div class="login-card">
-    <div class="text-center mb-4">
-      <img src="/images/logo.png" alt="Panelku Logo" style="width: 54px; height: 54px; border-radius: 12px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.6); margin-bottom: 15px;">
-      <h2 style="font-weight:700; font-size:1.5rem; margin-bottom:5px;">Welcome Back</h2>
-      <p style="color:var(--text-muted); font-size:0.9rem;">Sign in to your Linux Panel</p>
+  <div class="container-fluid g-0 login-container">
+    <div class="row g-0 min-vh-100">
+      <!-- Left Column: Info & Details (3/4 screen on desktop) -->
+      <div class="col-lg-9 d-none d-lg-flex info-column text-white">
+        <div>
+          <div class="d-flex align-items-center mb-4">
+            <img src="/images/logo.png" alt="Panelku Logo" style="width: 42px; height: 42px; border-radius: 10px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.6); margin-right: 15px;">
+            <div>
+              <h4 class="mb-0" style="font-weight: 700; letter-spacing: 0.5px;">PanelKu</h4>
+              <div class="d-flex align-items-center" style="font-size: 11px; color: var(--text-muted);">
+                <span class="pulse-dot"></span> System Operational
+              </div>
+            </div>
+          </div>
+          
+          <div style="max-width: 700px; margin-top: 60px;">
+            <h1 style="font-size: 2.8rem; font-weight: 800; line-height: 1.2; margin-bottom: 20px; background: linear-gradient(120deg, #ffffff, #93c5fd); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+              The Next-Gen Linux Server Control Panel
+            </h1>
+            <p style="color: var(--text-muted); font-size: 1.1rem; line-height: 1.6;">
+              Manage your websites, run database instances, spawn terminal sessions, and deploy Docker container stacks directly from an elegant, speed-optimized glassmorphic dashboard.
+            </p>
+          </div>
+
+          <div class="feature-grid">
+            <div class="feature-card">
+              <div class="feature-icon">
+                <i class="bi bi-globe"></i>
+              </div>
+              <h5 style="font-weight: 600; font-size: 1.1rem; margin-bottom: 8px;">Websites & SSL</h5>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0; line-height: 1.5;">
+                Deploy domains, configure reverse proxies, and auto-renew free Let's Encrypt SSL certificates.
+              </p>
+            </div>
+            
+            <div class="feature-card">
+              <div class="feature-icon">
+                <i class="bi bi-database"></i>
+              </div>
+              <h5 style="font-weight: 600; font-size: 1.1rem; margin-bottom: 8px;">Databases & Backups</h5>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0; line-height: 1.5;">
+                Optimize and query MySQL, PostgreSQL, or SQLite. Configure scheduled backups to remote storages.
+              </p>
+            </div>
+            
+            <div class="feature-card">
+              <div class="feature-icon">
+                <i class="bi bi-box-seam"></i>
+              </div>
+              <h5 style="font-weight: 600; font-size: 1.1rem; margin-bottom: 8px;">App Engine & Docker</h5>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0; line-height: 1.5;">
+                Launch container images, monitor systemd microservices, and stream real-time logs securely.
+              </p>
+            </div>
+            
+            <div class="feature-card">
+              <div class="feature-icon">
+                <i class="bi bi-shield-lock"></i>
+              </div>
+              <h5 style="font-weight: 600; font-size: 1.1rem; margin-bottom: 8px;">Security & WAF</h5>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0; line-height: 1.5;">
+                Enable custom firewalls, configure Web Application Firewall policies, and run secure isolated shells.
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div style="font-size: 0.85rem; color: var(--text-muted);">
+          &copy; 2026 PanelKu Linux Panel. All rights reserved.
+        </div>
+      </div>
+
+      <!-- Right Column: Login Form (1/4 screen on desktop) -->
+      <div class="col-lg-3 col-md-12 form-column">
+        <div class="login-card-right">
+          <div class="text-center mb-4">
+            <img src="/images/logo.png" alt="Panelku Logo" style="width: 54px; height: 54px; border-radius: 12px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.6); margin-bottom: 15px;">
+            <h2 style="font-weight:700; font-size:1.5rem; margin-bottom:5px;">Welcome Back</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem;">Sign in to your Linux Panel</p>
+          </div>
+
+          <form id="loginForm">
+            <div id="errorMsg" class="alert alert-danger" style="display:none; background:rgba(239, 68, 68, 0.2); color:#fca5a5; border:1px solid rgba(239, 68, 68, 0.3); font-size:13px; padding:10px;"></div>
+            
+            <div class="lp-form-group mb-3">
+              <label class="lp-label">Username</label>
+              <div class="input-group">
+                <span class="input-group-text" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); color:var(--text-muted); border-right:none;"><i class="bi bi-person"></i></span>
+                <input type="text" id="username" class="form-control" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); color:#fff; border-left:none;" required>
+              </div>
+            </div>
+            
+            <div class="lp-form-group mb-4">
+              <label class="lp-label">Password</label>
+              <div class="input-group">
+                <span class="input-group-text" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); color:var(--text-muted); border-right:none;"><i class="bi bi-lock"></i></span>
+                <input type="password" id="password" class="form-control" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); color:#fff; border-left:none;" required>
+              </div>
+            </div>
+
+            <button type="submit" id="submitBtn" class="btn-lp btn-lp-primary w-100 d-flex align-items-center justify-content-center" style="padding:10px; font-size:15px; border-radius:10px;">
+              <span id="btnText">Sign In</span>
+              <span id="btnSpinner" class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true" style="display: none;"></span>
+            </button>
+            <div class="text-center mt-3">
+              <a href="#" data-bs-toggle="modal" data-bs-target="#forgotModal" style="color:var(--text-muted); font-size:12px; text-decoration:none; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-primary)'" onmouseout="this.style.color='var(--text-muted)'">Forgot password / Reset Database?</a>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
-
-    <form id="loginForm">
-      <div id="errorMsg" class="alert alert-danger" style="display:none; background:rgba(239, 68, 68, 0.2); color:#fca5a5; border:1px solid rgba(239, 68, 68, 0.3); font-size:13px; padding:10px;"></div>
-      
-      <div class="lp-form-group mb-3">
-        <label class="lp-label">Username</label>
-        <div class="input-group">
-          <span class="input-group-text" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); color:var(--text-muted); border-right:none;"><i class="bi bi-person"></i></span>
-          <input type="text" id="username" class="form-control" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); color:#fff; border-left:none;" required>
-        </div>
-      </div>
-      
-      <div class="lp-form-group mb-4">
-        <label class="lp-label">Password</label>
-        <div class="input-group">
-          <span class="input-group-text" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); color:var(--text-muted); border-right:none;"><i class="bi bi-lock"></i></span>
-          <input type="password" id="password" class="form-control" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); color:#fff; border-left:none;" required>
-        </div>
-      </div>
-
-      <button type="submit" class="btn-lp btn-lp-primary w-100" style="padding:10px; font-size:15px; border-radius:10px;">Sign In</button>
-      <div class="text-center mt-3">
-        <a href="#" data-bs-toggle="modal" data-bs-target="#forgotModal" style="color:var(--text-muted); font-size:12px; text-decoration:none; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-primary)'" onmouseout="this.style.color='var(--text-muted)'">Forgot password / Reset Database?</a>
-      </div>
-    </form>
   </div>
 
   <!-- Forgot Password / Reset Database Modal -->
@@ -104,6 +257,20 @@
       const p = document.getElementById('password').value;
       const err = document.getElementById('errorMsg');
       
+      const submitBtn = document.getElementById('submitBtn');
+      const btnText = document.getElementById('btnText');
+      const btnSpinner = document.getElementById('btnSpinner');
+      const usernameInput = document.getElementById('username');
+      const passwordInput = document.getElementById('password');
+
+      // Set loading state
+      submitBtn.disabled = true;
+      usernameInput.disabled = true;
+      passwordInput.disabled = true;
+      btnText.textContent = 'Processing...';
+      btnSpinner.style.display = 'inline-block';
+      err.style.display = 'none';
+
       try {
         const res = await LP.login(u, p);
         if(res && res.success) {
@@ -113,11 +280,26 @@
               window.location.href = '/dashboard';
            }
         }
-        else { err.textContent = (res && res.message) ? res.message : 'Login failed'; err.style.display = 'block'; }
+        else {
+          err.textContent = (res && res.message) ? res.message : 'Login failed';
+          err.style.display = 'block';
+          // Reset loading state
+          submitBtn.disabled = false;
+          usernameInput.disabled = false;
+          passwordInput.disabled = false;
+          btnText.textContent = 'Sign In';
+          btnSpinner.style.display = 'none';
+        }
       } catch (e) {
         console.error(e);
         err.textContent = 'Connection error';
         err.style.display = 'block';
+        // Reset loading state
+        submitBtn.disabled = false;
+        usernameInput.disabled = false;
+        passwordInput.disabled = false;
+        btnText.textContent = 'Sign In';
+        btnSpinner.style.display = 'none';
       }
     });
   </script>
