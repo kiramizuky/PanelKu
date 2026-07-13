@@ -1,7 +1,9 @@
 import { exec } from 'child_process';
 import util from 'util';
+import path from 'path';
 import logger from '../../config/logger.js';
 import packageManager from './package-manager.js';
+import { getDb } from '../../core/db/sqlite.js';
 
 const execAsync = util.promisify(exec);
 
