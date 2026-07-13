@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import util from 'util';
 import path from 'path';
 import logger from '../../config/logger.js';
@@ -138,25 +138,62 @@ class SystemService {
       return { success: true, connected: true, loginUrl: null };
     }
     
-    try {
-      // Run with a 6-second timeout so it doesn't block the HTTP request if waiting for interactive web login
-      const { stdout, stderr } = await execAsync(cmd, { timeout: 6000 });
-      const out = stdout + '\n' + stderr;
-      if (out.includes('https://login.tailscale.com')) {
-        const match = out.match(/https:\/\/login\.tailscale\.com\S+/);
-        return { success: true, connected: false, loginUrl: match ? match[0] : null };
+    return new Promise((resolve, reject) => {
+      const args = ['tailscale', 'up'];
+      if (authkey) {
+        args.push(`--authkey=${authkey}`);
       }
-      return { success: true, connected: true, loginUrl: null };
-    } catch (err) {
-      // If the process was killed (timed out) or returned a non-zero status code,
-      // the authentication link may be printed in stdout, stderr, or error message.
-      const out = (err.stdout || '') + '\n' + (err.stderr || '') + '\n' + err.message;
-      if (out.includes('https://login.tailscale.com')) {
-        const match = out.match(/https:\/\/login\.tailscale\.com\S+/);
-        return { success: true, connected: false, loginUrl: match ? match[0] : null };
-      }
-      throw err;
-    }
+
+      // Spawn with shell to handle sudo wrapping cleanly
+      const child = spawn('sudo', args, { shell: true });
+      let output = '';
+      let resolved = false;
+
+      const handleData = (data) => {
+        const str = data.toString();
+        output += str;
+        logger.info(`[Tailscale Up] ${str.trim()}`);
+
+        if (str.includes('https://login.tailscale.com')) {
+          resolved = true;
+          const match = output.match(/https:\/\/login\.tailscale\.com\S+/);
+          resolve({ success: true, connected: false, loginUrl: match ? match[0] : null });
+          child.kill('SIGTERM');
+        }
+      };
+
+      if (child.stdout) child.stdout.on('data', handleData);
+      if (child.stderr) child.stderr.on('data', handleData);
+
+      child.on('close', (code) => {
+        if (resolved) return;
+        
+        if (code === 0) {
+          resolve({ success: true, connected: true, loginUrl: null });
+        } else {
+          reject(new Error(`Tailscale failed with exit code ${code}. Output: ${output}`));
+        }
+      });
+
+      child.on('error', (err) => {
+        if (resolved) return;
+        reject(err);
+      });
+
+      // Timeout backup
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          child.kill('SIGTERM');
+          if (output.includes('https://login.tailscale.com')) {
+            const match = output.match(/https:\/\/login\.tailscale\.com\S+/);
+            resolve({ success: true, connected: false, loginUrl: match ? match[0] : null });
+          } else {
+            reject(new Error(`Tailscale up timed out. Output: ${output}`));
+          }
+        }
+      }, 15000);
+    });
   }
 
   async tailscaleDown() {
