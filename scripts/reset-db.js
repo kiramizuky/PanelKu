@@ -134,10 +134,10 @@ for (const r of roles) {
 }
 
 // 5. Seed default admin user
-console.log("[→] Creating default admin user (username: admin, password: admin@123456)...");
+console.log("[→] Creating default admin user (username: admin, password: Admin@123456)...");
 const adminRoleId = roles[0].id;
 const salt = bcrypt.genSaltSync(10);
-const passwordHash = bcrypt.hashSync('admin@123456', salt);
+const passwordHash = bcrypt.hashSync('Admin@123456', salt);
 
 db.prepare(`
   INSERT INTO users (id, username, email, password, role_id, first_name, last_name, is_active, created_at, updated_at)
@@ -157,5 +157,5 @@ try {
 console.log("\n========================================================");
 console.log("[✓] Database reset successfully!                        ");
 console.log("    Username: admin                                     ");
-console.log("    Password: admin@123456                                  ");
+console.log("    Password: Admin@123456                                  ");
 console.log("========================================================\n");
