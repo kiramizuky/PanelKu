@@ -63,5 +63,11 @@ router.get('/audit/logs', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController
 router.get('/security/scan', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.runSecurityScan.bind(systemController));
 router.post('/security/fix', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.fixSecurityIssue.bind(systemController));
 
+// Tailscale endpoints
+router.get('/tailscale/status', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getTailscaleStatus.bind(systemController));
+router.post('/tailscale/install', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.installTailscale.bind(systemController));
+router.post('/tailscale/up', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.tailscaleUp.bind(systemController));
+router.post('/tailscale/down', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.tailscaleDown.bind(systemController));
+
 export default router;
 

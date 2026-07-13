@@ -8,6 +8,11 @@ import { getDb } from '../../core/db/sqlite.js';
 const execAsync = util.promisify(exec);
 
 class SystemService {
+  constructor() {
+    this.mockTailscaleInstalled = false;
+    this.mockTailscaleConnected = false;
+  }
+
   async runCommand(cmd) {
     try {
       if (process.platform === 'win32') {
@@ -25,7 +30,39 @@ class SystemService {
   }
 
   mockCommand(cmd) {
+    if (cmd.includes('systemctl is-active tailscaled')) {
+      return this.mockTailscaleInstalled ? 'active\n' : 'inactive\n';
+    }
     if (cmd.includes('is-active')) return 'active\n';
+    if (cmd.includes('command -v tailscale')) {
+      return this.mockTailscaleInstalled ? '/usr/bin/tailscale\n' : '';
+    }
+    if (cmd.includes('tailscale status')) {
+      if (this.mockTailscaleConnected) {
+        return '100.100.100.100  my-panelku-server  user@  linux  active\n';
+      } else {
+        return 'Logged out.\n';
+      }
+    }
+    if (cmd.includes('tailscale ip -4')) {
+      return this.mockTailscaleConnected ? '100.100.100.100\n' : '';
+    }
+    if (cmd.includes('tailscale up')) {
+      if (cmd.includes('--authkey')) {
+        this.mockTailscaleConnected = true;
+        return 'Success.\n';
+      } else {
+        return 'To authenticate, visit:\n\nhttps://login.tailscale.com/a/1234567890\n';
+      }
+    }
+    if (cmd.includes('tailscale down')) {
+      this.mockTailscaleConnected = false;
+      return 'Logged out.\n';
+    }
+    if (cmd.includes('tailscale.com/install.sh')) {
+      this.mockTailscaleInstalled = true;
+      return 'Tailscale installed successfully.\n';
+    }
     if (cmd.includes('apt update') || cmd.includes('pacman -Sy') || cmd.includes('dnf check-update') || cmd.includes('emerge --sync') || cmd.includes('mock update')) {
       return 'Reading package lists... Done\nBuilding dependency tree... Done\nAll packages are up to date.\n';
     }
@@ -35,14 +72,92 @@ class SystemService {
     return 'Command executed successfully (mock)';
   }
 
+  async isTailscaleInstalled() {
+    try {
+      const out = await this.runCommand('command -v tailscale');
+      return out.trim().length > 0;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async getTailscaleStatus() {
+    const installed = await this.isTailscaleInstalled();
+    if (!installed) {
+      return { installed: false, status: 'not_installed', ip: null, loginUrl: null };
+    }
+
+    const isActive = await this.getServiceStatus('tailscaled');
+    
+    let isConnected = false;
+    let ip = null;
+    let loginUrl = null;
+
+    try {
+      const statusOut = await this.runCommand('sudo tailscale status');
+      if (statusOut.includes('Logged out') || statusOut.includes('No connection')) {
+        isConnected = false;
+      } else {
+        isConnected = true;
+        const ipOut = await this.runCommand('sudo tailscale ip -4');
+        ip = ipOut.trim();
+      }
+    } catch (err) {
+      isConnected = false;
+    }
+
+    return {
+      installed: true,
+      serviceActive: isActive,
+      connected: isConnected,
+      ip,
+      loginUrl
+    };
+  }
+
+  async installTailscale() {
+    logger.info('Installing Tailscale...');
+    const out = await this.runCommand('curl -fsSL https://tailscale.com/install.sh | sh');
+    await this.runCommand('sudo systemctl enable --now tailscaled').catch(() => {});
+    return out;
+  }
+
+  async tailscaleUp(authkey = '') {
+    logger.info('Starting Tailscale up...');
+    let cmd = 'sudo tailscale up';
+    if (authkey) {
+      cmd += ` --authkey=${authkey}`;
+    }
+    
+    try {
+      const out = await this.runCommand(cmd);
+      if (out.includes('https://login.tailscale.com')) {
+        const match = out.match(/https:\/\/login\.tailscale\.com\S+/);
+        return { success: true, connected: false, loginUrl: match ? match[0] : null };
+      }
+      return { success: true, connected: true, loginUrl: null };
+    } catch (err) {
+      if (err.message.includes('https://login.tailscale.com')) {
+        const match = err.message.match(/https:\/\/login\.tailscale\.com\S+/);
+        return { success: true, connected: false, loginUrl: match ? match[0] : null };
+      }
+      throw err;
+    }
+  }
+
+  async tailscaleDown() {
+    logger.info('Stopping Tailscale down...');
+    await this.runCommand('sudo tailscale down');
+    return true;
+  }
+
   async getServiceStatus(serviceName) {
-    // Validate service name to prevent command injection
     if (!/^[a-zA-Z0-9_-]+$/.test(serviceName)) throw new Error('Invalid service name');
     try {
       const out = await this.runCommand(`systemctl is-active ${serviceName}`);
       return out.trim() === 'active';
     } catch (e) {
-      return false; // inactive or not found
+      return false; 
     }
   }
 

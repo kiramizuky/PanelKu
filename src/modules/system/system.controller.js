@@ -295,6 +295,43 @@ class SystemController {
       return errorResponse(res, error, 500);
     }
   }
+
+  async getTailscaleStatus(req, res) {
+    try {
+      const status = await systemService.getTailscaleStatus();
+      return success(res, status);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async installTailscale(req, res) {
+    try {
+      await systemService.installTailscale();
+      return success(res, null, 'Tailscale installed successfully');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async tailscaleUp(req, res) {
+    try {
+      const { authkey } = req.body;
+      const result = await systemService.tailscaleUp(authkey);
+      return success(res, result, 'Tailscale up command executed');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async tailscaleDown(req, res) {
+    try {
+      await systemService.tailscaleDown();
+      return success(res, null, 'Tailscale down command executed successfully');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
 }
 
 export default new SystemController();

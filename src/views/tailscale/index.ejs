@@ -1,0 +1,280 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Tailscale VPN</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Secure your server and panel access using Tailscale Mesh VPN</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left Side: Status & Settings -->
+  <div class="col-12 col-md-8">
+    <div class="lp-glass-card" style="padding:30px; border-radius:16px;">
+      <div style="border-bottom:1px solid var(--glass-border); padding-bottom:15px; margin-bottom:25px; display:flex; justify-content:space-between; align-items:center;">
+        <h5 style="font-weight:700; margin:0; color:var(--text-primary);"><i class="bi bi-shield-shaded me-2 text-primary"></i>VPN Connection Details</h5>
+        <div id="statusBadgeContainer">
+          <span class="badge bg-secondary">Checking...</span>
+        </div>
+      </div>
+
+      <!-- Main Status Info -->
+      <div id="tailscaleInfoContent">
+        <div class="text-center py-5">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="text-muted mt-3">Loading Tailscale status information...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Installation & Helper Instructions -->
+  <div class="col-12 col-md-4">
+    <!-- Tailscale Installation Card -->
+    <div class="lp-glass-card mb-4" id="installationCard" style="padding:25px; border-radius:16px;">
+      <h5 style="font-weight:700; color:var(--text-primary); margin-bottom:15px;"><i class="bi bi-download me-2 text-info"></i>Tailscale Client</h5>
+      <p style="color:var(--text-muted); font-size:13px; line-height:1.6;">
+        Tailscale must be installed on the host system to secure connections. Check the status or install the official package.
+      </p>
+      
+      <div id="installStatusContainer" style="padding:12px; background:rgba(0,0,0,0.15); border-radius:8px; border:1px solid var(--glass-border); margin-bottom:20px;">
+        <span style="font-size:12px; font-weight:500; color:var(--text-secondary);">Installation Status</span>
+        <div class="mt-1" id="installStatusText" style="font-weight:600; font-size:13px;">Checking...</div>
+      </div>
+
+      <button id="btnInstall" class="btn-lp btn-lp-primary w-100" onclick="TailscalePage.install()" style="display:none;">
+        <i class="bi bi-cloud-arrow-down-fill me-2"></i> Install Tailscale
+      </button>
+    </div>
+
+    <!-- Security Information Guide -->
+    <div class="lp-glass-card" style="padding:25px; border-radius:16px;">
+      <h5 style="font-weight:700; color:var(--text-primary); margin-bottom:15px;"><i class="bi bi-info-circle me-2 text-warning"></i>Security Advice</h5>
+      <ul class="text-muted" style="font-size:12.5px; padding-left:20px; line-height:1.7; margin:0;">
+        <li class="mb-2">Using Tailscale lets you access your PanelKu instance privately using Tailscale IP (e.g. <code>100.x.y.z</code>).</li>
+        <li class="mb-2">Once configured, you can disable public ports (like <code>80</code>, <code>443</code>, or <code>22</code>) in the <a href="/firewall" class="text-info" style="text-decoration:none;">Firewall settings</a> for ultimate security.</li>
+        <li>Ensure you authenticate using a Reusable Auth Key from the Tailscale Admin Console for non-interactive setups.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  const TailscalePage = {
+    status: null,
+
+    async init() {
+      await this.refreshStatus();
+    },
+
+    async refreshStatus() {
+      try {
+        const res = await fetch('/api/system/tailscale/status');
+        const data = await res.json();
+        
+        if (data.success) {
+          this.status = data.data;
+          this.render();
+        } else {
+          this.showError(data.message || 'Failed to fetch status');
+        }
+      } catch (err) {
+        this.showError('Connection error');
+      }
+    },
+
+    showError(msg) {
+      document.getElementById('tailscaleInfoContent').innerHTML = `
+        <div class="alert alert-danger" role="alert">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i> ${msg}
+        </div>
+      `;
+    },
+
+    render() {
+      const infoContainer = document.getElementById('tailscaleInfoContent');
+      const badgeContainer = document.getElementById('statusBadgeContainer');
+      const installStatusText = document.getElementById('installStatusText');
+      const btnInstall = document.getElementById('btnInstall');
+
+      if (!this.status.installed) {
+        badgeContainer.innerHTML = '<span class="badge bg-danger">Not Installed</span>';
+        installStatusText.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i> Not Detected</span>';
+        btnInstall.style.display = 'block';
+
+        infoContainer.innerHTML = `
+          <div class="text-center py-5">
+            <i class="bi bi-shield-slash text-muted" style="font-size:3rem; opacity:0.5;"></i>
+            <h4 class="mt-3 text-white">Tailscale Client is Not Installed</h4>
+            <p class="text-muted" style="max-width:450px; margin:10px auto 25px;">
+              Install Tailscale on this host to configure a secure private network tunnel.
+            </p>
+            <button class="btn-lp btn-lp-primary" onclick="TailscalePage.install()" style="padding:10px 24px;">
+              <i class="bi bi-download me-2"></i> Start Automatic Installation
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      btnInstall.style.display = 'none';
+      installStatusText.innerHTML = '<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> Installed</span>';
+
+      if (this.status.connected) {
+        badgeContainer.innerHTML = '<span class="badge bg-success">Connected</span>';
+        infoContainer.innerHTML = `
+          <div class="row g-4 align-items-center">
+            <div class="col-12 col-md-4 text-center border-end border-secondary" style="border-color: rgba(255,255,255,0.1) !important;">
+              <i class="bi bi-shield-check text-success" style="font-size:4rem; filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.3));"></i>
+              <h5 class="mt-3 text-white">VPN Connected</h5>
+              <div class="text-success font-monospace mt-1" style="font-weight:600; font-size:15px;">${this.status.ip}</div>
+            </div>
+            <div class="col-12 col-md-8 px-4">
+              <h6 class="text-white mb-3" style="font-weight:600;">Connection Details</h6>
+              <table class="table table-borderless text-white-50 text-xs" style="font-size:13px;">
+                <tr>
+                  <td style="width:30%; padding: 6px 0;">Service State:</td>
+                  <td class="text-white" style="padding: 6px 0;"><span class="pulse-dot"></span> Active (tailscaled)</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0;">IPv4 Address:</td>
+                  <td class="text-white font-monospace" style="padding: 6px 0;">${this.status.ip}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0;">Access Restriction:</td>
+                  <td class="text-white" style="padding: 6px 0;">You can now securely access this panel over Tailscale.</td>
+                </tr>
+              </table>
+              <div class="mt-4">
+                <button class="btn-lp btn-lp-danger" onclick="TailscalePage.disconnect()" style="padding: 8px 20px;">
+                  <i class="bi bi-power me-2"></i> Disconnect VPN
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        badgeContainer.innerHTML = '<span class="badge bg-warning text-dark">Disconnected</span>';
+        infoContainer.innerHTML = `
+          <div class="row g-4 align-items-center">
+            <div class="col-12 col-md-4 text-center border-end border-secondary" style="border-color: rgba(255,255,255,0.1) !important;">
+              <i class="bi bi-shield-exclamation text-warning" style="font-size:4rem;"></i>
+              <h5 class="mt-3 text-white">Disconnected</h5>
+              <p class="text-muted text-xs mt-1" style="font-size:12px;">Not joined to any Tailnet</p>
+            </div>
+            <div class="col-12 col-md-8 px-4">
+              <h6 class="text-white mb-3" style="font-weight:600;">Connect to Tailscale Network</h6>
+              
+              <div id="authAlert" class="alert alert-info py-2" style="display:none; font-size:12.5px; background:rgba(14, 165, 233, 0.15); color:#bae6fd; border:1px solid rgba(14, 165, 233, 0.25);">
+                <i class="bi bi-info-circle-fill me-2"></i> Please authenticate using the URL below:
+                <div class="mt-2"><a id="authLink" href="#" target="_blank" class="btn btn-sm btn-info text-dark" style="font-size:11px; font-weight:600;">Log In / Authenticate</a></div>
+              </div>
+
+              <div id="connectForm">
+                <div class="mb-3">
+                  <label class="lp-label" style="font-size:11px;">Tailscale Auth Key (Optional)</label>
+                  <input type="text" id="authKeyInput" class="lp-input" placeholder="tskey-auth-..." style="height:36px;">
+                  <div class="form-text text-muted" style="font-size:11px;">
+                    Provide an auth key for automated/headless connection, or leave blank to authenticate via web browser.
+                  </div>
+                </div>
+                <div class="d-flex gap-2">
+                  <button id="btnConnect" class="btn-lp btn-lp-primary" onclick="TailscalePage.connect()" style="padding: 8px 24px;">
+                    <i class="bi bi-play-fill me-1"></i> Connect / Authenticate
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    },
+
+    async install() {
+      const btn = document.getElementById('btnInstall');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Installing...';
+      }
+
+      try {
+        const res = await fetch('/api/system/tailscale/install', { method: 'POST' });
+        const data = await res.json();
+        
+        if (data.success) {
+          alert('Tailscale installation initiated successfully!');
+        } else {
+          alert('Error during installation: ' + data.message);
+        }
+      } catch (err) {
+        alert('Failed to connect to the server');
+      } finally {
+        await this.refreshStatus();
+      }
+    },
+
+    async connect() {
+      const authKey = document.getElementById('authKeyInput')?.value || '';
+      const btnConnect = document.getElementById('btnConnect');
+      
+      if (btnConnect) {
+        btnConnect.disabled = true;
+        btnConnect.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Connecting...';
+      }
+
+      try {
+        const res = await fetch('/api/system/tailscale/up', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authkey: authKey })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          if (data.data.loginUrl) {
+            const authAlert = document.getElementById('authAlert');
+            const authLink = document.getElementById('authLink');
+            if (authAlert && authLink) {
+              authLink.href = data.data.loginUrl;
+              authAlert.style.display = 'block';
+            }
+          } else {
+            alert('Tailscale connected successfully!');
+          }
+        } else {
+          alert('Failed to run Tailscale: ' + data.message);
+        }
+      } catch (err) {
+        alert('Connection error');
+      } finally {
+        if (btnConnect) {
+          btnConnect.disabled = false;
+          btnConnect.innerHTML = '<i class="bi bi-play-fill me-1"></i> Connect / Authenticate';
+        }
+        await this.refreshStatus();
+      }
+    },
+
+    async disconnect() {
+      if (!confirm('Are you sure you want to disconnect from Tailscale VPN?')) return;
+
+      try {
+        const res = await fetch('/api/system/tailscale/down', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+          alert('Tailscale VPN disconnected successfully!');
+        } else {
+          alert('Error: ' + data.message);
+        }
+      } catch (err) {
+        alert('Connection error');
+      } finally {
+        await this.refreshStatus();
+      }
+    }
+  };
+
+  // Init page status
+  document.addEventListener('DOMContentLoaded', () => {
+    TailscalePage.init();
+  });
+</script>
