@@ -72,6 +72,7 @@
 <script>
   const TailscalePage = {
     status: null,
+    loginUrl: null,
 
     async init() {
       await this.refreshStatus();
@@ -83,6 +84,9 @@
 
         if (data && data.success) {
           this.status = data.data;
+          if (this.status.connected) {
+            this.loginUrl = null;
+          }
           this.render();
         } else {
           this.showError((data && data.message) || 'Failed to fetch status');
@@ -174,9 +178,9 @@
             <div class="col-12 col-md-8 px-4">
               <h6 class="text-white mb-3" style="font-weight:600;">Connect to Tailscale Network</h6>
               
-              <div id="authAlert" class="alert alert-info py-2" style="display:none; font-size:12.5px; background:rgba(14, 165, 233, 0.15); color:#bae6fd; border:1px solid rgba(14, 165, 233, 0.25);">
+              <div id="authAlert" class="alert alert-info py-2" style="display: ${this.loginUrl ? 'block' : 'none'}; font-size:12.5px; background:rgba(14, 165, 233, 0.15); color:#bae6fd; border:1px solid rgba(14, 165, 233, 0.25);">
                 <i class="bi bi-info-circle-fill me-2"></i> Please authenticate using the URL below:
-                <div class="mt-2"><a id="authLink" href="#" target="_blank" class="btn btn-sm btn-info text-dark" style="font-size:11px; font-weight:600;">Log In / Authenticate</a></div>
+                <div class="mt-2"><a id="authLink" href="${this.loginUrl || '#'}" target="_blank" class="btn btn-sm btn-info text-dark" style="font-size:11px; font-weight:600;">Log In / Authenticate</a></div>
               </div>
 
               <div id="connectForm">
@@ -235,12 +239,9 @@
 
         if (data && data.success) {
           if (data.data && data.data.loginUrl) {
-            const authAlert = document.getElementById('authAlert');
-            const authLink = document.getElementById('authLink');
-            if (authAlert && authLink) {
-              authLink.href = data.data.loginUrl;
-              authAlert.style.display = 'block';
-            }
+            this.loginUrl = data.data.loginUrl;
+            this.render();
+            window.open(this.loginUrl, '_blank');
           } else {
             await LP.alert('Tailscale connected successfully!', 'Tailscale');
           }
