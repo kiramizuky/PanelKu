@@ -59,4 +59,55 @@
   </div>
 </div>
 
+<!-- Node Details Modal -->
+<div class="modal fade" id="nodeDetailsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border: 1px solid rgba(255,255,255,0.1); background: rgba(20,20,25,0.98);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;"><i class="bi bi-info-circle text-primary me-2"></i>Node Details: <span id="detailNodeName">...</span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding: 24px; max-height: 80vh; overflow-y: auto;">
+        
+        <!-- System Details Section -->
+        <h6 class="text-white border-bottom border-secondary pb-2 mb-3" style="font-size: 13px; font-weight: 700; letter-spacing: 0.5px;">SYSTEM INFORMATION</h6>
+        <div class="row g-3 mb-4" id="detailSystemInfo">
+          <div class="col-12 text-center text-muted">No system info fetched yet. Node must be online.</div>
+        </div>
+
+        <!-- Network Interface Section -->
+        <h6 class="text-white border-bottom border-secondary pb-2 mb-3" style="font-size: 13px; font-weight: 700; letter-spacing: 0.5px;">NETWORK INTERFACES</h6>
+        <div class="row g-3 mb-4" id="detailNetworkInfo">
+          <div class="col-12 text-center text-muted">No network interfaces info.</div>
+        </div>
+
+        <!-- Disk Mounted Section -->
+        <h6 class="text-white border-bottom border-secondary pb-2 mb-3" style="font-size: 13px; font-weight: 700; letter-spacing: 0.5px;">DISK MOUNT PATHS</h6>
+        <div class="table-responsive">
+          <table class="table table-dark table-sm table-borderless" style="background: transparent; font-size: 12px; margin: 0;">
+            <thead>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--text-muted);">
+                <th>Filesystem</th>
+                <th>Mount point</th>
+                <th>Type</th>
+                <th>Usage</th>
+                <th class="text-end">Total Size</th>
+              </tr>
+            </thead>
+            <tbody id="detailDisksInfo">
+              <tr>
+                <td colspan="5" class="text-center text-muted">No disk partition information.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/js/cluster.js?v=<%= Date.now() %>"></script>
