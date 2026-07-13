@@ -37,6 +37,7 @@ const SKIP_BODY_SCAN_PATHS = [
   '/api/ai/chat',
   '/api/system/logs',
   '/api/backup',
+  '/api/agent',     // cluster agent \u2014 metrics/log data may trigger false positives
 ];
 
 // Cache global rules to avoid DB hits on every request

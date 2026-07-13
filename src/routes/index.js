@@ -21,16 +21,20 @@ import pluginsRoutes from '../modules/plugins/plugins.routes.js';
 import whatsappRoutes from '../modules/whatsapp/whatsapp.routes.js';
 import clusterRoutes from '../modules/cluster/cluster.routes.js';
 import aiRoutes from '../modules/ai/ai.routes.js';
+import agentRoutes from '../modules/agent/agent.routes.js';
 
 const router = Router();
 
 
-// Health check
+// Health check — public endpoint, no auth required
+// Used by monitoring tools and cluster master panels for basic ping
 router.get('/health', (req, res) => {
   res.json({
+    success: true,
     status: 'ok',
-    timestamp: new Date().toISOString(),
+    panel: 'LinuxPanel',
     version: process.env.npm_package_version || '1.0.0',
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -57,5 +61,6 @@ router.use('/plugins', pluginsRoutes);
 router.use('/whatsapp', whatsappRoutes);
 router.use('/cluster', clusterRoutes);
 router.use('/ai', aiRoutes);
+router.use('/agent', agentRoutes);  // Cluster agent API — accessible via X-API-Key
 
 export default router;
