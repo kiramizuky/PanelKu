@@ -14,6 +14,7 @@
     "test": "node --experimental-vm-modules node_modules/.bin/jest"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1085.0",
     "@whiskeysockets/baileys": "^7.0.0-rc13",
     "archiver": "^7.0.1",
     "axios": "^1.7.9",

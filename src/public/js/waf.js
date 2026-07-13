@@ -2,6 +2,7 @@ const WAFPage = {
   async init() {
     await this.loadRules();
     await this.loadFail2BanLogs();
+    await this.scanSecurity();
   },
 
   async loadRules() {
@@ -94,6 +95,70 @@ const WAFPage = {
   askAILog() {
     const logs = document.getElementById('fail2banLogs').textContent;
     window.askAI("Tolong jelaskan log Fail2Ban ini dan rekomendasinya.", { logType: 'fail2ban', logText: logs });
+  },
+
+  async scanSecurity() {
+    const listEl = document.getElementById('securityAdvisorList');
+    listEl.innerHTML = '<p class="text-muted mb-0" style="font-size:13px;"><i class="spinner-border spinner-border-sm me-1"></i> Scanning system security configuration...</p>';
+    
+    try {
+      const res = await LP.get('/system/security/scan');
+      if (res?.success && res.data) {
+        const score = res.data.score;
+        const issues = res.data.issues;
+        
+        const scoreTextEl = document.getElementById('securityScoreText');
+        scoreTextEl.textContent = score;
+        
+        const ringEl = document.getElementById('securityScoreRing');
+        if (score >= 90) {
+          ringEl.style.borderColor = 'var(--accent-success)';
+          scoreTextEl.style.color = 'var(--accent-success)';
+        } else if (score >= 70) {
+          ringEl.style.borderColor = 'var(--accent-warning)';
+          scoreTextEl.style.color = 'var(--accent-warning)';
+        } else {
+          ringEl.style.borderColor = 'var(--accent-danger)';
+          scoreTextEl.style.color = 'var(--accent-danger)';
+        }
+        
+        if (issues.length === 0) {
+          listEl.innerHTML = '<p class="text-muted mb-0" style="font-size:13px;"><i class="bi bi-check2-circle text-success me-1"></i> No security vulnerabilities found. Your server is well-configured!</p>';
+        } else {
+          listEl.innerHTML = issues.map(issue => `
+            <div class="d-flex justify-content-between align-items-center p-2 rounded mb-2" style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05);">
+              <div>
+                <span class="d-block" style="font-size:12.5px; font-weight:600; color:#fff;">
+                  <span class="badge bg-${issue.severity === 'danger' ? 'danger' : 'warning'} me-1" style="font-size:9px;">${issue.severity.toUpperCase()}</span>
+                  ${issue.title}
+                </span>
+                <small class="text-muted d-block" style="font-size:11px; margin-top:2px;">${issue.description}</small>
+                <small class="text-info d-block" style="font-size:11px; margin-top:2px;"><i class="bi bi-lightbulb"></i> Recommendation: ${issue.recommendation}</small>
+              </div>
+              ${issue.fixable ? `
+                <button class="btn-lp btn-lp-primary btn-lp-sm" style="font-size:11px; padding:4px 8px; height: 28px;" onclick="WAFPage.fixIssue('${issue.id}')"><i class="bi bi-wrench"></i> Fix</button>
+              ` : ''}
+            </div>
+          `).join('');
+        }
+      }
+    } catch (e) {
+      listEl.innerHTML = '<p class="text-danger mb-0" style="font-size:13px;">Failed to execute security scan.</p>';
+    }
+  },
+
+  async fixIssue(id) {
+    try {
+      const res = await LP.post('/system/security/fix', { id });
+      if (res?.success) {
+        LP.toast(res.message || 'Issue resolved successfully', 'success');
+        this.scanSecurity();
+      } else {
+        LP.toast(res?.message || 'Failed to fix issue', 'error');
+      }
+    } catch {
+      LP.toast('Connection error', 'error');
+    }
   }
 };
 

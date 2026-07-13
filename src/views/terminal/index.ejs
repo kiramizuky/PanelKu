@@ -5,8 +5,11 @@
   </div>
 </div>
 
-<div class="lp-glass-card" style="padding: 10px; background: rgba(0,0,0,0.5);">
+<div class="lp-glass-card" style="padding: 10px; background: rgba(0,0,0,0.5); position: relative;">
   <div id="terminal" style="width: 100%; height: calc(100vh - 250px);"></div>
+  <button id="aiTerminalFixBtn" class="btn-lp btn-lp-primary d-none" style="position: absolute; bottom: 20px; right: 20px; z-index: 100; box-shadow: 0 4px 15px rgba(99,102,241,0.4);" onclick="TerminalPage.askAIFix()">
+    <i class="bi bi-robot me-1"></i> AI Fix Suggestion
+  </button>
 </div>
 
 <link href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" rel="stylesheet">

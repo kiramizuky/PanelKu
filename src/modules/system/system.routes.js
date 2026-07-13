@@ -55,5 +55,13 @@ router.post('/ssh/config', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemContro
 router.get('/php-config', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getPHPConfig.bind(systemController));
 router.post('/php-config', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.updatePHPConfig.bind(systemController));
 
+// Audit logs endpoints
+router.get('/audit/stats', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getAuditStats.bind(systemController));
+router.get('/audit/logs', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getAuditLogs.bind(systemController));
+
+// Security advisor endpoints
+router.get('/security/scan', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.runSecurityScan.bind(systemController));
+router.post('/security/fix', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.fixSecurityIssue.bind(systemController));
+
 export default router;
 

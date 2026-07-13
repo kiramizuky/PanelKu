@@ -46,6 +46,28 @@ class BackupController {
       errorResponse(res, 500, error.message);
     }
   }
+
+  async getS3Config(req, res) {
+    try {
+      const Setting = (await import('../../models/Setting.js')).default;
+      const s3Str = await Setting.get('s3_backup_config') || '{}';
+      const config = JSON.parse(s3Str);
+      successResponse(res, config);
+    } catch (error) {
+      errorResponse(res, 500, error.message);
+    }
+  }
+
+  async updateS3Config(req, res) {
+    try {
+      const Setting = (await import('../../models/Setting.js')).default;
+      const config = req.body || {};
+      await Setting.set('s3_backup_config', JSON.stringify(config), 'json');
+      successResponse(res, null, 'S3 Backup configuration updated successfully');
+    } catch (error) {
+      errorResponse(res, 500, error.message);
+    }
+  }
 }
 
 export default new BackupController();

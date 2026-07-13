@@ -58,9 +58,42 @@ class BackupService {
       }
 
       await execPromise(command);
+      this.uploadToS3(filepath).catch(() => {});
       return { success: true, file: path.basename(filepath) };
     } catch (error) {
       throw new Error(`Backup failed: ${error.message}`);
+    }
+  }
+
+  async uploadToS3(filepath) {
+    try {
+      const Setting = (await import('../../models/Setting.js')).default;
+      const s3Str = await Setting.get('s3_backup_config') || '{}';
+      const config = JSON.parse(s3Str);
+      if (!config.enabled) return;
+
+      const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+      const fs = (await import('fs')).default;
+      const fsStream = fs.createReadStream(filepath);
+
+      const s3 = new S3Client({
+        endpoint: config.endpoint || undefined,
+        region: config.region || 'us-east-1',
+        credentials: {
+          accessKeyId: config.accessKey,
+          secretAccessKey: config.secretKey
+        },
+        forcePathStyle: true
+      });
+
+      const filename = path.basename(filepath);
+      await s3.send(new PutObjectCommand({
+        Bucket: config.bucket,
+        Key: filename,
+        Body: fsStream
+      }));
+    } catch (err) {
+      console.error('Failed S3 backup upload:', err.message);
     }
   }
 

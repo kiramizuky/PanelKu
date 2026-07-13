@@ -11,6 +11,8 @@ const TerminalPage = (() => {
   let selectedOsUser = 'root';
   let loginModal = null;
 
+  let lastOutputBuffer = [];
+
   async function init() {
     await LP.init();
     if (!LP.state.accessToken) return;
@@ -57,6 +59,18 @@ const TerminalPage = (() => {
     socket.on('terminal:data', (data) => {
       if (data.sessionId === sessionId && term) {
         term.write(data.data);
+        lastOutputBuffer.push(data.data);
+        if (lastOutputBuffer.length > 50) lastOutputBuffer.shift();
+
+        const lowerData = data.data.toLowerCase();
+        if (lowerData.includes('command not found') || 
+            lowerData.includes('permission denied') || 
+            lowerData.includes('no such file or directory') || 
+            lowerData.includes('error:') || 
+            lowerData.includes('failed:')) {
+          const btn = document.getElementById('aiTerminalFixBtn');
+          if (btn) btn.classList.remove('d-none');
+        }
       }
     });
 
@@ -143,7 +157,17 @@ const TerminalPage = (() => {
     }
   }
 
-  return { init, connect };
+  function askAIFix() {
+    const textBuffer = lastOutputBuffer.join('');
+    const btn = document.getElementById('aiTerminalFixBtn');
+    if (btn) btn.classList.add('d-none');
+    window.askAI("Tolong berikan petunjuk perbaikan dan perintah solutif dari error terminal berikut ini.", {
+      logType: 'terminal_error',
+      logText: textBuffer
+    });
+  }
+
+  return { init, connect, askAIFix };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {

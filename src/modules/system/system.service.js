@@ -388,6 +388,100 @@ class SystemService {
     logger.info(`Panel auto-update set to: enabled=${config.enabled} freq=${config.frequency}`);
     return true;
   }
+
+  async getAuditStats() {
+    const db = getDb();
+    
+    const logins = db.prepare(`
+      SELECT date(created_at) as date, COUNT(*) as count 
+      FROM audit_logs 
+      WHERE action = 'login' 
+      GROUP BY date(created_at) 
+      ORDER BY date(created_at) DESC 
+      LIMIT 7
+    `).all();
+
+    const cmdCountByDate = {};
+    const cmdFreq = {};
+    const logPath = path.resolve(process.cwd(), 'storage', 'logs', 'terminal_audit.log');
+    
+    try {
+      const fs = (await import('fs/promises')).default;
+      const content = await fs.readFile(logPath, 'utf8').catch(() => '');
+      const lines = content.split('\n');
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const match = line.match(/^\[([^\]]+)\]\s+User:\s+([^\s|]+)\s+\|\s+Command:\s+(.+)$/);
+        if (match) {
+          const dateStr = match[1].split('T')[0];
+          cmdCountByDate[dateStr] = (cmdCountByDate[dateStr] || 0) + 1;
+          
+          const fullCmd = match[3].trim();
+          const baseCmd = fullCmd.split(' ')[0];
+          cmdFreq[baseCmd] = (cmdFreq[baseCmd] || 0) + 1;
+        }
+      }
+    } catch (e) {
+      logger.warn('Failed to parse terminal audit log: ' + e.message);
+    }
+
+    const sortedDates = Object.keys(cmdCountByDate).sort().reverse().slice(0, 7);
+    const terminalCmds = sortedDates.map(d => ({ date: d, count: cmdCountByDate[d] }));
+
+    const topCommands = Object.entries(cmdFreq)
+      .map(([cmd, count]) => ({ cmd, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      logins,
+      terminalCmds,
+      topCommands
+    };
+  }
+
+  async getAuditLogs(limit = 100) {
+    const db = getDb();
+    
+    const sysLogs = db.prepare(`
+      SELECT * FROM audit_logs 
+      ORDER BY created_at DESC 
+      LIMIT ?
+    `).all(limit).map(r => ({
+      type: 'system',
+      timestamp: r.created_at,
+      username: r.username,
+      action: r.action,
+      details: r.details || `${r.action} on ${r.resource || 'system'}`
+    }));
+
+    const termLogs = [];
+    const logPath = path.resolve(process.cwd(), 'storage', 'logs', 'terminal_audit.log');
+    try {
+      const fs = (await import('fs/promises')).default;
+      const content = await fs.readFile(logPath, 'utf8').catch(() => '');
+      const lines = content.split('\n');
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const match = line.match(/^\[([^\]]+)\]\s+User:\s+([^\s|]+)\s+\|\s+Command:\s+(.+)$/);
+        if (match) {
+          termLogs.push({
+            type: 'terminal',
+            timestamp: match[1],
+            username: match[2],
+            action: 'terminal_input',
+            details: match[3]
+          });
+        }
+      }
+    } catch {}
+
+    const merged = [...sysLogs, ...termLogs]
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, limit);
+
+    return { logs: merged };
+  }
 }
 
 export default new SystemService();

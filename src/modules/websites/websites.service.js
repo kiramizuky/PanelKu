@@ -185,19 +185,66 @@ class WebsiteService {
     const website = await Website.findById(id);
     if (!website || !website.gitRepo) throw new Error('Website or Git Repo not found');
     
+    const logs = [];
     try {
       const gitDir = path.join(website.rootDirectory, '.git');
+      logs.push('Starting deployment pipeline...');
+      
       try {
         await fs.access(gitDir);
-        await execAsync(`cd ${website.rootDirectory} && git pull`, { timeout: 60000 });
+        logs.push('Pulling latest commits from git repository...');
+        await execAsync(`git pull`, { cwd: website.rootDirectory, timeout: 60000 });
       } catch {
-        await execAsync(`rm -rf ${website.rootDirectory}/*`);
-        await execAsync(`git clone ${website.gitRepo} ${website.rootDirectory}`, { timeout: 60000 });
+        logs.push('Target directory is not a git repository. Cloning fresh...');
+        try {
+          const files = await fs.readdir(website.rootDirectory);
+          for (const f of files) {
+            await fs.rm(path.join(website.rootDirectory, f), { recursive: true, force: true });
+          }
+        } catch {}
+        await execAsync(`git clone ${website.gitRepo} .`, { cwd: website.rootDirectory, timeout: 120000 });
       }
-      return { success: true, message: 'Deployment successful' };
+
+      const filesInRoot = await fs.readdir(website.rootDirectory);
+      
+      if (filesInRoot.includes('package.json')) {
+        logs.push('package.json found. Installing npm dependencies...');
+        await execAsync(`npm install --no-audit --no-fund`, { cwd: website.rootDirectory, timeout: 180000 });
+        
+        try {
+          const pkgData = JSON.parse(await fs.readFile(path.join(website.rootDirectory, 'package.json'), 'utf8'));
+          if (pkgData.scripts && pkgData.scripts.build) {
+            logs.push('Build script found. Executing npm run build...');
+            await execAsync(`npm run build`, { cwd: website.rootDirectory, timeout: 180000 });
+          }
+        } catch (e) {
+          logs.push(`npm build skipped or failed: ${e.message}`);
+        }
+      }
+
+      if (filesInRoot.includes('composer.json')) {
+        logs.push('composer.json found. Running composer install...');
+        await execAsync(`composer install --no-interaction --optimize-autoloader`, { cwd: website.rootDirectory, timeout: 180000 }).catch(e => {
+          logs.push(`composer install skipped or failed: ${e.message}`);
+        });
+      }
+
+      if (filesInRoot.includes('deploy.sh')) {
+        logs.push('deploy.sh found. Executing custom deployment script...');
+        if (process.platform !== 'win32') {
+          await execAsync(`chmod +x deploy.sh`, { cwd: website.rootDirectory });
+          await execAsync(`./deploy.sh`, { cwd: website.rootDirectory, timeout: 300000 });
+        } else {
+          await execAsync(`bash deploy.sh`, { cwd: website.rootDirectory, timeout: 300000 });
+        }
+      }
+
+      logs.push('Deployment completed successfully.');
+      return { success: true, message: 'Deployment successful', logs };
     } catch (error) {
       console.error('Git deploy error:', error);
-      throw new Error('Failed to deploy from Git: ' + error.message);
+      logs.push(`Deployment failed: ${error.message}`);
+      throw new Error(`Failed to deploy from Git: ${error.message}\nLogs:\n${logs.join('\n')}`);
     }
   }
 

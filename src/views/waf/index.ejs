@@ -6,6 +6,33 @@
   <button class="btn-lp btn-lp-primary" onclick="WAFPage.showAddModal()"><i class="bi bi-shield-plus"></i> Add Rule</button>
 </div>
 
+<!-- Security Advisor Card -->
+<div class="lp-glass-card p-4 mb-4" style="border-radius:16px;">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 style="font-weight:700; margin:0; color:var(--text-primary);"><i class="bi bi-shield-lock-fill me-2 text-info"></i>Security Advisor</h5>
+    <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="WAFPage.scanSecurity()"><i class="bi bi-arrow-clockwise"></i> Scan Now</button>
+  </div>
+  
+  <div class="row g-4 align-items-center">
+    <!-- Score Gauge -->
+    <div class="col-12 col-md-3 text-center" style="border-right: 1px solid var(--glass-border);">
+      <div style="position:relative; display:inline-block;">
+        <div id="securityScoreRing" style="width: 100px; height: 100px; border-radius: 50%; border: 8px solid var(--glass-border); display: flex; align-items: center; justify-content: center; margin: 0 auto; transition: border-color 0.5s;">
+          <h2 id="securityScoreText" style="font-weight: 700; margin: 0; color: #fff;">--</h2>
+        </div>
+      </div>
+      <p class="text-muted mt-2 mb-0" style="font-size:12px;">Security Health Score</p>
+    </div>
+    
+    <!-- Issues List -->
+    <div class="col-12 col-md-9">
+      <div id="securityAdvisorList" style="display:flex; flex-direction:column; gap:10px; max-height:180px; overflow-y:auto;">
+        <p class="text-muted mb-0" style="font-size:13px;">Scanning system security configuration...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="row g-4">
   <!-- Left Side: WAF Rules -->
   <div class="col-12 col-xl-7">

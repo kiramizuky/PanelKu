@@ -2,6 +2,7 @@ import systemService from './system.service.js';
 import sshService from './ssh.service.js';
 import phpService from './php.service.js';
 import { success, errorResponse } from '../../helpers/response.js';
+import { runSecurityScan, fixSecurityIssue } from '../../helpers/security-advisor.js';
 
 class SystemController {
   async getServicesStatus(req, res) {
@@ -251,6 +252,45 @@ class SystemController {
     try {
       await phpService.updateConfig(req.body);
       return success(res, null, 'PHP-FPM configuration updated successfully');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async getAuditStats(req, res) {
+    try {
+      const stats = await systemService.getAuditStats();
+      return success(res, stats);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async getAuditLogs(req, res) {
+    try {
+      const limit = parseInt(req.query.limit) || 100;
+      const logs = await systemService.getAuditLogs(limit);
+      return success(res, logs);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async runSecurityScan(req, res) {
+    try {
+      const result = await runSecurityScan();
+      return success(res, result);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async fixSecurityIssue(req, res) {
+    try {
+      const { id } = req.body;
+      if (!id) return errorResponse(res, 'Issue ID is required', 400);
+      const result = await fixSecurityIssue(id);
+      return success(res, result, result.message);
     } catch (error) {
       return errorResponse(res, error, 500);
     }

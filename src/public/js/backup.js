@@ -116,6 +116,51 @@ const BackupPage = (() => {
     }
   }
 
+  let s3Modal;
+
+  async function showS3Modal() {
+    if (!s3Modal) s3Modal = new bootstrap.Modal(document.getElementById('s3ConfigModal'));
+    document.getElementById('s3ConfigForm').reset();
+    
+    try {
+      const res = await LP.get('/backup/s3');
+      if (res?.success && res.data) {
+        const config = res.data;
+        document.getElementById('s3Enabled').checked = config.enabled || false;
+        document.getElementById('s3Endpoint').value = config.endpoint || '';
+        document.getElementById('s3Region').value = config.region || 'us-east-1';
+        document.getElementById('s3Bucket').value = config.bucket || '';
+        document.getElementById('s3AccessKey').value = config.accessKey || '';
+        document.getElementById('s3SecretKey').value = config.secretKey || '';
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    s3Modal.show();
+  }
+
+  async function saveS3Config(e) {
+    e.preventDefault();
+    const enabled = document.getElementById('s3Enabled').checked;
+    const endpoint = document.getElementById('s3Endpoint').value;
+    const region = document.getElementById('s3Region').value;
+    const bucket = document.getElementById('s3Bucket').value;
+    const accessKey = document.getElementById('s3AccessKey').value;
+    const secretKey = document.getElementById('s3SecretKey').value;
+
+    try {
+      const res = await LP.post('/backup/s3', { enabled, endpoint, region, bucket, accessKey, secretKey });
+      if (res?.success) {
+        LP.toast('S3 Backup configuration saved successfully', 'success');
+        s3Modal.hide();
+      } else {
+        LP.toast(res?.message || 'Failed to save S3 configuration', 'error');
+      }
+    } catch (err) {
+      LP.toast('Connection error', 'error');
+    }
+  }
+
   // Initialize
   document.addEventListener('DOMContentLoaded', () => {
     loadData();
@@ -127,6 +172,8 @@ const BackupPage = (() => {
     createBackup,
     deleteBackup,
     showRestoreModal,
-    restoreBackup
+    restoreBackup,
+    showS3Modal,
+    saveS3Config
   };
 })();
