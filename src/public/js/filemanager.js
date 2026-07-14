@@ -114,7 +114,6 @@ const FMPage = (() => {
     const bulkBar = document.getElementById('fmBulkBar');
     if (bulkBar) bulkBar.style.display = 'none';
   }
-  }
 
   // ── Context Menu ──────────────────────────────────
   function showContextMenu(e, el) {
