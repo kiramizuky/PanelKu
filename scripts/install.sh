@@ -47,7 +47,25 @@ detect_os() {
   else
     error "Unsupported OS"
   fi
-  [[ "$OS" != "ubuntu" && "$OS" != "debian" ]] && warn "Non-standard OS: $OS (may work anyway)"
+
+  if command -v apt-get &>/dev/null; then
+    PM="apt"
+  elif command -v pacman &>/dev/null; then
+    PM="pacman"
+  elif command -v dnf &>/dev/null; then
+    PM="dnf"
+  elif command -v yum &>/dev/null; then
+    PM="yum"
+  elif command -v apk &>/dev/null; then
+    PM="apk"
+  elif command -v zypper &>/dev/null; then
+    PM="zypper"
+  elif command -v emerge &>/dev/null; then
+    PM="emerge"
+  else
+    warn "Unsupported package manager. Falling back to apt/standard detection."
+    PM="apt"
+  fi
 
   ARCH=$(uname -m)
   IS_64BIT=true
@@ -59,20 +77,71 @@ detect_os() {
 
 install_dependencies() {
   info "Configuring and fixing package manager..."
-  dpkg --configure -a || true
-  apt-get install -f -y || true
-
-  info "Updating package list..."
-  apt-get update -qq
+  if [ "$PM" = "apt" ]; then
+    dpkg --configure -a || true
+    apt-get install -f -y || true
+  fi
 
   info "Installing dependencies..."
-  apt-get install -y -qq curl git build-essential python3 make g++ redis-server nginx docker.io docker-compose ufw
+  case "$PM" in
+    apt)
+      apt-get update -qq
+      apt-get install -y curl git build-essential python3 make g++ redis-server nginx docker.io ufw || {
+        for pkg in curl git build-essential python3 make g++ redis-server nginx docker.io ufw; do
+          apt-get install -y -qq "$pkg" || warn "Failed to install $pkg"
+        done
+      }
+      ;;
+    pacman)
+      pacman -Sy --noconfirm
+      pacman -S --noconfirm --needed curl git base-devel python make gcc redis nginx docker ufw || {
+        for pkg in curl git base-devel python make gcc redis nginx docker ufw; do
+          pacman -S --noconfirm --needed "$pkg" || warn "Failed to install $pkg"
+        done
+      }
+      ;;
+    dnf|yum)
+      local cmd="$PM"
+      $cmd makecache || true
+      if [ "$cmd" = "yum" ] || command -v subscription-manager &>/dev/null; then
+        $cmd install -y epel-release || true
+      fi
+      $cmd install -y curl git python3 make gcc-c++ redis nginx docker ufw || {
+        for pkg in curl git python3 make gcc-c++ redis nginx docker ufw; do
+          $cmd install -y "$pkg" || warn "Failed to install $pkg"
+        done
+      }
+      ;;
+    apk)
+      apk update
+      apk add curl git build-base g++ make python3 redis nginx docker ufw || {
+        for pkg in curl git build-base g++ make python3 redis nginx docker ufw; do
+          apk add "$pkg" || warn "Failed to install $pkg"
+        done
+      }
+      ;;
+    zypper)
+      zypper refresh
+      zypper install -y gcc gcc-c++ make python3 curl git redis nginx docker ufw || {
+        for pkg in gcc gcc-c++ make python3 curl git redis nginx docker ufw; do
+          zypper install -y "$pkg" || warn "Failed to install $pkg"
+        done
+      }
+      ;;
+    emerge)
+      emerge --sync || true
+      emerge -v net-misc/curl dev-vcs/git www-servers/nginx dev-db/redis sys-devel/make sys-devel/gcc app-containers/docker net-firewall/ufw || {
+        for pkg in net-misc/curl dev-vcs/git www-servers/nginx dev-db/redis sys-devel/make sys-devel/gcc app-containers/docker net-firewall/ufw; do
+          emerge -v "$pkg" || warn "Failed to install $pkg"
+        done
+      }
+      ;;
+  esac
 
   # Install acme.sh for SSL
   if [ ! -d ~/.acme.sh ]; then
     info "Installing acme.sh..."
-    curl -s https://get.acme.sh | sh
-    log "acme.sh installed"
+    curl -s https://get.acme.sh | sh || warn "Failed to install acme.sh automatically"
   fi
 }
 
@@ -86,21 +155,69 @@ install_nodejs() {
   fi
 
   info "Installing Node.js $NODE_VERSION LTS..."
-  if [ "$IS_64BIT" = true ]; then
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
-    apt-get install -y -qq nodejs
-  else
-    warn "Non-64bit/ARM64 architecture. Installing standard nodejs package from repository..."
-    apt-get install -y -qq nodejs npm
+  local success=false
+  # Try repository / NodeSource first if 64-bit and supported PM
+  if [ "$PM" = "apt" ] && [ "$IS_64BIT" = true ]; then
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && apt-get install -y nodejs && success=true
+  elif [ "$PM" = "dnf" ] && [ "$IS_64BIT" = true ]; then
+    curl -fsSL https://rpm.nodesource.com/setup_${NODE_VERSION}.x | bash - && dnf install -y nodejs && success=true
   fi
-  log "Node.js $(node -v) installed"
+
+  if [ "$success" = false ]; then
+    case "$PM" in
+      apt) apt-get install -y nodejs npm && success=true ;;
+      pacman) pacman -S --noconfirm --needed nodejs npm && success=true ;;
+      dnf|yum) $PM install -y nodejs npm && success=true ;;
+      apk) apk add nodejs npm && success=true ;;
+      zypper) zypper install -y nodejs npm && success=true ;;
+      emerge) emerge -v net-libs/nodejs && success=true ;;
+    esac
+  fi
+
+  local check_ver=0
+  if command -v node &>/dev/null; then
+    check_ver=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+  fi
+
+  # Bulletproof fallback using official prebuilt binaries
+  if [ "$check_ver" -lt "$NODE_VERSION" ]; then
+    local node_arch=""
+    case "$ARCH" in
+      x86_64) node_arch="x64" ;;
+      aarch64|arm64) node_arch="arm64" ;;
+      armv7l) node_arch="armv7l" ;;
+    esac
+
+    if [ -n "$node_arch" ]; then
+      info "Package manager did not provide Node.js >= $NODE_VERSION. Installing official prebuilt binary..."
+      local temp_tar="/tmp/node.tar.xz"
+      case "$PM" in
+        apt) apt-get install -y tar xz-utils ;;
+        pacman) pacman -S --noconfirm --needed tar xz ;;
+        dnf|yum) $PM install -y tar xz ;;
+        apk) apk add tar xz ;;
+        zypper) zypper install -y tar xz ;;
+      esac
+      curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}.11.0/node-v${NODE_VERSION}.11.0-linux-${node_arch}.tar.xz" -o "$temp_tar" || \
+        curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}.0.0/node-v${NODE_VERSION}.0.0-linux-${node_arch}.tar.xz" -o "$temp_tar"
+      tar -xJf "$temp_tar" -C /usr/local --strip-components=1
+      rm -f "$temp_tar"
+    else
+      error "No prebuilt Node.js binary fallback available for architecture $ARCH. Installation failed."
+    fi
+  fi
+  log "Node.js $(node -v) ready"
 }
 
 install_pm2() {
   if ! command -v pm2 &>/dev/null; then
     info "Installing PM2..."
     npm install -g pm2 -q
-    pm2 startup systemd -u root --hp /root
+    if command -v systemctl &>/dev/null; then
+      pm2 startup systemd -u root --hp /root || true
+    else
+      pm2 startup || true
+    fi
     log "PM2 installed"
   else
     log "PM2 already installed"
@@ -123,16 +240,23 @@ setup_panel() {
     APP_SECRET=$(openssl rand -hex 32)
     JWT_SECRET=$(openssl rand -hex 32)
     JWT_REFRESH_SECRET=$(openssl rand -hex 32)
-    sed -i "s/change_this_to_a_very_long_random_secret_string/$APP_SECRET/" .env
-    sed -i "s/change_this_jwt_secret_very_long_random_string/$JWT_SECRET/" .env
-    sed -i "s/change_this_refresh_secret_very_long_random/$JWT_REFRESH_SECRET/" .env
+    
+    # Cross-platform sed compatibility
+    if sed --version 2>&1 | grep -q "GNU"; then
+      sed -i "s/change_this_to_a_very_long_random_secret_string/$APP_SECRET/" .env
+      sed -i "s/change_this_jwt_secret_very_long_random_string/$JWT_SECRET/" .env
+      sed -i "s/change_this_refresh_secret_very_long_random/$JWT_REFRESH_SECRET/" .env
+    else
+      sed -i "" "s/change_this_to_a_very_long_random_secret_string/$APP_SECRET/" .env
+      sed -i "" "s/change_this_jwt_secret_very_long_random_string/$JWT_SECRET/" .env
+      sed -i "" "s/change_this_refresh_secret_very_long_random/$JWT_REFRESH_SECRET/" .env
+    fi
     log "Generated secure secrets"
   fi
 
   info "Setting up storage permissions..."
   mkdir -p storage
   chmod -R 777 storage
-
 
   info "Installing npm packages..."
   npm install --production -q
