@@ -143,14 +143,6 @@ const FMPage = (() => {
         name: el.dataset.name,
         el,
       };
-
-      // Auto check the checkbox of the currently clicked item
-      const chk = el.querySelector('.fm-checkbox');
-      if (chk) {
-        // Toggling single check if clicked
-        chk.checked = !chk.checked;
-        updateBulkBar();
-      }
     }
   }
 
