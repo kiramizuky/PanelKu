@@ -8,6 +8,12 @@ class AIController {
       const { message, context = {} } = req.body;
       if (!message) return errorResponse(res, 'Message is required', 400);
 
+      // Construct rich prompt including context logs if available
+      let prompt = message;
+      if (context.logText) {
+        prompt = `${message}\n\n[Terminal/Log Context]:\n\`\`\`\n${context.logText}\n\`\`\``;
+      }
+
       // Check if user has AI settings configured with apiKey
       const aiSettings = req.user?.aiSettings || { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
       if (aiSettings.apiKey) {
@@ -27,7 +33,7 @@ class AIController {
               },
               body: JSON.stringify({
                 model: model,
-                messages: [{ role: 'user', content: message }]
+                messages: [{ role: 'user', content: prompt }]
               })
             });
             const dataApi = await resApi.json();
@@ -40,7 +46,7 @@ class AIController {
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                contents: [{ parts: [{ text: message }] }]
+                contents: [{ parts: [{ text: prompt }] }]
               })
             });
             const dataApi = await resApi.json();
@@ -56,7 +62,7 @@ class AIController {
               },
               body: JSON.stringify({
                 model: model || 'google/gemini-2.5-flash',
-                messages: [{ role: 'user', content: message }]
+                messages: [{ role: 'user', content: prompt }]
               })
             });
             const dataApi = await resApi.json();
