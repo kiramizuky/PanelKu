@@ -7,20 +7,22 @@
 
 <div class="row g-4">
   <div class="col-12 col-md-8">
-    <div class="lp-glass-card" style="padding:0;overflow-x:auto;">
-      <div class="lp-card-title" style="padding: 20px 20px 0;">Host Services</div>
-      <table class="lp-table">
-        <thead>
-          <tr>
-            <th>Service Name</th>
-            <th>Status</th>
-            <th style="text-align:right">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="servicesTableBody">
-          <tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
-        </tbody>
-      </table>
+    <div class="lp-glass-card" style="padding:0; display:flex; flex-direction:column;">
+      <div class="lp-card-title" style="padding: 20px 20px 0; flex-shrink:0;">Host Services</div>
+      <div style="overflow-x:auto; overflow-y:auto; max-height:340px; flex:1;">
+        <table class="lp-table">
+          <thead style="position:sticky; top:0; z-index:1; background:rgba(15,20,30,0.95); backdrop-filter:blur(10px);">
+            <tr>
+              <th>Service Name</th>
+              <th>Status</th>
+              <th style="text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="servicesTableBody">
+            <tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- SSH Key Manager & config -->
@@ -48,11 +50,11 @@
         </div>
 
         <!-- Keys list -->
-        <div class="col-12 col-md-8" style="padding-left: 20px;">
-          <h6 style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:15px;">Authorized SSH Keys</h6>
-          <div style="max-height: 200px; overflow-y: auto;">
+        <div class="col-12 col-md-8" style="padding-left: 20px; display:flex; flex-direction:column;">
+          <h6 style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:15px; flex-shrink:0;">Authorized SSH Keys</h6>
+          <div style="flex:1; max-height: 220px; overflow-y: auto; overflow-x:hidden;">
             <table class="w-100 text-left text-xs" style="color: var(--text-secondary);">
-              <thead>
+              <thead style="position:sticky; top:0; z-index:1; background:rgba(15,20,30,0.9); backdrop-filter:blur(8px);">
                 <tr style="border-bottom: 1px solid var(--glass-border); font-weight:600; color: var(--text-muted); height: 28px;">
                   <th style="padding-bottom:8px; width:25%;">Type</th>
                   <th style="padding-bottom:8px; width:60%;">Comment / Name</th>
@@ -96,31 +98,31 @@
   </div>
 
   <div class="col-12 col-md-4">
-    <div class="lp-glass-card mb-4" style="height:300px">
-      <div class="lp-card-title" id="pmTitle">Package Manager</div>
-      <p style="color:var(--text-muted);font-size:13px;">Update the system package repository and install available upgrades.</p>
+    <div class="lp-glass-card mb-4" style="display:flex; flex-direction:column;">
+      <div class="lp-card-title" id="pmTitle" style="flex-shrink:0;">Package Manager</div>
+      <p style="color:var(--text-muted);font-size:13px; flex-shrink:0;">Update the system package repository and install available upgrades.</p>
       
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;padding:10px;background:rgba(255,255,255,0.05);border-radius:8px; flex-shrink:0;">
         <span style="font-size:13px;font-weight:500;">Auto-Update System</span>
         <div class="form-check form-switch" style="margin:0;">
           <input class="form-check-input" type="checkbox" id="autoUpdateToggle" onchange="SystemPage.toggleAutoUpdate()" style="cursor:pointer;">
         </div>
       </div>
 
-      <button class="btn-lp btn-lp-primary w-100 mb-2" id="btnUpdate" onclick="SystemPage.runPM('update')">
+      <button class="btn-lp btn-lp-primary w-100 mb-2" id="btnUpdate" onclick="SystemPage.runPM('update')" style="flex-shrink:0;">
         <i class="bi bi-arrow-repeat"></i> Run Update
       </button>
-      <button class="btn-lp btn-lp-primary w-100" id="btnUpgrade" onclick="SystemPage.runPM('upgrade')" style="background:var(--accent-info);">
+      <button class="btn-lp btn-lp-primary w-100" id="btnUpgrade" onclick="SystemPage.runPM('upgrade')" style="background:var(--accent-info); flex-shrink:0;">
         <i class="bi bi-download"></i> Run Upgrade
       </button>
     </div>
 
-    <div class="lp-glass-card d-flex flex-column justify-content-between" style="height:300px">
-      <div>
+    <div class="lp-glass-card d-flex flex-column justify-content-between">
+      <div style="flex-shrink:0;">
         <div class="lp-card-title">Power & Maintenance</div>
         <p style="color:var(--text-muted);font-size:13px;">Manage server power state or restart the panel application.</p>
       </div>
-      <div>
+      <div style="flex-shrink:0;">
         <button class="btn-lp w-100 mb-2" onclick="SystemPage.restartPanel()" style="background:rgba(56, 189, 248, 0.2);color:#38bdf8;border:1px solid rgba(56, 189, 248, 0.3);border-radius:10px;padding:10px;font-weight:600;">
           <i class="bi bi-arrow-clockwise"></i> Restart Panel
         </button>
