@@ -7,7 +7,7 @@ export const registerDockerSocket = (namespace) => {
     logger.debug(`Docker WS connected: ${socket.id}`);
     
     // Check permission
-    const hasPerm = await PermissionManager.checkPermission(socket.user.role, 'docker_manage', 'read');
+    const hasPerm = PermissionManager.userCan(socket.user, 'docker_manage', 'read');
     if (!hasPerm) {
       return socket.disconnect(true);
     }

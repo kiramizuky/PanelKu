@@ -58,6 +58,10 @@ detect_os() {
 }
 
 install_dependencies() {
+  info "Configuring and fixing package manager..."
+  dpkg --configure -a || true
+  apt-get install -f -y || true
+
   info "Updating package list..."
   apt-get update -qq
 
