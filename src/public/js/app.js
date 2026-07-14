@@ -15,6 +15,7 @@ const LP = {
     user: null,
     accessToken: null,
     sidebarCollapsed: localStorage.getItem('lp_sidebar_collapsed') === 'true',
+    refreshPromise: null,
   },
 
   // ── Init ──────────────────────────────────────────────
@@ -105,19 +106,29 @@ const LP = {
   },
 
   async refreshToken() {
-    try {
-      const res = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (data?.success) {
-        this.state.accessToken = data.data.accessToken;
-        localStorage.setItem('lp_token', data.data.accessToken);
-        return true;
-      }
-    } catch { }
-    return false;
+    if (this.state.refreshPromise) {
+      return this.state.refreshPromise;
+    }
+
+    this.state.refreshPromise = (async () => {
+      try {
+        const res = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'include',
+        });
+        const data = await res.json();
+        if (data?.success) {
+          this.state.accessToken = data.data.accessToken;
+          localStorage.setItem('lp_token', data.data.accessToken);
+          return true;
+        }
+      } catch { }
+      return false;
+    })();
+
+    const result = await this.state.refreshPromise;
+    this.state.refreshPromise = null;
+    return result;
   },
 
   async fetchProfile() {
