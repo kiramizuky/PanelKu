@@ -326,6 +326,104 @@ const FMPage = (() => {
     else LP.toast(res?.message || 'Upload failed', 'error');
   }
 
+  let selectedUploadFiles = [];
+
+  function showUploadModal() {
+    selectedUploadFiles = [];
+    document.getElementById('modalUploadFilesList').innerHTML = '';
+    document.getElementById('btnStartUpload').disabled = true;
+    document.getElementById('modalFileInput').value = '';
+    
+    const modalEl = document.getElementById('uploadModal');
+    const uModal = new bootstrap.Modal(modalEl);
+    uModal.show();
+
+    // Hook drag-drop events specifically for the modal zone
+    const zone = document.getElementById('modalDragZone');
+    if (zone) {
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.style.borderColor = 'var(--accent-primary)';
+        zone.style.background = 'rgba(59,130,246,0.1)';
+      });
+      zone.addEventListener('dragleave', () => {
+        zone.style.borderColor = 'rgba(255,255,255,0.15)';
+        zone.style.background = 'rgba(0,0,0,0.15)';
+      });
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.style.borderColor = 'rgba(255,255,255,0.15)';
+        zone.style.background = 'rgba(0,0,0,0.15)';
+        if (e.dataTransfer.files.length) {
+          handleSelectedUploads(e.dataTransfer.files);
+        }
+      });
+    }
+  }
+
+  function handleSelectedUploads(files) {
+    if (!files || files.length === 0) return;
+    for (const f of files) {
+      // Avoid duplication
+      if (!selectedUploadFiles.some(existing => existing.name === f.name && existing.size === f.size)) {
+        selectedUploadFiles.push(f);
+      }
+    }
+    renderSelectedUploadsQueue();
+  }
+
+  function renderSelectedUploadsQueue() {
+    const list = document.getElementById('modalUploadFilesList');
+    const btn = document.getElementById('btnStartUpload');
+    if (!list) return;
+
+    if (selectedUploadFiles.length === 0) {
+      list.innerHTML = '';
+      if (btn) btn.disabled = true;
+      return;
+    }
+
+    if (btn) btn.disabled = false;
+
+    list.innerHTML = selectedUploadFiles.map((f, index) => `
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display:flex; flex-direction:column; overflow:hidden; max-width: 80%;">
+          <span class="text-white text-truncate" style="font-size: 12.5px; font-weight: 500;">${escHtml(f.name)}</span>
+          <span style="font-size: 10px; color: var(--text-muted);">${LP.formatBytes(f.size)}</span>
+        </div>
+        <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FMPage.removeSelectedUpload(${index})" style="width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center; border-radius: 6px; color:#ef4444;" title="Remove">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    `).join('');
+  }
+
+  function removeSelectedUpload(index) {
+    selectedUploadFiles.splice(index, 1);
+    renderSelectedUploadsQueue();
+  }
+
+  async function startSelectedUploads() {
+    if (selectedUploadFiles.length === 0) return;
+    const btn = document.getElementById('btnStartUpload');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Uploading...';
+    }
+
+    try {
+      await upload(selectedUploadFiles);
+      bootstrap.Modal.getInstance(document.getElementById('uploadModal'))?.hide();
+    } catch (e) {
+      LP.toast('Upload failed: ' + e.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-upload me-1"></i> Start Upload';
+      }
+    }
+  }
+
   async function downloadSelected() {
     if (!selectedItem) return;
     window.open(`/api/filemanager/download?path=${encodeURIComponent(selectedItem.path)}&token=${LP.state.accessToken}`, '_blank');
@@ -402,6 +500,10 @@ const FMPage = (() => {
     moveSelected,
     mkdir,
     upload,
+    showUploadModal,
+    handleSelectedUploads,
+    removeSelectedUpload,
+    startSelectedUploads,
     downloadSelected,
     zipSelected,
     showContextMenu,
