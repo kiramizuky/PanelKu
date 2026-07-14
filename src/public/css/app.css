@@ -199,6 +199,26 @@ body {
   overflow-x: hidden;
 }
 
+/* Light mode specific background and navbar override */
+.light-mode {
+  background-image: url('/images/bg1.png') !important;
+}
+
+.light-mode .lp-top-navbar {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.light-mode .lp-brand {
+  color: #111827 !important;
+}
+
+.light-mode .lp-nav-link:hover, 
+.light-mode .lp-nav-link.active {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #111827 !important;
+}
+
 .text-muted {
   color: var(--text-muted) !important;
 }
