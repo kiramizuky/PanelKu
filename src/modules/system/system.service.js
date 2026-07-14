@@ -163,7 +163,11 @@ class SystemService {
 
   async tailscaleUp(authkey = '') {
     logger.info('Starting Tailscale up...');
-    let cmd = 'sudo tailscale up';
+    
+    // Check if we are running as root to avoid sudo command wrapping errors
+    const isRoot = process.getuid ? (process.getuid() === 0) : true;
+    let cmd = isRoot ? 'tailscale up' : 'sudo tailscale up';
+    
     if (authkey) {
       cmd += ` --authkey=${authkey}`;
     }
@@ -178,13 +182,8 @@ class SystemService {
     }
     
     return new Promise((resolve, reject) => {
-      const args = ['tailscale', 'up'];
-      if (authkey) {
-        args.push(`--authkey=${authkey}`);
-      }
-
-      // Spawn with shell to handle sudo wrapping cleanly
-      const child = spawn('sudo', args, { shell: true });
+      // Spawn with a single command line string when shell: true is enabled
+      const child = spawn(cmd, { shell: true });
       let output = '';
       let resolved = false;
 
@@ -210,7 +209,7 @@ class SystemService {
         if (code === 0) {
           resolve({ success: true, connected: true, loginUrl: null });
         } else {
-          reject(new Error(`Tailscale failed with exit code ${code}. Output: ${output}`));
+          reject(new Error(`Tailscale failed with exit code ${code}. Output: ${output.trim()}`));
         }
       });
 
@@ -228,7 +227,7 @@ class SystemService {
             const match = output.match(/https:\/\/login\.tailscale\.com\S+/);
             resolve({ success: true, connected: false, loginUrl: match ? match[0] : null });
           } else {
-            reject(new Error(`Tailscale up timed out. Output: ${output}`));
+            reject(new Error(`Tailscale up timed out. Output: ${output.trim()}`));
           }
         }
       }, 15000);

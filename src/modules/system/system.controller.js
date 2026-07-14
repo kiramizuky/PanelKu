@@ -292,7 +292,7 @@ class SystemController {
       const result = await fixSecurityIssue(id);
       return success(res, result, result.message);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -301,7 +301,7 @@ class SystemController {
       const status = await systemService.getTailscaleStatus();
       return success(res, status);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -310,7 +310,7 @@ class SystemController {
       await systemService.installTailscale();
       return success(res, null, 'Tailscale installed successfully');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -320,7 +320,7 @@ class SystemController {
       const result = await systemService.tailscaleUp(authkey);
       return success(res, result, 'Tailscale up command executed');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message, 500);
     }
   }
 
@@ -329,7 +329,7 @@ class SystemController {
       await systemService.tailscaleDown();
       return success(res, null, 'Tailscale down command executed successfully');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message, 500);
     }
   }
 }
