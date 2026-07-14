@@ -200,7 +200,7 @@ body {
 }
 
 /* Light mode specific background and navbar override */
-.light-mode {
+html.light-mode body {
   background-image: url('/images/bg1.png') !important;
 }
 

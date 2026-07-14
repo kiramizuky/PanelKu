@@ -76,6 +76,9 @@ const FMPage = (() => {
     if (viewMode === 'list') {
       html += `
         <div class="fm-header-row" style="display:flex; align-items:center; gap:12px; padding:6px 12px; border-bottom:1px solid var(--glass-border); font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">
+          <div style="width:18px; display:flex; align-items:center; justify-content:center;">
+            <input type="checkbox" id="selectAllCheckbox" onclick="FMPage.toggleSelectAll(this)" style="width:14px; height:14px; cursor:pointer;">
+          </div>
           <div style="width:18px;"></div>
           <div style="flex:1;">Name</div>
           <div style="width:80px;">Permissions</div>
@@ -90,10 +93,13 @@ const FMPage = (() => {
         data-path="${escHtml(item.path)}"
         data-type="${item.type}"
         data-name="${escHtml(item.name)}"
-        onclick="FMPage.selectItem(this)"
+        onclick="FMPage.selectItem(this, event)"
         ondblclick="FMPage.openItem(this)"
         oncontextmenu="FMPage.showContextMenu(event, this)"
         title="${escHtml(item.path)}">
+        <div class="fm-checkbox-wrapper" onclick="event.stopPropagation()">
+          <input type="checkbox" class="fm-checkbox" data-path="${escHtml(item.path)}" onchange="FMPage.updateBulkBar()" style="margin:0;">
+        </div>
         <div class="fm-item-icon">${getIcon(item)}</div>
         <div class="fm-item-name">${escHtml(item.name)}</div>
         <div class="fm-item-permissions font-mono">${item.permissions || '-'}</div>
@@ -103,6 +109,11 @@ const FMPage = (() => {
     `).join('');
 
     grid.innerHTML = html;
+    
+    // Hide bulk bar on every navigate/refresh
+    const bulkBar = document.getElementById('fmBulkBar');
+    if (bulkBar) bulkBar.style.display = 'none';
+  }
   }
 
   // ── Context Menu ──────────────────────────────────
@@ -118,7 +129,12 @@ const FMPage = (() => {
     document.addEventListener('click', () => { menu.style.display = 'none'; }, { once: true });
   }
 
-  function selectItem(el) {
+  function selectItem(el, e = null) {
+    // If user clicks directly on input or checkbox wrapper, don't trigger normal single select
+    if (e && (e.target.classList.contains('fm-checkbox') || e.target.closest('.fm-checkbox-wrapper'))) {
+      return;
+    }
+
     document.querySelectorAll('.fm-item.selected').forEach(i => i.classList.remove('selected'));
     if (el) {
       el.classList.add('selected');
@@ -128,7 +144,137 @@ const FMPage = (() => {
         name: el.dataset.name,
         el,
       };
+
+      // Auto check the checkbox of the currently clicked item
+      const chk = el.querySelector('.fm-checkbox');
+      if (chk) {
+        // Toggling single check if clicked
+        chk.checked = !chk.checked;
+        updateBulkBar();
+      }
     }
+  }
+
+  function updateBulkBar() {
+    const checkboxes = document.querySelectorAll('.fm-checkbox:checked');
+    const bulkBar = document.getElementById('fmBulkBar');
+    const countSpan = document.getElementById('bulkSelectedCount');
+    
+    if (checkboxes.length > 0) {
+      if (bulkBar) bulkBar.style.display = 'flex';
+      if (countSpan) countSpan.textContent = checkboxes.length;
+    } else {
+      if (bulkBar) bulkBar.style.display = 'none';
+    }
+
+    // Toggle active background visual class for checked parent items
+    document.querySelectorAll('.fm-item').forEach(item => {
+      const chk = item.querySelector('.fm-checkbox');
+      if (chk && chk.checked) {
+        item.classList.add('selected');
+      } else if (selectedItem?.path !== item.dataset.path) {
+        item.classList.remove('selected');
+      }
+    });
+  }
+
+  function toggleSelectAll(masterChk) {
+    const isChecked = masterChk.checked;
+    document.querySelectorAll('.fm-checkbox').forEach(chk => {
+      chk.checked = isChecked;
+    });
+    updateBulkBar();
+  }
+
+  // ── Bulk Actions Implementations ───────────────────
+  function getSelectedPaths() {
+    return Array.from(document.querySelectorAll('.fm-checkbox:checked')).map(chk => chk.dataset.path);
+  }
+
+  async function bulkCompress() {
+    const paths = getSelectedPaths();
+    if (paths.length === 0) return;
+    const output = currentPath + '/archive-' + Date.now() + '.zip';
+    
+    LP.toast('Compressing files...', 'info');
+    
+    // Process compression sequentially or via bulk API
+    let successCount = 0;
+    for (const p of paths) {
+      try {
+        const itemOutput = p + '.zip';
+        const res = await LP.post('/filemanager/zip', { path: p, output: itemOutput });
+        if (res?.success) successCount++;
+      } catch {}
+    }
+
+    LP.toast(`Compressed ${successCount}/${paths.length} items.`, 'success');
+    refresh();
+  }
+
+  async function bulkDownload() {
+    const paths = getSelectedPaths();
+    if (paths.length === 0) return;
+    
+    LP.toast('Downloading selected files...', 'info');
+    
+    // Download files concurrently using window trigger
+    paths.forEach(p => {
+      const frame = document.createElement('iframe');
+      frame.src = `/api/filemanager/download?path=${encodeURIComponent(p)}&token=${LP.state.accessToken}`;
+      frame.style.display = 'none';
+      document.body.appendChild(frame);
+      setTimeout(() => frame.remove(), 5000);
+    });
+  }
+
+  async function bulkChmod() {
+    const paths = getSelectedPaths();
+    if (paths.length === 0) return;
+    const perm = prompt('Enter permissions octal (e.g. 755 or 644):', '644');
+    if (!perm || !/^[0-7]{3,4}$/.test(perm)) {
+      LP.toast('Invalid permission octal code', 'error');
+      return;
+    }
+
+    LP.toast('Chmod permissions...', 'info');
+
+    // Make chmod API call if supported, else loop
+    let successCount = 0;
+    for (const p of paths) {
+      try {
+        const res = await LP.post('/filemanager/chmod', { path: p, mode: perm });
+        if (res?.success) successCount++;
+      } catch {}
+    }
+
+    LP.toast(`Updated permissions for ${successCount}/${paths.length} items`, 'success');
+    refresh();
+  }
+
+  async function bulkDelete() {
+    const paths = getSelectedPaths();
+    if (paths.length === 0) return;
+    const confirmed = await LP.confirm(`Delete <strong>${paths.length}</strong> selected items?<br><small class="text-danger">This action cannot be undone.</small>`, 'Bulk Delete');
+    if (!confirmed) return;
+
+    LP.toast('Deleting selected items...', 'info');
+    
+    let successCount = 0;
+    for (const p of paths) {
+      try {
+        const delRes = await fetch('/api/filemanager/delete', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${LP.state.accessToken}` },
+          credentials: 'include',
+          body: JSON.stringify({ path: p }),
+        }).then(r => r.json());
+        if (delRes?.success) successCount++;
+      } catch {}
+    }
+
+    LP.toast(`Deleted ${successCount}/${paths.length} items`, 'success');
+    refresh();
   }
 
   // ── Actions ───────────────────────────────────────
@@ -136,6 +282,7 @@ const FMPage = (() => {
     const item = el ? {
       path: el.dataset.path,
       type: el.dataset.type,
+      name: el.dataset.name,
     } : selectedItem;
 
     if (!item) return;
@@ -143,6 +290,66 @@ const FMPage = (() => {
     if (item.type === 'dir') {
       navigate(item.path);
     } else {
+      const ext = item.name.split('.').pop()?.toLowerCase();
+      
+      // 1. Image preview modal
+      if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico'].includes(ext)) {
+        const id = 'img_view_' + Date.now();
+        const modal = document.createElement('div');
+        modal.innerHTML = `
+          <div class="modal fade" id="${id}" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+              <div class="modal-content lp-glass-card" style="border:1px solid var(--glass-border); background:rgba(10,12,20,0.95); border-radius:12px; overflow:hidden;">
+                <div class="modal-header" style="border-bottom:1px solid var(--glass-border); padding: 12px 20px;">
+                  <h6 class="modal-title font-mono text-white" style="font-size:12px;"><i class="bi bi-image me-2 text-primary"></i>Preview: ${escHtml(item.name)}</h6>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center" style="padding:20px; background:#04060b;">
+                  <img src="/api/filemanager/download?path=${encodeURIComponent(item.path)}&token=${LP.state.accessToken}" style="max-width:100%; max-height:70vh; object-fit:contain; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                </div>
+              </div>
+            </div>
+          </div>`;
+        document.body.appendChild(modal);
+        const bsModal = new bootstrap.Modal(document.getElementById(id));
+        bsModal.show();
+        document.getElementById(id).addEventListener('hidden.bs.modal', () => modal.remove());
+        return;
+      }
+
+      // 2. PDF preview modal
+      if (ext === 'pdf') {
+        const id = 'pdf_view_' + Date.now();
+        const modal = document.createElement('div');
+        modal.innerHTML = `
+          <div class="modal fade" id="${id}" tabindex="-1">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+              <div class="modal-content" style="border:1px solid var(--glass-border); background:rgba(10,12,20,0.95); border-radius:12px; overflow:hidden; height:90vh;">
+                <div class="modal-header" style="border-bottom:1px solid var(--glass-border); padding: 12px 20px;">
+                  <h6 class="modal-title font-mono text-white" style="font-size:12px;"><i class="bi bi-file-pdf me-2 text-danger"></i>PDF Reader: ${escHtml(item.name)}</h6>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="padding:0; height:calc(100% - 50px);">
+                  <iframe src="/api/filemanager/download?path=${encodeURIComponent(item.path)}&token=${LP.state.accessToken}" style="width:100%; height:100%; border:none;"></iframe>
+                </div>
+              </div>
+            </div>
+          </div>`;
+        document.body.appendChild(modal);
+        const bsModal = new bootstrap.Modal(document.getElementById(id));
+        bsModal.show();
+        document.getElementById(id).addEventListener('hidden.bs.modal', () => modal.remove());
+        return;
+      }
+
+      // 3. Binary file blocker (zip, tar, exe, db, mp4, etc.)
+      const isText = ['txt', 'md', 'js', 'ts', 'json', 'html', 'css', 'py', 'php', 'sh', 'bash', 'zsh', 'env', 'yml', 'yaml', 'xml', 'log', 'htaccess', 'conf', 'ini'].includes(ext);
+      if (!isText && ext) {
+        await LP.alert(`File <strong>${escHtml(item.name)}</strong> merupakan file biner (.${ext}) dan tidak dapat dibuka langsung menggunakan Text Editor. Silakan download file untuk membukanya.`, 'Buka File Gagal');
+        return;
+      }
+
+      // Default fallback: text editor
       await openFileEditor(item.path);
     }
   }
@@ -508,6 +715,12 @@ const FMPage = (() => {
     zipSelected,
     showContextMenu,
     _saveFile,
+    updateBulkBar,
+    toggleSelectAll,
+    bulkCompress,
+    bulkDownload,
+    bulkChmod,
+    bulkDelete,
   };
 })();
 
