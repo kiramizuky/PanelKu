@@ -157,23 +157,24 @@ const FMPage = (() => {
     modal.innerHTML = `
       <div class="modal fade" id="${id}" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
-          <div class="modal-content" style="background:#0b0f19; border:1px solid var(--glass-border); color:#fff;">
+          <div class="modal-content" style="background:#0b0f19; border:1px solid var(--glass-border); color:#fff; border-radius:12px; overflow:hidden;">
             <div class="modal-header" style="border-bottom:1px solid var(--glass-border); padding: 12px 20px;">
               <h6 class="modal-title font-mono" style="font-size:12px; color:var(--text-secondary);"><i class="bi bi-file-code-fill me-2 text-primary"></i>${escHtml(path)}</h6>
               <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" style="padding:0; display:flex; position:relative; overflow:hidden;">
+            <div class="modal-body" style="padding:0; display:flex; position:relative; overflow:hidden; background:#070a13; height:550px;">
               <!-- Gutter Line Numbers -->
-              <div id="${id}_gutter" style="width:48px; background:#070a13; border-right:1px solid rgba(255,255,255,0.05); color:rgba(255,255,255,0.25); font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:16px 8px 16px 0; text-align:right; select:none; user-select:none; overflow:hidden; line-height:1.6; box-sizing:border-box;">
+              <div id="${id}_gutter" style="width:54px; background:#04060c; border-right:1px solid rgba(255,255,255,0.06); color:rgba(255,255,255,0.2); font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:16px 12px 16px 0; text-align:right; select:none; user-select:none; overflow:hidden; line-height:1.6; box-sizing:border-box;">
                 <div>1</div>
               </div>
               <!-- Text Area -->
-              <textarea id="${id}_ta" style="flex:1; height:500px; background:#0a0e1a; color:#e2e8f0; border:none; padding:16px; font-family:'JetBrains Mono',monospace; font-size:12.5px; resize:none; outline:none; line-height:1.6; overflow-y:auto; box-sizing:border-box; white-space:pre; word-wrap:normal;" wrap="off">${escHtml(content)}</textarea>
+              <textarea id="${id}_ta" style="flex:1; height:100%; background:transparent; color:#e2e8f0; border:none; padding:16px; font-family:'JetBrains Mono',monospace; font-size:12.5px; resize:none; outline:none; line-height:1.6; overflow-y:auto; overflow-x:auto; box-sizing:border-box; white-space:pre; word-wrap:normal;" wrap="off" spellcheck="false">${escHtml(content)}</textarea>
             </div>
             <div class="modal-footer" style="border-top:1px solid var(--glass-border); padding: 12px 20px;">
               <div class="me-auto font-mono" id="${id}_stats" style="font-size:11px; color:var(--text-muted);">Lines: 1 | Length: 0</div>
+              <small class="text-muted me-3 d-none d-sm-inline" style="font-size:11px;"><kbd style="background:rgba(255,255,255,0.08); color:var(--text-muted); font-size:10px; padding:2px 5px; border-radius:3px;">Ctrl + S</kbd> to Quick Save</small>
               <button class="btn-lp btn-lp-ghost btn-lp-sm" data-bs-dismiss="modal">Cancel</button>
-              <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="FMPage._saveFile('${escHtml(path)}', '${id}')"><i class="bi bi-floppy me-1"></i> Save File</button>
+              <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="FMPage._saveFile('${escHtml(path)}', '${id}', false)"><i class="bi bi-floppy me-1"></i> Save</button>
             </div>
           </div>
         </div>
@@ -204,6 +205,25 @@ const FMPage = (() => {
         gutter.scrollTop = ta.scrollTop;
       });
 
+      // Handle TAB key indentation
+      ta.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const start = ta.selectionStart;
+          const end = ta.selectionEnd;
+          const val = ta.value;
+          ta.value = val.substring(0, start) + '  ' + val.substring(end);
+          ta.selectionStart = ta.selectionEnd = start + 2;
+          updateGutter();
+        }
+
+        // Handle Ctrl + S shortcut
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+          e.preventDefault();
+          FMPage._saveFile(path, id, true);
+        }
+      });
+
       ta.addEventListener('input', updateGutter);
       
       // Initial Gutter generation
@@ -213,12 +233,14 @@ const FMPage = (() => {
     document.getElementById(id).addEventListener('hidden.bs.modal', () => modal.remove());
   }
 
-  async function _saveFile(path, modalId) {
+  async function _saveFile(path, modalId, keepOpen = false) {
     const content = document.getElementById(`${modalId}_ta`).value;
     const res = await LP.post('/filemanager/write', { path, content });
     if (res?.success) {
       LP.toast('File saved successfully', 'success');
-      bootstrap.Modal.getInstance(document.getElementById(modalId))?.hide();
+      if (!keepOpen) {
+        bootstrap.Modal.getInstance(document.getElementById(modalId))?.hide();
+      }
     } else {
       LP.toast('Failed to save: ' + res?.message, 'error');
     }

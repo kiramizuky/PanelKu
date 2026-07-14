@@ -160,8 +160,40 @@
 
       if (this.status.connected) {
         badgeContainer.innerHTML = '<span class="badge bg-success">Connected</span>';
+        
+        // Build peers rows
+        let peersHtml = `
+          <tr>
+            <td colspan="4" class="text-center text-muted py-3">No other peers connected in this Tailnet.</td>
+          </tr>`;
+        
+        if (this.status.peers && this.status.peers.length > 0) {
+          peersHtml = this.status.peers.map(p => {
+            let osIcon = 'bi-laptop';
+            if (p.os === 'linux') osIcon = 'bi-ubuntu';
+            if (p.os === 'windows') osIcon = 'bi-windows';
+            if (p.os === 'apple' || p.os === 'macos' || p.os === 'ios') osIcon = 'bi-apple';
+            if (p.os === 'android') osIcon = 'bi-android2';
+
+            const isActive = p.status.includes('active') || p.status.includes('idle');
+            
+            return `
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); font-size:12.5px;">
+                <td style="padding: 10px 0;">
+                  <span class="text-white font-mono" style="font-weight:600;">${p.host}</span>
+                  <div style="font-size:10px; color:var(--text-muted);">${p.user || ''}</div>
+                </td>
+                <td class="font-monospace" style="padding: 10px 0; color:var(--text-secondary);">${p.ip}</td>
+                <td style="padding: 10px 0; text-transform:capitalize; color:var(--text-secondary);"><i class="bi ${osIcon} me-1"></i> ${p.os}</td>
+                <td class="text-end" style="padding: 10px 0;">
+                  <span class="lp-badge ${isActive ? 'lp-badge-success' : 'lp-badge-ghost'}" style="font-size:9.5px;">${p.status}</span>
+                </td>
+              </tr>`;
+          }).join('');
+        }
+
         infoContainer.innerHTML = `
-          <div class="row g-4 align-items-center">
+          <div class="row g-4 mb-4">
             <div class="col-12 col-md-4 text-center border-end border-secondary" style="border-color: rgba(255,255,255,0.1) !important;">
               <i class="bi bi-shield-check text-success" style="font-size:4rem; filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.3));"></i>
               <h5 class="mt-3" style="color: var(--text-primary);">VPN Connected</h5>
@@ -172,22 +204,42 @@
               <table class="table table-borderless text-xs" style="font-size:13px; color: var(--text-secondary); background: transparent; --bs-table-bg: transparent;">
                 <tr style="background: transparent;">
                   <td style="width:30%; padding: 6px 0; color: var(--text-muted);">Service State:</td>
-                  <td style="padding: 6px 0; color: var(--text-primary);"><span class="pulse-dot"></span> Active (tailscaled)</td>
+                  <td style="padding: 6px 0; color: var(--text-primary);"><span class="status-pulse-green d-inline-block me-1"></span> Active (tailscaled)</td>
                 </tr>
                 <tr style="background: transparent;">
                   <td style="padding: 6px 0; color: var(--text-muted);">IPv4 Address:</td>
                   <td class="font-monospace" style="padding: 6px 0; color: var(--text-primary);">${this.status.ip}</td>
                 </tr>
                 <tr style="background: transparent;">
-                  <td style="padding: 6px 0; color: var(--text-muted);">Access Restriction:</td>
+                  <td style="padding: 6px 0; color: var(--text-muted);">Secure Access:</td>
                   <td style="padding: 6px 0; color: var(--text-primary);">You can now securely access this panel over Tailscale.</td>
                 </tr>
               </table>
-              <div class="mt-4">
+              <div class="mt-3">
                 <button class="btn-lp btn-lp-danger" onclick="TailscalePage.disconnect()" style="padding: 8px 20px;">
                   <i class="bi bi-power me-2"></i> Disconnect VPN
                 </button>
               </div>
+            </div>
+          </div>
+
+          <!-- Tailscale Peers Table Section -->
+          <div class="mt-4" style="border-top: 1px solid var(--glass-border); padding-top:24px;">
+            <h6 class="mb-3 text-white" style="font-weight:700; letter-spacing:0.5px; font-size:13px;">MESH VPN PEERS (${this.status.peers ? this.status.peers.length : 0})</h6>
+            <div class="table-responsive">
+              <table class="table table-dark table-borderless m-0" style="background:transparent; --bs-table-bg: transparent;">
+                <thead>
+                  <tr style="border-bottom:1px solid rgba(255,255,255,0.06); font-size:11px; text-transform:uppercase; color:var(--text-muted);">
+                    <th style="padding-bottom:10px;">Hostname</th>
+                    <th style="padding-bottom:10px;">Tailscale IP</th>
+                    <th style="padding-bottom:10px;">OS</th>
+                    <th class="text-end" style="padding-bottom:10px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${peersHtml}
+                </tbody>
+              </table>
             </div>
           </div>
         `;
@@ -207,7 +259,7 @@
                 <i class="bi bi-info-circle-fill me-2"></i> Please authenticate using the URL below:
                 <div class="mt-2"><a id="authLink" href="${this.loginUrl || '#'}" target="_blank" class="btn btn-sm btn-info text-dark" style="font-size:11px; font-weight:600;">Log In / Authenticate</a></div>
               </div>
-
+ 
               <div id="connectForm">
                 <div class="mb-3">
                   <label class="lp-label" style="font-size:11px;">Tailscale Auth Key (Optional)</label>

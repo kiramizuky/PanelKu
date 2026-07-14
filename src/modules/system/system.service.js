@@ -84,7 +84,7 @@ class SystemService {
   async getTailscaleStatus() {
     const installed = await this.isTailscaleInstalled();
     if (!installed) {
-      return { installed: false, status: 'not_installed', ip: null, loginUrl: null };
+      return { installed: false, status: 'not_installed', ip: null, loginUrl: null, peers: [] };
     }
 
     const isActive = await this.getServiceStatus('tailscaled');
@@ -92,6 +92,7 @@ class SystemService {
     let isConnected = false;
     let ip = null;
     let loginUrl = null;
+    let peers = [];
 
     try {
       const statusOut = await this.runCommand('sudo tailscale status');
@@ -101,9 +102,46 @@ class SystemService {
         isConnected = true;
         const ipOut = await this.runCommand('sudo tailscale ip -4');
         ip = ipOut.trim();
+
+        // Parse peer nodes
+        // Format of tailscale status output lines:
+        // IP hostname user os [status]
+        const lines = statusOut.trim().split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          const parts = trimmed.split(/\s+/);
+          if (parts.length >= 4) {
+            const peerIp = parts[0];
+            const peerHost = parts[1];
+            const peerUser = parts[2];
+            const peerOs = parts[3];
+            const peerStatus = parts.slice(4).join(' ') || 'active';
+            
+            // Exclude self from peers list
+            if (peerIp !== ip && !peerHost.includes('self')) {
+              peers.push({
+                ip: peerIp,
+                host: peerHost,
+                user: peerUser,
+                os: peerOs,
+                status: peerStatus
+              });
+            }
+          }
+        }
       }
     } catch (err) {
       isConnected = false;
+    }
+
+    // Windows simulation mockup fallback
+    if (process.platform === 'win32' && this.mockTailscaleInstalled && this.mockTailscaleConnected) {
+      peers = [
+        { ip: '100.80.20.10', host: 'workstation-windows', user: 'work@', os: 'windows', status: 'active; idle' },
+        { ip: '100.95.40.55', host: 'prod-db-replica', user: 'db@', os: 'linux', status: 'active; tx/rx' },
+        { ip: '100.110.15.82', host: 'mobile-iphone', user: 'ios@', os: 'ios', status: 'idle' }
+      ];
     }
 
     return {
@@ -111,7 +149,8 @@ class SystemService {
       serviceActive: isActive,
       connected: isConnected,
       ip,
-      loginUrl
+      loginUrl,
+      peers
     };
   }
 
