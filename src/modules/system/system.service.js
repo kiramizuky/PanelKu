@@ -1,4 +1,4 @@
-import { exec, spawn } from 'child_process';
+import { exec, spawn, execFile } from 'child_process';
 import util from 'util';
 import path from 'path';
 import logger from '../../config/logger.js';
@@ -291,6 +291,46 @@ class SystemService {
     }
   }
 
+  /**
+   * [CRIT-1 FIX] Validate database password strictly before use.
+   * Prevents shell injection via special characters.
+   */
+  _validateDbPassword(password) {
+    if (!password || typeof password !== 'string') throw new Error('Password is required');
+    // Only allow safe characters: alphanumeric + common special chars (no shell metacharacters)
+    if (!/^[A-Za-z0-9@#$%^&*!_\-+=.]{6,128}$/.test(password)) {
+      throw new Error('Password contains invalid characters. Use only: A-Z a-z 0-9 @ # $ % ^ & * ! _ - + = .');
+    }
+    return password;
+  }
+
+  /**
+   * [CRIT-1 FIX] Run a MySQL command safely using execFile (no shell interpreter).
+   * Arguments are passed as an array — no string interpolation into shell.
+   */
+  _execMysql(sqlStatement) {
+    return new Promise((resolve, reject) => {
+      const args = ['-u', 'root', '--execute', sqlStatement];
+      execFile('mysql', args, { timeout: 10000 }, (err, stdout, stderr) => {
+        if (err) reject(new Error(stderr || err.message));
+        else resolve(stdout);
+      });
+    });
+  }
+
+  /**
+   * [CRIT-1 FIX] Run a PostgreSQL command safely using execFile (no shell interpreter).
+   */
+  _execPsql(sqlStatement) {
+    return new Promise((resolve, reject) => {
+      // Use -c flag with separate argument — not shell interpolation
+      execFile('sudo', ['-u', 'postgres', 'psql', '-c', sqlStatement], { timeout: 10000 }, (err, stdout, stderr) => {
+        if (err) reject(new Error(stderr || err.message));
+        else resolve(stdout);
+      });
+    });
+  }
+
   async installPackage(pkgName, password = '') {
     if (!/^[a-zA-Z0-9_-]+$/.test(pkgName)) throw new Error('Invalid package name');
     logger.info(`Installing package: ${pkgName}`);
@@ -326,15 +366,23 @@ class SystemService {
     const out = await this.runCommand(installCmd);
 
     if (password) {
+      // [CRIT-1 FIX] Validate password before using in any database command
+      this._validateDbPassword(password);
+
       if (pkgName === 'mysql') {
         logger.info('Configuring MySQL root password...');
-        const sqlCmds = [
-          `sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${password}'; FLUSH PRIVILEGES;"`,
-          `sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${password}'; FLUSH PRIVILEGES;"`
+        // [CRIT-1 FIX] Use execFile-based helpers — no shell string interpolation
+        const sqlStatements = [
+          `ALTER USER 'root'@'localhost' IDENTIFIED BY '${password}'; FLUSH PRIVILEGES;`,
+          `ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${password}'; FLUSH PRIVILEGES;`,
         ];
-        for (const sql of sqlCmds) {
+        for (const sql of sqlStatements) {
           try {
-            await this.runCommand(sql);
+            if (process.platform !== 'win32') {
+              await this._execMysql(sql);
+            } else {
+              logger.info('[Mock] MySQL password configured');
+            }
             break;
           } catch (_) {}
         }
@@ -344,8 +392,15 @@ class SystemService {
         try {
           await this.runCommand('sudo postgresql-setup --initdb || sudo postgresql-setup initdb || true').catch(() => {});
           await this.runCommand('sudo systemctl enable postgresql && sudo systemctl start postgresql').catch(() => {});
-          await this.runCommand(`sudo -u postgres psql -c "ALTER USER postgres PASSWORD '${password}';"`);
-        } catch (_) {}
+          // [CRIT-1 FIX] Use execFile-based helper — no shell string interpolation
+          if (process.platform !== 'win32') {
+            await this._execPsql(`ALTER USER postgres PASSWORD '${password}';`);
+          } else {
+            logger.info('[Mock] PostgreSQL password configured');
+          }
+        } catch (e) {
+          logger.warn(`PostgreSQL password setup warning: ${e.message}`);
+        }
         await this.updateEnvVariable('DB_PG_PASSWORD', password);
       }
     }

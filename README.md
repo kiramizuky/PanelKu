@@ -3,6 +3,7 @@
 > Lightweight, modern, realtime Linux server control panel — a blend of aaPanel, Portainer, CasaOS, and Cockpit, but far lighter.
 
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green)](https://nodejs.org)
+[![Version](https://img.shields.io/badge/version-1.8.0-blue)](CHANGELOG)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
 ## Core Features
@@ -22,6 +23,7 @@
 - ⚙️ **Distro-Aware Auto-Updates** — Dynamically writes daily update/upgrade cron scripts tailored to native package managers (APT, DNF, Pacman, Emerge)
 - 📱 **Responsive Design** — Fully mobile-friendly layout with a frosted-glass **Burger Sidebar Drawer** offcanvas navigation menu
 - 📡 **Built-in Plugins** — DB Web Admin (phpMyAdmin, pgAdmin, Adminer), Smart Home Manager (Home Assistant, Mosquitto, Zigbee2MQTT), Media & Cloud Services (Jellyfin, qBottorrent), Realtime Log Analyzer, OpenClaw AI, WireGuard VPN, Fail2ban Admin, PM2 Manager, S3/Rclone Backups, Redis, Nextcloud, AdGuard Home, MinIO S3 Server, Uptime Kuma, and Rclone Manager (featuring host-level dependencies auto-installers)
+- 🔐 **Security Hardened (v1.8.0)** — Shell injection prevention via `execFile()`, Zip Slip protection, upload extension blocking (18 dangerous types), WAL-safe graceful shutdown, EISDIR crash guard, storage permission hardening (`750`), and path traversal validation on rename
 
 ## Requirements
 
@@ -121,6 +123,42 @@ src/
 | Phase 5 | ✅ Done | Git Deploy, Auto Update, Plugin Marketplace, WireGuard VPN, Fail2ban, PM2, Rclone, OpenClaw AI, DB Web Admin, Smart Home, Media Services, Log Analyzer |
 | Phase 6 (v1.6.0) | ✅ Done | Multi-Node Cluster, SQLite Auto-Backups, PTY Terminal Command Audit Log, GitHub Actions Docker Hub Integration |
 | Phase 7 (v1.7.0) | ✅ Done | OpenClaw AI Copilot Floating Assistant, Nginx Reverse Proxy Docker Mapper, PHP Pool Configuration Manager, Database Visual Explorer/Console, WhatsApp Alerting, Service Watchdog Auto-Healer, Visual Audit Log Dashboard, Security Advisor (One-Click Fix), Multi-Cloud S3 Backup, Terminal AI Suggestions, Git Webhook Auto-Build, Tailscale VPN Integration |
+| Phase 8 (v1.8.0) | ✅ Done | **Security Patch** — Shell injection fix (execFile), Zip Slip protection, upload extension filter, graceful shutdown WAL-safe, EISDIR crash guard, install dir fix (/opt/panelku), storage permission hardening (750→), multi-distro install.sh rewrite |
+
+## Changelog
+
+### v1.8.0 — July 15, 2026 (Security Patch & Stability Release)
+
+> Critical security vulnerabilities patched. Recommended upgrade for all production deployments.
+
+**🔴 Critical Fixes**
+- **[CRIT-1]** Fixed shell command injection in database password config — replaced shell string interpolation with `execFile()` + strict regex validation
+- **[CRIT-2]** Fixed Zip Slip attack in File Manager — each ZIP entry path validated before extraction
+- **[CRIT-3]** Added upload file extension filter — blocks `.php`, `.sh`, `.exe`, `.htaccess` and 15 other dangerous types
+
+**🟠 High Severity Fixes**
+- **[HIGH-1]** Fixed graceful shutdown race condition — `server.close()` now called before SQLite/Redis close (prevents WAL corruption)
+- **[HIGH-2]** Fixed EISDIR crash on directory download — returns HTTP 400 instead of crashing the Node.js process
+- **[HIGH-3]** Upgraded `unzipper` from `^0.12.3` to `^0.12.5`
+- **[HIGH-4]** Fixed install directory mismatch (`/opt/linux-panel` → `/opt/panelku`, port `3000` → `23456`)
+
+**🟡 Medium Fixes**
+- **[MED-3]** Added File Manager API endpoints to WAF skip list (prevents false positives on `../` in config files)
+- **[MED-4]** Fixed path traversal via rename — `newName` now validated through `_resolvePath()`
+- **[MED-7]** Storage permission hardened from `777` to `750` in install scripts
+
+**🟢 Improvements**
+- **[LOW-1]** Added `npm rebuild node-pty` in install scripts
+- **install.sh** (both scripts): Rewritten with `set -euo pipefail`, multi-distro support (`yum`/`apk`/`zypper`), secure secrets via `openssl rand -hex 32`, dynamic Node.js binary URL, safer `sed` delimiter (`|`), systemd hardening
+
+### v1.7.0 — July 13, 2026
+Added OpenClaw AI Copilot, Nginx Reverse Proxy Docker Mapper, PHP Pool Manager, Database Visual Explorer, WhatsApp Alerting, Service Watchdog, Visual Audit Log Dashboard, Security Advisor, Multi-Cloud S3 Backup, Terminal AI Suggestions, Git Webhook Auto-Build, Tailscale VPN Integration.
+
+### v1.6.0 — July 9, 2026
+Introduced Multi-Node Cluster Manager, SQLite Auto-Backups, Terminal Audit Logs, GitHub Actions CI/CD pipeline.
+
+### v1.5.0 — July 8, 2026
+PHP Manager, 2FA/MFA, SSH Key Manager, Let's Encrypt Auto-Renewal, Fail2Ban logs, distro-aware auto-updates.
 
 ## License
 

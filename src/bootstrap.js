@@ -19,8 +19,15 @@ import { mkdirSync } from 'fs';
 });
 
 let redis;
+// [HIGH-1 FIX] Keep a reference to httpServer for graceful shutdown.
+// This allows us to stop accepting new connections before closing DB/Redis,
+// preventing in-flight writes from corrupting the SQLite WAL.
+let _httpServer = null;
 
 export const bootstrap = async (app, httpServer) => {
+  // [HIGH-1 FIX] Store reference for graceful shutdown
+  _httpServer = httpServer;
+
   // 1. Initialize SQLite (auto-creates tables on first run)
   logger.info('Initializing SQLite database...');
   getDb(); // singleton — opens & creates schema
@@ -64,9 +71,27 @@ export const bootstrap = async (app, httpServer) => {
 
 export const gracefulShutdown = async () => {
   logger.info('Graceful shutdown initiated...');
-  const { getDb } = await import('./core/db/sqlite.js');
-  getDb().close();
-  if (redis) await redis.quit();
+
+  // [HIGH-1 FIX] Stop accepting new HTTP connections first.
+  // This ensures all in-flight requests (including DB writes) can complete
+  // before we close the database and Redis, preventing SQLite WAL corruption.
+  if (_httpServer) {
+    await new Promise((resolve) => {
+      _httpServer.close(() => {
+        logger.info('HTTP server closed (no new connections accepted)');
+        resolve();
+      });
+      // Force close after 10s if connections don't drain
+      setTimeout(resolve, 10000);
+    });
+  }
+
+  // Now safe to close DB and Redis
+  try { getDb().close(); } catch (e) { logger.warn('DB close error: ' + e.message); }
+  if (redis) {
+    try { await redis.quit(); } catch (e) { logger.warn('Redis quit error: ' + e.message); }
+  }
+
   logger.info('Shutdown complete');
   process.exit(0);
 };

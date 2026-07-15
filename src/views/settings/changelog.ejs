@@ -45,20 +45,46 @@
         <h5 class="settings-section-title">
           <i class="bi bi-file-earmark-text text-primary"></i> Version Changelog
         </h5>
-        <span class="lp-badge lp-badge-success" style="font-size: 10px;">v1.7.0 Active</span>
+        <span class="lp-badge lp-badge-success" style="font-size: 10px;">v1.8.0 Active</span>
       </div>
       <div class="settings-section-body" style="display: flex; flex-direction: column; gap: 20px;">
         
-        <!-- Release Version 1.7.0 -->
+        <!-- Release Version 1.8.0 -->
         <div style="position: relative; padding-left: 20px; border-left: 2px solid var(--accent-success);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
-            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v1.7.0 <span class="lp-badge lp-badge-success" style="font-size: 9px; padding: 2px 6px;">Latest Release</span></h6>
+            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v1.8.0 <span class="lp-badge lp-badge-success" style="font-size: 9px; padding: 2px 6px;">Latest Release</span></h6>
+            <span style="font-size: 11px; color: var(--text-muted);">July 15, 2026</span>
+          </div>
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px;">
+            Security Patch &amp; Stability Release — Critical vulnerability fixes across File Manager, installation script, and graceful shutdown. Includes path traversal protection, Zip Slip defense, upload extension blocking, and multi-distro install hardening.
+          </p>
+          <ul style="font-size: 12px; color: var(--text-secondary); padding-left: 16px; margin: 0; display: flex; flex-direction: column; gap: 4px;">
+            <li><strong>[CRIT-1]</strong> Fixed shell command injection in database password configuration — now uses <code>execFile()</code> (no shell parser) + strict regex validation.</li>
+            <li><strong>[CRIT-2]</strong> Fixed Zip Slip attack in File Manager unzip — each ZIP entry validated via path resolver before extraction.</li>
+            <li><strong>[CRIT-3]</strong> Added Multer file extension filter — blocks 18 dangerous types (.php, .sh, .exe, .htaccess, etc.) regardless of MIME header.</li>
+            <li><strong>[HIGH-1]</strong> Fixed graceful shutdown race condition — <code>server.close()</code> now waits for in-flight requests before closing SQLite, preventing WAL corruption.</li>
+            <li><strong>[HIGH-2]</strong> Fixed EISDIR crash on directory download — added <code>stat()</code> check, returns 400 instead of crashing the server.</li>
+            <li><strong>[HIGH-3]</strong> Upgraded <code>unzipper</code> dependency to v0.12.5 (latest).</li>
+            <li><strong>[HIGH-4]</strong> Fixed install directory mismatch (<code>/opt/linux-panel</code> → <code>/opt/panelku</code>) and port (<code>3000</code> → <code>23456</code>) — panel update &amp; restart features now work correctly on fresh installs.</li>
+            <li><strong>[MED-3]</strong> Added File Manager endpoints to WAF skip list — prevents false positives when editing config files containing <code>../</code>.</li>
+            <li><strong>[MED-4]</strong> Fixed path traversal via rename — <code>newName</code> now validated through <code>_resolvePath()</code>.</li>
+            <li><strong>[MED-7]</strong> Hardened storage directory permission from <code>777</code> to <code>750</code> in install scripts.</li>
+            <li><strong>[LOW-1]</strong> Added <code>npm rebuild node-pty</code> to install scripts — prevents terminal crash after Node.js ABI change.</li>
+            <li><strong>install.sh:</strong> Major rewrite with <code>set -euo pipefail</code>, multi-distro support (yum/apk/zypper), secure secrets via <code>openssl rand -hex 32</code>, dynamic Node.js binary URL, systemd service hardening, and safer <code>sed</code> delimiters.</li>
+          </ul>
+        </div>
+
+        <!-- Release Version 1.7.0 -->
+        <div style="position: relative; padding-left: 20px; border-left: 2px solid var(--accent-primary);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v1.7.0</h6>
             <span style="font-size: 11px; color: var(--text-muted);">July 13, 2026</span>
           </div>
           <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px;">
             Added OpenClaw AI Copilot Floating assistant, Nginx Reverse Proxy Docker Mapper, PHP Pool Configuration Manager, Database Visual Explorer/Console, WhatsApp Alerting (Baileys), Service Watchdog Auto-Healer, Visual Audit Log Dashboard, Security Advisor (One-Click Fix), Multi-Cloud S3 Backups, Terminal AI Troubleshooting, Git Webhook Auto-Build pipelines, and optional Tailscale VPN integration.
           </p>
         </div>
+
 
         <!-- Release Version 1.6.0 -->
         <div style="position: relative; padding-left: 20px; border-left: 2px solid var(--accent-primary);">

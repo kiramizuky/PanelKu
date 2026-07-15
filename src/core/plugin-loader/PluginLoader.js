@@ -117,12 +117,14 @@ class PluginLoader {
   getAll() {
     return [...this._plugins.entries()].map(([name, info]) => {
       const proxyUrl = this._proxies.get(name) || '';
+      const isInstalled = this.isLoaded(name);
       return {
         name,
         ...info,
         proxyUrl,
-        // Override path with proxy URL if set, so the frontend UI automatically opens it
-        path: proxyUrl || info.path || `/plugins/${name}`
+        // Override path with proxy URL ONLY if the plugin is fully installed/loaded.
+        // Otherwise, route to local path /plugins/:name.
+        path: (isInstalled && proxyUrl) ? proxyUrl : `/plugins/${name}`
       };
     });
   }

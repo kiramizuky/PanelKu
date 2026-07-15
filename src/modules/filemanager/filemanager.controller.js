@@ -110,8 +110,19 @@ class FileManagerController {
     try {
       const { path: filePath } = req.query;
       const full = fileManagerService._resolvePath(filePath);
-      const filename = filePath.split('/').pop();
+
+      // [HIGH-2 FIX] Check if target exists and is a regular file before streaming.
+      // createReadStream() on a directory throws EISDIR which is an uncaught crash risk.
+      const { stat } = await import('fs/promises');
+      const stats = await stat(full);
+      if (stats.isDirectory()) {
+        return error(res, 'Cannot download a directory directly. Please compress it first.', 400);
+      }
+
+      // Sanitize filename to prevent Content-Disposition header injection
+      const filename = filePath.split('/').pop().replace(/[\r\n"]/g, '_');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', stats.size);
       createReadStream(full).pipe(res);
     } catch (err) {
       return error(res, err.message, err.statusCode || 500);

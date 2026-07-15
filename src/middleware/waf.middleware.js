@@ -37,7 +37,13 @@ const SKIP_BODY_SCAN_PATHS = [
   '/api/ai/chat',
   '/api/system/logs',
   '/api/backup',
-  '/api/agent',     // cluster agent \u2014 metrics/log data may trigger false positives
+  '/api/agent',     // cluster agent — metrics/log data may trigger false positives
+  // [MED-3 FIX] File manager write/read/unzip endpoints may contain arbitrary file content.
+  // e.g. editing nginx.conf which contains "../" patterns, or ZIP archives with relative paths.
+  // Path traversal is already validated server-side by _resolvePath() in filemanager.service.js.
+  '/api/filemanager/write',
+  '/api/filemanager/read',
+  '/api/filemanager/unzip',
 ];
 
 // Cache global rules to avoid DB hits on every request

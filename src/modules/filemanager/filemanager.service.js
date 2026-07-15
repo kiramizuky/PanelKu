@@ -1,6 +1,6 @@
 import { readdir, stat, rename, rm, mkdir, copyFile, writeFile, readFile } from 'fs/promises';
 import { createReadStream, createWriteStream } from 'fs';
-import { join, resolve, basename, extname, dirname, sep } from 'path';
+import { join, resolve, resolve as resolveUnzip, basename, extname, dirname, sep } from 'path';
 import archiver from 'archiver';
 import unzipper from 'unzipper';
 import logger from '../../config/logger.js';
@@ -123,8 +123,14 @@ class FileManagerService {
   }
 
   async rename(oldPath, newName) {
+    // [MED-4 FIX] Validate that newName does not escape BASE_DIR via traversal
+    if (!newName || typeof newName !== 'string' || newName.includes('/') || newName.includes('\\')) {
+      throw Object.assign(new Error('Invalid file name: must not contain path separators'), { statusCode: 400 });
+    }
     const oldFull = this._resolvePath(oldPath);
-    const newFull = join(dirname(oldFull), newName);
+    // Compute newFull relative to the parent of oldPath (not full) to stay within _resolvePath guard
+    const parentRelative = join(dirname(oldPath), newName);
+    const newFull = this._resolvePath(parentRelative);
     await rename(oldFull, newFull);
   }
 
@@ -168,9 +174,37 @@ class FileManagerService {
     const src = this._resolvePath(zipPath);
     const dest = this._resolvePath(destDir);
     await mkdir(dest, { recursive: true });
+
+    // [CRIT-2 FIX] Manually parse ZIP entries to validate each entry path.
+    // unzipper.Extract({ path }) does NOT check entry names — vulnerable to Zip Slip.
+    // We resolve each entry's full path and ensure it stays inside dest.
     return new Promise((resolve, reject) => {
       createReadStream(src)
-        .pipe(unzipper.Extract({ path: dest }))
+        .pipe(unzipper.Parse())
+        .on('entry', async (entry) => {
+          const entryPath = entry.path;
+          // Normalize and validate entry path against dest directory
+          let entryFull;
+          try {
+            entryFull = resolveUnzip(join(dest, entryPath));
+          } catch {
+            entry.autodrain(); // Skip malformed entries
+            return;
+          }
+          // [CRIT-2 FIX] Core check: resolved path must start with destDir
+          if (!entryFull.startsWith(dest + sep) && entryFull !== dest) {
+            logger.warn(`[Zip Slip Blocked] Entry '${entryPath}' resolved outside dest: ${entryFull}`);
+            entry.autodrain(); // Discard this malicious entry
+            return;
+          }
+          if (entry.type === 'Directory') {
+            await mkdir(entryFull, { recursive: true }).catch(() => {});
+            entry.autodrain();
+          } else {
+            await mkdir(dirname(entryFull), { recursive: true }).catch(() => {});
+            entry.pipe(createWriteStream(entryFull));
+          }
+        })
         .on('close', resolve)
         .on('error', reject);
     });

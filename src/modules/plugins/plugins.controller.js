@@ -52,7 +52,7 @@ class PluginsController {
             version: currentVersion,
             latestVersion,
             updateAvailable,
-            path: manifest.path || `/plugins/${entry.name}`,
+            path: (isInstalled && proxies[entry.name]) ? proxies[entry.name] : `/plugins/${entry.name}`,
             icon: manifest.icon || 'bi-plugin',
             color: manifest.color || '#38bdf8',
             installed: isInstalled,

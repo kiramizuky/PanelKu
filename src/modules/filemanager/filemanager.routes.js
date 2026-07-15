@@ -8,9 +8,26 @@ import { uploadLimiter } from '../../middleware/rateLimiter.js';
 import { RESOURCES, ACTIONS } from '../../config/constants.js';
 import appConfig from '../../config/app.js';
 
+// [CRIT-3 FIX] Block dangerous file extensions regardless of MIME type.
+// MIME type can be spoofed in Content-Type header; extension check provides defense-in-depth.
+const BLOCKED_EXTENSIONS = new Set([
+  '.php', '.php3', '.php4', '.php5', '.phtml', '.phar',
+  '.sh', '.bash', '.zsh', '.fish',
+  '.py', '.rb', '.pl', '.cgi',
+  '.exe', '.bat', '.cmd', '.com', '.msi',
+  '.htaccess', '.htpasswd',
+]);
+
 const upload = multer({
   dest: appConfig.upload.path,
   limits: { fileSize: appConfig.upload.maxSize },
+  fileFilter: (_req, file, cb) => {
+    const ext = file.originalname.slice(file.originalname.lastIndexOf('.')).toLowerCase();
+    if (BLOCKED_EXTENSIONS.has(ext)) {
+      return cb(Object.assign(new Error(`File type '${ext}' is not allowed for security reasons`), { statusCode: 400 }));
+    }
+    cb(null, true);
+  },
 });
 
 const router = Router();

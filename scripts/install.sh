@@ -1,7 +1,8 @@
 #!/bin/bash
 # ============================================================
+# ============================================================
 # Linux Panel — One-Click Install Script
-# Supports: Debian, Ubuntu, Armbian
+# Supports: Debian, Ubuntu, Armbian, RHEL/CentOS, Arch, Alpine
 # ============================================================
 
 set -e
@@ -13,8 +14,10 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-PANEL_DIR="/opt/linux-panel"
-PANEL_PORT=3000
+# [HIGH-4 FIX] Use /opt/panelku to match all references in system.service.js
+# Previously was /opt/linux-panel which caused panel update commands to fail
+PANEL_DIR="/opt/panelku"
+PANEL_PORT=23456
 NODE_VERSION=22
 
 print_banner() {
@@ -231,8 +234,10 @@ setup_panel() {
   cd "$PANEL_DIR"
 
   info "Setting up storage directories..."
-  mkdir -p storage/logs storage/backups storage/websites
-  chmod -R 755 storage
+  mkdir -p storage/logs storage/backups storage/websites storage/uploads storage/temp
+  # [MED-7 FIX] Use 750 instead of 777 — storage contains SQLite DB and secrets.
+  # Only panel process (running as root or dedicated user) needs access.
+  chmod -R 750 storage
 
   # Copy env
   if [ ! -f .env ]; then
@@ -254,18 +259,47 @@ setup_panel() {
     log "Generated secure secrets"
   fi
 
-  info "Setting up storage permissions..."
-  mkdir -p storage
-  chmod -R 777 storage
-
   info "Installing npm packages..."
   npm install --production -q
+  # [LOW-1 FIX] Rebuild native addons after npm install.
+  # node-pty and better-sqlite3 are native modules that must match the running Node.js ABI.
   npm rebuild better-sqlite3
+  npm rebuild node-pty
 
-  info "Starting panel with PM2..."
-  pm2 start ecosystem.config.cjs --env production
-  pm2 save
-  log "Panel started"
+  # Create systemd service so 'systemctl restart panelku' works
+  # [HIGH-4 FIX] Service name 'panelku' matches system.service.js restartPanel()
+  if command -v systemctl &>/dev/null; then
+    info "Creating systemd service: panelku..."
+    cat > /etc/systemd/system/panelku.service << EOF
+[Unit]
+Description=Panelku Linux Control Panel
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$PANEL_DIR
+ExecStart=$(which node) src/server.js
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable panelku
+    systemctl start panelku
+    log "Panelku service created and started"
+  else
+    info "Starting panel with PM2..."
+    pm2 start ecosystem.config.cjs --env production
+    pm2 save
+    log "Panel started with PM2"
+  fi
 }
 
 setup_firewall() {
