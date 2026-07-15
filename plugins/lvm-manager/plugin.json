@@ -1,0 +1,9 @@
+{
+  "name": "LVM Manager",
+  "version": "1.0.0",
+  "description": "Manage Logical Volume Manager — Physical Volumes, Volume Groups, Logical Volumes, snapshots, and disk extensions for multi-drive servers.",
+  "entry": "index.js",
+  "path": "/plugins/lvm-manager",
+  "icon": "bi-hdd-stack-fill",
+  "color": "#f59e0b"
+}
