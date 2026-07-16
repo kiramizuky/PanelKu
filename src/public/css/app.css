@@ -277,10 +277,14 @@ html.light-mode body {
 
 /* Dropdown Menu Overrides */
 .dropdown-menu {
-  background: var(--glass-bg) !important;
+  background: rgba(15, 20, 32, 0.95) !important;
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
   border: 1px solid var(--glass-border) !important;
+}
+
+.light-mode .dropdown-menu {
+  background: rgba(255, 255, 255, 0.96) !important;
 }
 
 .dropdown-item {

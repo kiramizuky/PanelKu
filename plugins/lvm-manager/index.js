@@ -19,27 +19,46 @@ async function run(cmd) {
 }
 
 // ─────────────────────────────────────────────
-// Parsers
+// Parsers & Helpers
 // ─────────────────────────────────────────────
 function parseG(s) { return parseFloat((s || '0').replace(/[^0-9.]/g, '')) || 0; }
 
+function findMountpoint(lvPath, vgName, lvName, mountMap) {
+  if (!lvPath) return '';
+  if (mountMap.has(lvPath)) return mountMap.get(lvPath);
+
+  // Try mapper format: /dev/mapper/vg--name-lv--name
+  const escapedVg = vgName.replace(/-/g, '--');
+  const escapedLv = lvName.replace(/-/g, '--');
+  const mapperPath = `/dev/mapper/${escapedVg}-${escapedLv}`;
+  if (mountMap.has(mapperPath)) return mountMap.get(mapperPath);
+
+  // Fallback: search key containing both VG and LV names
+  for (const [source, target] of mountMap.entries()) {
+    if (source.includes(vgName) && source.includes(lvName)) {
+      return target;
+    }
+  }
+  return '';
+}
+
 function parsePvs(raw) {
   return raw.split('\n').filter(Boolean).map(line => {
-    const p = line.trim().split(/\s{2,}|\t/);
+    const p = line.trim().split('|').map(s => s.trim());
     return { name: p[0]||'', vg: p[1]||'(none)', fmt: p[2]||'lvm2', size: p[3]||'0g', free: p[4]||'0g', attr: p[5]||'' };
   });
 }
 
 function parseVgs(raw) {
   return raw.split('\n').filter(Boolean).map(line => {
-    const p = line.trim().split(/\s{2,}|\t/);
+    const p = line.trim().split('|').map(s => s.trim());
     return { name: p[0]||'', pvCount: parseInt(p[1])||0, lvCount: parseInt(p[2])||0, attr: p[3]||'', size: p[4]||'0g', free: p[5]||'0g' };
   });
 }
 
 function parseLvs(raw) {
   return raw.split('\n').filter(Boolean).map(line => {
-    const p = line.trim().split(/\s{2,}|\t/);
+    const p = line.trim().split('|').map(s => s.trim());
     return { name: p[0]||'', vg: p[1]||'', attr: p[2]||'', size: p[3]||'0g', origin: p[4]||'', mountpoint: p[5]||'' };
   });
 }
@@ -85,17 +104,33 @@ async function getLvmData() {
     };
   }
 
-  const [pvsRaw, vgsRaw, lvsRaw, lsblkRaw, dfRaw] = await Promise.all([
-    run('pvs --noheadings --units g --separator "  " -o pv_name,vg_name,pv_fmt,pv_size,pv_free,pv_attr 2>/dev/null').catch(() => ''),
-    run('vgs --noheadings --units g --separator "  " -o vg_name,pv_count,lv_count,vg_attr,vg_size,vg_free 2>/dev/null').catch(() => ''),
-    run('lvs --noheadings --units g --separator "  " -o lv_name,vg_name,lv_attr,lv_size,origin,lv_path 2>/dev/null').catch(() => ''),
+  const [pvsRaw, vgsRaw, lvsRaw, lsblkRaw, dfRaw, mountsRaw] = await Promise.all([
+    run('pvs --noheadings --units g --separator "|" -o pv_name,vg_name,pv_fmt,pv_size,pv_free,pv_attr 2>/dev/null').catch(() => ''),
+    run('vgs --noheadings --units g --separator "|" -o vg_name,pv_count,lv_count,vg_attr,vg_size,vg_free 2>/dev/null').catch(() => ''),
+    run('lvs --noheadings --units g --separator "|" -o lv_name,vg_name,lv_attr,lv_size,origin,lv_path 2>/dev/null').catch(() => ''),
     run('lsblk -J -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,MODEL 2>/dev/null').catch(() => '{"blockdevices":[]}'),
-    run('df -BG --output=target,size,used,avail,pcent 2>/dev/null | tail -n +2').catch(() => '')
+    run('df -BG --output=target,size,used,avail,pcent 2>/dev/null | tail -n +2').catch(() => ''),
+    run('findmnt -l -o SOURCE,TARGET 2>/dev/null || cat /proc/mounts | awk \'{print $1, $2}\'').catch(() => '')
   ]);
 
   const pvs = parsePvs(pvsRaw);
   const vgs = parseVgs(vgsRaw);
   const lvs = parseLvs(lvsRaw);
+
+  const mountMap = new Map();
+  if (mountsRaw) {
+    mountsRaw.split('\n').forEach(line => {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        mountMap.set(parts[0], parts[1]);
+      }
+    });
+  }
+
+  lvs.forEach(lv => {
+    const lvPath = lv.mountpoint;
+    lv.mountpoint = findMountpoint(lvPath, lv.vg, lv.name, mountMap);
+  });
 
   // Parse df output
   const dfStats = dfRaw.split('\n').filter(Boolean).map(line => {
@@ -1050,7 +1085,7 @@ const LvmPage = (() => {
           out += '\n' + await run(`mkdir -p ${mount} 2>&1`);
           out += '\n' + await run(`mount ${lvPath} ${mount} 2>&1`);
           const fstab = await run('cat /etc/fstab').catch(()=>'');
-          if (!fstab.includes(lvPath)) out += '\n' + await run(`echo '${lvPath} ${mount} ${fs||'ext4'} defaults 0 2' >> /etc/fstab && echo 'Added to /etc/fstab'`);
+          if (!fstab.includes(lvPath)) out += '\n' + await run(`printf '\\n%s\\n' '${lvPath} ${mount} ${fs||'ext4'} defaults 0 2' >> /etc/fstab && echo 'Added to /etc/fstab'`);
         }
         return successResponse(res, { output: out }, 'LV created');
       } catch (e) { return errorResponse(res, e.message, 500); }
