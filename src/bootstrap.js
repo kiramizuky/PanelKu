@@ -53,6 +53,16 @@ export const bootstrap = async (app, httpServer) => {
   app.set('io', io);
   logger.info('Socket.IO initialized');
 
+  // 4.5 Initialize Agent Terminal WebSocket upgrade listener
+  const parsedUrlLib = await import('url');
+  const { handleAgentTerminalUpgrade } = await import('./websocket/agent-terminal.ws.js');
+  httpServer.on('upgrade', (request, socket, head) => {
+    const parsed = parsedUrlLib.parse(request.url);
+    if (parsed.pathname === '/api/agent/terminal/ws') {
+      handleAgentTerminalUpgrade(request, socket, head);
+    }
+  });
+
   // 5. Start background jobs
   startMonitorJob();
   startHealthJob();

@@ -140,15 +140,16 @@ const salt = bcrypt.genSaltSync(10);
 const passwordHash = bcrypt.hashSync('Admin@123456', salt);
 
 db.prepare(`
-  INSERT INTO users (id, username, email, password, role_id, first_name, last_name, is_active, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+  INSERT INTO users (id, username, email, password, role_id, first_name, last_name, is_active, is_super_admin, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
 `).run(uuidv4(), 'admin', 'admin@panelku.fun', passwordHash, adminRoleId, 'Super', 'Admin', ts, ts);
 
 db.close();
 
-// 6. Set chmod 777 on db files
-console.log("[→] Setting write permissions on database files...");
+// 6. Set chmod 777 on storage directory and db files
+console.log("[→] Setting write permissions on database directory and files...");
 try {
+  fs.chmodSync(path.resolve(process.cwd(), 'storage'), 0o777);
   fs.chmodSync(DB_PATH, 0o777);
   if (fs.existsSync(`${DB_PATH}-shm`)) fs.chmodSync(`${DB_PATH}-shm`, 0o777);
   if (fs.existsSync(`${DB_PATH}-wal`)) fs.chmodSync(`${DB_PATH}-wal`, 0o777);

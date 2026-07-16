@@ -172,6 +172,11 @@ const ClusterPage = (() => {
               title="Ping node">
               <i class="bi bi-arrow-repeat"></i><span>Ping</span>
             </button>
+            <a href="/terminal?nodeId=${node.id}" target="_blank" class="btn-lp btn-lp-ghost"
+              style="flex:1; font-size:12px; height:34px; padding:0 10px; display:flex; align-items:center; justify-content:center; gap:5px; border-radius:8px; text-decoration:none; color:var(--text-primary); ${!isOnline ? 'pointer-events:none; opacity:0.5;' : ''}"
+              title="Open Remote Terminal">
+              <i class="bi bi-terminal"></i><span>Terminal</span>
+            </a>
             <button class="btn-lp btn-lp-ghost" onclick="ClusterPage.refreshMetrics('${node.id}')"
               style="flex:1; font-size:12px; height:34px; padding:0 10px; display:flex; align-items:center; justify-content:center; gap:5px; border-radius:8px;"
               title="Refresh metrics" ${!isOnline ? 'disabled' : ''}>

@@ -10,12 +10,20 @@ const TerminalPage = (() => {
   let sessionId = null;
   let selectedOsUser = 'root';
   let loginModal = null;
+  let nodeId = null;
 
   let lastOutputBuffer = [];
 
   async function init() {
     await LP.init();
     if (!LP.state.accessToken) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    nodeId = urlParams.get('nodeId');
+    if (nodeId) {
+      const titleEl = document.querySelector('.lp-page-title');
+      if (titleEl) titleEl.innerHTML = '<i class="bi bi-terminal me-2"></i>Web Terminal (Remote Node)';
+    }
 
     const savedUser = sessionStorage.getItem('lp_terminal_user');
     if (savedUser) {
@@ -47,7 +55,8 @@ const TerminalPage = (() => {
           cols: term.cols,
           rows: term.rows,
           shell: 'bash',
-          osUser: selectedOsUser
+          osUser: selectedOsUser,
+          nodeId: nodeId
         });
       }
     });
