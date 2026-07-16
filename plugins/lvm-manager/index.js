@@ -21,7 +21,7 @@ async function run(cmd) {
 // ─────────────────────────────────────────────
 // Parsers & Helpers
 // ─────────────────────────────────────────────
-function parseG(s) { return parseFloat((s || '0').replace(/[^0-9.]/g, '')) || 0; }
+function parseG(s) { return parseFloat((s || '0').replace(/,/g, '.').replace(/[^0-9.]/g, '')) || 0; }
 
 function findMountpoint(lvPath, vgName, lvName, mountMap) {
   if (!lvPath) return '';
@@ -43,21 +43,21 @@ function findMountpoint(lvPath, vgName, lvName, mountMap) {
 }
 
 function parsePvs(raw) {
-  return raw.split('\n').filter(Boolean).map(line => {
+  return raw.split('\n').filter(line => line.includes('|')).map(line => {
     const p = line.trim().split('|').map(s => s.trim());
     return { name: p[0]||'', vg: p[1]||'(none)', fmt: p[2]||'lvm2', size: p[3]||'0g', free: p[4]||'0g', attr: p[5]||'' };
   });
 }
 
 function parseVgs(raw) {
-  return raw.split('\n').filter(Boolean).map(line => {
+  return raw.split('\n').filter(line => line.includes('|')).map(line => {
     const p = line.trim().split('|').map(s => s.trim());
     return { name: p[0]||'', pvCount: parseInt(p[1])||0, lvCount: parseInt(p[2])||0, attr: p[3]||'', size: p[4]||'0g', free: p[5]||'0g' };
   });
 }
 
 function parseLvs(raw) {
-  return raw.split('\n').filter(Boolean).map(line => {
+  return raw.split('\n').filter(line => line.includes('|')).map(line => {
     const p = line.trim().split('|').map(s => s.trim());
     return { name: p[0]||'', vg: p[1]||'', attr: p[2]||'', size: p[3]||'0g', origin: p[4]||'', mountpoint: p[5]||'' };
   });
@@ -141,9 +141,20 @@ async function getLvmData() {
   // Parse lsblk + get SMART + temp per disk
   let blockDevices = [];
   try {
+    const flattenDevices = (devices) => {
+      let list = [];
+      for (const d of devices) {
+        list.push(d);
+        if (d.children) {
+          list = list.concat(flattenDevices(d.children));
+        }
+      }
+      return list;
+    };
+
     const lsblkData = JSON.parse(lsblkRaw);
     const pvNames = pvs.map(p => p.name);
-    const disks = (lsblkData.blockdevices || []).filter(d => d.type === 'disk');
+    const disks = flattenDevices(lsblkData.blockdevices || []).filter(d => d.type === 'disk' || d.type === 'part');
 
     blockDevices = await Promise.all(disks.map(async d => {
       const used = pvNames.some(pv => pv.includes(d.name));
@@ -241,7 +252,7 @@ export default {
     app.get('/plugins/lvm-manager', async (req, res) => {
       try {
         const data = await getLvmData();
-        const parseG = s => parseFloat((s||'0').replace(/[^0-9.]/g,''))||0;
+        const parseG = s => parseFloat((s||'0').replace(/,/g, '.').replace(/[^0-9.]/g,''))||0;
 
         // ── Summary stats
         const totalStorageG = data.pvs.reduce((a, p) => a + parseG(p.size), 0);
