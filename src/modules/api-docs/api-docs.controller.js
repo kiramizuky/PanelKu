@@ -30,6 +30,11 @@ class ApiDocsController {
         tryItOutEnabled: false,
       },
     });
+
+    // JSON endpoint to serve raw OpenAPI spec
+    this.serveJson = (req, res) => {
+      res.json(swaggerSpec);
+    };
   }
 }
 
