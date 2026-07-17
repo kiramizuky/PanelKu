@@ -1,0 +1,66 @@
+<!-- API Documentation Page -->
+<div class="container-fluid px-0">
+  <!-- Page Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3 px-3">
+    <div>
+      <h4 class="mb-1" style="font-weight:600;">
+        <i class="bi bi-book me-2" style="color:var(--accent-primary);"></i>API Documentation
+      </h4>
+      <p class="text-muted mb-0" style="font-size:13px;">
+        Complete REST API reference for Linux Panel. 
+        <a href="/api/api-docs/spec.json" target="_blank" class="text-info" style="font-size:12px;">
+          <i class="bi bi-download"></i> Download OpenAPI Spec (JSON)
+        </a>
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn-lp btn-lp-ghost" onclick="document.querySelector('.swagger-ui .btn.authorize')?.click()" style="font-size:12px;">
+        <i class="bi bi-shield-lock me-1"></i> Authorize
+      </button>
+      <button class="btn-lp btn-lp-ghost" onclick="window.open('/api/api-docs/spec.json', '_blank')" style="font-size:12px;">
+        <i class="bi bi-filetype-json me-1"></i> Raw Spec
+      </button>
+    </div>
+  </div>
+
+  <!-- Swagger UI Container -->
+  <div id="swaggerContainer" style="position:relative; min-height: calc(100vh - 200px);">
+    <!-- Loading indicator -->
+    <div id="swaggerLoading" class="text-center py-5">
+      <div class="spinner-border text-primary mb-3" role="status" style="width: 2.5rem; height: 2.5rem;"></div>
+      <p class="text-muted" style="font-size:13px;">Loading API documentation...</p>
+    </div>
+
+    <!-- Error indicator -->
+    <div id="swaggerError" class="text-center py-5 d-none">
+      <i class="bi bi-exclamation-triangle text-warning" style="font-size: 2rem; display:block; margin-bottom:12px;"></i>
+      <p class="text-muted" style="font-size:13px;">Failed to load Swagger UI. Please refresh the page.</p>
+      <button class="btn-lp btn-lp-primary btn-lp-sm mt-2" onclick="location.reload()">Refresh</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // Strip 'layout' scripts since Swagger UI loads its own 
+    // and we inject via iframe to avoid CSS conflicts
+    const container = document.getElementById('swaggerContainer');
+    const loading = document.getElementById('swaggerLoading');
+    
+    // Create an iframe to isolate Swagger UI from panel styles
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width:100%; height:100%; min-height:calc(100vh - 200px); border:none; border-radius:12px; background:#f7f9fc;';
+    iframe.src = '/api/api-docs/docs';
+    iframe.title = 'API Documentation';
+    iframe.onload = () => {
+      loading.classList.add('d-none');
+    };
+    iframe.onerror = () => {
+      loading.classList.add('d-none');
+      document.getElementById('swaggerError').classList.remove('d-none');
+    };
+    
+    // Append iframe to container (after loading spinner)
+    container.appendChild(iframe);
+  })();
+</script>

@@ -22,6 +22,7 @@ import whatsappRoutes from '../modules/whatsapp/whatsapp.routes.js';
 import clusterRoutes from '../modules/cluster/cluster.routes.js';
 import aiRoutes from '../modules/ai/ai.routes.js';
 import agentRoutes from '../modules/agent/agent.routes.js';
+import apiDocsRoutes from '../modules/api-docs/api-docs.routes.js';
 
 const router = Router();
 
@@ -62,5 +63,8 @@ router.use('/whatsapp', whatsappRoutes);
 router.use('/cluster', clusterRoutes);
 router.use('/ai', aiRoutes);
 router.use('/agent', agentRoutes);  // Cluster agent API — accessible via X-API-Key
+
+// API Documentation (mounted under /api prefix)
+router.use('/api-docs', apiDocsRoutes);
 
 export default router;

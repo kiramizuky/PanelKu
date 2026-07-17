@@ -149,8 +149,7 @@ const createApp = () => {
   app.get('/settings/audit', (req, res) => res.render('settings/audit', { title: 'Audit Log' }));
   app.get('/settings/changelog', (req, res) => res.render('settings/changelog', { title: 'Changelog' }));
   app.get('/whatsapp', (req, res) => res.render('whatsapp/index', { title: 'WhatsApp API' }));
-
-
+  app.get('/api-docs', (req, res) => res.render('api-docs/index', { title: 'API Documentation' }));
 
   // Dynamic plugins router (loaded before 404 handler)
   app.use((req, res, next) => pluginLoader.handleProxy(req, res, next));
