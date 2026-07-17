@@ -32,7 +32,7 @@ const WAFPage = {
           </tr>
         `, 'No WAF rules found', 5);
       } else {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${res.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${LP.escHtml(res.message)}</td></tr>`;
       }
     } catch (err) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Failed to load WAF rules</td></tr>';

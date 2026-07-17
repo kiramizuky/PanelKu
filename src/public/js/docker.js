@@ -31,7 +31,7 @@ const DockerPage = (() => {
 
     const res = await LP.get('/docker/containers');
     if (!res?.success) {
-      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${res?.message || 'Error'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${LP.escHtml(res?.message || 'Error')}</td></tr>`;
       return;
     }
 

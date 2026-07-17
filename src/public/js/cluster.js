@@ -207,7 +207,7 @@ const ClusterPage = (() => {
     try {
       const res = await LP.get('/cluster/nodes');
       if (!res?.success) {
-        container.innerHTML = `<div class="col-12 text-center text-danger">Gagal memuat nodes: ${res?.message || ''}</div>`;
+        container.innerHTML = `<div class="col-12 text-center text-danger">Gagal memuat nodes: ${LP.escHtml(res?.message || '')}</div>`;
         return;
       }
 
@@ -453,7 +453,7 @@ const ClusterPage = (() => {
       }
 
     } catch (err) {
-      document.getElementById('detailSystemInfo').innerHTML = `<div class="col-12 text-center text-danger">Error: ${err.message}</div>`;
+      document.getElementById('detailSystemInfo').innerHTML = `<div class="col-12 text-center text-danger">Error: ${LP.escHtml(err.message)}</div>`;
     }
   }
 

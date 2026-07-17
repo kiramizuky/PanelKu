@@ -22,7 +22,7 @@ const WebsitesPage = (() => {
 
       const res = await LP.get('/websites');
       if (!res?.success) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${res?.message || 'Error loading websites'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${LP.escHtml(res?.message || 'Error loading websites')}</td></tr>`;
         return;
       }
 
@@ -58,7 +58,7 @@ const WebsitesPage = (() => {
     } catch (err) {
       console.error('loadWebsites error:', err);
       const tbody = document.getElementById('websitesTableBody');
-      if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error: ${err.message}</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error: ${LP.escHtml(err.message)}</td></tr>`;
     }
   }
 

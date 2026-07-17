@@ -13,6 +13,31 @@ import auditRepository from '../../repositories/audit.repository.js';
 
 class AuthService {
   /**
+   * In-memory cache for recently rotated tokens.
+   * Prevents race condition when two concurrent refresh requests both
+   * attempt to use the same old refresh token within a short window.
+   * TTL: 60 seconds. Cleans up stale entries automatically.
+   */
+  static _recentlyRotated = new Map();
+  static _rotationCleanupTimer = null;
+
+  static _startRotationCleanup() {
+    if (AuthService._rotationCleanupTimer) return;
+    AuthService._rotationCleanupTimer = setInterval(() => {
+      const now = Date.now();
+      for (const [token, entry] of AuthService._recentlyRotated) {
+        if (entry.expiresAt <= now) {
+          AuthService._recentlyRotated.delete(token);
+        }
+      }
+    }, 30000); // Clean every 30s
+    // Allow process to exit even if timer is active
+    if (AuthService._rotationCleanupTimer.unref) {
+      AuthService._rotationCleanupTimer.unref();
+    }
+  }
+
+  /**
    * Login with username/password
    */
   async login(username, password, req) {
@@ -146,8 +171,19 @@ class AuthService {
   /**
    * Refresh access token using refresh token
    * [SECURITY FIX] Token rotation: old session deactivated, new session created
+   * [RACE CONDITION FIX] In-memory grace cache prevents race condition when two
+   * concurrent requests attempt to refresh using the same old token.
    */
   async refreshToken(token) {
+    // [RACE CONDITION FIX] Check grace cache first — if this token was recently
+    // rotated by a concurrent request, return the new tokens without throwing 401.
+    AuthService._startRotationCleanup();
+    const cached = AuthService._recentlyRotated.get(token);
+    if (cached && cached.expiresAt > Date.now()) {
+      logger.debug('Token rotation grace cache hit — concurrent refresh detected');
+      return { accessToken: cached.accessToken, refreshToken: cached.newRefreshToken };
+    }
+
     const session = await sessionRepository.findByRefreshToken(token);
 
     if (!session || !session.isActive) {
@@ -183,6 +219,16 @@ class AuthService {
       ip: session.ip || '',
       expiresAt,
     });
+
+    // [RACE CONDITION FIX] Cache old token for 60s grace period so concurrent
+    // requests using the same old token don't fail with 401.
+    AuthService._recentlyRotated.set(token, {
+      accessToken,
+      newRefreshToken: refreshToken,
+      expiresAt: Date.now() + 60000,
+    });
+    // Remove from cache after 60s to free memory
+    setTimeout(() => AuthService._recentlyRotated.delete(token), 60000);
 
     return { accessToken, refreshToken };
   }

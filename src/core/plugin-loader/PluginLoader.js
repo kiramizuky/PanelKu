@@ -142,8 +142,10 @@ class PluginLoader {
   /**
    * Validate a proxy URL — only http/https, no private/internal IPs.
    * Prevents SSRF attacks.
+   * @param {string} url - The proxy URL to validate
+   * @param {boolean} [allowInternal=false] - If true, allow private/internal IP ranges
    */
-  _validateProxyUrl(url) {
+  _validateProxyUrl(url, allowInternal = false) {
     if (!url || typeof url !== 'string') throw new Error('Proxy URL is required');
 
     let parsed;
@@ -160,43 +162,88 @@ class PluginLoader {
 
     const hostname = parsed.hostname.toLowerCase();
 
-    // Block private/internal IPs (SSRF protection)
-    const blockedPatterns = [
-      // Loopback
-      'localhost', '127.0.0.1', '::1', '0.0.0.0',
-      // Cloud metadata endpoints
-      '169.254.169.254',
-      // Docker internal
-      'host.docker.internal',
-    ];
+    // Block private/internal IPs (SSRF protection) — unless allowInternal is true
+    if (!allowInternal) {
+      const blockedPatterns = [
+        // Loopback
+        'localhost', '127.0.0.1', '::1', '0.0.0.0',
+        // Cloud metadata endpoints
+        '169.254.169.254',
+        // Docker internal
+        'host.docker.internal',
+      ];
 
-    if (blockedPatterns.includes(hostname)) {
-      throw new Error('Proxy URL cannot point to localhost or internal services');
-    }
+      if (blockedPatterns.includes(hostname)) {
+        throw new Error('Proxy URL cannot point to localhost or internal services');
+      }
 
-    // Block private IP ranges
-    if (isIP(hostname)) {
-      const parts = hostname.split('.').map(Number);
-      if (parts.length === 4) {
-        // 10.0.0.0/8
-        if (parts[0] === 10) throw new Error('Proxy URL cannot point to private IP range');
-        // 172.16.0.0/12
-        if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) throw new Error('Proxy URL cannot point to private IP range');
-        // 192.168.0.0/16
-        if (parts[0] === 192 && parts[1] === 168) throw new Error('Proxy URL cannot point to private IP range');
-        // 100.64.0.0/10 (CGNAT)
-        if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) throw new Error('Proxy URL cannot point to CGNAT range');
+      // Block private IP ranges
+      if (isIP(hostname)) {
+        const parts = hostname.split('.').map(Number);
+        if (parts.length === 4) {
+          // 10.0.0.0/8
+          if (parts[0] === 10) throw new Error('Proxy URL cannot point to private IP range');
+          // 172.16.0.0/12
+          if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) throw new Error('Proxy URL cannot point to private IP range');
+          // 192.168.0.0/16
+          if (parts[0] === 192 && parts[1] === 168) throw new Error('Proxy URL cannot point to private IP range');
+          // 100.64.0.0/10 (CGNAT)
+          if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) throw new Error('Proxy URL cannot point to CGNAT range');
+        }
       }
     }
 
-    return url.trim();
+    return { validatedUrl: url.trim(), hostname };
   }
 
-  setProxy(id, proxyUrl) {
+  /**
+   * Trusted proxy overrides — plugins explicitly marked as trusted
+   * are allowed to proxy to internal/private IPs (Docker containers, etc.).
+   * This is a set of plugin IDs that have been explicitly trusted by the admin.
+   */
+  _trustedPlugins = new Set();
+
+  /**
+   * Mark a plugin as trusted for internal proxy access.
+   * Trusted plugins can proxy to Docker containers, local services, etc.
+   * @param {string} pluginId 
+   */
+  trustPlugin(pluginId) {
+    if (!pluginId || typeof pluginId !== 'string') throw new Error('Invalid plugin ID');
+    this._trustedPlugins.add(pluginId);
+    logger.info(`PluginLoader: plugin [${pluginId}] marked as trusted for proxy`);
+  }
+
+  /**
+   * Remove trusted status from a plugin.
+   * @param {string} pluginId 
+   */
+  untrustPlugin(pluginId) {
+    this._trustedPlugins.delete(pluginId);
+  }
+
+  /**
+   * Check if a plugin is trusted for internal proxy access.
+   * @param {string} pluginId 
+   * @returns {boolean}
+   */
+  isPluginTrusted(pluginId) {
+    return this._trustedPlugins.has(pluginId);
+  }
+
+  /**
+   * Set a proxy URL for a plugin.
+   * If the plugin is trusted (via trustPlugin()), internal/private IPs are allowed.
+   * @param {string} id - Plugin ID
+   * @param {string} proxyUrl - Target proxy URL
+   * @param {boolean} [forceAllowInternal=false] - Explicitly allow internal IPs for this call
+   */
+  setProxy(id, proxyUrl, forceAllowInternal = false) {
     if (proxyUrl) {
       try {
-        const validated = this._validateProxyUrl(proxyUrl);
-        this._proxies.set(id, validated);
+        const allowInternal = forceAllowInternal || this._trustedPlugins.has(id);
+        const { validatedUrl } = this._validateProxyUrl(proxyUrl, allowInternal);
+        this._proxies.set(id, validatedUrl);
       } catch (err) {
         logger.warn(`PluginLoader: invalid proxy URL for plugin ${id}: ${err.message}`);
         throw err;
