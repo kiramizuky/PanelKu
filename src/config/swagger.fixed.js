@@ -1295,7 +1295,7 @@ Rate limit headers (\`RateLimit-*\`) are included in all responses.
       },
     },
   },
-  }
+},
   // swagger-jsdoc options — we define all paths manually in the spec above,
   // so we just need the base configuration.
   apis: []

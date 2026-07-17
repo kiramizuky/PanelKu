@@ -40,6 +40,50 @@
   --bg-color: #f3f4f6;
 }
 
+/* Midnight Theme */
+:root[data-theme="midnight"] {
+  --text-primary: #e2e8f0;
+  --text-secondary: rgba(226, 232, 240, 0.85);
+  --text-muted: rgba(148, 163, 184, 0.7);
+  
+  --glass-bg: rgba(10, 14, 23, 0.55);
+  --glass-border: rgba(59, 130, 246, 0.15);
+  --glass-border-hover: rgba(59, 130, 246, 0.3);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+
+  --accent-primary: #60a5fa;
+  --accent-hover: #3b82f6;
+  --bg-color: #070b14;
+}
+
+:root[data-theme="midnight"] body {
+  background-image: url('/images/bg2.png');
+}
+
+/* Dracula Theme */
+:root[data-theme="dracula"] {
+  --text-primary: #f8f8f2;
+  --text-secondary: rgba(248, 248, 242, 0.85);
+  --text-muted: rgba(189, 147, 249, 0.6);
+  
+  --glass-bg: rgba(40, 42, 54, 0.55);
+  --glass-border: rgba(189, 147, 249, 0.2);
+  --glass-border-hover: rgba(189, 147, 249, 0.35);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+
+  --accent-primary: #bd93f9;
+  --accent-hover: #caa8ff;
+  --accent-success: #50fa7b;
+  --accent-warning: #ffb86c;
+  --accent-danger: #ff5555;
+  --accent-info: #8be9fd;
+  --bg-color: #1e1f2c;
+}
+
+:root[data-theme="dracula"] body {
+  background-image: url('/images/bg3.png');
+}
+
 /* Light mode specific element adjustments */
 .light-mode .lp-brand,
 .light-mode .lp-nav-link,

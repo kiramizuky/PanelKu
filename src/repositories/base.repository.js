@@ -8,11 +8,11 @@ export default class BaseRepository {
     this.model = model;
   }
 
-  async findById(id, options = {}) {
+  async findById(id, _options = {}) {
     return this.model.findById(id);
   }
 
-  async findOne(filter, options = {}) {
+  async findOne(filter, _options = {}) {
     return this.model.findOne(filter);
   }
 
@@ -41,8 +41,8 @@ export default class BaseRepository {
     return this.model.create(data);
   }
 
-  async updateById(id, data, options = {}) {
-    return this.model.findByIdAndUpdate(id, data, { new: true, ...options });
+  async updateById(id, data, _options = {}) {
+    return this.model.findByIdAndUpdate(id, data, { new: true, ..._options });
   }
 
   async updateOne(filter, data, options = {}) {

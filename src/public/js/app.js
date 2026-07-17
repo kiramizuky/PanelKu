@@ -245,23 +245,27 @@ const LP = {
   // ── Theme ─────────────────────────────────────────────
   initTheme() {
     const saved = localStorage.getItem('lp_theme') || 'dark';
-    if (saved === 'light') {
-      document.documentElement.classList.add('light-mode');
-      const icon = document.getElementById('themeIcon');
-      if (icon) {
-        icon.classList.remove('bi-moon-fill');
-        icon.classList.add('bi-sun-fill');
-      }
-    }
+    this.applyTheme(saved);
   },
 
-  toggleTheme() {
-    const isLight = document.documentElement.classList.toggle('light-mode');
-    localStorage.setItem('lp_theme', isLight ? 'light' : 'dark');
-    
+  applyTheme(theme) {
+    document.documentElement.classList.remove('light-mode');
+
+    if (theme === 'light') {
+      document.documentElement.classList.add('light-mode');
+      document.documentElement.style.colorScheme = 'light';
+      document.documentElement.setAttribute('data-bs-theme', 'light');
+    } else {
+      document.documentElement.style.colorScheme = 'dark';
+      document.documentElement.setAttribute('data-bs-theme', 'dark');
+    }
+
+    document.documentElement.setAttribute('data-theme', theme);
+
+    // Update icon
     const icon = document.getElementById('themeIcon');
     if (icon) {
-      if (isLight) {
+      if (theme === 'light') {
         icon.classList.remove('bi-moon-fill');
         icon.classList.add('bi-sun-fill');
       } else {
@@ -269,6 +273,13 @@ const LP = {
         icon.classList.add('bi-moon-fill');
       }
     }
+  },
+
+  toggleTheme() {
+    const current = localStorage.getItem('lp_theme') || 'dark';
+    const newTheme = current === 'light' ? 'dark' : 'light';
+    localStorage.setItem('lp_theme', newTheme);
+    this.applyTheme(newTheme);
   },
 
   // ── HTML/Js String Escape ────────────────────────────────

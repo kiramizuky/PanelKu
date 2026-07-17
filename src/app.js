@@ -8,10 +8,10 @@ import { dirname, join } from 'path';
 import appConfig from './config/app.js';
 import logger from './config/logger.js';
 import apiRoutes from './routes/index.js';
-import { apiLimiter, apiKeyLimiter } from './middleware/rateLimiter.js';
+import { apiLimiter } from './middleware/rateLimiter.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
-import { wafMiddleware, refreshWafCache } from './middleware/waf.middleware.js';
+import { wafMiddleware } from './middleware/waf.middleware.js';
 
 import expressEjsLayouts from 'express-ejs-layouts';
 import pluginLoader from './core/plugin-loader/PluginLoader.js';
@@ -57,8 +57,9 @@ const createApp = () => {
         formAction: ["'self'"],
         // [HARDEN] Restrict base URI to prevent base tag injection
         baseUri: ["'self'"],
-        // [HARDEN] Prevent clickjacking — frame-ancestors 'none' is stricter than X-Frame-Options
-        frameAncestors: ["'none'"],
+        // Allow same-origin framing (needed for API docs iframe)
+        // Cross-origin framing (clickjacking) is still prevented
+        frameAncestors: ["'self'"],
         upgradeInsecureRequests: null,
       },
     },

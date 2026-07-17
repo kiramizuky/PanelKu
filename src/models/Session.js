@@ -1,7 +1,7 @@
 /**
  * Session model — SQLite adapter
  */
-import { getDb, generateId, now, fromJson } from '../core/db/sqlite.js';
+import { getDb, generateId, now } from '../core/db/sqlite.js';
 
 function rowToSession(row) {
   if (!row) return null;
@@ -65,7 +65,7 @@ const Session = {
     return this.findById(id);
   },
 
-  async findByIdAndUpdate(id, data, options = {}) {
+  async findByIdAndUpdate(id, data, _options = {}) {
     const db = getDb();
     const ts = now();
     const sets = [];

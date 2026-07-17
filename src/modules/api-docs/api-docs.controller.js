@@ -35,6 +35,7 @@ class ApiDocsController {
     this.serveJson = (req, res) => {
       res.json(swaggerSpec);
     };
+
   }
 }
 

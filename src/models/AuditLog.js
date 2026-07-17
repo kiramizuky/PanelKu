@@ -83,7 +83,7 @@ const AuditLog = {
     return this.findById(id);
   },
 
-  async deleteMany(filter = {}) {
+  async deleteMany(_filter = {}) {
     const db = getDb();
     db.prepare('DELETE FROM audit_logs').run();
   },

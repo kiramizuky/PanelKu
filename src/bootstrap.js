@@ -110,8 +110,6 @@ async function seedInitialData() {
   const Role = (await import('./models/Role.js')).default;
   const User = (await import('./models/User.js')).default;
   const { ROLES, RESOURCES, ACTIONS } = await import('./config/constants.js');
-  const bcrypt = (await import('bcryptjs')).default;
-
   // Create default roles if they don't exist
   const defaultRoles = [
     {

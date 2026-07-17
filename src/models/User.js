@@ -77,14 +77,14 @@ function populateRole(user) {
 
 const User = {
   // findById
-  async findById(id, select) {
+  async findById(id, _select) {
     const db  = getDb();
     const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     const user = rowToUser(row);
     return populateRole(user);
   },
 
-  async findOne(filter, select) {
+  async findOne(filter, _select) {
     const db = getDb();
     if (filter.username) {
       const row = db.prepare('SELECT * FROM users WHERE username = ?').get(filter.username.toLowerCase());
@@ -120,7 +120,7 @@ const User = {
     return chain;
   },
 
-  async find(filter = {}, select) {
+  async find(_filter = {}, _select) {
     const db = getDb();
     const rows = db.prepare('SELECT * FROM users ORDER BY created_at DESC').all();
     return rows.map(r => populateRole(rowToUser(r)));
@@ -164,7 +164,7 @@ const User = {
     return this.findById(id);
   },
 
-  async findByIdAndUpdate(id, update, options = {}) {
+  async findByIdAndUpdate(id, update, _options = {}) {
     const db = getDb();
     const ts = now();
     const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);

@@ -1,7 +1,7 @@
 /**
  * Setting model — SQLite adapter
  */
-import { getDb, generateId, now, toJson, fromJson } from '../core/db/sqlite.js';
+import { getDb, generateId, now, fromJson } from '../core/db/sqlite.js';
 
 function rowToSetting(row) {
   if (!row) return null;

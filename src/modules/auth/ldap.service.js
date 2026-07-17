@@ -217,7 +217,8 @@ class LDAPService {
     const defaultRole = await roleRepository.findBySlug(config.defaultRole);
     if (!defaultRole) throw new Error('Default role not found');
 
-    // Generate a random password (LDAP users authenticate via LDAP, not local password)      const randomPass = crypto.randomBytes(24).toString('hex');
+    // Generate a random password (LDAP users authenticate via LDAP, not local password)
+      const randomPass = crypto.randomBytes(24).toString('hex');
 
     user = await userRepository.create({
       username: ldapProfile.username,

@@ -31,7 +31,6 @@ const Notification = {
   },
 
   async findOne(filter) {
-    const db = getDb();
     if (filter._id) return this.findById(filter._id);
     return null;
   },
@@ -74,7 +73,7 @@ const Notification = {
     return this.findById(id);
   },
 
-  async findByIdAndUpdate(id, data, options = {}) {
+  async findByIdAndUpdate(id, data, _options = {}) {
     const db = getDb();
     const ts = now();
     const upd = data.$set || data;

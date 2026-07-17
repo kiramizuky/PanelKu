@@ -58,7 +58,7 @@ const WafRule = {
     return this.findById(id);
   },
 
-  async findByIdAndUpdate(id, data, options = {}) {
+  async findByIdAndUpdate(id, data, _options = {}) {
     const db = getDb();
     const ts = now();
     const existing = await this.findById(id);
@@ -84,7 +84,7 @@ const WafRule = {
     return r;
   },
 
-  async deleteMany(filter = {}) {
+  async deleteMany(_filter = {}) {
     const db = getDb();
     db.prepare('DELETE FROM waf_rules').run();
   },

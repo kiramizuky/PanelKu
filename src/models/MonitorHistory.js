@@ -17,7 +17,7 @@ function rowToHistory(row) {
 }
 
 const MonitorHistory = {
-  async find(filter = {}, options = {}) {
+  async find(_filter = {}, options = {}) {
     const db    = getDb();
     const limit = options.limit || 1000;
     const rows  = db.prepare('SELECT * FROM monitor_history ORDER BY timestamp DESC LIMIT ?').all(limit);

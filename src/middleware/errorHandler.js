@@ -5,7 +5,7 @@ import { HTTP } from '../config/constants.js';
  * Global error handler middleware.
  * Must be registered LAST in Express middleware chain.
  */
-export const errorHandler = (err, req, res, next) => {
+export const errorHandler = (err, req, res, _next) => {
   // Log error
   logger.error(`${err.name}: ${err.message}`, {
     path: req.path,

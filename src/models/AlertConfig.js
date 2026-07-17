@@ -39,7 +39,7 @@ const AlertConfig = {
     return rowToConfig(db.prepare('SELECT * FROM alert_configs WHERE id = ?').get(id));
   },
 
-  async findOne(filter = {}) {
+  async findOne(_filter = {}) {
     const db = getDb();
     const row = db.prepare('SELECT * FROM alert_configs WHERE singleton = ?').get('global');
     if (row) return rowToConfig(row);
@@ -60,7 +60,7 @@ const AlertConfig = {
     return rowToConfig(db.prepare('SELECT * FROM alert_configs WHERE id = ?').get(id));
   },
 
-  async findOneAndUpdate(filter, data, options = {}) {
+  async findOneAndUpdate(filter, data, _options = {}) {
     const db = getDb();
     const ts = now();
     let existing = await this.findOne(filter);

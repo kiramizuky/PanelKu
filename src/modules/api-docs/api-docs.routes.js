@@ -1,18 +1,16 @@
 import { Router } from 'express';
 import apiDocsController from './api-docs.controller.js';
-import { authenticate } from '../../middleware/auth.js';
-import { rbac } from '../../middleware/rbac.js';
-import { RESOURCES, ACTIONS } from '../../config/constants.js';
 
 const router = Router();
 
-// Protected routes
-router.use(authenticate);
+// API Documentation is publicly served (read-only docs, no sensitive data).
+// Auth is handled by the parent page — the iframe cannot pass Bearer token headers,
+// and the spec is just endpoint descriptions without credentials.
 
-// Swagger UI page (DASHBOARD:READ permission since all admins should see API docs)
-router.use('/docs', rbac(RESOURCES.DASHBOARD, ACTIONS.READ), apiDocsController.serve, apiDocsController.setup);
+// Swagger UI page
+router.use('/docs', apiDocsController.serve, apiDocsController.setup);
 
 // Raw JSON specification endpoint
-router.get('/spec.json', rbac(RESOURCES.DASHBOARD, ACTIONS.READ), apiDocsController.serveJson);
+router.get('/spec.json', apiDocsController.serveJson);
 
 export default router;

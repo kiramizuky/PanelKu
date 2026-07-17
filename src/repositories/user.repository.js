@@ -1,20 +1,20 @@
 import BaseRepository from './base.repository.js';
 import User from '../models/User.js';
-import { getDb, toJson, now } from '../core/db/sqlite.js';
+import { getDb, now } from '../core/db/sqlite.js';
 
 class UserRepository extends BaseRepository {
   constructor() {
     super(User);
   }
 
-  async findByUsername(username, withPassword = false) {
+  async findByUsername(username, _withPassword = false) {
     const user = await User.findOne({ username: username.toLowerCase() });
     if (!user) return null;
     // Populate role
     return this._populateRole(user);
   }
 
-  async findByEmail(email, withPassword = false) {
+  async findByEmail(email, _withPassword = false) {
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) return null;
     return this._populateRole(user);
