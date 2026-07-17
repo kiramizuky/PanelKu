@@ -161,19 +161,31 @@ class SystemService {
     return out;
   }
 
+  /**
+   * Validate a Tailscale authkey — must be alphanumeric with optional hyphens/underscores
+   * Prevents command injection via shell metacharacters.
+   */
+  _validateAuthkey(key) {
+    if (!key) return '';
+    if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
+      throw new Error('Authkey contains invalid characters');
+    }
+    return key;
+  }
+
   async tailscaleUp(authkey = '') {
     logger.info('Starting Tailscale up...');
     
     // Check if we are running as root to avoid sudo command wrapping errors
     const isRoot = process.getuid ? (process.getuid() === 0) : true;
-    let cmd = isRoot ? 'tailscale up' : 'sudo tailscale up';
-    
-    if (authkey) {
-      cmd += ` --authkey=${authkey}`;
-    }
+
+    // [SECURITY FIX] Validate authkey before using it — prevents command injection
+    const safeAuthkey = this._validateAuthkey(authkey);
 
     if (process.platform === 'win32') {
-      const out = this.mockCommand(cmd);
+      const cmd = isRoot ? 'tailscale up' : 'sudo tailscale up';
+      const cmdWithKey = safeAuthkey ? `${cmd} --authkey=${safeAuthkey}` : cmd;
+      const out = this.mockCommand(cmdWithKey);
       if (out.includes('https://login.tailscale.com')) {
         const match = out.match(/https:\/\/login\.tailscale\.com\S+/);
         return { success: true, connected: false, loginUrl: match ? match[0] : null };
@@ -182,8 +194,14 @@ class SystemService {
     }
     
     return new Promise((resolve, reject) => {
-      // Spawn with a single command line string when shell: true is enabled
-      const child = spawn(cmd, { shell: true });
+      // [SECURITY FIX] Use execFile with args array — NO shell:true, NO string interpolation.
+      // This completely prevents command injection via authkey.
+      const bin = isRoot ? 'tailscale' : 'sudo';
+      const args = isRoot
+        ? (safeAuthkey ? ['up', '--authkey', safeAuthkey] : ['up'])
+        : (safeAuthkey ? ['tailscale', 'up', '--authkey', safeAuthkey] : ['tailscale', 'up']);
+
+      const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
       let output = '';
       let resolved = false;
 
@@ -272,8 +290,7 @@ class SystemService {
 
   async updateEnvVariable(key, value) {
     try {
-      const fs = (await import('fs/promises')).default;
-      const path = (await import('path')).default;
+      const fs = await import('fs/promises');
       const envPath = path.resolve('.env');
       let content = await fs.readFile(envPath, 'utf8');
       
@@ -444,8 +461,7 @@ class SystemService {
 
   async getAutoUpdate() {
     try {
-      const fs = (await import('fs/promises')).default;
-      const path = (await import('path')).default;
+      const fs = await import('fs/promises');
       const data = await fs.readFile(path.resolve('storage', 'system.json'), 'utf8');
       return JSON.parse(data).autoUpdate === true;
     } catch {
@@ -454,8 +470,7 @@ class SystemService {
   }
 
   async setAutoUpdate(enabled) {
-    const fs = (await import('fs/promises')).default;
-    const path = (await import('path')).default;
+    const fs = await import('fs/promises');
     const filePath = path.resolve('storage', 'system.json');
     let data = {};
     try {
@@ -503,8 +518,7 @@ class SystemService {
   // ── Panel Update Methods ─────────────────────────────────
 
   async getPanelVersion() {
-    const fs = (await import('fs/promises')).default;
-    const path = (await import('path')).default;
+    const fs = await import('fs/promises');
 
     // Read from package.json
     let current = '1.0.0';
@@ -523,13 +537,33 @@ class SystemService {
     return { current, lastUpdated };
   }
 
+  /**
+   * Validate a git branch/tag reference — only allow safe characters.
+   * Git refs can contain: alphanumeric, hyphens, underscores, dots, slashes.
+   * Explicitly block shell metacharacters like ; ` $ () { } < > | &.
+   */
+  _validateGitRef(ref) {
+    if (!ref || typeof ref !== 'string') throw new Error('Invalid git reference');
+    // Git refs may contain: letters, numbers, hyphens, underscores, dots, slashes
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/.test(ref)) {
+      throw new Error('Invalid git reference: contains unsafe characters');
+    }
+    if (ref.length > 256) throw new Error('Git reference too long');
+    return ref;
+  }
+
   async checkPanelUpdate() {
     const { current } = await this.getPanelVersion();
     let latest = current;
     let hasUpdate = false;
 
     try {
-      const activeBranch = (await this.runCommand('git rev-parse --abbrev-ref HEAD 2>/dev/null')).trim() || 'master';
+      const rawBranch = (await this.runCommand('git rev-parse --abbrev-ref HEAD 2>/dev/null')).trim() || 'master';
+      // [SECURITY FIX] Validate the branch name before interpolating into shell commands.
+      // Even though it comes from git output, a malicious branch name (e.g. "main;echo pwned")
+      // could execute arbitrary commands.
+      const activeBranch = this._validateGitRef(rawBranch);
+
       const result = await this.runCommand(`git fetch origin && git log HEAD..origin/${activeBranch} --oneline 2>/dev/null | wc -l`);
       const behindCount = parseInt(result.trim()) || 0;
       hasUpdate = behindCount > 0;
@@ -546,13 +580,31 @@ class SystemService {
     return { current, latest, hasUpdate };
   }
 
+  /**
+   * Validate a git commit hash — must be a full SHA-1 (40 hex chars) or SHA-256 (64 hex chars).
+   */
+  _validateCommitHash(hash) {
+    if (!hash) return '';
+    if (!/^[a-f0-9]{40}$/.test(hash) && !/^[a-f0-9]{64}$/.test(hash)) {
+      throw new Error('Invalid commit hash format');
+    }
+    return hash;
+  }
+
   async runPanelUpdate(method = 'git', branch = 'main') {
     let log = '';
-    const currentCommit = (await this.runCommand('git rev-parse HEAD 2>/dev/null').catch(() => '')).trim();
+    const rawCommit = (await this.runCommand('git rev-parse HEAD 2>/dev/null').catch(() => '')).trim();
+    // [SECURITY FIX] Validate commit hash before using in shell rollback command
+    const currentCommit = this._validateCommitHash(rawCommit);
 
     if (method === 'git') {
-      const localBranch = (await this.runCommand('git rev-parse --abbrev-ref HEAD 2>/dev/null')).trim() || 'master';
-      const targetBranch = branch === 'main' && localBranch !== 'main' ? localBranch : branch;
+      const rawLocalBranch = (await this.runCommand('git rev-parse --abbrev-ref HEAD 2>/dev/null')).trim() || 'master';
+      // [SECURITY FIX] Validate branch name from git output
+      const localBranch = this._validateGitRef(rawLocalBranch);
+      
+      // [SECURITY FIX] Validate user-supplied branch parameter
+      const safeBranch = this._validateGitRef(branch);
+      const targetBranch = safeBranch === 'main' && localBranch !== 'main' ? localBranch : safeBranch;
 
       // Mark directory safe for root
       log += await this.runCommand('git config --global --add safe.directory /opt/panelku 2>&1').catch(() => '');
@@ -576,14 +628,14 @@ class SystemService {
     }
 
     if (!syntaxCheckSuccess && currentCommit) {
+      // [SECURITY FIX] currentCommit is validated as a valid SHA hash — safe to use
       log += await this.runCommand(`git reset --hard ${currentCommit} && npm install --production 2>&1`);
       log += `\n[Rollback Complete] System restored to commit ${currentCommit}.\n`;
       return log;
     }
 
     // Save last updated timestamp
-    const fs = (await import('fs/promises')).default;
-    const path = (await import('path')).default;
+    const fs = await import('fs/promises');
     const filePath = path.resolve('storage', 'panel.json');
     let data = {};
     try { data = JSON.parse(await fs.readFile(filePath, 'utf8')); } catch {}
@@ -625,8 +677,7 @@ class SystemService {
   }
 
   async getPanelAutoUpdate() {
-    const fs = (await import('fs/promises')).default;
-    const path = (await import('path')).default;
+    const fs = await import('fs/promises');
     try {
       const data = JSON.parse(await fs.readFile(path.resolve('storage', 'panel.json'), 'utf8'));
       return {
@@ -639,8 +690,7 @@ class SystemService {
   }
 
   async setPanelAutoUpdate(config) {
-    const fs = (await import('fs/promises')).default;
-    const path = (await import('path')).default;
+    const fs = await import('fs/promises');
     const filePath = path.resolve('storage', 'panel.json');
     let data = {};
     try { data = JSON.parse(await fs.readFile(filePath, 'utf8')); } catch {}
@@ -669,7 +719,7 @@ class SystemService {
     const logPath = path.resolve(process.cwd(), 'storage', 'logs', 'terminal_audit.log');
     
     try {
-      const fs = (await import('fs/promises')).default;
+      const fs = await import('fs/promises');
       const content = await fs.readFile(logPath, 'utf8').catch(() => '');
       const lines = content.split('\n');
       for (const line of lines) {
@@ -725,7 +775,7 @@ class SystemService {
     const termLogs = [];
     const logPath = path.resolve(process.cwd(), 'storage', 'logs', 'terminal_audit.log');
     try {
-      const fs = (await import('fs/promises')).default;
+      const fs = await import('fs/promises');
       const content = await fs.readFile(logPath, 'utf8').catch(() => '');
       const lines = content.split('\n');
       for (const line of lines) {

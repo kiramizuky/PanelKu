@@ -15,19 +15,19 @@ class SystemController {
       }
       return success(res, statuses);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to get services status', 500);
     }
   }
 
   async manageService(req, res) {
     try {
       const { service, action } = req.body;
-      if (!service || !action) return errorResponse(res, new Error('Service and action are required'), 400);
+      if (!service || !action) return errorResponse(res, 'Service and action are required', 400);
 
       await systemService.manageService(service, action);
       return success(res, null, `Service ${service} ${action}ed successfully`);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to manage service', 500);
     }
   }
 
@@ -40,21 +40,21 @@ class SystemController {
       }
       return success(res, statuses);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to get install status', 500);
     }
   }
 
   async installPackage(req, res) {
     try {
       const { package: pkgName, password } = req.body;
-      if (!pkgName) return errorResponse(res, new Error('Package name is required'), 400);
+      if (!pkgName) return errorResponse(res, 'Package name is required', 400);
       
       // Fire and forget or wait. apt-get takes time.
       // We will wait for it so the frontend spinner stays active.
       await systemService.installPackage(pkgName, password);
       return success(res, null, `${pkgName} installed successfully`);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to install package', 500);
     }
   }
 
@@ -63,7 +63,7 @@ class SystemController {
       const info = await systemService.getPackageManagerInfo();
       return success(res, info);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to get package manager info', 500);
     }
   }
 
@@ -72,7 +72,7 @@ class SystemController {
       const log = await systemService.runUpdate();
       return success(res, { log }, 'System update completed');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to run update', 500);
     }
   }
 
@@ -81,7 +81,7 @@ class SystemController {
       const log = await systemService.runUpgrade();
       return success(res, { log }, 'System upgrade completed');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to run upgrade', 500);
     }
   }
 
@@ -91,7 +91,7 @@ class SystemController {
       const log = await systemService.runAptUpdate();
       return success(res, { log }, `${info.name} update completed`);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to run update', 500);
     }
   }
 
@@ -101,7 +101,7 @@ class SystemController {
       const log = await systemService.runAptUpgrade();
       return success(res, { log }, `${info.name} upgrade completed`);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to run upgrade', 500);
     }
   }
 
@@ -110,7 +110,7 @@ class SystemController {
       await systemService.reboot();
       return success(res, null, 'Reboot initiated');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to reboot', 500);
     }
   }
 
@@ -119,7 +119,7 @@ class SystemController {
       const enabled = await systemService.getAutoUpdate();
       return success(res, { enabled });
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to get auto-update status', 500);
     }
   }
 
@@ -129,7 +129,7 @@ class SystemController {
       await systemService.setAutoUpdate(!!enabled);
       return success(res, null, `Auto-update ${enabled ? 'enabled' : 'disabled'}`);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to set auto-update', 500);
     }
   }
 
@@ -140,7 +140,7 @@ class SystemController {
       const data = await systemService.getPanelVersion();
       return success(res, data);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to get panel version', 500);
     }
   }
 
@@ -149,7 +149,7 @@ class SystemController {
       const data = await systemService.checkPanelUpdate();
       return success(res, data);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to check panel update', 500);
     }
   }
 
@@ -159,7 +159,7 @@ class SystemController {
       const log = await systemService.runPanelUpdate(method, branch);
       return success(res, { log }, 'Panel update started');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to run panel update', 500);
     }
   }
 
@@ -168,7 +168,7 @@ class SystemController {
       await systemService.restartPanel();
       return success(res, null, 'Panel is restarting');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to restart panel', 500);
     }
   }
 
@@ -177,7 +177,7 @@ class SystemController {
       const data = await systemService.getPanelAutoUpdate();
       return success(res, data);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to get panel auto-update', 500);
     }
   }
 
@@ -187,7 +187,7 @@ class SystemController {
       await systemService.setPanelAutoUpdate({ enabled: !!enabled, frequency: frequency || 'daily' });
       return success(res, null, `Panel auto-update ${enabled ? 'enabled' : 'disabled'}`);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to set panel auto-update', 500);
     }
   }
 
@@ -196,7 +196,7 @@ class SystemController {
       const keys = await sshService.getKeys();
       return success(res, keys);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to get SSH keys', 500);
     }
   }
 
@@ -206,7 +206,7 @@ class SystemController {
       await sshService.addKey(key);
       return success(res, null, 'SSH key added successfully');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to add SSH key', 500);
     }
   }
 
@@ -216,7 +216,7 @@ class SystemController {
       await sshService.deleteKey(id);
       return success(res, null, 'SSH key deleted successfully');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to delete SSH key', 500);
     }
   }
 
@@ -225,7 +225,7 @@ class SystemController {
       const config = await sshService.getSSHConfig();
       return success(res, config);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to get SSH config', 500);
     }
   }
 
@@ -235,7 +235,7 @@ class SystemController {
       await sshService.updateSSHConfig({ port, passwordAuth });
       return success(res, null, 'SSH configuration updated successfully');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to update SSH config', 500);
     }
   }
 
@@ -244,7 +244,7 @@ class SystemController {
       const config = await phpService.getConfig();
       return success(res, config);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to get PHP config', 500);
     }
   }
 
@@ -253,7 +253,7 @@ class SystemController {
       await phpService.updateConfig(req.body);
       return success(res, null, 'PHP-FPM configuration updated successfully');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to update PHP config', 500);
     }
   }
 
@@ -262,7 +262,7 @@ class SystemController {
       const stats = await systemService.getAuditStats();
       return success(res, stats);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to get audit stats', 500);
     }
   }
 
@@ -272,7 +272,7 @@ class SystemController {
       const logs = await systemService.getAuditLogs(limit);
       return success(res, logs);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to get audit logs', 500);
     }
   }
 
@@ -281,7 +281,7 @@ class SystemController {
       const result = await runSecurityScan();
       return success(res, result);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Failed to run security scan', 500);
     }
   }
 

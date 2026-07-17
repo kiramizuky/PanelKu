@@ -56,9 +56,17 @@ export const startHealthJob = () => {
           try {
             const proto = site.ssl && site.ssl.enabled ? 'https' : 'http';
             const url = `${proto}://${site.domain}`;
-            const res = await fetch(url, { method: 'HEAD', timeout: 5000 });
-            if (!res.ok && res.status >= 500) throw new Error(`HTTP ${res.status}`);
-            websiteDownCounts[site.domain] = 0;
+            // [FIX] Node.js fetch() doesn't support the `timeout` option natively.
+            // Use AbortController for a timeout instead.
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            try {
+              const res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+              if (!res.ok && res.status >= 500) throw new Error(`HTTP ${res.status}`);
+              websiteDownCounts[site.domain] = 0;
+            } finally {
+              clearTimeout(timeoutId);
+            }
           } catch (err) {
             websiteDownCounts[site.domain] = (websiteDownCounts[site.domain] || 0) + 1;
             if (websiteDownCounts[site.domain] === 3) { // 15 mins down

@@ -48,15 +48,27 @@ class DatabaseService {
     } catch (err) { return []; }
   }
 
+  /**
+   * Validate database name — only alphanumeric and underscores, prevent SQL injection.
+   */
+  _sanitizeDbName(name) {
+    if (!name || !/^[a-zA-Z_][a-zA-Z0-9_$]{0,63}$/.test(name)) {
+      throw new Error(`Invalid database name: "${name}". Use only letters, numbers, and underscores.`);
+    }
+    return name;
+  }
+
   async createMysqlDatabase(name) {
+    this._sanitizeDbName(name);
     const pool = await this.getMysqlConnection();
-    await pool.query(`CREATE DATABASE IF NOT EXISTS \`${name}\``);
+    await pool.query('CREATE DATABASE IF NOT EXISTS `' + name + '`');
     return true;
   }
 
   async deleteMysqlDatabase(name) {
+    this._sanitizeDbName(name);
     const pool = await this.getMysqlConnection();
-    await pool.query(`DROP DATABASE IF EXISTS \`${name}\``);
+    await pool.query('DROP DATABASE IF EXISTS `' + name + '`');
     return true;
   }
 
@@ -69,14 +81,16 @@ class DatabaseService {
   }
 
   async createPgDatabase(name) {
+    this._sanitizeDbName(name);
     const client = await this.getPgConnection();
-    await client.query(`CREATE DATABASE "${name}"`);
+    await client.query('CREATE DATABASE "' + name + '"');
     return true;
   }
 
   async deletePgDatabase(name) {
+    this._sanitizeDbName(name);
     const client = await this.getPgConnection();
-    await client.query(`DROP DATABASE "${name}"`);
+    await client.query('DROP DATABASE "' + name + '"');
     return true;
   }
 
@@ -128,7 +142,8 @@ class DatabaseService {
       return tables;
     } else if (type === 'mysql') {
       const pool = await this.getMysqlConnection();
-      await pool.query(`USE \`${name}\``);
+      this._sanitizeDbName(name);
+      await pool.query('USE `' + name + '`');
       const [rows] = await pool.query('SHOW TABLES');
       return rows.map(r => Object.values(r)[0]);
     } else if (type === 'postgres') {

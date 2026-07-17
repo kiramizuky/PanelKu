@@ -14,10 +14,10 @@ export const registerNotificationSocket = (namespace) => {
 
     // Send unread notifications on connect
     try {
-      const unread = await Notification.find({
-        $or: [{ userId }, { isGlobal: true }],
-        isRead: false,
-      }).sort({ createdAt: -1 }).limit(20);
+      // [FIX] SQLite adapter doesn't support $or operator or .sort().limit() chaining.
+      // We fetch all notifications for this user and filter manually.
+      const all = await Notification.find({ userId }, { limit: 100 });
+      const unread = all.filter(n => !n.isRead).slice(0, 20);
 
       if (unread.length) socket.emit('notifications:unread', unread);
     } catch (err) {
@@ -37,10 +37,8 @@ export const registerNotificationSocket = (namespace) => {
     // Mark all as read
     socket.on('notifications:read_all', async () => {
       try {
-        await Notification.updateMany(
-          { $or: [{ userId }, { isGlobal: true }], isRead: false },
-          { isRead: true }
-        );
+        // [FIX] SQLite adapter doesn't support $or — mark all for this user
+        await Notification.updateMany({ userId }, { isRead: true });
         socket.emit('notifications:all_read');
       } catch (err) {
         logger.warn('Notifications mark all read error:', err.message);

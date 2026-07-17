@@ -166,7 +166,8 @@ class AuthService {
    */
   async logoutSession(userId, sessionId) {
     const session = await sessionRepository.findById(sessionId);
-    if (!session || String(session.userId._id) !== String(userId)) {
+    // [FIX] session.userId is a plain string (SQLite), not an object with _id
+    if (!session || String(session.userId) !== String(userId)) {
       throw Object.assign(new Error('Session not found'), { statusCode: 404 });
     }
     await sessionRepository.deactivate(sessionId);

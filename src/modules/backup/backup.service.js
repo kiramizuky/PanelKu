@@ -214,10 +214,20 @@ class BackupService {
         const env = { ...process.env };
         if (mysqlPass) env.MYSQL_PWD = mysqlPass;
         const sqlContent = await fs.readFile(filepath);
-        await spawnPromise('mysql', ['-u', mysqlUser, target], {
-          env,
-          stdio: ['pipe', 'pipe', 'pipe'],
-          input: sqlContent
+        // [FIX] spawn() does not support `input` option (that's for exec/execFile).
+        // Write to stdin via the existing spawnPromise approach.
+        // We create a custom promise to pipe stdin.
+        await new Promise((resolve, reject) => {
+          const child = spawn('mysql', ['-u', mysqlUser, target], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+          let stderr = '';
+          child.stderr?.on('data', (d) => { stderr += d; });
+          child.on('error', reject);
+          child.on('close', (code) => {
+            if (code === 0) resolve();
+            else reject(new Error(stderr || `mysql exited with code ${code}`));
+          });
+          child.stdin.write(sqlContent);
+          child.stdin.end();
         });
 
       } else if (filename.startsWith('postgres_') && filename.endsWith('.sql')) {
