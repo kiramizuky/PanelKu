@@ -30,21 +30,6 @@ class ApiDocsController {
         tryItOutEnabled: false,
       },
     });
-
-    /**
-     * Render the Swagger UI page within the panel layout
-     */
-    this.renderPage = (req, res) => {
-      res.render('api-docs/index', {
-        title: 'API Documentation',
-        layout: 'layout',
-      });
-    };
-
-    // JSON endpoint to serve raw spec
-    this.serveJson = (req, res) => {
-      res.json(swaggerSpec);
-    };
   }
 }
 

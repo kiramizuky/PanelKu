@@ -14,7 +14,7 @@
       </p>
     </div>
     <div class="d-flex gap-2">
-      <button class="btn-lp btn-lp-ghost" onclick="document.querySelector('.swagger-ui .btn.authorize')?.click()" style="font-size:12px;">
+      <button class="btn-lp btn-lp-ghost" onclick="document.querySelector('iframe').contentDocument.querySelector('.swagger-ui .btn.authorize')?.click()" style="font-size:12px;">
         <i class="bi bi-shield-lock me-1"></i> Authorize
       </button>
       <button class="btn-lp btn-lp-ghost" onclick="window.open('/api/api-docs/spec.json', '_blank')" style="font-size:12px;">
@@ -34,8 +34,10 @@
     <!-- Error indicator -->
     <div id="swaggerError" class="text-center py-5 d-none">
       <i class="bi bi-exclamation-triangle text-warning" style="font-size: 2rem; display:block; margin-bottom:12px;"></i>
-      <p class="text-muted" style="font-size:13px;">Failed to load Swagger UI. Please refresh the page.</p>
-      <button class="btn-lp btn-lp-primary btn-lp-sm mt-2" onclick="location.reload()">Refresh</button>
+      <p class="text-muted" style="font-size:13px;">Failed to load Swagger UI automatically.</p>
+      <a href="/api/api-docs/docs" target="_blank" class="btn-lp btn-lp-primary btn-lp-sm mt-2">
+        <i class="bi bi-box-arrow-up-right me-1"></i> Open in New Tab
+      </a>
     </div>
   </div>
 </div>
@@ -52,11 +54,21 @@
     iframe.style.cssText = 'width:100%; height:100%; min-height:calc(100vh - 200px); border:none; border-radius:12px; background:#f7f9fc;';
     iframe.src = '/api/api-docs/docs';
     iframe.title = 'API Documentation';
+    // Fallback timeout: if iframe doesn't load within 15s, show error
+    const timeoutId = setTimeout(() => {
+      if (!loading.classList.contains('d-none')) {
+        loading.classList.add('d-none');
+        document.getElementById('swaggerError').classList.remove('d-none');
+      }
+    }, 15000);
+
     iframe.onload = () => {
       loading.classList.add('d-none');
+      clearTimeout(timeoutId);
     };
     iframe.onerror = () => {
       loading.classList.add('d-none');
+      clearTimeout(timeoutId);
       document.getElementById('swaggerError').classList.remove('d-none');
     };
     
