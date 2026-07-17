@@ -11,6 +11,8 @@
     "setup": "bash scripts/install.sh",
     "reset-db": "node scripts/reset-db.js",
     "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "lint:check": "eslint src/ --max-warnings 0",
     "test": "node --experimental-vm-modules node_modules/.bin/jest"
   },
   "dependencies": {
