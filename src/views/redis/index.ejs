@@ -1,0 +1,265 @@
+<style>
+  .rd-tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .rd-tab:hover { color: var(--text-primary); background: rgba(255,255,255,0.03); }
+  .rd-tab.active {
+    color: var(--accent-primary);
+    background: rgba(99,102,241,0.08);
+    border-bottom-color: var(--accent-primary);
+  }
+  .rd-tab-content { display: none; }
+  .rd-tab-content.active { display: block; animation: fadeIn 0.25s ease-out; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+</style>
+
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
+      <i class="bi bi-database-fill-gear text-danger me-2"></i> Redis Manager
+    </h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
+      Monitor Redis server, manage keys, configuration, clients, and slow queries
+    </p>
+  </div>
+  <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="RedisPage.refresh()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
+</div>
+
+<!-- Status Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-6 col-lg-2">
+    <div class="lp-glass-card p-3 text-center">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Status</div>
+      <div id="rdStatus" class="fw-bold font-mono" style="font-size:16px;color:var(--accent-success);">—</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-2">
+    <div class="lp-glass-card p-3 text-center">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Version</div>
+      <div id="rdVersion" class="fw-bold font-mono" style="font-size:16px;">—</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-2">
+    <div class="lp-glass-card p-3 text-center">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Memory</div>
+      <div id="rdMemory" class="fw-bold font-mono" style="font-size:16px;">—</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-2">
+    <div class="lp-glass-card p-3 text-center">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Clients</div>
+      <div id="rdClients" class="fw-bold font-mono" style="font-size:16px;">—</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-2">
+    <div class="lp-glass-card p-3 text-center">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Ops/sec</div>
+      <div id="rdOps" class="fw-bold font-mono" style="font-size:16px;">—</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-2">
+    <div class="lp-glass-card p-3 text-center">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Hit Ratio</div>
+      <div id="rdHitRatio" class="fw-bold font-mono" style="font-size:16px;">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- Not Connected Banner -->
+<div id="rdNotConnectedBanner" style="display:none;" class="mb-4">
+  <div class="alert" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:16px 20px;color:#f59e0b;">
+    <div class="d-flex align-items-start gap-3">
+      <i class="bi bi-exclamation-triangle-fill" style="font-size:20px;flex-shrink:0;margin-top:2px;"></i>
+      <div>
+        <strong>Redis is not connected.</strong>
+        <p style="margin:6px 0 0 0;font-size:13px;color:var(--text-muted);">
+          Ensure Redis server is running on <code id="rdConnTarget">localhost:6379</code>.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Tabs -->
+<div class="lp-glass-card mb-4" style="padding:0;overflow:hidden;">
+  <div style="display:flex;border-bottom:1px solid var(--glass-border);overflow-x:auto;background:rgba(0,0,0,0.1);">
+    <button class="rd-tab active" data-tab="dashboard" onclick="RedisPage.switchTab('dashboard')"><i class="bi bi-speedometer2 me-1"></i> Dashboard</button>
+    <button class="rd-tab" data-tab="keys" onclick="RedisPage.switchTab('keys')"><i class="bi bi-key me-1"></i> Keys</button>
+    <button class="rd-tab" data-tab="config" onclick="RedisPage.switchTab('config')"><i class="bi bi-gear me-1"></i> Config</button>
+    <button class="rd-tab" data-tab="clients" onclick="RedisPage.switchTab('clients')"><i class="bi bi-people me-1"></i> Clients</button>
+    <button class="rd-tab" data-tab="slowlog" onclick="RedisPage.switchTab('slowlog')"><i class="bi bi-clock-history me-1"></i> Slow Log</button>
+  </div>
+
+  <!-- Tab: Dashboard -->
+  <div id="tab-dashboard" class="rd-tab-content active" style="padding:20px;">
+    <div class="row g-4">
+      <div class="col-12 col-lg-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:15px;"><i class="bi bi-server me-1"></i> Server</h6>
+          <table class="lp-table" style="font-size:12px;">
+            <tbody id="rdServerTable">
+              <tr><td style="padding:4px 0;color:var(--text-muted);width:130px;">Uptime</td><td id="rdUptime" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">Role</td><td id="rdRole" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">Mode</td><td id="rdMode" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">Port</td><td id="rdPort" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">OS</td><td id="rdOs" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">Connected Slaves</td><td id="rdSlaves" style="padding:4px 0;">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="lp-glass-card p-4 mt-3" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:15px;"><i class="bi bi-database me-1"></i> Keyspace</h6>
+          <div id="rdKeyspaceList" style="display:flex;flex-direction:column;gap:6px;">
+            <div style="padding:12px;text-align:center;color:var(--text-muted);font-size:13px;">Loading...</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:15px;"><i class="bi bi-memory me-1"></i> Memory</h6>
+          <table class="lp-table" style="font-size:12px;">
+            <tbody id="rdMemTable">
+              <tr><td style="padding:4px 0;color:var(--text-muted);width:130px;">Used Memory</td><td id="rdMemUsed" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">Peak Memory</td><td id="rdMemPeak" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">Fragmentation</td><td id="rdMemFrag" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">CPU Sys</td><td id="rdCpuSys" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">CPU User</td><td id="rdCpuUser" style="padding:4px 0;">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="lp-glass-card p-4 mt-3" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:15px;"><i class="bi bi-shield-check me-1"></i> Persistence</h6>
+          <table class="lp-table" style="font-size:12px;">
+            <tbody id="rdPersistTable">
+              <tr><td style="padding:4px 0;color:var(--text-muted);width:130px;">RDB Enabled</td><td id="rdRdbEnabled" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">Last Save</td><td id="rdLastSave" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">Last BGSAVE Status</td><td id="rdLastBgsave" style="padding:4px 0;">—</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text-muted);">AOF Enabled</td><td id="rdAofEnabled" style="padding:4px 0;">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="d-flex gap-2 mt-3 flex-wrap">
+          <button class="btn-lp btn-lp-primary btn-sm" onclick="RedisPage.triggerSave()"><i class="bi bi-save me-1"></i> SAVE</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="RedisPage.triggerBgsave()"><i class="bi bi-arrow-repeat me-1"></i> BGSAVE</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="RedisPage.triggerFlushDb()"><i class="bi bi-trash me-1"></i> FLUSHDB</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="RedisPage.triggerFlushAll()"><i class="bi bi-trash-fill me-1"></i> FLUSHALL</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Keys -->
+  <div id="tab-keys" class="rd-tab-content" style="padding:20px;">
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-3">
+        <div class="lp-form-group"><label class="lp-label">Database</label>
+          <select id="rdKeyDb" class="lp-input"><option value="0">db0</option><option value="1">db1</option><option value="2">db2</option><option value="3">db3</option><option value="4">db4</option><option value="5">db5</option><option value="6">db6</option><option value="7">db7</option><option value="8">db8</option><option value="9">db9</option></select>
+        </div>
+      </div>
+      <div class="col-12 col-md-5">
+        <div class="lp-form-group"><label class="lp-label">Pattern</label><input type="text" id="rdKeyPattern" class="lp-input font-mono" value="*" placeholder="e.g. user:*"></div>
+      </div>
+      <div class="col-12 col-md-2 d-flex align-items-end">
+        <button class="btn-lp btn-lp-primary w-100" onclick="RedisPage.scanKeys()"><i class="bi bi-search me-1"></i> Scan</button>
+      </div>
+      <div class="col-12 col-md-2 d-flex align-items-end">
+        <button class="btn-lp btn-lp-ghost w-100" onclick="RedisPage.refreshKeys()"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="lp-table">
+        <thead><tr><th>Key</th><th>Type</th><th>TTL</th><th style="text-align:right">Actions</th></tr></thead>
+        <tbody id="rdKeysTableBody"><tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted)">Click Scan to list keys.</td></tr></tbody>
+      </table>
+    </div>
+    <div id="rdKeyDetail" style="display:none;margin-top:15px;" class="lp-glass-card p-4">
+      <div class="d-flex justify-content-between mb-2">
+        <h6 style="font-size:13px;font-weight:600;color:var(--text-primary);margin:0;"><span id="rdDetailKeyName"></span> <span id="rdDetailKeyType" class="lp-badge lp-badge-info" style="font-size:9px;"></span></h6>
+        <div class="d-flex gap-2">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="RedisPage.closeKeyDetail()"><i class="bi bi-x-lg"></i></button>
+        </div>
+      </div>
+      <pre id="rdDetailValue" style="background:#0a0a0f;color:#00ff88;padding:12px;border-radius:8px;font-size:12px;font-family:monospace;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin:0;"></pre>
+    </div>
+  </div>
+
+  <!-- Tab: Config -->
+  <div id="tab-config" class="rd-tab-content" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;"><i class="bi bi-gear text-primary me-1"></i> Redis Configuration</h5>
+      <div class="d-flex gap-2">
+        <input type="text" id="rdConfigFilter" class="lp-input font-mono" style="width:200px;height:32px;font-size:12px;" placeholder="Filter: *maxmem*" value="*">
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="RedisPage.loadConfig()"><i class="bi bi-search"></i></button>
+      </div>
+    </div>
+    <div class="table-responsive" style="max-height:500px;overflow-y:auto;">
+      <table class="lp-table" style="font-size:12px;">
+        <thead><tr><th>Key</th><th>Value</th><th style="text-align:right;width:80px;">Actions</th></tr></thead>
+        <tbody id="rdConfigTableBody"><tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab: Clients -->
+  <div id="tab-clients" class="rd-tab-content" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;"><i class="bi bi-people text-primary me-1"></i> Connected Clients</h5>
+      <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="RedisPage.loadClients()"><i class="bi bi-arrow-clockwise"></i></button>
+    </div>
+    <div class="table-responsive">
+      <table class="lp-table" style="font-size:12px;">
+        <thead><tr><th>ID</th><th>Addr</th><th>Name</th><th>Age</th><th>Idle</th><th>Flags</th><th>DB</th><th>CMD</th><th style="text-align:right">Action</th></tr></thead>
+        <tbody id="rdClientsTableBody"><tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab: Slow Log -->
+  <div id="tab-slowlog" class="rd-tab-content" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;"><i class="bi bi-clock-history text-primary me-1"></i> Slow Queries</h5>
+      <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="RedisPage.loadSlowLog()"><i class="bi bi-arrow-clockwise"></i></button>
+    </div>
+    <div class="table-responsive">
+      <table class="lp-table" style="font-size:12px;">
+        <thead><tr><th>ID</th><th>Timestamp</th><th>Duration (μs)</th><th>Command</th><th>Client</th></tr></thead>
+        <tbody id="rdSlowLogBody"><tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Set TTL Modal -->
+<div class="modal fade" id="setTtlModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;"><i class="bi bi-clock text-primary me-2"></i> Set Key TTL</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-secondary);">Key: <strong id="rdTtlKeyName" style="font-family:monospace;"></strong></p>
+        <div class="lp-form-group">
+          <label class="lp-label">TTL (seconds, -1 = no expiry)</label>
+          <input type="number" id="rdTtlSeconds" class="lp-input" value="-1" min="-1" max="2147483647">
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="RedisPage.setKeyTtl()"><i class="bi bi-check me-1"></i> Set TTL</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/redis.js"></script>

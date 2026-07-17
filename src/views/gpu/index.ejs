@@ -1,0 +1,58 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">GPU Manager</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Monitor & manage NVIDIA GPUs, CUDA, processes</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-ghost" onclick="GPU.loadData()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+  </div>
+</div>
+
+<div id="gpuNoGpu" style="display:none;">
+  <div class="lp-glass-card" style="padding:60px;text-align:center;">
+    <i class="bi bi-cpu" style="font-size:48px;color:var(--text-muted);opacity:0.3;"></i>
+    <h4 style="margin:20px 0 10px;">No NVIDIA GPU Detected</h4>
+    <p style="color:var(--text-muted);font-size:13px;">This server does not have an NVIDIA GPU or the NVIDIA driver is not installed.</p>
+    <button class="btn-lp btn-lp-primary mt-3" onclick="GPU.checkGpu()"><i class="bi bi-arrow-clockwise"></i> Check Again</button>
+  </div>
+</div>
+
+<div id="gpuContent" style="display:none;">
+  <!-- Info Cards -->
+  <div id="gpuInfoCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;"></div>
+
+  <!-- GPU List -->
+  <div id="gpuCards"></div>
+
+  <!-- Processes -->
+  <div class="lp-glass-card" style="padding:20px;margin-top:20px;">
+    <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-list-task me-2 text-info"></i>GPU Processes <span id="gpuProcessCount" class="text-muted" style="font-weight:400;font-size:12px;"></span></h5>
+    <div style="overflow-x:auto;">
+      <table class="lp-table" style="font-size:12px;">
+        <thead><tr><th>PID</th><th>Name</th><th>GPU Memory (MB)</th><th>GPU</th><th>Actions</th></tr></thead>
+        <tbody id="gpuProcessesBody"><tr><td colspan="5" class="text-muted" style="text-align:center;">No processes using GPU.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Power & Reset -->
+  <div class="lp-glass-card" style="padding:20px;margin-top:20px;">
+    <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-lightning-charge me-2 text-warning"></i>GPU Power Management</h5>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;max-width:600px;">
+      <div>
+        <label class="lp-label">Select GPU</label>
+        <select id="gpuPowerSelect" class="lp-input" style="font-size:12px;"></select>
+      </div>
+      <div>
+        <label class="lp-label">Power Limit (Watts)</label>
+        <div style="display:flex;gap:8px;">
+          <input type="number" id="gpuPowerWatts" class="lp-input" placeholder="e.g. 150" style="flex:1;font-size:12px;">
+          <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="GPU.setPowerLimit()">Set</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn-lp btn-lp-danger btn-lp-sm mt-3" onclick="GPU.resetGpu()"><i class="bi bi-arrow-counterclockwise"></i> Reset Selected GPU</button>
+  </div>
+</div>
+
+<script src="/js/gpu.js"></script>

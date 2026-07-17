@@ -1,0 +1,407 @@
+<style>
+  .nodejs-tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .nodejs-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.03);
+  }
+  .nodejs-tab.active {
+    color: var(--accent-primary);
+    background: rgba(99,102,241,0.08);
+    border-bottom-color: var(--accent-primary);
+  }
+  .nodejs-tab-content {
+    display: none;
+  }
+  .nodejs-tab-content.active {
+    display: block;
+    animation: fadeIn 0.25s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
+      <i class="bi bi-code-slash text-success me-2"></i> Node.js Manager
+    </h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
+      Manage Node.js versions via NVM, global npm packages, and PM2 processes
+    </p>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="NodeJSPage.refresh()" title="Refresh">
+      <i class="bi bi-arrow-clockwise"></i> Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Status Cards Row -->
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-success);">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#10b981;flex-shrink:0;">
+        <i class="bi bi-code-slash"></i>
+      </div>
+      <div style="min-width:0;">
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Node.js</div>
+        <div id="nodejsCurrentVersion" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-info);">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#3b82f6;flex-shrink:0;">
+        <i class="bi bi-box-seam"></i>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">NPM</div>
+        <div id="nodejsNpmVersion" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-warning);">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#f59e0b;flex-shrink:0;">
+        <i class="bi bi-layers"></i>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">NVM</div>
+        <div id="nodejsNvmStatus" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-info);">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(139,92,246,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#8b5cf6;flex-shrink:0;">
+        <i class="bi bi-cpu"></i>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">PM2</div>
+        <div id="nodejsPm2Status" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content Tabs -->
+<div class="lp-glass-card mb-4" style="padding:0;overflow:hidden;">
+  <div style="display:flex;border-bottom:1px solid var(--glass-border);overflow-x:auto;background:rgba(0,0,0,0.1);">
+    <button class="nodejs-tab active" data-tab="versions" onclick="NodeJSPage.switchTab('versions')">
+      <i class="bi bi-list-stars me-1"></i> Versions
+    </button>
+    <button class="nodejs-tab" data-tab="packages" onclick="NodeJSPage.switchTab('packages')">
+      <i class="bi bi-box-seam me-1"></i> NPM Packages
+    </button>
+    <button class="nodejs-tab" data-tab="pm2" onclick="NodeJSPage.switchTab('pm2')">
+      <i class="bi bi-cpu me-1"></i> PM2 Processes
+    </button>
+    <button class="nodejs-tab" data-tab="info" onclick="NodeJSPage.switchTab('info')">
+      <i class="bi bi-info-circle me-1"></i> Environment Info
+    </button>
+  </div>
+
+  <!-- Tab: Versions -->
+  <div id="tab-versions" class="nodejs-tab-content active" style="padding:20px;">
+    <!-- NVM Not Installed Warning -->
+    <div id="nvmNotInstalledBanner" style="display:none;" class="mb-4">
+      <div class="alert" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:16px 20px;color:#f59e0b;">
+        <div class="d-flex align-items-start gap-3">
+          <i class="bi bi-exclamation-triangle-fill" style="font-size:20px;flex-shrink:0;margin-top:2px;"></i>
+          <div>
+            <strong>NVM is not installed on this server.</strong>
+            <p style="margin:6px 0 0 0;font-size:13px;color:var(--text-muted);">
+              NVM (Node Version Manager) is required to manage multiple Node.js versions.
+              Click the button below to install it automatically.
+            </p>
+            <button class="btn-lp btn-lp-primary btn-sm mt-2" onclick="NodeJSPage.installNvm()">
+              <i class="bi bi-download me-1"></i> Install NVM
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Version Management UI -->
+    <div id="nvmAvailableSection">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+          <i class="bi bi-list-stars text-primary me-1"></i> Installed Versions
+        </h5>
+        <button class="btn-lp btn-lp-primary btn-sm" onclick="NodeJSPage.showInstallModal()">
+          <i class="bi bi-plus-lg me-1"></i> Install Version
+        </button>
+      </div>
+
+      <div id="installedVersionsList" style="display:flex;flex-direction:column;gap:8px;">
+        <div style="padding:20px;text-align:center;color:var(--text-muted);">
+          <div class="spinner-border spinner-border-sm text-primary me-2"></div> Loading versions...
+        </div>
+      </div>
+
+      <hr style="border-color:var(--glass-border);margin:20px 0;">
+
+      <!-- Remote Versions -->
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+          <i class="bi bi-cloud-download text-info me-1"></i> Available LTS Versions
+        </h5>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="NodeJSPage.loadRemoteVersions()">
+          <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+        </button>
+      </div>
+
+      <div id="remoteVersionsList" style="display:flex;flex-direction:column;gap:6px;">
+        <div style="padding:15px;text-align:center;color:var(--text-muted);font-size:13px;">
+          Loading remote versions...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: NPM Packages -->
+  <div id="tab-packages" class="nodejs-tab-content" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+        <i class="bi bi-box-seam text-primary me-1"></i> Global NPM Packages
+      </h5>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-lp btn-lp-primary btn-sm" onclick="NodeJSPage.showPkgInstallModal()">
+          <i class="bi bi-plus-lg me-1"></i> Install Package
+        </button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="NodeJSPage.loadGlobalPackages()">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="lp-table">
+        <thead>
+          <tr>
+            <th>Package Name</th>
+            <th>Version</th>
+            <th style="text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="globalPackagesTableBody">
+          <tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab: PM2 Processes -->
+  <div id="tab-pm2" class="nodejs-tab-content" style="padding:20px;">
+    <div id="pm2NotInstalledBanner" style="display:none;" class="mb-3">
+      <div class="alert" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.15);border-radius:10px;padding:12px 16px;font-size:13px;">
+        <i class="bi bi-info-circle me-2 text-warning"></i>
+        PM2 is not installed globally. 
+        <button class="btn-lp btn-lp-primary btn-sm ms-2" onclick="NodeJSPage.installPm2()">
+          <i class="bi bi-download me-1"></i> Install PM2
+        </button>
+      </div>
+    </div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+        <i class="bi bi-cpu text-success me-1"></i> Running Processes
+      </h5>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-lp btn-lp-primary btn-sm" onclick="NodeJSPage.showPm2StartModal()">
+          <i class="bi bi-play-fill me-1"></i> Start Process
+        </button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="NodeJSPage.loadPm2List()">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="lp-table">
+        <thead>
+          <tr>
+            <th>App Name</th>
+            <th>PID</th>
+            <th>Status</th>
+            <th>CPU</th>
+            <th>Memory</th>
+            <th>Restarts</th>
+            <th>Uptime</th>
+            <th style="text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="pm2TableBody">
+          <tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab: Environment Info -->
+  <div id="tab-info" class="nodejs-tab-content" style="padding:20px;">
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:16px;">
+            <i class="bi bi-info-circle me-1"></i> Runtime Info
+          </h6>
+          <table class="lp-table" style="font-size:13px;">
+            <tbody id="nodeInfoTableBody">
+              <tr><td style="padding:6px 0;color:var(--text-muted);width:120px;">Version</td><td id="niVersion" style="padding:6px 0;">—</td></tr>
+              <tr><td style="padding:6px 0;color:var(--text-muted);">NPM</td><td id="niNpm" style="padding:6px 0;">—</td></tr>
+              <tr><td style="padding:6px 0;color:var(--text-muted);">Path</td><td id="niPath" style="padding:6px 0;font-family:monospace;font-size:12px;">—</td></tr>
+              <tr><td style="padding:6px 0;color:var(--text-muted);">Arch</td><td id="niArch" style="padding:6px 0;">—</td></tr>
+              <tr><td style="padding:6px 0;color:var(--text-muted);">Platform</td><td id="niPlatform" style="padding:6px 0;">—</td></tr>
+              <tr><td style="padding:6px 0;color:var(--text-muted);">NVM</td><td id="niNvm" style="padding:6px 0;">—</td></tr>
+              <tr><td style="padding:6px 0;color:var(--text-muted);">PM2</td><td id="niPm2" style="padding:6px 0;">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:16px;">
+            <i class="bi bi-lightbulb me-1"></i> Quick Tips
+          </h6>
+          <ul style="font-size:13px;color:var(--text-secondary);line-height:1.7;padding-left:18px;margin:0;">
+            <li>Use <strong>NVM</strong> to install and switch between Node.js versions.</li>
+            <li>Each website can use a different Node.js version via NVM.</li>
+            <li><strong>PM2</strong> keeps your Node.js apps running in production.</li>
+            <li>Global npm packages are available to all Node.js versions.</li>
+            <li>Use <code>nvm alias default &lt;version&gt;</code> to set the system default.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Install Version Modal ── -->
+<div class="modal fade" id="installNodeModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;">
+          <i class="bi bi-download text-primary me-2"></i> Install Node.js Version
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Select Version</label>
+          <select id="installVersionSelect" class="lp-input" required>
+            <option value="">Loading available versions...</option>
+          </select>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Or type custom version</label>
+          <input type="text" id="installVersionCustom" class="lp-input font-mono" placeholder="e.g. 20.11.0 or lts/iron">
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0;">
+          Installing a new Node.js version may take a few minutes depending on your server's internet connection.
+        </p>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="NodeJSPage.installVersion()">
+          <i class="bi bi-download me-1"></i> Install
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Install NPM Package Modal ── -->
+<div class="modal fade" id="installPkgModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;">
+          <i class="bi bi-box-seam text-primary me-2"></i> Install Global NPM Package
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="lp-form-group">
+          <label class="lp-label">Package Name</label>
+          <input type="text" id="installPkgName" class="lp-input font-mono" placeholder="e.g. pm2, yarn, nodemon" required>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="NodeJSPage.installGlobalPackage()">
+          <i class="bi bi-download me-1"></i> Install
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PM2 Start Modal ── -->
+<div class="modal fade" id="pm2StartModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;">
+          <i class="bi bi-play-fill text-success me-2"></i> Start PM2 Process
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Script Path</label>
+          <input type="text" id="pm2StartScript" class="lp-input font-mono" placeholder="e.g. /var/www/myapp/server.js" required>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Process Name (optional)</label>
+          <input type="text" id="pm2StartName" class="lp-input" placeholder="Defaults to script filename">
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Working Directory (optional)</label>
+          <input type="text" id="pm2StartCwd" class="lp-input font-mono" placeholder="e.g. /var/www/myapp">
+        </div>
+        <div class="lp-form-group">
+          <label class="lp-label">Arguments (optional)</label>
+          <input type="text" id="pm2StartArgs" class="lp-input font-mono" placeholder="e.g. --port 3000">
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="NodeJSPage.pm2Start()">
+          <i class="bi bi-play-fill me-1"></i> Start
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PM2 Logs Modal ── -->
+<div class="modal fade" id="pm2LogsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono" id="pm2LogsModalTitle" style="font-size:14px;color:var(--text-primary);">Process Logs</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:0;">
+        <pre id="pm2LogsArea" style="background:#0a0a0f;color:#00ff88;padding:20px;font-size:12px;font-family:monospace;max-height:500px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-all;border-radius:0;"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/nodejs.js"></script>

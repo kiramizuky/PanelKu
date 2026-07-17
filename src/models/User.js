@@ -26,6 +26,8 @@ function rowToUser(row) {
     apiKeyEnabled:     Boolean(row.api_key_enabled),
     isActive:          Boolean(row.is_active),
     isSuperAdmin:      Boolean(row.is_super_admin),
+    isLdapUser:        Boolean(row.is_ldap_user),
+    ssoLinks:          fromJson(row.sso_links, {}),
     sessions:          fromJson(row.sessions, []),
     aiSettings:        fromJson(row.ai_settings, { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' }),
     lastLogin:         row.last_login ? new Date(row.last_login) : null,
@@ -140,10 +142,10 @@ const User = {
       INSERT INTO users (
         id, username, email, password, role_id, first_name, last_name, avatar,
         two_factor_enabled, two_factor_secret, api_key, api_key_enabled,
-        is_active, is_super_admin, sessions, ai_settings, last_login, last_login_ip,
+        is_active, is_super_admin, is_ldap_user, sso_links, sessions, ai_settings, last_login, last_login_ip,
         login_count, reset_token, reset_token_expiry, created_at, updated_at
       ) VALUES (
-        ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+        ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
       )
     `).run(
       id, data.username.toLowerCase(), data.email.toLowerCase(), hashedPw,
@@ -153,6 +155,8 @@ const User = {
       data.apiKey || null, data.apiKeyEnabled ? 1 : 0,
       data.isActive !== false ? 1 : 0,
       data.isSuperAdmin ? 1 : 0,
+      data.isLdapUser ? 1 : 0,
+      toJson(data.ssoLinks || {}),
       '[]',
       toJson(data.aiSettings || { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' }),
       null, null, 0, null, null, ts, ts
@@ -175,6 +179,7 @@ const User = {
       twoFactorEnabled: 'two_factor_enabled', twoFactorSecret: 'two_factor_secret',
       apiKey: 'api_key', apiKeyEnabled: 'api_key_enabled',
       isActive: 'is_active', isSuperAdmin: 'is_super_admin',
+      isLdapUser: 'is_ldap_user', ssoLinks: 'sso_links',
       sessions: 'sessions', lastLogin: 'last_login', lastLoginIp: 'last_login_ip',
       loginCount: 'login_count', resetToken: 'reset_token',
       resetTokenExpiry: 'reset_token_expiry', role: 'role_id',

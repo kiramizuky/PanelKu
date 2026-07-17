@@ -29,7 +29,7 @@ router.get('/health', (req, res) => {
   res.json({
     success: true,
     status: 'online',
-    panel: appConfig.appName || 'LinuxPanel',
+    panel: appConfig.appName || 'Panelku',
     version: process.env.npm_package_version || '1.0.0',
     timestamp: new Date().toISOString(),
     node: process.version,

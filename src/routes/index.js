@@ -23,6 +23,21 @@ import clusterRoutes from '../modules/cluster/cluster.routes.js';
 import aiRoutes from '../modules/ai/ai.routes.js';
 import agentRoutes from '../modules/agent/agent.routes.js';
 import apiDocsRoutes from '../modules/api-docs/api-docs.routes.js';
+import nodejsRoutes from '../modules/nodejs/nodejs.routes.js';
+import pythonRoutes from '../modules/python/python.routes.js';
+import mongodbRoutes from '../modules/mongodb/mongodb.routes.js';
+import redisRoutes from '../modules/redis/redis.routes.js';
+import apacheRoutes from '../modules/apache/apache.routes.js';
+import analyticsRoutes from '../modules/analytics/analytics.routes.js';
+import autohealRoutes from '../modules/autoheal/autoheal.routes.js';
+import updaterRoutes from '../modules/updater/updater.routes.js';
+import caddyRoutes from '../modules/caddy/caddy.routes.js';
+import aiRepairRoutes from '../modules/ai-repair/ai-repair.routes.js';
+import gpuRoutes from '../modules/gpu/gpu.routes.js';
+import powerRoutes from '../modules/power/power.routes.js';
+import mailRoutes from '../modules/mail/mail.routes.js';
+import cdnRoutes from '../modules/cdn/cdn.routes.js';
+import iotRoutes from '../modules/iot/iot.routes.js';
 
 const router = Router();
 
@@ -33,7 +48,7 @@ router.get('/health', (req, res) => {
   res.json({
     success: true,
     status: 'ok',
-    panel: 'LinuxPanel',
+    panel: 'Panelku',
     version: process.env.npm_package_version || '1.0.0',
     timestamp: new Date().toISOString(),
   });
@@ -63,6 +78,21 @@ router.use('/whatsapp', whatsappRoutes);
 router.use('/cluster', clusterRoutes);
 router.use('/ai', aiRoutes);
 router.use('/agent', agentRoutes);  // Cluster agent API — accessible via X-API-Key
+router.use('/nodejs', nodejsRoutes);
+router.use('/python', pythonRoutes);
+router.use('/mongodb', mongodbRoutes);
+router.use('/redis', redisRoutes);
+router.use('/apache', apacheRoutes);
+router.use('/analytics', analyticsRoutes);
+router.use('/autoheal', autohealRoutes);
+router.use('/updater', updaterRoutes);
+router.use('/caddy', caddyRoutes);
+router.use('/ai-repair', aiRepairRoutes);
+router.use('/gpu', gpuRoutes);
+router.use('/power', powerRoutes);
+router.use('/mail', mailRoutes);
+router.use('/cdn', cdnRoutes);
+router.use('/iot', iotRoutes);
 
 // API Documentation (mounted under /api prefix)
 router.use('/api-docs', apiDocsRoutes);

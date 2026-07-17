@@ -66,6 +66,9 @@ function initSchema(db) {
       api_key_enabled     INTEGER NOT NULL DEFAULT 0,
       is_active           INTEGER NOT NULL DEFAULT 1,
       is_super_admin      INTEGER NOT NULL DEFAULT 0,
+      is_ldap_user        INTEGER NOT NULL DEFAULT 0,
+      sso_links           TEXT NOT NULL DEFAULT '{}',
+      ai_settings         TEXT NOT NULL DEFAULT '{"provider":"openai","apiKey":"","model":"gpt-4o-mini"}',
       sessions            TEXT NOT NULL DEFAULT '[]',
       last_login          TEXT,
       last_login_ip       TEXT,
@@ -227,6 +230,16 @@ function initSchema(db) {
   }
   try {
     db.exec("ALTER TABLE users ADD COLUMN ai_settings TEXT NOT NULL DEFAULT '{\"provider\":\"openai\",\"apiKey\":\"\",\"model\":\"gpt-4o-mini\"}'");
+  } catch (e) {
+    // Column already exists
+  }
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN is_ldap_user INTEGER NOT NULL DEFAULT 0");
+  } catch (e) {
+    // Column already exists
+  }
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN sso_links TEXT NOT NULL DEFAULT '{}'");
   } catch (e) {
     // Column already exists
   }

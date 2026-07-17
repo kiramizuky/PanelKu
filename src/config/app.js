@@ -22,7 +22,7 @@ if (process.env.NODE_ENV === 'production') {
 export default {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT) || 3000,
-  appName: process.env.APP_NAME || 'LinuxPanel',
+  appName: process.env.APP_NAME || 'Panelku',
   appUrl: process.env.APP_URL || 'http://localhost:3000',
   appSecret: process.env.APP_SECRET || 'dev-secret-change-in-production',
 
@@ -39,7 +39,7 @@ export default {
   },
 
   totp: {
-    issuer: process.env.TOTP_ISSUER || 'LinuxPanel',
+    issuer: process.env.TOTP_ISSUER || 'Panelku',
   },
 
   upload: {

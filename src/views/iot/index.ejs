@@ -1,0 +1,102 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">IoT & Edge Device Manager</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">MQTT Broker, Home Assistant, Node-RED, Device Discovery</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-ghost" onclick="IOT.loadData()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+  </div>
+</div>
+
+<style>
+  .iot-tabs { border-bottom:1px solid var(--glass-border); }
+  .iot-tabs .nav-link { color:var(--text-muted); background:transparent; border:none; padding:10px 16px; font-weight:500; border-radius:8px 8px 0 0; }
+  .iot-tabs .nav-link:hover { color:var(--text-primary); }
+  .iot-tabs .nav-link.active { color:var(--accent-primary); background:rgba(99,102,241,0.1); border:1px solid var(--glass-border); border-bottom-color:transparent; }
+</style>
+
+<ul class="nav nav-tabs mb-4 iot-tabs">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#iot-mqtt">MQTT Broker</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#iot-ha">Home Assistant</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#iot-nr">Node-RED</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#iot-devices">Device Discovery</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#iot-metrics">Metrics</a></li>
+</ul>
+
+<div class="tab-content">
+  <!-- MQTT Broker -->
+  <div class="tab-pane fade show active" id="iot-mqtt">
+    <div class="lp-glass-card" style="padding:20px;">
+      <div id="mqttStatus"></div>
+      <div id="mqttControls" style="margin:15px 0;display:flex;gap:8px;flex-wrap:wrap;"></div>
+
+      <div style="margin-top:20px;">
+        <label class="lp-label">MQTT Config</label>
+        <textarea id="mqttConfigInput" class="lp-input" rows="8" style="font-family:monospace;font-size:11px;"></textarea>
+        <button class="btn-lp btn-lp-primary btn-lp-sm mt-2" onclick="IOT.saveMqttConfig()">Save & Restart</button>
+      </div>
+    </div>
+
+    <div class="lp-glass-card" style="padding:20px;margin-top:15px;">
+      <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-people me-2 text-info"></i>MQTT Users</h5>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <input type="text" id="mqttUserInput" class="lp-input" placeholder="Username" style="width:150px;">
+        <input type="password" id="mqttPassInput" class="lp-input" placeholder="Password" style="width:150px;">
+        <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="IOT.addMqttUser()"><i class="bi bi-plus"></i> Add</button>
+      </div>
+      <div id="mqttUsersList"><p class="text-muted">Loading...</p></div>
+    </div>
+
+    <div class="lp-glass-card" style="padding:20px;margin-top:15px;">
+      <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-send me-2 text-primary"></i>Publish Message</h5>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" id="mqttTopicInput" class="lp-input" placeholder="topic/test" style="flex:1;">
+        <input type="text" id="mqttMsgInput" class="lp-input" placeholder="Message payload" style="flex:2;">
+        <select id="mqttQosInput" class="lp-input" style="width:70px;">
+          <option value="0">QoS 0</option>
+          <option value="1">QoS 1</option>
+          <option value="2">QoS 2</option>
+        </select>
+        <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="IOT.publish()"><i class="bi bi-send"></i> Publish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Home Assistant -->
+  <div class="tab-pane fade" id="iot-ha">
+    <div class="lp-glass-card" style="padding:20px;">
+      <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-house-heart me-2 text-danger"></i>Home Assistant</h5>
+      <div id="haStatus"><p class="text-muted">Loading...</p></div>
+    </div>
+  </div>
+
+  <!-- Node-RED -->
+  <div class="tab-pane fade" id="iot-nr">
+    <div class="lp-glass-card" style="padding:20px;">
+      <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-diagram-3 me-2 text-danger"></i>Node-RED</h5>
+      <div id="nrStatus"><p class="text-muted">Loading...</p></div>
+    </div>
+  </div>
+
+  <!-- Device Discovery -->
+  <div class="tab-pane fade" id="iot-devices">
+    <div class="lp-glass-card" style="padding:20px;">
+      <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-wifi me-2 text-success"></i>Network Device Discovery</h5>
+      <div style="display:flex;gap:8px;margin-bottom:15px;">
+        <input type="text" id="discoverSubnet" class="lp-input" value="192.168.1.0/24" placeholder="192.168.1.0/24" style="width:200px;">
+        <button class="btn-lp btn-lp-primary" onclick="IOT.discover()"><i class="bi bi-search"></i> Scan</button>
+      </div>
+      <div id="devicesList"><p class="text-muted">Click "Scan" to discover devices on your network.</p></div>
+    </div>
+  </div>
+
+  <!-- Metrics -->
+  <div class="tab-pane fade" id="iot-metrics">
+    <div class="lp-glass-card" style="padding:20px;">
+      <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-graph-up me-2 text-warning"></i>IoT Metrics</h5>
+      <div id="iotMetricsContent"><p class="text-muted">Loading...</p></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/iot.js"></script>

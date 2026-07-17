@@ -1,7 +1,7 @@
 {
-  "name": "linux-panel",
+  "name": "panelku",
   "version": "1.8.0",
-  "description": "Lightweight Linux Server Control Panel",
+  "description": "Panelku - Lightweight Linux Server Control Panel",
   "type": "module",
   "main": "src/server.js",
   "scripts": {

@@ -90,7 +90,12 @@ class AuthService {
 
   /**
    * Complete login after optional 2FA verify
+   * Made public so SSO/LDAP controllers can use it.
    */
+  async completeLogin(user, req) {
+    return this._completeLogin(user, req);
+  }
+
   async _completeLogin(user, req) {
     const deviceInfo = getDeviceInfo(req);
     const { accessToken, refreshToken } = this._generateTokens(user);

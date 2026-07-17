@@ -1,0 +1,481 @@
+<div class="row g-4">
+  <!-- Page Header -->
+  <div class="col-12">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+      <div>
+        <h1 style="font-size:22px;font-weight:700;margin:0;display:flex;align-items:center;gap:10px;">
+          <i class="bi bi-arrow-up-circle-fill text-warning"></i> Panel Updater
+        </h1>
+        <p style="color:var(--text-muted);font-size:13px;margin:4px 0 0 0;">
+          Auto-Updater &amp; Rollback Engine — one-click updates with health check and automatic rollback on failure
+        </p>
+      </div>
+      <div id="updaterHealthBadge" style="display:flex;gap:8px;align-items:center;">
+        <span class="lp-badge lp-badge-secondary"><i class="bi bi-arrow-repeat me-1"></i>Checking...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="col-12">
+    <ul class="nav nav-tabs lp-tabs" id="updaterTabs" role="tablist" style="border-bottom:1px solid var(--glass-border);gap:0;">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab-overview" data-bs-toggle="tab" data-bs-target="#tabOverview" type="button" role="tab">
+          <i class="bi bi-info-circle me-1"></i> Overview
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-update" data-bs-toggle="tab" data-bs-target="#tabUpdate" type="button" role="tab">
+          <i class="bi bi-cloud-download me-1"></i> Update &amp; Rollback
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-schedule" data-bs-toggle="tab" data-bs-target="#tabSchedule" type="button" role="tab">
+          <i class="bi bi-calendar-check me-1"></i> Schedule &amp; Health
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-history" data-bs-toggle="tab" data-bs-target="#tabHistory" type="button" role="tab">
+          <i class="bi bi-clock-history me-1"></i> History
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content" style="padding-top:20px;">
+
+      <!-- ═══ TAB 1: OVERVIEW ═══ -->
+      <div class="tab-pane fade show active" id="tabOverview" role="tabpanel">
+        <div class="row g-3">
+
+          <!-- Version Cards -->
+          <div class="col-12 col-md-6 col-lg-3">
+            <div class="lp-glass-card" style="text-align:center;padding:20px;">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Current Version</div>
+              <div id="ovCurrentVersion" style="font-size:28px;font-weight:700;color:var(--accent-primary);font-family:monospace;">—</div>
+              <div id="ovCurrentBranch" style="font-size:12px;color:var(--text-secondary);margin-top:4px;"><span class="lp-badge lp-badge-ghost">main</span></div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <div class="lp-glass-card" style="text-align:center;padding:20px;">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Latest Available</div>
+              <div id="ovLatestVersion" style="font-size:28px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+              <div id="ovUpdateStatus" style="font-size:12px;margin-top:4px;"><span class="lp-badge lp-badge-secondary">—</span></div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <div class="lp-glass-card" style="text-align:center;padding:20px;">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Commit</div>
+              <div id="ovCurrentCommit" style="font-size:14px;font-weight:600;color:var(--accent-warning);font-family:monospace;">—</div>
+              <div id="ovLastUpdated" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Last update: —</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <div class="lp-glass-card" style="text-align:center;padding:20px;">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Update Channel</div>
+              <div id="ovChannel" style="font-size:20px;font-weight:700;color:var(--accent-success);">stable</div>
+              <div id="ovNodeVersion" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Node: —</div>
+            </div>
+          </div>
+
+          <!-- Changelog Preview -->
+          <div class="col-12 col-lg-8">
+            <div class="lp-glass-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <div class="lp-card-title" style="font-size:14px;margin:0;">
+                  <i class="bi bi-list-stars text-primary me-1"></i> Recent Commits
+                </div>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="UpdaterPage.refreshChangelog()" style="font-size:11px;">
+                  <i class="bi bi-arrow-repeat"></i> Refresh
+                </button>
+              </div>
+              <div id="ovChangelogContainer" style="max-height:300px;overflow-y:auto;">
+                <div id="ovChangelogLoading" style="text-align:center;padding:20px;color:var(--text-muted);">
+                  <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading commits...
+                </div>
+                <div id="ovChangelogContent" style="display:none;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Health Status Sidebar -->
+          <div class="col-12 col-lg-4">
+            <div class="lp-glass-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <div class="lp-card-title" style="font-size:14px;margin:0;">
+                  <i class="bi bi-heart-pulse text-danger me-1"></i> Health Status
+                </div>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="UpdaterPage.refreshHealth()" style="font-size:11px;">
+                  <i class="bi bi-arrow-repeat"></i> Check
+                </button>
+              </div>
+              <div id="ovHealthContainer">
+                <div style="text-align:center;padding:15px;color:var(--text-muted);">
+                  <div class="spinner-border spinner-border-sm text-primary me-2"></div>Checking...
+                </div>
+              </div>
+              <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--glass-border);">
+                <div style="display:flex;justify-content:space-between;font-size:12px;">
+                  <span style="color:var(--text-muted);">Uptime</span>
+                  <span id="ovUptime" style="color:var(--text-primary);font-family:monospace;">—</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px;">
+                  <span style="color:var(--text-muted);">Last Restart</span>
+                  <span id="ovLastRestart" style="color:var(--text-primary);font-family:monospace;">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Diff Stats -->
+          <div class="col-12">
+            <div class="lp-glass-card" id="ovDiffStatsCard" style="display:none;">
+              <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                <span style="font-size:13px;font-weight:600;color:var(--text-primary);">
+                  <i class="bi bi-git text-warning me-1"></i> Pending Changes
+                </span>
+                <span id="ovDiffFiles" class="lp-badge lp-badge-info">0 files</span>
+                <span id="ovDiffInsertions" class="lp-badge lp-badge-success">+0</span>
+                <span id="ovDiffDeletions" class="lp-badge lp-badge-danger">-0</span>
+                <span id="ovBehindCount" class="lp-badge lp-badge-warning">0 commits behind</span>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm ms-auto" onclick="UpdaterPage.showDiffPreview()" style="font-size:11px;">
+                  <i class="bi bi-file-diff me-1"></i> View Diff
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ═══ TAB 2: UPDATE & ROLLBACK ═══ -->
+      <div class="tab-pane fade" id="tabUpdate" role="tabpanel">
+        <div class="row g-3">
+
+          <!-- Left: Update Panel -->
+          <div class="col-12 col-lg-7">
+            <div class="lp-glass-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <div>
+                  <div class="lp-card-title" style="font-size:14px;margin:0;">
+                    <i class="bi bi-cloud-download text-primary me-1"></i> Update Panel
+                  </div>
+                  <div style="color:var(--text-secondary);font-size:12px;">Pull latest code, install dependencies, and restart</div>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="UpdaterPage.dryRunUpdate()" id="btnDryRun" style="font-size:11px;">
+                    <i class="bi bi-eye"></i> Dry Run
+                  </button>
+                </div>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-4">
+                  <label class="lp-label" style="font-size:12px;">Method</label>
+                  <select id="upMethod" class="lp-input" style="font-size:13px;">
+                    <option value="git">Git Pull</option>
+                    <option value="npm">NPM Only</option>
+                  </select>
+                </div>
+                <div class="col-4">
+                  <label class="lp-label" style="font-size:12px;">Branch</label>
+                  <input type="text" id="upBranch" class="lp-input" value="main" style="font-size:13px;">
+                </div>
+                <div class="col-4">
+                  <label class="lp-label" style="font-size:12px;">Channel</label>
+                  <select id="upChannel" class="lp-input" style="font-size:13px;">
+                    <option value="stable">Stable</option>
+                    <option value="beta">Beta</option>
+                    <option value="dev">Dev</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="d-flex gap-2 mb-3 flex-wrap">
+                <button class="btn-lp btn-lp-primary" onclick="UpdaterPage.runUpdate()" id="btnUpdate">
+                  <i class="bi bi-cloud-download me-1"></i> Update Panel
+                </button>
+                <button class="btn-lp btn-lp-ghost" onclick="UpdaterPage.refreshUpdateStatus()" id="btnRefreshUpdate">
+                  <i class="bi bi-arrow-repeat me-1"></i> Check Again
+                </button>
+              </div>
+
+              <label class="lp-label" style="font-size:12px;margin-bottom:4px;">Update Log</label>
+              <div id="upLog" style="background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:10px;padding:12px;font-family:monospace;font-size:12px;color:var(--text-secondary);height:240px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;">
+Ready. Configure options above and click "Update Panel".
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Rollback -->
+          <div class="col-12 col-lg-5">
+            <!-- Rollback Card -->
+            <div class="lp-glass-card mb-3">
+              <div class="lp-card-title" style="font-size:14px;margin-bottom:14px;">
+                <i class="bi bi-arrow-counterclockwise text-warning me-1"></i> Rollback
+              </div>
+              <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
+                Rollback to a previous commit or restore from a backup archive.
+              </p>
+              <div class="lp-form-group mb-2">
+                <label class="lp-label" style="font-size:12px;">Rollback Method</label>
+                <select id="rbMethod" class="lp-input" onchange="UpdaterPage.toggleRollbackMethod()" style="font-size:13px;">
+                  <option value="commit">Git Commit</option>
+                  <option value="backup">Backup Archive</option>
+                </select>
+              </div>
+              <div id="rbCommitGroup" class="lp-form-group mb-2">
+                <label class="lp-label" style="font-size:12px;">Commit Hash</label>
+                <input type="text" id="rbCommit" class="lp-input font-mono" placeholder="e.g. abc123def456..." style="font-size:12px;">
+              </div>
+              <div id="rbBackupGroup" class="lp-form-group mb-2" style="display:none;">
+                <label class="lp-label" style="font-size:12px;">Backup</label>
+                <select id="rbBackupSelect" class="lp-input" style="font-size:12px;">
+                  <option value="">Loading backups...</option>
+                </select>
+              </div>
+              <button class="btn-lp btn-lp-warning w-100" onclick="UpdaterPage.runRollback()" id="btnRollback">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Rollback
+              </button>
+              <div id="rbLog" style="background:var(--bg-tertiary);border:1px solid var(--glass-border);border-radius:8px;padding:10px;font-family:monospace;font-size:11px;color:var(--text-secondary);height:100px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;margin-top:10px;display:none;"></div>
+            </div>
+
+            <!-- Backups Card -->
+            <div class="lp-glass-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <div class="lp-card-title" style="font-size:14px;margin:0;">
+                  <i class="bi bi-archive text-info me-1"></i> Pre-Update Backups
+                </div>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="UpdaterPage.createBackup()" id="btnCreateBackup" style="font-size:11px;">
+                  <i class="bi bi-plus-circle"></i> Backup Now
+                </button>
+              </div>
+              <div id="rbBackupList" style="max-height:200px;overflow-y:auto;">
+                <div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;">
+                  <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading...
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ═══ TAB 3: SCHEDULE & HEALTH ═══ -->
+      <div class="tab-pane fade" id="tabSchedule" role="tabpanel">
+        <div class="row g-3">
+
+          <!-- Auto-Update Schedule -->
+          <div class="col-12 col-lg-6">
+            <div class="lp-glass-card">
+              <div class="lp-card-title" style="font-size:14px;margin-bottom:16px;">
+                <i class="bi bi-calendar-check text-primary me-1"></i> Auto-Update Schedule
+              </div>
+
+              <div class="lp-form-group mb-3">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <label class="lp-label" style="font-size:13px;margin:0;">Enable Auto-Update</label>
+                  <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" id="schEnabled" style="width:38px;height:20px;cursor:pointer;">
+                  </div>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                  Automatically check for and apply panel updates on schedule
+                </div>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="lp-label" style="font-size:12px;">Frequency</label>
+                  <select id="schFreq" class="lp-input" style="font-size:13px;">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly (Sunday)</option>
+                    <option value="monthly">Monthly (1st)</option>
+                    <option value="manual">Manual Only</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="lp-label" style="font-size:12px;">Time (24h)</label>
+                  <input type="time" id="schTime" class="lp-input" value="03:00" style="font-size:13px;">
+                </div>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="lp-label" style="font-size:12px;">Update Branch</label>
+                  <select id="schBranch" class="lp-input" style="font-size:13px;">
+                    <option value="main">main (stable)</option>
+                    <option value="develop">develop</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="lp-label" style="font-size:12px;">Channel</label>
+                  <select id="schChannel" class="lp-input" style="font-size:13px;">
+                    <option value="stable">Stable</option>
+                    <option value="beta">Beta</option>
+                    <option value="dev">Dev</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="lp-label" style="font-size:12px;">Max Backups</label>
+                  <input type="number" id="schMaxBackups" class="lp-input" value="5" min="1" max="20" style="font-size:13px;">
+                </div>
+                <div class="col-6">
+                  <label class="lp-label" style="font-size:12px;">Health Check Timeout (s)</label>
+                  <input type="number" id="schHealthTimeout" class="lp-input" value="60" min="10" max="300" style="font-size:13px;">
+                </div>
+              </div>
+
+              <button class="btn-lp btn-lp-primary w-100" onclick="UpdaterPage.saveSchedule()">
+                <i class="bi bi-floppy me-1"></i> Save Schedule Configuration
+              </button>
+            </div>
+          </div>
+
+          <!-- Health Check Details -->
+          <div class="col-12 col-lg-6">
+            <div class="lp-glass-card mb-3">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <div class="lp-card-title" style="font-size:14px;margin:0;">
+                  <i class="bi bi-heart-pulse text-danger me-1"></i> Health Check
+                </div>
+                <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="UpdaterPage.refreshHealth()">
+                  <i class="bi bi-arrow-repeat me-1"></i> Run Now
+                </button>
+              </div>
+              <div id="schHealthResults">
+                <div style="text-align:center;padding:20px;color:var(--text-muted);">
+                  <div class="spinner-border spinner-border-sm text-primary me-2"></div>Running health check...
+                </div>
+              </div>
+            </div>
+
+            <!-- Auto-Update Log -->
+            <div class="lp-glass-card">
+              <div class="lp-card-title" style="font-size:14px;margin-bottom:12px;">
+                <i class="bi bi-info-circle text-info me-1"></i> Auto-Update Info
+              </div>
+              <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;">
+                <p><strong>How it works:</strong></p>
+                <ol style="padding-left:18px;margin:0;">
+                  <li>At scheduled time, the system checks for updates</li>
+                  <li>If an update is found, a pre-update backup is created automatically</li>
+                  <li>The latest code is pulled and dependencies are installed</li>
+                  <li>A syntax/health check verifies the new code</li>
+                  <li>If verification fails, auto-rollback to the previous version</li>
+                  <li>On success, the panel restarts automatically</li>
+                </ol>
+                <div style="margin-top:10px;padding:8px 10px;background:rgba(255,193,7,0.1);border-radius:8px;border:1px solid rgba(255,193,7,0.2);">
+                  <i class="bi bi-exclamation-triangle text-warning me-1"></i> 
+                  Auto-updates only work when the panel is installed in a git repository.
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ═══ TAB 4: HISTORY ═══ -->
+      <div class="tab-pane fade" id="tabHistory" role="tabpanel">
+        <div class="row g-3">
+
+          <div class="col-12">
+            <div class="lp-glass-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+                <div class="lp-card-title" style="font-size:14px;margin:0;">
+                  <i class="bi bi-clock-history text-primary me-1"></i> Update &amp; Rollback History
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="UpdaterPage.refreshHistory()" style="font-size:11px;">
+                    <i class="bi bi-arrow-repeat me-1"></i> Refresh
+                  </button>
+                  <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="UpdaterPage.clearHistory()" style="font-size:11px;">
+                    <i class="bi bi-trash me-1"></i> Clear
+                  </button>
+                </div>
+              </div>
+              <div id="historyContent">
+                <div style="text-align:center;padding:30px;color:var(--text-muted);">
+                  <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading history...
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Diff Preview Modal -->
+<div class="modal fade" id="diffModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content" style="background:rgba(15,20,30,0.95);border:1px solid var(--glass-border);">
+      <div class="modal-header" style="border-bottom:1px solid var(--glass-border);">
+        <h5 class="modal-title" style="font-size:15px;"><i class="bi bi-file-diff text-warning me-1"></i> Diff Preview</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:0;">
+        <pre id="diffPreviewContent" style="margin:0;padding:15px;font-family:monospace;font-size:11px;line-height:1.5;color:var(--text-secondary);overflow-x:auto;white-space:pre-wrap;max-height:60vh;">Loading diff...</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Rollback Confirm Modal -->
+<div class="modal fade" id="rollbackConfirmModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:rgba(15,20,30,0.95);border:1px solid var(--glass-border);">
+      <div class="modal-header" style="border-bottom:1px solid var(--glass-border);">
+        <h5 class="modal-title" style="font-size:15px;color:var(--accent-warning);">
+          <i class="bi bi-exclamation-triangle me-1"></i> Confirm Rollback
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="font-size:13px;color:var(--text-secondary);">
+        <p>Are you sure you want to perform a rollback?</p>
+        <ul id="rbConfirmDetails" style="font-size:12px;"></ul>
+        <p class="text-warning" style="font-size:12px;"><i class="bi bi-exclamation-circle me-1"></i> The panel will restart after rollback.</p>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--glass-border);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-warning" id="btnConfirmRollback" onclick="UpdaterPage.confirmRollback()">
+          <i class="bi bi-arrow-counterclockwise me-1"></i> Execute Rollback
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Update Confirmation Modal -->
+<div class="modal fade" id="updateConfirmModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:rgba(15,20,30,0.95);border:1px solid var(--glass-border);">
+      <div class="modal-header" style="border-bottom:1px solid var(--glass-border);">
+        <h5 class="modal-title" style="font-size:15px;"><i class="bi bi-cloud-download text-primary me-1"></i> Confirm Update</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="font-size:13px;color:var(--text-secondary);">
+        <div id="upConfirmDetails"></div>
+        <p style="margin-top:10px;font-size:12px;">
+          <i class="bi bi-info-circle text-info me-1"></i> A pre-update backup will be created automatically.
+          The panel will restart after the update.
+        </p>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--glass-border);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" id="btnConfirmUpdate" onclick="UpdaterPage.confirmUpdate()">
+          <i class="bi bi-cloud-download me-1"></i> Start Update
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/updater.js"></script>

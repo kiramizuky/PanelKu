@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
 # ============================================================
-# Linux Panel — One-Click Install Script
+# Panelku — One-Click Install Script
 # Supports: Debian, Ubuntu, Armbian, RHEL/CentOS, Arch, Alpine
 # ============================================================
 
@@ -28,7 +28,7 @@ print_banner() {
   echo "  ██║     ██║██║╚██╗██║██║   ██║ ██╔██╗ "
   echo "  ███████╗██║██║ ╚████║╚██████╔╝██╔╝ ██╗"
   echo "  ╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝"
-  echo "  PANEL — Linux Server Control Panel"
+  echo "  PANELKU — Linux Server Control Panel"
   echo -e "${NC}"
 }
 
@@ -228,7 +228,7 @@ install_pm2() {
 }
 
 setup_panel() {
-  info "Setting up Linux Panel in $PANEL_DIR..."
+  info "Setting up Panelku in $PANEL_DIR..."
   mkdir -p "$PANEL_DIR"
   cp -r . "$PANEL_DIR/"
   cd "$PANEL_DIR"
@@ -304,7 +304,7 @@ EOF
 
 setup_firewall() {
   if command -v ufw &>/dev/null; then
-    ufw allow "$PANEL_PORT"/tcp comment 'Linux Panel' >/dev/null 2>&1
+    ufw allow "$PANEL_PORT"/tcp comment 'Panelku' >/dev/null 2>&1
     log "Firewall: port $PANEL_PORT opened"
   fi
 }
@@ -320,7 +320,7 @@ setup_firewall
 
 echo ""
 echo -e "${GREEN}════════════════════════════════════════${NC}"
-echo -e "${GREEN}  Linux Panel installed successfully!   ${NC}"
+echo -e "${GREEN}  Panelku installed successfully!       ${NC}"
 echo -e "${GREEN}════════════════════════════════════════${NC}"
 echo -e "  URL:      ${CYAN}http://$(hostname -I | awk '{print $1}'):$PANEL_PORT${NC}"
 echo -e "  Login:    ${YELLOW}admin${NC} / ${YELLOW}Admin@123456${NC}"

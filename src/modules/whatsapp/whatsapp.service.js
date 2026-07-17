@@ -73,7 +73,7 @@ class WhatsappService {
       auth: state,
       printQRInTerminal: false,
       logger: silentLogger,
-      browser: ['LinuxPanel', 'Chrome', '1.0.0'],
+      browser: ['Panelku', 'Chrome', '1.0.0'],
       keepAliveIntervalMs: 30000,
       defaultQueryTimeoutMs: 60000,
       connectTimeoutMs: 60000

@@ -1,84 +1,193 @@
 <div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
   <div>
-    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Databases</h1>
-    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage MySQL, PostgreSQL, and SQLite</p>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Database Explorer</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage MySQL, PostgreSQL, SQLite — Browse, Query, Export & Import</p>
   </div>
   <div style="display:flex;gap:10px">
-    <button class="btn-lp btn-lp-primary" onclick="DatabasePage.showCreateModal()"><i class="bi bi-plus-lg"></i> Create DB</button>
+    <button class="btn-lp btn-lp-primary" onclick="DB.showCreateModal()"><i class="bi bi-plus-lg"></i> Create DB</button>
   </div>
 </div>
 
 <style>
   .db-tabs { border-bottom: 1px solid var(--glass-border); }
   .db-tabs .nav-link { color: var(--text-muted); background: transparent; border: none; padding: 10px 16px; font-weight: 500; border-radius: 8px 8px 0 0; }
-  .db-tabs .nav-link:hover { color: var(--text-primary); border-color: transparent; }
-  .db-tabs .nav-link.active { 
-    color: var(--accent-primary); 
-    background: rgba(99,102,241,0.1); 
-    border: 1px solid var(--glass-border); 
-    border-bottom-color: transparent; 
+  .db-tabs .nav-link:hover { color: var(--text-primary); }
+  .db-tabs .nav-link.active {
+    color: var(--accent-primary);
+    background: rgba(99,102,241,0.1);
+    border: 1px solid var(--glass-border);
+    border-bottom-color: transparent;
   }
+  .lp-table th.sortable { cursor: pointer; }
+  .lp-table th.sortable:hover { color: var(--accent-primary); }
+  .lp-table th.sortable::after { content: ' ↕'; opacity: 0.4; }
+  .lp-table th.sortable.asc::after { content: ' ↑'; opacity: 1; }
+  .lp-table th.sortable.desc::after { content: ' ↓'; opacity: 1; }
+  .query-textarea { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12.5px; background: #0a0e1a !important; color: #e0e0e0 !important; border: 1px solid rgba(255,255,255,0.08) !important; }
 </style>
 
-<ul class="nav nav-tabs mb-4 db-tabs">
+<ul class="nav nav-tabs mb-4 db-tabs" id="dbMainTabs">
   <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#mysql">MySQL</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#postgres">PostgreSQL</a></li>
   <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#sqlite">SQLite</a></li>
 </ul>
 
 <div class="tab-content">
-  <!-- MySQL Tab -->
-  <div class="tab-pane fade show active" id="mysql">
+  <% ['mysql', 'postgres', 'sqlite'].forEach(function(type) { %>
+  <div class="tab-pane fade <%= type === 'mysql' ? 'show active' : '' %>" id="<%= type %>">
     <div class="lp-glass-card" style="padding:0;overflow-x:auto;">
       <table class="lp-table">
         <thead>
           <tr>
             <th>Database Name</th>
-            <th style="text-align:right">Actions</th>
+            <th style="width:60px;text-align:center">Tables</th>
+            <th style="width:180px;text-align:right">Actions</th>
           </tr>
         </thead>
-        <tbody id="mysqlTableBody">
-          <tr><td colspan="2" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+        <tbody id="<%= type %>TableBody">
+          <tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
         </tbody>
       </table>
-      <div id="mysqlPagination" style="padding: 0 15px 15px 15px;"></div>
+      <div id="<%= type %>Pagination" style="padding:0 15px 15px 15px;"></div>
     </div>
   </div>
+  <% }); %>
+</div>
 
-  <!-- PostgreSQL Tab -->
-  <div class="tab-pane fade" id="postgres">
-    <div class="lp-glass-card" style="padding:0;overflow-x:auto;">
-      <table class="lp-table">
-        <thead>
-          <tr>
-            <th>Database Name</th>
-            <th style="text-align:right">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="postgresTableBody">
-          <tr><td colspan="2" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
-        </tbody>
-      </table>
-      <div id="postgresPagination" style="padding: 0 15px 15px 15px;"></div>
-    </div>
-  </div>
+<!-- Database Explorer Modal (Enhanced) -->
+<div class="modal fade" id="exploreDbModal" tabindex="-1">
+  <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
+    <div class="modal-content" style="background:#0b0f19;border:1px solid var(--glass-border);color:#fff;">
+      <div class="modal-header" style="border-bottom:1px solid var(--glass-border);">
+        <h5 class="modal-title font-mono" style="font-size:14px" id="exploreDbTitle">Database Explorer</h5>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="DB.refreshExplorerTables()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+      </div>
+      <div class="modal-body" style="padding:0;display:flex;height:calc(100vh - 120px);overflow:hidden;">
+        <!-- Left Sidebar: Tables -->
+        <div style="width:240px;background:#070a13;border-right:1px solid rgba(255,255,255,0.05);overflow-y:auto;padding:15px;flex-shrink:0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h6 style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;margin:0;">Tables</h6>
+            <span id="explorerTableCount" class="text-muted" style="font-size:10px;">0</span>
+          </div>
+          <div id="dbExplorerTablesList" style="display:flex;flex-direction:column;gap:2px;"></div>
+        </div>
+        <!-- Right Area -->
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <!-- Tabs: Browse / Structure / Query -->
+          <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.05);background:rgba(0,0,0,0.15);padding:0 15px;">
+            <button class="explorer-tab btn-lp btn-lp-ghost btn-lp-sm active" data-tab="browse" onclick="DB.switchExplorerTab('browse')" style="padding:10px 14px;border-radius:0;border-bottom:2px solid var(--accent-primary);color:var(--accent-primary);font-size:12px;">Browse</button>
+            <button class="explorer-tab btn-lp btn-lp-ghost btn-lp-sm" data-tab="structure" onclick="DB.switchExplorerTab('structure')" style="padding:10px 14px;border-radius:0;border-bottom:2px solid transparent;font-size:12px;">Structure</button>
+            <button class="explorer-tab btn-lp btn-lp-ghost btn-lp-sm" data-tab="query" onclick="DB.switchExplorerTab('query')" style="padding:10px 14px;border-radius:0;border-bottom:2px solid transparent;font-size:12px;">Query</button>
+            <button class="explorer-tab btn-lp btn-lp-ghost btn-lp-sm" data-tab="export" onclick="DB.switchExplorerTab('export')" style="padding:10px 14px;border-radius:0;border-bottom:2px solid transparent;font-size:12px;">Export</button>
+            <button class="explorer-tab btn-lp btn-lp-ghost btn-lp-sm" data-tab="history" onclick="DB.switchExplorerTab('history')" style="padding:10px 14px;border-radius:0;border-bottom:2px solid transparent;font-size:12px;">History</button>
+          </div>
 
+          <!-- Browse Tab -->
+          <div class="explorer-panel" id="panel-browse" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+            <!-- Pagination Top -->
+            <div style="padding:8px 15px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.1);flex-shrink:0;">
+              <span style="font-size:11px;color:var(--text-muted);">
+                Table: <strong id="browseTableName" style="color:#fff;">—</strong> &nbsp;
+                <span id="browseRowInfo">0 rows</span>
+              </span>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <span style="font-size:11px;color:var(--text-muted);">Rows/page:</span>
+                <select id="browseLimit" onchange="DB.loadTableData()" class="lp-input" style="width:70px;padding:3px 6px;font-size:11px;margin:0;">
+                  <option value="25">25</option>
+                  <option value="50" selected>50</option>
+                  <option value="100">100</option>
+                  <option value="200">200</option>
+                </select>
+                <div id="browsePagination" style="display:flex;gap:5px;"></div>
+              </div>
+            </div>
+            <!-- Data Table -->
+            <div style="flex:1;overflow:auto;padding:0;">
+              <table class="lp-table" style="font-size:12px;margin:0;" id="browseDataTable">
+                <thead id="browseDataHead"><tr><th>Select a table to browse</th></tr></thead>
+                <tbody id="browseDataBody"><tr><td class="text-muted">Click a table name in the left panel.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
 
-  <!-- SQLite Tab -->
-  <div class="tab-pane fade" id="sqlite">
-    <div class="lp-glass-card" style="padding:0;overflow-x:auto;">
-      <table class="lp-table">
-        <thead>
-          <tr>
-            <th>Database File</th>
-            <th style="text-align:right">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="sqliteTableBody">
-          <tr><td colspan="2" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
-        </tbody>
-      </table>
-      <div id="sqlitePagination" style="padding: 0 15px 15px 15px;"></div>
+          <!-- Structure Tab -->
+          <div class="explorer-panel" id="panel-structure" style="flex:1;display:none;overflow:auto;padding:15px;">
+            <div id="structureContent"><p class="text-muted">Select a table to view its structure.</p></div>
+          </div>
+
+          <!-- Query Tab -->
+          <div class="explorer-panel" id="panel-query" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
+            <div style="padding:12px 15px;border-bottom:1px solid rgba(255,255,255,0.05);background:rgba(0,0,0,0.1);flex-shrink:0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <label class="lp-label" style="font-size:11px;margin:0;">SQL Query Console <span style="color:var(--text-muted);font-weight:400;font-size:10px;">(Ctrl+Enter to run)</span></label>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="document.getElementById('queryInput').value='SELECT * FROM `table_name` LIMIT 50;'" style="font-size:11px;">Clear</button>
+                  <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="DB.runQuery()"><i class="bi bi-play-fill"></i> Run</button>
+                </div>
+              </div>
+              <textarea id="queryInput" class="lp-input query-textarea" rows="4" style="resize:vertical;width:100%;" placeholder="SELECT * FROM table_name LIMIT 50;" spellcheck="false"></textarea>
+            </div>
+            <!-- Query Results -->
+            <div style="flex:1;overflow:auto;padding:0;">
+              <div id="queryStatus" style="padding:6px 15px;font-size:11px;color:var(--text-muted);border-bottom:1px solid rgba(255,255,255,0.05);">Ready</div>
+              <table class="lp-table" style="font-size:12px;margin:0;" id="queryResultsTable">
+                <thead id="queryResultsHead"></thead>
+                <tbody id="queryResultsBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Export Tab -->
+          <div class="explorer-panel" id="panel-export" style="flex:1;display:none;overflow:auto;padding:30px;">
+            <div id="exportContent" style="max-width:500px;margin:0 auto;">
+              <h5 style="margin-bottom:20px;font-size:16px;">Export Table Data</h5>
+              <div class="lp-form-group mb-3">
+                <label class="lp-label">Table</label>
+                <select id="exportTableSelect" class="lp-input"></select>
+              </div>
+              <div class="lp-form-group mb-3">
+                <label class="lp-label">Format</label>
+                <select id="exportFormatSelect" class="lp-input">
+                  <option value="json">JSON</option>
+                  <option value="csv">CSV</option>
+                  <option value="sql">SQL</option>
+                </select>
+              </div>
+              <button class="btn-lp btn-lp-primary" onclick="DB.exportTable()"><i class="bi bi-download"></i> Export & Download</button>
+              <hr style="border-color:var(--glass-border);margin:30px 0;">
+              <h5 style="margin-bottom:20px;font-size:16px;">Import Data</h5>
+              <div class="lp-form-group mb-3">
+                <label class="lp-label">Import Type</label>
+                <select id="importTypeSelect" class="lp-input" onchange="DB.toggleImportFields()">
+                  <option value="sql">SQL Statements</option>
+                  <option value="csv">CSV File</option>
+                </select>
+              </div>
+              <div class="lp-form-group mb-3" id="importTableGroup">
+                <label class="lp-label">Target Table (CSV only)</label>
+                <select id="importTableSelect" class="lp-input"></select>
+              </div>
+              <div class="lp-form-group mb-3">
+                <label class="lp-label">Content</label>
+                <textarea id="importContent" class="lp-input query-textarea" rows="6" placeholder="Paste SQL INSERT statements or CSV content here..." spellcheck="false"></textarea>
+              </div>
+              <button class="btn-lp btn-lp-primary" onclick="DB.importData()"><i class="bi bi-upload"></i> Import</button>
+            </div>
+          </div>
+
+          <!-- History Tab -->
+          <div class="explorer-panel" id="panel-history" style="flex:1;display:none;overflow:auto;padding:15px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+              <h6 style="font-size:12px;margin:0;color:var(--text-muted);">Recent Queries</h6>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DB.clearHistory()"><i class="bi bi-trash"></i> Clear</button>
+            </div>
+            <div id="historyList"><p class="text-muted">No query history yet.</p></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -91,7 +200,7 @@
         <h5 class="modal-title font-mono" style="font-size:14px">Create Database</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-      <form id="createDbForm" onsubmit="DatabasePage.createDatabase(event)">
+      <form id="createDbForm" onsubmit="DB.createDatabase(event)">
         <div class="modal-body">
           <div class="lp-form-group">
             <label class="lp-label">Type</label>
@@ -111,76 +220,6 @@
           <button type="submit" class="btn-lp btn-lp-primary">Create Database</button>
         </div>
       </form>
-    </div>
-  </div>
-</div>
-
-<!-- Install Password Config Modal -->
-<div class="modal fade" id="installConfigModal" tabindex="-1" data-bs-backdrop="static">
-  <div class="modal-dialog">
-    <div class="modal-content" style="background:var(--bg-primary); border:1px solid var(--glass-border);">
-      <div class="modal-header">
-        <h5 class="modal-title font-mono" style="font-size:14px" id="installConfigTitle">Configure Database</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <form id="installConfigForm" onsubmit="DatabasePage.submitInstall(event)">
-        <input type="hidden" id="installPkgName">
-        <div class="modal-body">
-          <p id="installConfigDescription" class="text-muted" style="font-size:13px; margin-bottom:15px;"></p>
-          <div class="lp-form-group">
-            <label class="lp-label" id="installPasswordLabel">Root Password</label>
-            <input type="password" id="installPassword" class="lp-input" placeholder="Enter secure password" required minlength="4">
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn-lp btn-lp-primary">Install & Configure</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<!-- Database Explorer Modal -->
-<div class="modal fade" id="exploreDbModal" tabindex="-1">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable">
-    <div class="modal-content" style="background:#0b0f19; border:1px solid var(--glass-border); color:#fff;">
-      <div class="modal-header" style="border-bottom:1px solid var(--glass-border);">
-        <h5 class="modal-title font-mono" style="font-size:14px" id="exploreDbTitle">Database Explorer</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" style="padding:0; display:flex; height:600px; overflow:hidden;">
-        <!-- Left Sidebar: Tables List -->
-        <div style="width:220px; background:#070a13; border-right:1px solid rgba(255,255,255,0.05); overflow-y:auto; padding:15px;">
-          <h6 style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px; letter-spacing:0.5px;">Tables</h6>
-          <div id="dbExplorerTablesList" style="display:flex; flex-direction:column; gap:5px;">
-            <p class="text-muted" style="font-size:12px;">No tables found</p>
-          </div>
-        </div>
-        <!-- Right Area: Query Console & Results -->
-        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
-          <!-- SQL Input -->
-          <div style="padding:15px; border-bottom:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.15);">
-            <label class="lp-label" style="font-size:11px;">SQL Query Console</label>
-            <textarea id="dbQueryInput" class="lp-input font-mono" rows="4" style="font-size:12.5px; resize:none;" placeholder="SELECT * FROM table_name LIMIT 10;"></textarea>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
-              <span id="dbQueryStatus" style="font-size:11px; color:var(--text-muted);">Ready</span>
-              <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="DatabasePage.runExplorerQuery()"><i class="bi bi-play-fill"></i> Run Query</button>
-            </div>
-          </div>
-          <!-- Results Table -->
-          <div style="flex:1; overflow:auto; padding:15px; background:#0a0e1a;">
-            <table class="lp-table" style="font-size:12px; margin:0;" id="dbExplorerResultsTable">
-              <thead id="dbExplorerResultsHead">
-                <tr><th>Query results will be displayed here</th></tr>
-              </thead>
-              <tbody id="dbExplorerResultsBody">
-                <tr><td class="text-muted">Execute a query or select a table to begin.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </div>

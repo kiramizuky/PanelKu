@@ -148,8 +148,24 @@ const createApp = () => {
   app.get('/settings/panel', (req, res) => res.render('settings/panel', { title: 'Panel Update' }));
   app.get('/settings/audit', (req, res) => res.render('settings/audit', { title: 'Audit Log' }));
   app.get('/settings/changelog', (req, res) => res.render('settings/changelog', { title: 'Changelog' }));
+  app.get('/settings/themes', (req, res) => res.render('settings/themes', { title: 'Themes' }));
   app.get('/whatsapp', (req, res) => res.render('whatsapp/index', { title: 'WhatsApp API' }));
   app.get('/api-docs', (req, res) => res.render('api-docs/index', { title: 'API Documentation' }));
+  app.get('/nodejs', (req, res) => res.render('nodejs/index', { title: 'Node.js Manager' }));
+  app.get('/python', (req, res) => res.render('python/index', { title: 'Python Manager' }));
+  app.get('/mongodb', (req, res) => res.render('mongodb/index', { title: 'MongoDB Manager' }));
+  app.get('/redis-manager', (req, res) => res.render('redis/index', { title: 'Redis Manager' }));
+  app.get('/apache', (req, res) => res.render('apache/index', { title: 'Apache Manager' }));
+  app.get('/analytics', (req, res) => res.render('analytics/index', { title: 'Analytics Dashboard' }));
+  app.get('/autoheal', (req, res) => res.render('autoheal/index', { title: 'Auto-Healing' }));
+  app.get('/ai-repair', (req, res) => res.render('ai-repair/index', { title: 'AI Auto-Repair' }));
+  app.get('/updater', (req, res) => res.render('updater/index', { title: 'Panel Updater' }));
+  app.get('/caddy', (req, res) => res.render('caddy/index', { title: 'Caddy Server' }));
+  app.get('/gpu', (req, res) => res.render('gpu/index', { title: 'GPU Manager' }));
+  app.get('/power', (req, res) => res.render('power/index', { title: 'Power Manager' }));
+  app.get('/mail', (req, res) => res.render('mail/index', { title: 'Mail Server' }));
+  app.get('/cdn', (req, res) => res.render('cdn/index', { title: 'CDN Manager' }));
+  app.get('/iot', (req, res) => res.render('iot/index', { title: 'IoT Manager' }));
 
   // Dynamic plugins router (loaded before 404 handler)
   app.use((req, res, next) => pluginLoader.handleProxy(req, res, next));

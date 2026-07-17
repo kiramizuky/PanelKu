@@ -1,13 +1,13 @@
 import alertsService from './alerts.service.js';
-import { success, errorResponse } from '../../helpers/response.js';
+import { success, error } from '../../helpers/response.js';
 
 class AlertsController {
   async getConfig(req, res) {
     try {
       const config = await alertsService.getConfig();
       return success(res, config);
-    } catch (error) {
-      return errorResponse(res, error, 500);
+    } catch (err) {
+      return error(res, err.message, 500);
     }
   }
 
@@ -15,8 +15,8 @@ class AlertsController {
     try {
       const config = await alertsService.updateConfig(req.body);
       return success(res, config, 'Alert configuration updated successfully');
-    } catch (error) {
-      return errorResponse(res, error, 500);
+    } catch (err) {
+      return error(res, err.message, 500);
     }
   }
 
@@ -24,8 +24,8 @@ class AlertsController {
     try {
       await alertsService.triggerAlert('Test Alert', 'This is a test alert from your Linux Server Control Panel.');
       return success(res, null, 'Test alert dispatched');
-    } catch (error) {
-      return errorResponse(res, error, 500);
+    } catch (err) {
+      return error(res, err.message, 500);
     }
   }
 }

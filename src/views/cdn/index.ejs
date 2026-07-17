@@ -1,0 +1,93 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">CDN & Cache Manager</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Cloudflare CDN, Varnish Cache, Redis Cache, Full Page Cache</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-ghost" onclick="CDN.loadData()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+  </div>
+</div>
+
+<style>
+  .cdn-tabs { border-bottom:1px solid var(--glass-border); }
+  .cdn-tabs .nav-link { color:var(--text-muted); background:transparent; border:none; padding:10px 16px; font-weight:500; border-radius:8px 8px 0 0; }
+  .cdn-tabs .nav-link:hover { color:var(--text-primary); }
+  .cdn-tabs .nav-link.active { color:var(--accent-primary); background:rgba(99,102,241,0.1); border:1px solid var(--glass-border); border-bottom-color:transparent; }
+</style>
+
+<ul class="nav nav-tabs mb-4 cdn-tabs">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#cdn-cloudflare">Cloudflare</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#cdn-varnish">Varnish</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#cdn-redis">Redis Cache</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#cdn-fpc">Full Page Cache</a></li>
+</ul>
+
+<div class="tab-content">
+  <!-- Cloudflare -->
+  <div class="tab-pane fade show active" id="cdn-cloudflare">
+    <div class="lp-glass-card" style="padding:20px;">
+      <div id="cfConfigForm" style="max-width:500px;margin-bottom:20px;">
+        <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;">Cloudflare API Credentials</h5>
+        <div class="lp-form-group">
+          <label class="lp-label">API Key (Global)</label>
+          <input type="password" id="cfApiKey" class="lp-input" placeholder="Your Cloudflare Global API Key">
+        </div>
+        <div class="lp-form-group">
+          <label class="lp-label">Account Email</label>
+          <input type="email" id="cfEmail" class="lp-input" placeholder="your@email.com">
+        </div>
+        <button class="btn-lp btn-lp-primary" onclick="CDN.loadCfZones()"><i class="bi bi-cloud"></i> Load Zones</button>
+      </div>
+      <div id="cfZoneContent" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span style="font-size:13px;color:var(--text-muted);">Your Cloudflare Zones</span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="CDN.purgeAll()"><i class="bi bi-trash"></i> Purge All</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="CDN.loadCfAnalytics()"><i class="bi bi-graph-up"></i> Analytics</button>
+          </div>
+        </div>
+        <div id="cfZonesList"></div>
+        <div id="cfAnalyticsContent" style="margin-top:15px;display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Varnish -->
+  <div class="tab-pane fade" id="cdn-varnish">
+    <div class="lp-glass-card" style="padding:20px;">
+      <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-server me-2 text-primary"></i>Varnish Cache</h5>
+      <div id="varnishStatus" class="text-muted">Loading...</div>
+      <div id="varnishControls" style="display:none;margin:15px 0;gap:8px;">
+        <button class="btn-lp btn-lp-success btn-lp-sm" onclick="CDN.varnishAction('start')"><i class="bi bi-play"></i> Start</button>
+        <button class="btn-lp btn-lp-danger btn-lp-sm" onclick="CDN.varnishAction('stop')"><i class="bi bi-stop"></i> Stop</button>
+        <button class="btn-lp btn-lp-warning btn-lp-sm" onclick="CDN.varnishAction('restart')"><i class="bi bi-arrow-clockwise"></i> Restart</button>
+        <button class="btn-lp btn-lp-info btn-lp-sm" onclick="CDN.varnishPurge()"><i class="bi bi-trash"></i> Purge Cache</button>
+      </div>
+      <div id="varnishConfig" style="margin-top:15px;">
+        <label class="lp-label">VCL Config</label>
+        <textarea id="varnishVclInput" class="lp-input" rows="8" style="font-family:monospace;font-size:11px;"></textarea>
+        <button class="btn-lp btn-lp-primary btn-lp-sm mt-2" onclick="CDN.saveVcl()">Save & Reload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Redis Cache -->
+  <div class="tab-pane fade" id="cdn-redis">
+    <div class="lp-glass-card" style="padding:20px;">
+      <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-database me-2 text-danger"></i>Redis Cache Stats</h5>
+      <div id="redisCacheInfo"><p class="text-muted">Loading...</p></div>
+      <button class="btn-lp btn-lp-danger btn-lp-sm mt-3" onclick="CDN.flushRedis()"><i class="bi bi-trash"></i> Flush Redis Cache</button>
+    </div>
+  </div>
+
+  <!-- Full Page Cache -->
+  <div class="tab-pane fade" id="cdn-fpc">
+    <div class="lp-glass-card" style="padding:20px;">
+      <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-layers me-2 text-success"></i>Full Page Cache</h5>
+      <div id="fpcInfo"><p class="text-muted">Loading...</p></div>
+      <button class="btn-lp btn-lp-danger btn-lp-sm mt-3" onclick="CDN.flushFpc()"><i class="bi bi-trash"></i> Flush Full Page Cache</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cdn.js"></script>

@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'linux-panel',
+      name: 'panelku',
       script: 'src/server.js',
       instances: 1,
       autorestart: true,

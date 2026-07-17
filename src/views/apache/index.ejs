@@ -1,0 +1,347 @@
+<style>
+  .apache-tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .apache-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.03);
+  }
+  .apache-tab.active {
+    color: var(--accent-primary);
+    background: rgba(99,102,241,0.08);
+    border-bottom-color: var(--accent-primary);
+  }
+  .apache-tab-content {
+    display: none;
+  }
+  .apache-tab-content.active {
+    display: block;
+    animation: fadeIn 0.25s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
+      <i class="bi bi-server text-warning me-2"></i> Apache Manager
+    </h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
+      Manage Apache virtual hosts, modules, configuration, and logs
+    </p>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="ApachePage.refresh()" title="Refresh">
+      <i class="bi bi-arrow-clockwise"></i> Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Not Installed Banner -->
+<div id="apacheNotInstalled" style="display:none;" class="mb-4">
+  <div class="lp-glass-card p-4 text-center">
+    <i class="bi bi-server text-muted" style="font-size:48px;display:block;margin-bottom:15px;"></i>
+    <h4 style="color:var(--text-primary);margin-bottom:10px;">Apache is not installed</h4>
+    <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px;">
+      Apache web server is not installed on this system. Click the button below to install it.
+    </p>
+    <button class="btn-lp btn-lp-primary" onclick="ApachePage.installApache()">
+      <i class="bi bi-download me-2"></i> Install Apache
+    </button>
+  </div>
+</div>
+
+<!-- Status Cards Row (shown when installed) -->
+<div id="apacheContent" style="display:none;">
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-md-6 col-lg-3">
+      <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-success);">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#10b981;flex-shrink:0;">
+          <i class="bi bi-server"></i>
+        </div>
+        <div style="min-width:0;">
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Status</div>
+          <div id="apacheStatusValue" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-lg-3">
+      <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-info);">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#3b82f6;flex-shrink:0;">
+          <i class="bi bi-tag"></i>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Version</div>
+          <div id="apacheVersionValue" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-lg-3">
+      <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-warning);">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#f59e0b;flex-shrink:0;">
+          <i class="bi bi-puzzle"></i>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Modules</div>
+          <div id="apacheModulesValue" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-lg-3">
+      <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-purple);">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(139,92,246,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#8b5cf6;flex-shrink:0;">
+          <i class="bi bi-wifi"></i>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Ports</div>
+          <div id="apachePortsValue" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Tabs -->
+  <div class="lp-glass-card mb-4" style="padding:0;overflow:hidden;">
+    <div style="display:flex;border-bottom:1px solid var(--glass-border);overflow-x:auto;background:rgba(0,0,0,0.1);">
+      <button class="apache-tab active" data-tab="vhosts" onclick="ApachePage.switchTab('vhosts')">
+        <i class="bi bi-globe2 me-1"></i> Virtual Hosts
+      </button>
+      <button class="apache-tab" data-tab="modules" onclick="ApachePage.switchTab('modules')">
+        <i class="bi bi-puzzle me-1"></i> Modules
+      </button>
+      <button class="apache-tab" data-tab="config" onclick="ApachePage.switchTab('config')">
+        <i class="bi bi-file-earmark-text me-1"></i> Config
+      </button>
+      <button class="apache-tab" data-tab="logs" onclick="ApachePage.switchTab('logs')">
+        <i class="bi bi-journal-text me-1"></i> Logs
+      </button>
+      <button class="apache-tab" data-tab="service" onclick="ApachePage.switchTab('service')">
+        <i class="bi bi-gear me-1"></i> Service
+      </button>
+    </div>
+
+    <!-- Tab: Virtual Hosts -->
+    <div id="tab-vhosts" class="apache-tab-content active" style="padding:20px;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+          <i class="bi bi-globe2 text-primary me-1"></i> Virtual Hosts (Vhosts)
+        </h5>
+        <button class="btn-lp btn-lp-primary btn-sm" onclick="ApachePage.showCreateVhostModal()">
+          <i class="bi bi-plus-lg me-1"></i> Add Vhost
+        </button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="lp-table">
+          <thead>
+            <tr>
+              <th>ServerName</th>
+              <th>Type / Port</th>
+              <th>Document Root</th>
+              <th>Status</th>
+              <th style="text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="vhostsTableBody">
+            <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab: Modules -->
+    <div id="tab-modules" class="apache-tab-content" style="padding:20px;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+          <i class="bi bi-puzzle text-primary me-1"></i> Apache Modules
+        </h5>
+        <div>
+          <input type="text" id="moduleFilterInput" class="lp-input" style="width:200px;display:inline-block;margin-right:8px;" placeholder="Filter modules..." oninput="ApachePage.filterModules()">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="ApachePage.loadModules()">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="moduleListContainer">
+        <div style="padding:20px;text-align:center;color:var(--text-muted);">
+          <div class="spinner-border spinner-border-sm text-primary me-2"></div> Loading modules...
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Config -->
+    <div id="tab-config" class="apache-tab-content" style="padding:20px;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+          <i class="bi bi-file-earmark-text text-primary me-1"></i> Main Configuration
+        </h5>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="ApachePage.loadConfig()">
+            <i class="bi bi-arrow-clockwise me-1"></i> Reload
+          </button>
+          <button class="btn-lp btn-lp-primary btn-sm" onclick="ApachePage.saveConfig()">
+            <i class="bi bi-floppy me-1"></i> Save & Reload
+          </button>
+        </div>
+      </div>
+      <div style="position:relative;">
+        <div id="configFilePath" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-family:monospace;"></div>
+        <textarea id="apacheConfigEditor" class="lp-input font-mono" style="width:100%;min-height:450px;font-size:12px;line-height:1.5;resize:vertical;tab-size:4;" spellcheck="false"></textarea>
+        <div id="configTestResult" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:12px;font-family:monospace;white-space:pre-wrap;"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Logs -->
+    <div id="tab-logs" class="apache-tab-content" style="padding:20px;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+          <i class="bi bi-journal-text text-primary me-1"></i> Log Viewer
+        </h5>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="logVhostSelect" class="lp-input" style="width:180px;display:inline-block;" onchange="ApachePage.loadLogs()">
+            <option value="">All vhosts (main)</option>
+          </select>
+          <select id="logTypeSelect" class="lp-input" style="width:120px;display:inline-block;" onchange="ApachePage.loadLogs()">
+            <option value="access">Access</option>
+            <option value="error">Error</option>
+          </select>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="ApachePage.loadLogs()">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+      </div>
+      <div style="background:#0a0a0f;border-radius:10px;border:1px solid var(--glass-border);overflow:hidden;">
+        <div style="padding:10px 15px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center;">
+          <span id="logFilePath" style="font-size:11px;color:var(--text-muted);font-family:monospace;"></span>
+          <span style="font-size:11px;color:var(--text-muted);">Last 100 lines</span>
+        </div>
+        <pre id="logOutputArea" style="margin:0;padding:15px;font-size:11px;font-family:monospace;color:#00ff88;max-height:500px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;background:transparent;"></pre>
+      </div>
+    </div>
+
+    <!-- Tab: Service -->
+    <div id="tab-service" class="apache-tab-content" style="padding:20px;">
+      <div class="row g-4">
+        <div class="col-12 col-md-6">
+          <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+            <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:16px;">
+              <i class="bi bi-gear me-1"></i> Service Control
+            </h6>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;">
+              <button class="btn-lp btn-lp-success" onclick="ApachePage.serviceAction('start')">
+                <i class="bi bi-play-fill me-1"></i> Start
+              </button>
+              <button class="btn-lp btn-lp-warning" onclick="ApachePage.serviceAction('stop')">
+                <i class="bi bi-stop-fill me-1"></i> Stop
+              </button>
+              <button class="btn-lp btn-lp-primary" onclick="ApachePage.serviceAction('restart')">
+                <i class="bi bi-arrow-repeat me-1"></i> Restart
+              </button>
+              <button class="btn-lp btn-lp-info" onclick="ApachePage.serviceAction('reload')">
+                <i class="bi bi-arrow-clockwise me-1"></i> Reload
+              </button>
+            </div>
+            <hr style="border-color:var(--glass-border);margin:16px 0;">
+            <button class="btn-lp btn-lp-primary" onclick="ApachePage.testConfig()" style="width:100%;">
+              <i class="bi bi-check-circle me-1"></i> Test Configuration
+            </button>
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+            <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:16px;">
+              <i class="bi bi-info-circle me-1"></i> Apache Info
+            </h6>
+            <table class="lp-table" style="font-size:13px;">
+              <tbody id="apacheInfoTableBody">
+                <tr><td style="padding:6px 0;color:var(--text-muted);width:120px;">Binary</td><td id="aiBinary" style="padding:6px 0;">—</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted);">Service</td><td id="aiService" style="padding:6px 0;">—</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted);">PID</td><td id="aiPid" style="padding:6px 0;font-family:monospace;">—</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted);">Ports</td><td id="aiPorts" style="padding:6px 0;">—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Vhost Modal -->
+<div class="modal fade" id="createVhostModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;">
+          <i class="bi bi-plus-circle text-primary me-2"></i> Create Virtual Host
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Server Name (domain)</label>
+          <input type="text" id="cvServerName" class="lp-input font-mono" placeholder="example.com" required>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Server Aliases (optional, space-separated)</label>
+          <input type="text" id="cvAliases" class="lp-input font-mono" placeholder="www.example.com">
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Type</label>
+          <select id="cvType" class="lp-input" onchange="ApachePage.toggleCreateVhostFields()">
+            <option value="static">Static HTML</option>
+            <option value="proxy">Reverse Proxy</option>
+            <option value="php">PHP-FPM</option>
+            <option value="ssl">SSL (HTTPS)</option>
+          </select>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Document Root</label>
+          <input type="text" id="cvRoot" class="lp-input font-mono" placeholder="/var/www/example.com">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Leave empty for default</div>
+        </div>
+        <div class="lp-form-group mb-3" id="cvPortGroup" style="display:none;">
+          <label class="lp-label">Proxy Target Port</label>
+          <input type="number" id="cvPort" class="lp-input" placeholder="8080">
+        </div>
+        <div class="lp-form-group mb-3" id="cvPhpGroup" style="display:none;">
+          <label class="lp-label">PHP Version</label>
+          <select id="cvPhpVersion" class="lp-input">
+            <option value="8.0">PHP 8.0</option>
+            <option value="8.1">PHP 8.1</option>
+            <option value="8.2" selected>PHP 8.2</option>
+            <option value="8.3">PHP 8.3</option>
+          </select>
+        </div>
+        <div class="lp-form-group mb-3" id="cvSslGroup" style="display:none;">
+          <label class="lp-label">SSL Certificate Path</label>
+          <input type="text" id="cvSslCert" class="lp-input font-mono" placeholder="/etc/ssl/certs/example.com.pem">
+          <label class="lp-label mt-2">SSL Key Path</label>
+          <input type="text" id="cvSslKey" class="lp-input font-mono" placeholder="/etc/ssl/private/example.com.key">
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="ApachePage.createVhost()">
+          <i class="bi bi-plus-lg me-1"></i> Create
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/apache.js"></script>

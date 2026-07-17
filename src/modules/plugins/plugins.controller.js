@@ -196,6 +196,204 @@ class PluginsController {
     }
   }
 
+  // ── Marketplace ────────────────────────────────────────────────────
+
+  async getMarketplace(req, res) {
+    try {
+      // In production, this would fetch from a remote registry API.
+      // For now, return curated list of available plugins with installation instructions.
+      const marketplace = [
+        {
+          id: 'php-manager',
+          name: 'PHP Manager',
+          description: 'Install multiple PHP versions, manage php.ini, FPM pools, extensions, and Composer.',
+          version: '1.2.0',
+          author: 'Panelku Team',
+          icon: 'bi-filetype-php',
+          color: '#787cb5',
+          category: 'runtime',
+          downloads: 1240,
+          installed: true,
+        },
+        {
+          id: 'home-assistant-manager',
+          name: 'Home Assistant Manager',
+          description: 'Deploy and manage Home Assistant via Docker with SSL, backups, and add-ons.',
+          version: '1.5.0',
+          author: 'Panelku Team',
+          icon: 'bi-house-heart',
+          color: '#41bdf5',
+          category: 'smarthome',
+          downloads: 890,
+          installed: true,
+        },
+        {
+          id: 'adguard-manager',
+          name: 'AdGuard Home Manager',
+          description: 'DNS-level ad-blocking with AdGuard Home. Manage blocklists, clients, and statistics.',
+          version: '1.1.0',
+          author: 'Panelku Team',
+          icon: 'bi-shield-shaded',
+          color: '#68bd59',
+          category: 'security',
+          downloads: 750,
+          installed: true,
+        },
+        {
+          id: 'fail2ban-manager',
+          name: 'Fail2Ban Manager',
+          description: 'Monitor Fail2Ban jails, manage banned IPs, view security logs and intrusion attempts.',
+          version: '1.0.5',
+          author: 'Panelku Team',
+          icon: 'bi-shield-exclamation',
+          color: '#ef4444',
+          category: 'security',
+          downloads: 1100,
+          installed: true,
+        },
+        {
+          id: 'nextcloud-manager',
+          name: 'Nextcloud Manager',
+          description: 'Deploy and manage Nextcloud with Docker. Backup data, manage users, and configure apps.',
+          version: '1.3.0',
+          author: 'Panelku Team',
+          icon: 'bi-cloud',
+          color: '#0082c9',
+          category: 'storage',
+          downloads: 650,
+          installed: true,
+        },
+        {
+          id: 'uptime-kuma-manager',
+          name: 'Uptime Kuma Manager',
+          description: 'Self-hosted uptime monitoring with status pages, notifications, and SSL checks.',
+          version: '1.0.0',
+          author: 'Panelku Team',
+          icon: 'bi-activity',
+          color: '#5cdd8b',
+          category: 'monitoring',
+          downloads: 520,
+          installed: true,
+        },
+        {
+          id: 'wireguard-manager',
+          name: 'WireGuard VPN Manager',
+          description: 'Manage WireGuard VPN peers, generate configs, monitor traffic and connection status.',
+          version: '1.0.0',
+          author: 'Panelku Team',
+          icon: 'bi-shield-lock',
+          color: '#38bdf8',
+          category: 'network',
+          downloads: 430,
+          installed: true,
+        },
+        {
+          id: 'redis-manager',
+          name: 'Redis Manager',
+          description: 'Monitor Redis keyspace, memory usage, manage config, flush, backup, and performance.',
+          version: '1.0.0',
+          author: 'Panelku Team',
+          icon: 'bi-database-fill-gear',
+          color: '#dc382d',
+          category: 'database',
+          downloads: 380,
+          installed: true,
+        },
+        {
+          id: 'rclone-manager',
+          name: 'Rclone Manager',
+          description: 'Manage rclone remotes for cloud storage sync across S3, Google Drive, Dropbox, and more.',
+          version: '1.0.0',
+          author: 'Panelku Team',
+          icon: 'bi-cloud-arrow-up',
+          color: '#6366f1',
+          category: 'storage',
+          downloads: 310,
+          installed: true,
+        },
+        {
+          id: 'rclone-backuper',
+          name: 'Rclone Backuper',
+          description: 'Scheduled backups to cloud storage via rclone with retention policies.',
+          version: '1.0.0',
+          author: 'Panelku Team',
+          icon: 'bi-archive',
+          color: '#10b981',
+          category: 'backup',
+          downloads: 290,
+          installed: true,
+        },
+        {
+          id: 'log-analyzer-manager',
+          name: 'Log Analyzer',
+          description: 'Parse and analyze system logs, detect anomalies, and visualize log patterns.',
+          version: '1.0.0',
+          author: 'Panelku Team',
+          icon: 'bi-journal-text',
+          color: '#f59e0b',
+          category: 'monitoring',
+          downloads: 270,
+          installed: true,
+        },
+        {
+          id: 'lvm-manager',
+          name: 'LVM Manager',
+          description: 'Manage Logical Volume Manager volumes, resize, snapshot, and monitor disk usage.',
+          version: '1.0.0',
+          author: 'Panelku Team',
+          icon: 'bi-hdd-stack',
+          color: '#8b5cf6',
+          category: 'storage',
+          downloads: 150,
+          installed: true,
+        },
+        {
+          id: 'pm2-manager',
+          name: 'PM2 Manager',
+          description: 'Monitor and manage PM2 processes, logs, restart policies, and clustering.',
+          version: '1.0.0',
+          author: 'Panelku Team',
+          icon: 'bi-diagram-3',
+          color: '#2b4ad4',
+          category: 'runtime',
+          downloads: 200,
+          installed: true,
+        },
+      ];
+
+      // Get installed plugins
+      const installedStr = await Setting.get('installed_plugins') || '[]';
+      const installedIds = JSON.parse(typeof installedStr === 'string' ? installedStr : JSON.stringify(installedStr));
+
+      const result = marketplace.map(p => ({
+        ...p,
+        installed: installedIds.includes(p.id),
+      }));
+
+      return successResponse(res, result, 'Marketplace plugins retrieved');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  // ── Plugin Upload ────────────────────────────────────────────────────
+
+  async uploadPlugin(req, res) {
+    try {
+      // This would handle multer upload of a plugin zip file
+      // For now, return helpful instructions
+      return successResponse(res, {
+        message: 'Plugin upload is handled via the plugins directory. To install a plugin:\n' +
+          '1. Download the plugin zip file\n' +
+          '2. Extract it to /opt/panelku/plugins/<plugin-name>/\n' +
+          '3. Ensure it has a valid plugin.json manifest\n' +
+          '4. Go to Plugins page and click Install',
+      }, 'Upload instructions');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
   async updatePlugin(req, res) {
     try {
       const { id } = req.body;

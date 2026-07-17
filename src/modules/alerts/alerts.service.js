@@ -33,7 +33,7 @@ class AlertsService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: config.telegram.chatId,
-          text: `🚨 *Linux Panel Alert*\n\n${message}`,
+          text: `🚨 *Panelku Alert*\n\n${message}`,
           parse_mode: 'Markdown'
         })
       });
@@ -60,7 +60,7 @@ class AlertsService {
       await transporter.sendMail({
         from: config.email.fromAddress,
         to: config.email.toAddress,
-        subject: `[Linux Panel] ${subject}`,
+        subject: `[Panelku] ${subject}`,
         text: message
       });
       logger.info('Email alert sent.');
@@ -76,7 +76,7 @@ class AlertsService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: `🚨 **[Linux Panel] ${subject}**\n${message}`
+          content: `🚨 **[Panelku] ${subject}**\n${message}`
         })
       });
       logger.info('Discord alert sent.');
@@ -92,7 +92,7 @@ class AlertsService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: `🚨 *[Linux Panel] ${subject}*\n${message}`
+          text: `🚨 *[Panelku] ${subject}*\n${message}`
         })
       });
       logger.info('Slack alert sent.');
@@ -125,7 +125,7 @@ class AlertsService {
     try {
       const whatsappService = (await import('../whatsapp/whatsapp.service.js')).default;
       const sessionName = 'default'; 
-      await whatsappService.sendMessage(sessionName, config.whatsapp.phoneNumber, `🚨 *Linux Panel Alert*\n\n${message}`);
+      await whatsappService.sendMessage(sessionName, config.whatsapp.phoneNumber, `🚨 *Panelku Alert*\n\n${message}`);
       logger.info('WhatsApp alert sent.');
     } catch (error) {
       logger.error('Failed to send WhatsApp alert:', error.message);

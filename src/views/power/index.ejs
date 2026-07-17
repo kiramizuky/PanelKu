@@ -1,0 +1,56 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Power Manager</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">CPU frequency scaling, power profiles, thermal monitoring, suspend/hibernate</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-ghost" onclick="POWER.loadData()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+  </div>
+</div>
+
+<style>
+  .power-gauge { height:8px; background:rgba(255,255,255,0.06); border-radius:4px; overflow:hidden; }
+  .power-gauge-bar { height:100%; border-radius:4px; transition:width 0.5s; }
+</style>
+
+<div id="powerContent">
+  <!-- CPU Governor Section -->
+  <div class="lp-glass-card" style="padding:20px;margin-bottom:20px;">
+    <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-cpu me-2 text-primary"></i>CPU Frequency Scaling</h5>
+    <div id="cpuGovernorContent">
+      <p class="text-muted">Loading CPU info...</p>
+    </div>
+  </div>
+
+  <!-- Power Profiles -->
+  <div class="lp-glass-card" style="padding:20px;margin-bottom:20px;">
+    <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-sliders2 me-2 text-success"></i>Power Profiles</h5>
+    <div id="powerProfilesContent">
+      <p class="text-muted">Loading profiles...</p>
+    </div>
+  </div>
+
+  <!-- Thermal & Fans -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+    <div class="lp-glass-card" style="padding:20px;">
+      <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-thermometer-half me-2 text-danger"></i>Thermal Zones</h5>
+      <div id="thermalContent"><p class="text-muted">Loading...</p></div>
+    </div>
+    <div class="lp-glass-card" style="padding:20px;">
+      <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-fan me-2 text-info"></i>Fans</h5>
+      <div id="fansContent"><p class="text-muted">Loading...</p></div>
+    </div>
+  </div>
+
+  <!-- Suspend / Hibernate -->
+  <div class="lp-glass-card" style="padding:20px;margin-bottom:20px;">
+    <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;"><i class="bi bi-moon-stars me-2 text-warning"></i>System Sleep</h5>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn-lp btn-lp-warning" onclick="POWER.systemAction('suspend')"><i class="bi bi-moon"></i> Suspend</button>
+      <button class="btn-lp btn-lp-danger" onclick="POWER.systemAction('hibernate')"><i class="bi bi-snow"></i> Hibernate</button>
+      <button class="btn-lp btn-lp-info" onclick="POWER.systemAction('hybrid-sleep')"><i class="bi bi-moon-stars"></i> Hybrid Sleep</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/power.js"></script>

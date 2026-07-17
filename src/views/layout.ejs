@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= typeof title !== 'undefined' ? title + ' — Linux Panel' : 'Linux Panel' %></title>
+  <title><%= typeof title !== 'undefined' ? title + ' — Panelku' : 'Panelku' %></title>
   <link rel="icon" type="image/png" href="/favicon.png">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
@@ -27,6 +27,7 @@
         <a href="#" class="lp-nav-link dropdown-toggle" data-bs-toggle="dropdown">Core</a>
         <ul class="dropdown-menu lp-dropdown" style="background:rgba(20,25,40,0.9); backdrop-filter:blur(15px); border:1px solid var(--glass-border);">
           <li><a class="dropdown-item" href="/monitor">Monitoring</a></li>
+          <li><a class="dropdown-item" href="/analytics">Analytics</a></li>
           <li><a class="dropdown-item" href="/system">System</a></li>
           <li><a class="dropdown-item" href="/terminal">Terminal</a></li>
           <li><a class="dropdown-item" href="/filemanager">File Manager</a></li>
@@ -38,9 +39,21 @@
         <a href="#" class="lp-nav-link dropdown-toggle" data-bs-toggle="dropdown">Services</a>
         <ul class="dropdown-menu lp-dropdown" style="background:rgba(20,25,40,0.9); backdrop-filter:blur(15px); border:1px solid var(--glass-border);">
           <li><a class="dropdown-item" href="/docker">Docker</a></li>
-          <li><a class="dropdown-item" href="/websites">Websites</a></li>
+          <li><a class="dropdown-item" href="/websites">Websites (Nginx)</a></li>
+          <li><a class="dropdown-item" href="/caddy">Caddy Server</a></li>
+          <li><a class="dropdown-item" href="/apache">Apache</a></li>
+          <li><a class="dropdown-item" href="/dns"><i class="bi bi-globe2 me-1"></i>DNS Manager</a></li>
           <li><a class="dropdown-item" href="/database">Databases</a></li>
+          <li><a class="dropdown-item" href="/nodejs">Node.js</a></li>
+          <li><a class="dropdown-item" href="/python">Python</a></li>
+          <li><a class="dropdown-item" href="/mongodb">MongoDB</a></li>
+          <li><a class="dropdown-item" href="/redis-manager">Redis</a></li>
           <li><a class="dropdown-item" href="/cron">Cron Jobs</a></li>
+          <li><a class="dropdown-item" href="/gpu"><i class="bi bi-cpu me-1"></i>GPU Manager</a></li>
+          <li><a class="dropdown-item" href="/power"><i class="bi bi-sliders2 me-1"></i>Power Manager</a></li>
+          <li><a class="dropdown-item" href="/mail"><i class="bi bi-envelope me-1"></i>Mail Server</a></li>
+          <li><a class="dropdown-item" href="/cdn"><i class="bi bi-cloud-fill me-1"></i>CDN & Cache</a></li>
+          <li><a class="dropdown-item" href="/iot"><i class="bi bi-wifi me-1"></i>IoT Manager</a></li>
         </ul>
       </div>
 
@@ -50,6 +63,8 @@
         <ul class="dropdown-menu lp-dropdown" style="background:rgba(20,25,40,0.9); backdrop-filter:blur(15px); border:1px solid var(--glass-border);">
           <li><a class="dropdown-item" href="/firewall">Firewall</a></li>
           <li><a class="dropdown-item" href="/ssl">SSL Certificates</a></li>
+          <li><a class="dropdown-item" href="/autoheal">Auto-Healing</a></li>
+          <li><a class="dropdown-item" href="/ai-repair"><i class="bi bi-robot me-1"></i>AI Auto-Repair</a></li>
           <li><a class="dropdown-item" href="/waf">WAF</a></li>
           <li><a class="dropdown-item" href="/n8n">n8n Automation</a></li>
           <li><a class="dropdown-item" href="/tailscale">Tailscale VPN</a></li>
@@ -71,7 +86,9 @@
             <% }); %>
           <% } %>
           <li><hr class="dropdown-divider" style="border-color: var(--glass-border);"></li>
+          <li><a class="dropdown-item" href="/updater"><i class="bi bi-arrow-up-circle me-2"></i>Panel Updater</a></li>
           <li><a class="dropdown-item" href="/settings/profile">Settings</a></li>
+          <li><a class="dropdown-item" href="/settings/themes"><i class="bi bi-palette me-2"></i>Themes</a></li>
           <li><a class="dropdown-item" href="/api-docs"><i class="bi bi-book me-2"></i>API Docs</a></li>
         </ul>
       </div>
@@ -116,6 +133,7 @@
           <span style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:8px;">Core</span>
           <div class="d-flex flex-column gap-1" style="padding-left:10px;">
             <a class="lp-nav-link py-2" href="/monitor"><i class="bi bi-cpu me-2"></i>Monitoring</a>
+            <a class="lp-nav-link py-2" href="/analytics"><i class="bi bi-bar-chart-fill me-2"></i>Analytics</a>
             <a class="lp-nav-link py-2" href="/system"><i class="bi bi-gear-wide-connected me-2"></i>System</a>
             <a class="lp-nav-link py-2" href="/terminal"><i class="bi bi-terminal me-2"></i>Terminal</a>
             <a class="lp-nav-link py-2" href="/filemanager"><i class="bi bi-folder2-open me-2"></i>File Manager</a>
@@ -127,9 +145,21 @@
           <span style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; display:block; margin-bottom:8px;">Services</span>
           <div class="d-flex flex-column gap-1" style="padding-left:10px;">
             <a class="lp-nav-link py-2" href="/docker"><i class="bi bi-box-seam me-2"></i>Docker</a>
-            <a class="lp-nav-link py-2" href="/websites"><i class="bi bi-globe2 me-2"></i>Websites</a>
+            <a class="lp-nav-link py-2" href="/websites"><i class="bi bi-globe2 me-2"></i>Websites (Nginx)</a>
+            <a class="lp-nav-link py-2" href="/caddy"><i class="bi bi-shield-fill-check text-success me-2"></i>Caddy Server</a>
+            <a class="lp-nav-link py-2" href="/apache"><i class="bi bi-server me-2"></i>Apache</a>
+            <a class="lp-nav-link py-2" href="/dns"><i class="bi bi-globe2 text-info me-2"></i>DNS Manager</a>
             <a class="lp-nav-link py-2" href="/database"><i class="bi bi-database me-2"></i>Databases</a>
+            <a class="lp-nav-link py-2" href="/nodejs"><i class="bi bi-code-slash me-2"></i>Node.js</a>
+            <a class="lp-nav-link py-2" href="/python"><i class="bi bi-filetype-py me-2"></i>Python</a>
+            <a class="lp-nav-link py-2" href="/mongodb"><i class="bi bi-database-fill me-2"></i>MongoDB</a>
+            <a class="lp-nav-link py-2" href="/redis-manager"><i class="bi bi-database-fill-gear me-2"></i>Redis</a>
             <a class="lp-nav-link py-2" href="/cron"><i class="bi bi-calendar3 me-2"></i>Cron Jobs</a>
+            <a class="lp-nav-link py-2" href="/gpu"><i class="bi bi-cpu me-2"></i>GPU Manager</a>
+            <a class="lp-nav-link py-2" href="/power"><i class="bi bi-sliders2 me-2"></i>Power Manager</a>
+            <a class="lp-nav-link py-2" href="/mail"><i class="bi bi-envelope me-2"></i>Mail Server</a>
+            <a class="lp-nav-link py-2" href="/cdn"><i class="bi bi-cloud-fill me-2"></i>CDN & Cache</a>
+            <a class="lp-nav-link py-2" href="/iot"><i class="bi bi-wifi me-2"></i>IoT Manager</a>
           </div>
         </div>
 
@@ -139,6 +169,8 @@
           <div class="d-flex flex-column gap-1" style="padding-left:10px;">
             <a class="lp-nav-link py-2" href="/firewall"><i class="bi bi-shield-lock me-2"></i>Firewall</a>
             <a class="lp-nav-link py-2" href="/ssl"><i class="bi bi-safe me-2"></i>SSL Certificates</a>
+            <a class="lp-nav-link py-2" href="/autoheal"><i class="bi bi-heart-pulse-fill me-2"></i>Auto-Healing</a>
+            <a class="lp-nav-link py-2" href="/ai-repair"><i class="bi bi-robot text-primary me-2"></i>AI Auto-Repair</a>
             <a class="lp-nav-link py-2" href="/waf"><i class="bi bi-shield-fill-exclamation me-2"></i>WAF</a>
             <a class="lp-nav-link py-2" href="/n8n"><i class="bi bi-shuffle me-2"></i>n8n Automation</a>
             <a class="lp-nav-link py-2" href="/tailscale"><i class="bi bi-shield-shaded me-2"></i>Tailscale VPN</a>
@@ -160,6 +192,8 @@
               <% }); %>
             <% } %>
             <div style="border-top: 1px solid rgba(255,255,255,0.05); margin: 6px 0;"></div>
+            <a class="lp-nav-link py-2 text-warning" href="/updater"><i class="bi bi-arrow-up-circle-fill me-2"></i>Panel Updater</a>
+            <a class="lp-nav-link py-2" href="/settings/themes"><i class="bi bi-palette me-2"></i>Themes</a>
             <a class="lp-nav-link py-2" href="/settings/profile"><i class="bi bi-person-fill-gear me-2"></i>Settings</a>
             <a class="lp-nav-link py-2" href="/api-docs"><i class="bi bi-book me-2"></i>API Docs</a>
             <a class="lp-nav-link py-2 text-warning d-none" id="panelUpdateMobileBtn" href="/settings/panel"><i class="bi bi-arrow-up-circle-fill me-2"></i>Update Available!</a>

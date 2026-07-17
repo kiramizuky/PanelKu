@@ -1,0 +1,109 @@
+<div class="row g-4">
+  <!-- Left Side: Navigation -->
+  <div class="col-12 col-lg-4">
+    <div class="settings-sidebar">
+      <div class="settings-sidebar-header">
+        <div style="position:relative;display:inline-block;">
+          <div class="settings-avatar" style="margin:0 auto 10px;">
+            <i class="bi bi-palette"></i>
+          </div>
+        </div>
+        <h5 class="settings-sidebar-name">Theme Manager</h5>
+        <p class="settings-sidebar-sub">Customize panel appearance</p>
+      </div>
+      <div class="settings-nav">
+        <a href="/settings/profile" class="settings-nav-item"><i class="bi bi-person"></i> My Profile</a>
+        <a href="/settings/users" class="settings-nav-item"><i class="bi bi-people"></i> Users</a>
+        <a href="/settings/roles" class="settings-nav-item"><i class="bi bi-shield-lock"></i> Roles &amp; Permissions</a>
+        <a href="/settings/themes" class="settings-nav-item active"><i class="bi bi-palette"></i> Themes</a>
+        <a href="/settings/panel" class="settings-nav-item"><i class="bi bi-arrow-repeat"></i> Panel Update</a>
+        <a href="/settings/audit" class="settings-nav-item"><i class="bi bi-journal-text"></i> Audit Log</a>
+        <a href="/settings/changelog" class="settings-nav-item"><i class="bi bi-file-earmark-text"></i> Changelog</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Themes -->
+  <div class="col-12 col-lg-8">
+    <!-- Built-in Themes -->
+    <div class="lp-glass-card mb-3">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div class="lp-card-title" style="font-size:14px;margin:0;">
+            <i class="bi bi-paint-bucket text-primary me-1"></i> Built-in Themes
+          </div>
+          <div style="color:var(--text-secondary);font-size:12px;">Choose a predefined theme</div>
+        </div>
+        <span id="currentThemeBadge" class="lp-badge lp-badge-success" style="font-size:10px;">Dark (default)</span>
+      </div>
+      <div class="row g-2" id="builtinThemes">
+        <div class="col-6 col-md-3">
+          <div class="lp-glass-card theme-option active" data-theme="dark" onclick="ThemesPage.selectBuiltin('dark')" style="padding:16px;text-align:center;cursor:pointer;border:2px solid var(--accent-primary);">
+            <div style="width:36px;height:36px;border-radius:50%;background:#0f1420;border:2px solid #2a2a3a;margin:0 auto 8px;"></div>
+            <div style="font-weight:600;font-size:13px;">Dark</div>
+            <div style="font-size:10px;color:var(--text-muted);">Default</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="lp-glass-card theme-option" data-theme="light" onclick="ThemesPage.selectBuiltin('light')" style="padding:16px;text-align:center;cursor:pointer;">
+            <div style="width:36px;height:36px;border-radius:50%;background:#f8f9fa;border:2px solid #dee2e6;margin:0 auto 8px;"></div>
+            <div style="font-weight:600;font-size:13px;">Light</div>
+            <div style="font-size:10px;color:var(--text-muted);">Clean & bright</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="lp-glass-card theme-option" data-theme="midnight" onclick="ThemesPage.selectBuiltin('midnight')" style="padding:16px;text-align:center;cursor:pointer;">
+            <div style="width:36px;height:36px;border-radius:50%;background:#0a0e17;border:2px solid #1a1a3e;margin:0 auto 8px;"></div>
+            <div style="font-weight:600;font-size:13px;">Midnight</div>
+            <div style="font-size:10px;color:var(--text-muted);">Deep blue</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="lp-glass-card theme-option" data-theme="dracula" onclick="ThemesPage.selectBuiltin('dracula')" style="padding:16px;text-align:center;cursor:pointer;">
+            <div style="width:36px;height:36px;border-radius:50%;background:#282a36;border:2px solid #bd93f9;margin:0 auto 8px;"></div>
+            <div style="font-weight:600;font-size:13px;">Dracula</div>
+            <div style="font-size:10px;color:var(--text-muted);">Purple accent</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom CSS -->
+    <div class="lp-glass-card mb-3">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div>
+          <div class="lp-card-title" style="font-size:14px;margin:0;">
+            <i class="bi bi-code-slash text-info me-1"></i> Custom CSS
+          </div>
+          <div style="color:var(--text-secondary);font-size:12px;">Add custom CSS to override panel styles</div>
+        </div>
+        <button class="btn-lp btn-lp-primary btn-sm" onclick="ThemesPage.saveCustomCSS()">
+          <i class="bi bi-floppy me-1"></i> Apply
+        </button>
+      </div>
+      <textarea id="customCSS" class="lp-input font-mono" style="width:100%;min-height:200px;font-size:12px;line-height:1.5;resize:vertical;tab-size:4;" spellcheck="false" placeholder="/* Custom CSS rules */&#10;body { background: ... }&#10;.lp-glass-card { ... }"></textarea>
+    </div>
+
+    <!-- Theme Upload -->
+    <div class="lp-glass-card">
+      <div style="margin-bottom:14px;">
+        <div class="lp-card-title" style="font-size:14px;margin:0;">
+          <i class="bi bi-upload text-success me-1"></i> Upload Theme
+        </div>
+        <div style="color:var(--text-secondary);font-size:12px;">Upload a custom theme JSON file</div>
+      </div>
+      <div style="border:2px dashed var(--glass-border);border-radius:12px;padding:30px;text-align:center;">
+        <i class="bi bi-upload" style="font-size:32px;color:var(--text-muted);display:block;margin-bottom:8px;"></i>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
+          Drop a theme JSON file or click to browse
+        </p>
+        <input type="file" id="themeFileInput" accept=".json,.css" style="display:none;" onchange="ThemesPage.uploadTheme(this)">
+        <button class="btn-lp btn-lp-primary" onclick="document.getElementById('themeFileInput').click()">
+          <i class="bi bi-folder2-open me-1"></i> Browse Files
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/settings/themes.js"></script>

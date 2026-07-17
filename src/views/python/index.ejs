@@ -1,0 +1,377 @@
+<style>
+  .python-tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .python-tab:hover { color: var(--text-primary); background: rgba(255,255,255,0.03); }
+  .python-tab.active {
+    color: var(--accent-primary);
+    background: rgba(99,102,241,0.08);
+    border-bottom-color: var(--accent-primary);
+  }
+  .python-tab-content { display: none; }
+  .python-tab-content.active { display: block; animation: fadeIn 0.25s ease-out; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
+      <i class="bi bi-filetype-py text-primary me-2"></i> Python Manager
+    </h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
+      Manage Python versions via Pyenv, virtual environments, pip packages, WSGI servers, and Supervisor
+    </p>
+  </div>
+  <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="PythonPage.refresh()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
+</div>
+
+<!-- Status Cards Row -->
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-success);">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#10b981;flex-shrink:0;">
+        <i class="bi bi-filetype-py"></i>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Python</div>
+        <div id="pyCurrentVersion" style="font-size:17px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-info);">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#3b82f6;flex-shrink:0;">
+        <i class="bi bi-box-seam"></i>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Pip</div>
+        <div id="pyPipVersion" style="font-size:17px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-warning);">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#f59e0b;flex-shrink:0;">
+        <i class="bi bi-layers"></i>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Pyenv</div>
+        <div id="pyPyenvStatus" style="font-size:17px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left: 3px solid var(--accent-info);">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(139,92,246,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#8b5cf6;flex-shrink:0;">
+        <i class="bi bi-gear-wide-connected"></i>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">WSGI</div>
+        <div id="pyWsgiStatus" style="font-size:17px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content Tabs -->
+<div class="lp-glass-card mb-4" style="padding:0;overflow:hidden;">
+  <div style="display:flex;border-bottom:1px solid var(--glass-border);overflow-x:auto;background:rgba(0,0,0,0.1);">
+    <button class="python-tab active" data-tab="versions" onclick="PythonPage.switchTab('versions')"><i class="bi bi-list-stars me-1"></i> Versions</button>
+    <button class="python-tab" data-tab="venvs" onclick="PythonPage.switchTab('venvs')"><i class="bi bi-diagram-3 me-1"></i> Virtual Envs</button>
+    <button class="python-tab" data-tab="packages" onclick="PythonPage.switchTab('packages')"><i class="bi bi-box-seam me-1"></i> Pip Packages</button>
+    <button class="python-tab" data-tab="wsgi" onclick="PythonPage.switchTab('wsgi')"><i class="bi bi-play-circle me-1"></i> WSGI Servers</button>
+    <button class="python-tab" data-tab="supervisor" onclick="PythonPage.switchTab('supervisor')"><i class="bi bi-shield-check me-1"></i> Supervisor</button>
+  </div>
+
+  <!-- Tab: Versions -->
+  <div id="tab-versions" class="python-tab-content active" style="padding:20px;">
+    <div id="pyenvNotInstalledBanner" style="display:none;" class="mb-4">
+      <div class="alert" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:16px 20px;color:#f59e0b;">
+        <div class="d-flex align-items-start gap-3">
+          <i class="bi bi-exclamation-triangle-fill" style="font-size:20px;flex-shrink:0;margin-top:2px;"></i>
+          <div>
+            <strong>Pyenv is not installed.</strong>
+            <p style="margin:6px 0 0 0;font-size:13px;color:var(--text-muted);">Pyenv is required to manage multiple Python versions. Install it automatically below.</p>
+            <button class="btn-lp btn-lp-primary btn-sm mt-2" onclick="PythonPage.installPyenv()"><i class="bi bi-download me-1"></i> Install Pyenv</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="pyenvAvailableSection">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;"><i class="bi bi-list-stars text-primary me-1"></i> Installed Versions</h5>
+        <button class="btn-lp btn-lp-primary btn-sm" onclick="PythonPage.showInstallModal()"><i class="bi bi-plus-lg me-1"></i> Install Version</button>
+      </div>
+      <div id="installedVersionsList" style="display:flex;flex-direction:column;gap:8px;">
+        <div style="padding:20px;text-align:center;color:var(--text-muted);"><div class="spinner-border spinner-border-sm text-primary me-2"></div> Loading...</div>
+      </div>
+      <hr style="border-color:var(--glass-border);margin:20px 0;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;"><i class="bi bi-cloud-download text-info me-1"></i> Available Versions</h5>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="PythonPage.loadRemoteVersions()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
+      </div>
+      <div id="remoteVersionsList" style="display:flex;flex-direction:column;gap:6px;">
+        <div style="padding:15px;text-align:center;color:var(--text-muted);font-size:13px;">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Virtual Envs -->
+  <div id="tab-venvs" class="python-tab-content" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;"><i class="bi bi-diagram-3 text-primary me-1"></i> Virtual Environments</h5>
+      <button class="btn-lp btn-lp-primary btn-sm" onclick="PythonPage.showVenveateModal()"><i class="bi bi-plus-lg me-1"></i> Create Venv</button>
+    </div>
+    <div class="table-responsive">
+      <table class="lp-table">
+        <thead><tr><th>Name</th><th>Path</th><th>Python Version</th><th style="text-align:right">Actions</th></tr></thead>
+        <tbody id="venvTableBody"><tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      </table>
+      <div id="venvPagination" style="padding:0 15px 15px 15px;"></div>
+    </div>
+  </div>
+
+  <!-- Tab: Pip Packages -->
+  <div id="tab-packages" class="python-tab-content" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;"><i class="bi bi-box-seam text-primary me-1"></i> Global Pip Packages</h5>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-lp btn-lp-primary btn-sm" onclick="PythonPage.showPipInstallModal()"><i class="bi bi-plus-lg me-1"></i> Install Package</button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="PythonPage.loadPipPackages()"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="lp-table">
+        <thead><tr><th>Package</th><th>Version</th><th style="text-align:right">Actions</th></tr></thead>
+        <tbody id="pipTableBody"><tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab: WSGI Servers -->
+  <div id="tab-wsgi" class="python-tab-content" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;"><i class="bi bi-play-circle text-primary me-1"></i> Running Gunicorn/Uvicorn Servers</h5>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-lp btn-lp-primary btn-sm" onclick="PythonPage.showWsgiStartModal()"><i class="bi bi-play-fill me-1"></i> Start Server</button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="PythonPage.loadWsgiServers()"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="lp-table">
+        <thead><tr><th>Type</th><th>Name</th><th>PID</th><th>User</th><th>CPU</th><th>MEM</th><th style="text-align:right">Actions</th></tr></thead>
+        <tbody id="wsgiTableBody"><tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab: Supervisor -->
+  <div id="tab-supervisor" class="python-tab-content" style="padding:20px;">
+    <div id="supervisorNotInstalled" style="display:none;">
+      <div class="alert" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.15);border-radius:10px;padding:12px 16px;font-size:13px;">
+        <i class="bi bi-info-circle me-2 text-warning"></i> Supervisor not detected. Install it via pip: <code>pip install supervisor</code>
+      </div>
+    </div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;"><i class="bi bi-shield-check text-primary me-1"></i> Supervisor Processes</h5>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-lp btn-lp-primary btn-sm" onclick="PythonPage.showSupervisorConfigModal()"><i class="bi bi-plus-lg me-1"></i> Add Config</button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="PythonPage.loadSupervisor()"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="lp-table">
+        <thead><tr><th>Program</th><th>Status</th><th>PID</th><th>Uptime</th><th style="text-align:right">Actions</th></tr></thead>
+        <tbody id="supervisorTableBody"><tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      </table>
+    </div>
+    <div id="supervisorHelp" style="display:none;" class="mt-4">
+      <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+        <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:8px;"><i class="bi bi-lightbulb me-1"></i> About Supervisor</h6>
+        <p style="font-size:13px;color:var(--text-secondary);margin:0;line-height:1.6;">
+          Supervisor ensures your Python apps stay running. Create a config, then start it with the &quot;Start&quot; button.
+          Configs are stored in <code>/etc/supervisor/conf.d/</code> and automatically loaded.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Install Modal -->
+<div class="modal fade" id="installPyModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;"><i class="bi bi-download text-primary me-2"></i> Install Python Version</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Select Version</label>
+          <select id="installPyVersionSelect" class="lp-input"><option value="">Loading...</option></select>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Or type version (e.g. 3.12.1)</label>
+          <input type="text" id="installPyVersionCustom" class="lp-input font-mono" placeholder="3.12.1">
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0;">Installing a Python version via pyenv may take several minutes.</p>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="PythonPage.installVersion()"><i class="bi bi-download me-1"></i> Install</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Venv Modal -->
+<div class="modal fade" id="createVenvModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;"><i class="bi bi-diagram-3 text-primary me-2"></i> Create Virtual Environment</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Environment Name</label>
+          <input type="text" id="venvName" class="lp-input" placeholder="e.g. myproject-env" required>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Python Version (optional)</label>
+          <select id="venvPythonVersion" class="lp-input"><option value="">System default</option></select>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin:0;">Created at <code>/opt/&lt;name&gt;/</code></p>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="PythonPage.createVenv()"><i class="bi bi-plus-circle me-1"></i> Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pip Install Modal -->
+<div class="modal fade" id="installPipModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;"><i class="bi bi-box-seam text-primary me-2"></i> Install Pip Package</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="lp-form-group">
+          <label class="lp-label">Package Name</label>
+          <input type="text" id="installPipName" class="lp-input font-mono" placeholder="e.g. django, flask, gunicorn" required>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="PythonPage.installPipPackage()"><i class="bi bi-download me-1"></i> Install</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Start WSGI Modal -->
+<div class="modal fade" id="startWsgiModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;"><i class="bi bi-play-fill text-success me-2"></i> Start WSGI Server</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Server Type</label>
+          <select id="wsgiType" class="lp-input">
+            <option value="gunicorn">Gunicorn (WSGI)</option>
+            <option value="uvicorn">Uvicorn (ASGI)</option>
+          </select>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">App Module</label>
+          <input type="text" id="wsgiModule" class="lp-input font-mono" placeholder="e.g. myapp:app" required>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Port</label>
+          <input type="number" id="wsgiPort" class="lp-input" value="8000" min="80" max="65535">
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <div class="lp-form-group"><label class="lp-label">Host</label><input type="text" id="wsgiHost" class="lp-input" value="127.0.0.1"></div>
+          </div>
+          <div class="col-6">
+            <div class="lp-form-group"><label class="lp-label">Workers</label><input type="number" id="wsgiWorkers" class="lp-input" value="4" min="1" max="32"></div>
+          </div>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Venv Path (optional)</label>
+          <input type="text" id="wsgiVenv" class="lp-input font-mono" placeholder="/opt/myproject-env">
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="PythonPage.startWsgi()"><i class="bi bi-play-fill me-1"></i> Start</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Supervisor Config Modal -->
+<div class="modal fade" id="supervisorConfigModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;"><i class="bi bi-file-earmark-plus text-primary me-2"></i> Create Supervisor Config</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Program Name</label>
+          <input type="text" id="supName" class="lp-input" placeholder="e.g. myapp" required>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Command</label>
+          <input type="text" id="supCommand" class="lp-input font-mono" placeholder="/opt/myapp-env/bin/gunicorn myapp:app -b 0.0.0.0:8000" required>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Working Directory</label>
+          <input type="text" id="supDir" class="lp-input font-mono" placeholder="/opt/myapp">
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <div class="lp-form-group"><label class="lp-label">User</label><input type="text" id="supUser" class="lp-input" value="www-data"></div>
+          </div>
+          <div class="col-6">
+            <div class="lp-form-group"><label class="lp-label">Num Procs</label><input type="number" id="supNumprocs" class="lp-input" value="1" min="1" max="16"></div>
+          </div>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Environment Variables (comma separated, optional)</label>
+          <input type="text" id="supEnv" class="lp-input font-mono" placeholder='KEY1=val1,KEY2=val2'>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="PythonPage.createSupervisorConfig()"><i class="bi bi-save me-1"></i> Save & Reload</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/python.js"></script>

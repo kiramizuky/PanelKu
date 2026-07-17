@@ -8,10 +8,10 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Linux Panel API',
+      title: 'Panelku API',
       version: '1.8.0',
       description: `
-## REST API for Linux Server Control Panel
+## REST API for Panelku Linux Server Control Panel
 
 Manage your Linux server entirely through this API — authentication, system
 management, Docker, websites, databases, firewalls, backups, and more.
@@ -69,8 +69,8 @@ Paginated responses include a \`pagination\` object:
 Rate limit headers (\`RateLimit-*\`) are included in all responses.
       `,
       contact: {
-        name: 'Linux Panel Team',
-        url: 'https://github.com/linux-panel',
+        name: 'Panelku Team',
+        url: 'https://github.com/kiramizuky/PanelKu',
       },
       license: {
         name: 'MIT',

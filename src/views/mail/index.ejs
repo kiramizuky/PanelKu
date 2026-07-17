@@ -1,0 +1,135 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Mail Server Manager</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Postfix & Dovecot — Domains, Accounts, Queue, Spam Filter, Logs</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-ghost" onclick="MAIL.loadData()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+  </div>
+</div>
+
+<style>
+  .mail-tabs { border-bottom:1px solid var(--glass-border); }
+  .mail-tabs .nav-link { color:var(--text-muted); background:transparent; border:none; padding:10px 16px; font-weight:500; border-radius:8px 8px 0 0; }
+  .mail-tabs .nav-link:hover { color:var(--text-primary); }
+  .mail-tabs .nav-link.active { color:var(--accent-primary); background:rgba(99,102,241,0.1); border:1px solid var(--glass-border); border-bottom-color:transparent; }
+</style>
+
+<div id="mailNotInstalled" style="display:none;">
+  <div class="lp-glass-card" style="padding:60px;text-align:center;">
+    <i class="bi bi-envelope" style="font-size:48px;color:var(--text-muted);opacity:0.3;"></i>
+    <h4 style="margin:20px 0 10px;">Mail Server Not Installed</h4>
+    <p style="color:var(--text-muted);font-size:13px;">Postfix, Dovecot, and SpamAssassin are not installed on this server.</p>
+    <button class="btn-lp btn-lp-primary mt-3" onclick="MAIL.install()"><i class="bi bi-download"></i> Install Mail Server</button>
+  </div>
+</div>
+
+<div id="mailContent" style="display:none;">
+  <!-- Status Cards -->
+  <div id="mailStatusCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;"></div>
+
+  <ul class="nav nav-tabs mb-4 mail-tabs">
+    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#mail-domains">Domains</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-accounts">Accounts</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-queue">Queue</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-spam">Spam Filter</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-logs">Logs</a></li>
+  </ul>
+
+  <div class="tab-content">
+    <!-- Domains -->
+    <div class="tab-pane fade show active" id="mail-domains">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span style="font-size:13px;color:var(--text-muted);">Manage email domains (virtual mail domains)</span>
+        <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="MAIL.showAddDomainModal()"><i class="bi bi-plus-lg"></i> Add Domain</button>
+      </div>
+      <div class="lp-glass-card" style="padding:0;">
+        <table class="lp-table">
+          <thead><tr><th>Domain</th><th style="width:100px;text-align:right">Actions</th></tr></thead>
+          <tbody id="mailDomainsBody"><tr><td colspan="2" class="text-muted" style="text-align:center;">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Accounts -->
+    <div class="tab-pane fade" id="mail-accounts">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span style="font-size:13px;color:var(--text-muted);">Email accounts</span>
+        <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="MAIL.showAddAccountModal()"><i class="bi bi-plus-lg"></i> Add Account</button>
+      </div>
+      <div class="lp-glass-card" style="padding:0;">
+        <table class="lp-table">
+          <thead><tr><th>Email</th><th>Mailbox</th><th style="width:120px;text-align:right">Actions</th></tr></thead>
+          <tbody id="mailAccountsBody"><tr><td colspan="3" class="text-muted" style="text-align:center;">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Queue -->
+    <div class="tab-pane fade" id="mail-queue">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span style="font-size:13px;color:var(--text-muted);">Mail Queue <span id="mailQueueCount"></span></span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.flushQueue()"><i class="bi bi-send"></i> Flush</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.loadQueue()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </div>
+      </div>
+      <div class="lp-glass-card" style="padding:0;">
+        <pre id="mailQueueContent" style="margin:0;padding:15px;font-size:11px;max-height:400px;overflow:auto;white-space:pre-wrap;"></pre>
+      </div>
+    </div>
+
+    <!-- Spam Filter -->
+    <div class="tab-pane fade" id="mail-spam">
+      <div class="lp-glass-card" style="padding:20px;max-width:500px;">
+        <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;">SpamAssassin Configuration</h5>
+        <div id="spamConfigContent"><p class="text-muted">Loading...</p></div>
+      </div>
+    </div>
+
+    <!-- Logs -->
+    <div class="tab-pane fade" id="mail-logs">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+        <select id="mailLogService" class="lp-input" style="width:auto;font-size:12px;">
+          <option value="postfix">Postfix</option>
+          <option value="dovecot">Dovecot</option>
+          <option value="spamassassin">SpamAssassin</option>
+        </select>
+        <input type="number" id="mailLogLines" class="lp-input" style="width:80px;font-size:12px;" value="50" min="10" max="500">
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.loadLogs()"><i class="bi bi-arrow-clockwise"></i> Load</button>
+      </div>
+      <div class="lp-glass-card" style="padding:0;">
+        <pre id="mailLogContent" style="margin:0;padding:15px;font-size:11px;max-height:500px;overflow:auto;white-space:pre-wrap;font-family:monospace;"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Domain Modal -->
+<div class="modal fade" id="addDomainModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Add Mail Domain</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <form onsubmit="MAIL.addDomain(event)">
+      <div class="modal-body">
+        <div class="lp-form-group"><label class="lp-label">Domain Name</label><input type="text" id="mailDomainInput" class="lp-input" placeholder="example.com" required></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn-lp btn-lp-primary">Add Domain</button></div>
+    </form>
+  </div></div>
+</div>
+
+<!-- Add Account Modal -->
+<div class="modal fade" id="addAccountModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Add Email Account</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <form onsubmit="MAIL.addAccount(event)">
+      <div class="modal-body">
+        <div class="lp-form-group"><label class="lp-label">Email Address</label><input type="email" id="accEmailInput" class="lp-input" placeholder="user@example.com" required></div>
+        <div class="lp-form-group"><label class="lp-label">Password</label><input type="password" id="accPasswordInput" class="lp-input" placeholder="Min 6 characters" required minlength="6"></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn-lp btn-lp-primary">Create Account</button></div>
+    </form>
+  </div></div>
+</div>
+
+<script src="/js/mail.js"></script>

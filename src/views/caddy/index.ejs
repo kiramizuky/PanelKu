@@ -1,0 +1,398 @@
+<style>
+  .caddy-tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .caddy-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.03);
+  }
+  .caddy-tab.active {
+    color: var(--accent-primary);
+    background: rgba(99,102,241,0.08);
+    border-bottom-color: var(--accent-primary);
+  }
+  .caddy-tab-content {
+    display: none;
+  }
+  .caddy-tab-content.active {
+    display: block;
+    animation: fadeIn 0.25s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .caddy-log-line { display:block; white-space:pre; font-family:monospace; font-size:11px; line-height:1.5; color:var(--text-secondary); }
+  .caddy-log-line:hover { background:rgba(255,255,255,0.03); }
+</style>
+
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
+      <i class="bi bi-shield-fill-check text-success me-2"></i> Caddy Server
+    </h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
+      Reverse proxy with automatic HTTPS — manage sites, Caddyfile, certificates, and logs
+    </p>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="CaddyPage.refresh()" title="Refresh">
+      <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Not Installed Banner -->
+<div id="caddyNotInstalled" style="display:none;" class="mb-4">
+  <div class="lp-glass-card p-4 text-center">
+    <i class="bi bi-shield-fill-check text-muted" style="font-size:48px;display:block;margin-bottom:15px;"></i>
+    <h4 style="color:var(--text-primary);margin-bottom:10px;">Caddy is not installed</h4>
+    <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px;">
+      Caddy web server is not installed on this system. Caddy is a powerful, enterprise-ready,
+      open source web server with automatic HTTPS by default.
+    </p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn-lp btn-lp-primary" onclick="CaddyPage.installCaddy()">
+        <i class="bi bi-download me-2"></i> Install Caddy
+      </button>
+      <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="CaddyPage.refresh()">
+        <i class="bi bi-arrow-clockwise me-1"></i> Check Again
+      </button>
+    </div>
+    <div style="margin-top:16px;font-size:12px;color:var(--text-muted);background:rgba(0,0,0,0.15);padding:12px 16px;border-radius:8px;display:inline-block;">
+      <i class="bi bi-info-circle me-1"></i> Caddy automatically provisions HTTPS certificates via Let's Encrypt or ZeroSSL.
+    </div>
+  </div>
+</div>
+
+<!-- Main Content (shown when installed) -->
+<div id="caddyContent" style="display:none;">
+  <!-- Status Cards Row -->
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-md-6 col-lg-3">
+      <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left:3px solid var(--accent-success);">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#10b981;flex-shrink:0;">
+          <i class="bi bi-shield-fill-check"></i>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Status</div>
+          <div id="caddyStatusValue" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-lg-3">
+      <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left:3px solid var(--accent-info);">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#3b82f6;flex-shrink:0;">
+          <i class="bi bi-tag"></i>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Version</div>
+          <div id="caddyVersionValue" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-lg-3">
+      <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left:3px solid var(--accent-warning);">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#f59e0b;flex-shrink:0;">
+          <i class="bi bi-layers"></i>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Sites</div>
+          <div id="caddySitesValue" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-lg-3">
+      <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left:3px solid var(--accent-purple);">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(139,92,246,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#8b5cf6;flex-shrink:0;">
+          <i class="bi bi-wifi"></i>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Ports</div>
+          <div id="caddyPortsValue" style="font-size:18px;font-weight:700;color:var(--text-primary);font-family:monospace;">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="lp-glass-card mb-4" style="padding:0;overflow:hidden;">
+    <div style="display:flex;border-bottom:1px solid var(--glass-border);overflow-x:auto;background:rgba(0,0,0,0.1);">
+      <button class="caddy-tab active" data-tab="sites" onclick="CaddyPage.switchTab('sites')">
+        <i class="bi bi-globe2 me-1"></i> Sites
+      </button>
+      <button class="caddy-tab" data-tab="caddyfile" onclick="CaddyPage.switchTab('caddyfile')">
+        <i class="bi bi-file-earmark-text me-1"></i> Caddyfile
+      </button>
+      <button class="caddy-tab" data-tab="certs" onclick="CaddyPage.switchTab('certs')">
+        <i class="bi bi-patch-check-fill me-1"></i> Certificates
+      </button>
+      <button class="caddy-tab" data-tab="logs" onclick="CaddyPage.switchTab('logs')">
+        <i class="bi bi-journal-text me-1"></i> Logs
+      </button>
+      <button class="caddy-tab" data-tab="service" onclick="CaddyPage.switchTab('service')">
+        <i class="bi bi-gear me-1"></i> Service
+      </button>
+    </div>
+
+    <!-- Tab: Sites -->
+    <div id="tab-sites" class="caddy-tab-content active" style="padding:20px;">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+          <i class="bi bi-globe2 text-primary me-1"></i> Sites (Virtual Hosts)
+        </h5>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="siteFilterInput" class="lp-input" style="width:180px;display:inline-block;" placeholder="Filter sites..." oninput="CaddyPage.filterSites()">
+          <button class="btn-lp btn-lp-primary btn-sm" onclick="CaddyPage.showCreateSiteModal()">
+            <i class="bi bi-plus-lg me-1"></i> Add Site
+          </button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="lp-table">
+          <thead>
+            <tr>
+              <th>Domain</th>
+              <th>Type</th>
+              <th>Target / Root</th>
+              <th>HTTPS</th>
+              <th style="text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="sitesTableBody">
+            <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab: Caddyfile -->
+    <div id="tab-caddyfile" class="caddy-tab-content" style="padding:20px;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+          <i class="bi bi-file-earmark-text text-primary me-1"></i> Caddyfile Editor
+        </h5>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="CaddyPage.loadCaddyfile()">
+            <i class="bi bi-arrow-clockwise me-1"></i> Reload
+          </button>
+          <button class="btn-lp btn-lp-info btn-lp-sm" onclick="CaddyPage.formatCaddyfile()">
+            <i class="bi bi-align-center me-1"></i> Format
+          </button>
+          <button class="btn-lp btn-lp-success btn-sm" onclick="CaddyPage.validateConfig()">
+            <i class="bi bi-check-circle me-1"></i> Validate
+          </button>
+          <button class="btn-lp btn-lp-primary btn-sm" onclick="CaddyPage.saveCaddyfile()">
+            <i class="bi bi-floppy me-1"></i> Save
+          </button>
+        </div>
+      </div>
+      <div id="caddyfilePath" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-family:monospace;"></div>
+      <textarea id="caddyfileEditor" class="lp-input font-mono" style="width:100%;min-height:450px;font-size:12px;line-height:1.5;resize:vertical;tab-size:4;" spellcheck="false" placeholder="# Caddyfile v2&#10;&#10;example.com {&#10;    root * /var/www/example&#10;    file_server&#10;    encode gzip&#10;}"></textarea>
+      <div id="caddyfileValidationResult" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:12px;font-family:monospace;white-space:pre-wrap;"></div>
+    </div>
+
+    <!-- Tab: Certificates -->
+    <div id="tab-certs" class="caddy-tab-content" style="padding:20px;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+          <i class="bi bi-patch-check-fill text-success me-1"></i> Automatic Certificates
+        </h5>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="CaddyPage.loadCertificates()">
+          <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+        </button>
+      </div>
+      <div class="row g-3">
+        <div class="col-12">
+          <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <i class="bi bi-info-circle-fill text-success" style="font-size:20px;"></i>
+            <div style="font-size:13px;color:var(--text-secondary);">
+              Caddy automatically provisions and renews HTTPS certificates via Let's Encrypt or ZeroSSL.
+              No manual certificate management needed for production sites.
+            </div>
+          </div>
+        </div>
+        <div class="col-12">
+          <div id="certsContainer">
+            <div style="padding:20px;text-align:center;color:var(--text-muted);">
+              <div class="spinner-border spinner-border-sm text-primary me-2"></div> Loading certificates...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Logs -->
+    <div id="tab-logs" class="caddy-tab-content" style="padding:20px;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+          <i class="bi bi-journal-text text-primary me-1"></i> Log Viewer
+        </h5>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="logTypeSelect" class="lp-input" style="width:130px;display:inline-block;" onchange="CaddyPage.loadLogs()">
+            <option value="access">Access</option>
+            <option value="error">Error</option>
+          </select>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="CaddyPage.loadLogs()">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+      </div>
+      <div style="background:#0a0a0f;border-radius:10px;border:1px solid var(--glass-border);overflow:hidden;">
+        <div style="padding:10px 15px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center;">
+          <span id="logFilePath" style="font-size:11px;color:var(--text-muted);font-family:monospace;"></span>
+          <span style="font-size:11px;color:var(--text-muted);">Last 100 lines</span>
+        </div>
+        <pre id="logOutputArea" style="margin:0;padding:15px;font-size:11px;font-family:monospace;color:#00ff88;max-height:500px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;background:transparent;"></pre>
+      </div>
+    </div>
+
+    <!-- Tab: Service -->
+    <div id="tab-service" class="caddy-tab-content" style="padding:20px;">
+      <div class="row g-4">
+        <div class="col-12 col-md-6">
+          <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+            <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:16px;">
+              <i class="bi bi-gear me-1"></i> Service Control
+            </h6>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;">
+              <button class="btn-lp btn-lp-success" onclick="CaddyPage.serviceAction('start')">
+                <i class="bi bi-play-fill me-1"></i> Start
+              </button>
+              <button class="btn-lp btn-lp-warning" onclick="CaddyPage.serviceAction('stop')">
+                <i class="bi bi-stop-fill me-1"></i> Stop
+              </button>
+              <button class="btn-lp btn-lp-primary" onclick="CaddyPage.serviceAction('restart')">
+                <i class="bi bi-arrow-repeat me-1"></i> Restart
+              </button>
+              <button class="btn-lp btn-lp-info" onclick="CaddyPage.serviceAction('reload')">
+                <i class="bi bi-arrow-clockwise me-1"></i> Reload
+              </button>
+            </div>
+            <hr style="border-color:var(--glass-border);margin:16px 0;">
+            <button class="btn-lp btn-lp-primary w-100" onclick="CaddyPage.validateConfig()">
+              <i class="bi bi-check-circle me-1"></i> Validate Configuration
+            </button>
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+            <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:16px;">
+              <i class="bi bi-info-circle me-1"></i> Caddy Info
+            </h6>
+            <table class="lp-table" style="font-size:13px;">
+              <tbody id="caddyInfoTableBody">
+                <tr><td style="padding:6px 0;color:var(--text-muted);width:120px;">Binary</td><td id="ciBinary" style="padding:6px 0;">—</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted);">Admin API</td><td id="ciAdminApi" style="padding:6px 0;">—</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted);">PID</td><td id="ciPid" style="padding:6px 0;font-family:monospace;">—</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted);">Ports</td><td id="ciPorts" style="padding:6px 0;">—</td></tr>
+                <tr><td style="padding:6px 0;color:var(--text-muted);">Modules</td><td id="ciModules" style="padding:6px 0;">—</td></tr>
+              </tbody>
+            </table>
+            <hr style="border-color:var(--glass-border);margin:12px 0;">
+            <div style="display:flex;gap:8px;">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="CaddyPage.uninstallCaddy()">
+                <i class="bi bi-trash me-1"></i> Uninstall
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Site Modal -->
+<div class="modal fade" id="createSiteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;">
+          <i class="bi bi-plus-circle text-primary me-2"></i> Create Caddy Site
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Domain</label>
+          <input type="text" id="csDomain" class="lp-input font-mono" placeholder="example.com" required>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Supports wildcard: *.example.com</div>
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Site Name (optional, auto-generated from domain)</label>
+          <input type="text" id="csName" class="lp-input font-mono" placeholder="Leave empty for auto">
+        </div>
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Type</label>
+          <select id="csType" class="lp-input" onchange="CaddyPage.toggleCreateSiteFields()">
+            <option value="static">Static File Server</option>
+            <option value="proxy">Reverse Proxy</option>
+            <option value="php">PHP-FPM</option>
+            <option value="redirect">Redirect</option>
+            <option value="file-server">File Server (with auth)</option>
+          </select>
+        </div>
+        <div class="lp-form-group mb-3" id="csRootGroup">
+          <label class="lp-label">Root Directory</label>
+          <input type="text" id="csRootDir" class="lp-input font-mono" placeholder="/var/www/example.com">
+        </div>
+        <div class="lp-form-group mb-3" id="csPortGroup" style="display:none;">
+          <label class="lp-label">Proxy Target Port</label>
+          <input type="number" id="csPort" class="lp-input" placeholder="8080" value="8080">
+        </div>
+        <div class="lp-form-group mb-3" id="csPhpGroup" style="display:none;">
+          <label class="lp-label">PHP-FPM Socket</label>
+          <input type="text" id="csPhpSocket" class="lp-input font-mono" value="/var/run/php/php8.2-fpm.sock">
+        </div>
+        <div class="lp-form-group mb-3" id="csRedirectGroup" style="display:none;">
+          <label class="lp-label">Redirect Target</label>
+          <input type="text" id="csRedirectTarget" class="lp-input font-mono" value="https://{http.request.host}{http.request.uri}">
+          <label class="lp-label mt-2">Redirect Code</label>
+          <select id="csRedirectCode" class="lp-input">
+            <option value="301">301 Permanent</option>
+            <option value="302">302 Temporary</option>
+          </select>
+        </div>
+        <div class="lp-form-group mb-3" id="csAuthGroup" style="display:none;">
+          <label class="lp-label">Basic Auth Username (optional)</label>
+          <input type="text" id="csAuthUser" class="lp-input" placeholder="admin">
+          <label class="lp-label mt-2">Basic Auth Password (will be hashed)</label>
+          <input type="text" id="csAuthPass" class="lp-input" placeholder="securepassword">
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="CaddyPage.createSite()">
+          <i class="bi bi-plus-lg me-1"></i> Create Site
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Site Config View Modal -->
+<div class="modal fade" id="siteConfigModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content" style="background:rgba(15,20,30,0.95);border:1px solid var(--glass-border);">
+      <div class="modal-header" style="border-bottom:1px solid var(--glass-border);">
+        <h5 class="modal-title" style="font-size:15px;"><i class="bi bi-file-earmark-text text-primary me-1"></i> <span id="siteConfigTitle">Site Config</span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:0;">
+        <pre id="siteConfigContent" style="margin:0;padding:15px;font-family:monospace;font-size:12px;line-height:1.5;color:var(--text-secondary);overflow-x:auto;white-space:pre-wrap;max-height:60vh;">Loading...</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/caddy.js"></script>

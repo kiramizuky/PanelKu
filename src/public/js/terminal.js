@@ -49,7 +49,6 @@ const TerminalPage = (() => {
     });
 
     socket.on('connect', () => {
-      console.log('Terminal socket connected');
       if (term) {
         socket.emit('terminal:create', {
           cols: term.cols,
@@ -97,7 +96,7 @@ const TerminalPage = (() => {
     });
 
     socket.on('disconnect', () => {
-      console.log('Terminal socket disconnected');
+      // Terminal socket disconnected — will auto-reconnect
     });
 
     if (savedUser) {

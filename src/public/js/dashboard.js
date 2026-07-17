@@ -259,7 +259,6 @@ const Dashboard = (() => {
     });
 
     monitorSocket.on('connect', () => {
-      console.log('Monitor socket connected');
       updateConnectionStatus(true);
       monitorSocket.emit('request:metrics');
     });

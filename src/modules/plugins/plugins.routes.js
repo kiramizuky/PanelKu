@@ -8,6 +8,8 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get('/', requirePermission('system', 'read'), pluginsController.getPlugins);
+router.get('/marketplace', requirePermission('system', 'read'), pluginsController.getMarketplace);
+router.post('/upload', requirePermission('system', 'execute'), pluginsController.uploadPlugin);
 router.post('/install', requirePermission('system', 'execute'), pluginsController.installPlugin);
 router.post('/uninstall', requirePermission('system', 'execute'), pluginsController.uninstallPlugin);
 router.post('/proxy', requirePermission('system', 'execute'), pluginsController.updateProxy);

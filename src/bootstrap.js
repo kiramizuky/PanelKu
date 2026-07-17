@@ -174,7 +174,7 @@ async function seedInitialData() {
     const superAdminRole = await Role.findOne({ slug: ROLES.SUPER_ADMIN });
     await User.create({
       username: 'admin',
-      email: 'admin@linuxpanel.local',
+      email: 'admin@panelku.local',
       password: 'Admin@123456',
       role: superAdminRole._id,
       firstName: 'Super',

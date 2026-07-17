@@ -1,0 +1,235 @@
+<style>
+  .air-tab { padding:10px 20px; background:transparent; border:none; color:var(--text-muted); font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s ease; white-space:nowrap; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .air-tab:hover { color:var(--text-primary); background:rgba(255,255,255,0.03); }
+  .air-tab.active { color:var(--accent-primary); background:rgba(99,102,241,0.08); border-bottom-color:var(--accent-primary); }
+  .air-tab-content { display:none; }
+  .air-tab-content.active { display:block; animation:fadeIn 0.25s ease-out; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  .health-ring { width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; font-family:monospace; }
+  .trend-up { color:var(--accent-danger); }
+  .trend-down { color:var(--accent-success); }
+  .trend-stable { color:var(--accent-warning); }
+</style>
+
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
+      <i class="bi bi-robot text-primary me-2"></i> AI Auto-Repair
+    </h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
+      Intelligent diagnostics, log analysis, auto-fix suggestions, and predictive alerts
+    </p>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <span id="airConfigBadge" class="lp-badge lp-badge-ghost" style="font-size:10px;"><i class="bi bi-wifi me-1"></i>AI: Not configured</span>
+  </div>
+</div>
+
+<!-- Health Score Header -->
+<div class="row g-3 mb-4" id="healthScoreRow">
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3">
+      <div class="health-ring" id="healthScoreRing" style="background:rgba(16,185,129,0.12);color:#10b981;">—</div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Health Score</div>
+        <div id="healthScoreLevel" style="font-size:14px;font-weight:600;">Loading...</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;color:#ef4444;"><i class="bi bi-exclamation-triangle"></i></div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Issues</div>
+        <div id="healthIssues" style="font-size:18px;font-weight:700;font-family:monospace;">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;color:#3b82f6;"><i class="bi bi-activity"></i></div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Services Down</div>
+        <div id="healthServicesDown" style="font-size:18px;font-weight:700;font-family:monospace;">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-3">
+    <div class="lp-glass-card p-3 d-flex align-items-center gap-3">
+      <div style="width:44px;height:44px;border-radius:12px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;font-size:20px;color:#10b981;"><i class="bi bi-lightbulb"></i></div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Recommendations</div>
+        <div id="healthRecs" style="font-size:18px;font-weight:700;font-family:monospace;">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="lp-glass-card" style="padding:0;overflow:hidden;">
+  <div style="display:flex;border-bottom:1px solid var(--glass-border);overflow-x:auto;background:rgba(0,0,0,0.1);">
+    <button class="air-tab active" data-tab="diagnostic" onclick="AIRepairPage.switchTab('diagnostic');AIRepairPage.runDiagnostic()">
+      <i class="bi bi-stethoscope me-1"></i> Diagnostics
+    </button>
+    <button class="air-tab" data-tab="analyze" onclick="AIRepairPage.switchTab('analyze')">
+      <i class="bi bi-file-text me-1"></i> Log Analysis
+    </button>
+    <button class="air-tab" data-tab="autofix" onclick="AIRepairPage.switchTab('autofix')">
+      <i class="bi bi-wrench me-1"></i> Auto-Fix
+    </button>
+    <button class="air-tab" data-tab="trends" onclick="AIRepairPage.switchTab('trends');AIRepairPage.loadTrends()">
+      <i class="bi bi-graph-up-arrow me-1"></i> Predictive Alerts
+    </button>
+    <button class="air-tab" data-tab="config" onclick="AIRepairPage.switchTab('config')">
+      <i class="bi bi-gear me-1"></i> AI Config
+    </button>
+  </div>
+
+  <!-- Tab: Diagnostics -->
+  <div id="tab-diagnostic" class="air-tab-content active" style="padding:20px;">
+    <div id="diagnosticContent">
+      <div style="text-align:center;padding:30px;color:var(--text-muted);">
+        <div class="spinner-border spinner-border-sm text-primary me-2"></div>Running diagnostic...
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Log Analysis -->
+  <div id="tab-analyze" class="air-tab-content" style="padding:20px;">
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="lp-form-group">
+          <label class="lp-label">Paste log content or error message for AI analysis</label>
+          <textarea id="logInput" class="lp-input font-mono" rows="6" placeholder="Paste your log content here...&#10;e.g. systemctl status output, error logs, Docker logs" style="font-size:12px;resize:vertical;"></textarea>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn-lp btn-lp-primary" onclick="AIRepairPage.analyzeLog()">
+            <i class="bi bi-search me-1"></i> Analyze with AI
+          </button>
+          <button class="btn-lp btn-lp-ghost" onclick="AIRepairPage.suggestFix()">
+            <i class="bi bi-wrench me-1"></i> Suggest Fix
+          </button>
+          <button class="btn-lp btn-lp-ghost" onclick="AIRepairPage.loadNginxTest()">
+            <i class="bi bi-server me-1"></i> Test Nginx Config
+          </button>
+        </div>
+      </div>
+      <div class="col-12" id="analysisResult" style="display:none;">
+        <div class="lp-glass-card" style="background:rgba(0,0,0,0.08);">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 style="font-size:13px;font-weight:600;margin:0;"><i class="bi bi-file-text text-primary me-1"></i> Analysis Result</h6>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="document.getElementById('analysisResult').style.display='none'"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div id="analysisOutput" style="font-family:monospace;font-size:12px;line-height:1.6;white-space:pre-wrap;color:var(--text-secondary);"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Auto-Fix -->
+  <div id="tab-autofix" class="air-tab-content" style="padding:20px;">
+    <div class="row g-3">
+      <div class="col-12">
+        <h5 style="font-size:14px;font-weight:600;margin-bottom:12px;">
+          <i class="bi bi-wrench text-warning me-1"></i> Available Fix Patterns
+        </h5>
+        <div id="fixPatternsContainer" class="row g-2"></div>
+      </div>
+      <div class="col-12" id="fixResultArea" style="display:none;">
+        <div class="lp-glass-card" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;margin-bottom:8px;"><i class="bi bi-check-circle text-success me-1"></i> Fix Result</h6>
+          <pre id="fixResultOutput" style="font-family:monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;color:var(--text-secondary);margin:0;"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Predictive Alerts -->
+  <div id="tab-trends" class="air-tab-content" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <h5 style="font-size:14px;font-weight:600;margin:0;">
+        <i class="bi bi-graph-up-arrow text-danger me-1"></i> Resource Trend Analysis
+      </h5>
+      <div class="d-flex gap-2 align-items-center">
+        <select id="trendPeriod" class="lp-input" style="width:130px;font-size:12px;" onchange="AIRepairPage.loadTrends()">
+          <option value="1">Last hour</option>
+          <option value="6">Last 6 hours</option>
+          <option value="24" selected>Last 24 hours</option>
+          <option value="72">Last 3 days</option>
+          <option value="168">Last 7 days</option>
+        </select>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="AIRepairPage.loadTrends()"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
+    </div>
+    <div id="trendsContent">
+      <div style="text-align:center;padding:30px;color:var(--text-muted);">
+        <div class="spinner-border spinner-border-sm text-primary me-2"></div>Analyzing trends...
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: AI Config -->
+  <div id="tab-config" class="air-tab-content" style="padding:20px;">
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card" style="background:rgba(0,0,0,0.08);">
+          <h5 style="font-size:14px;font-weight:600;margin-bottom:14px;">
+            <i class="bi bi-gear text-primary me-1"></i> AI Provider Settings
+          </h5>
+          <div class="lp-form-group mb-3">
+            <label class="lp-label">AI Provider</label>
+            <select id="airProvider" class="lp-input">
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="openrouter">OpenRouter</option>
+            </select>
+          </div>
+          <div class="lp-form-group mb-3">
+            <label class="lp-label">API Key</label>
+            <input type="password" id="airApiKey" class="lp-input" placeholder="Enter your AI provider API key">
+          </div>
+          <div class="lp-form-group mb-3">
+            <label class="lp-label">Model (optional)</label>
+            <input type="text" id="airModel" class="lp-input" placeholder="e.g. gpt-4o-mini, gemini-1.5-flash">
+          </div>
+          <div class="lp-form-group mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="airAutoFix" checked>
+              <label class="form-check-label" for="airAutoFix" style="font-size:13px;">Enable Auto-Fix</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="airPredictive" checked>
+              <label class="form-check-label" for="airPredictive" style="font-size:13px;">Enable Predictive Alerts</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="airNotifyFix" checked>
+              <label class="form-check-label" for="airNotifyFix" style="font-size:13px;">Notify on applied fixes</label>
+            </div>
+          </div>
+          <button class="btn-lp btn-lp-primary w-100" onclick="AIRepairPage.saveConfig()">
+            <i class="bi bi-floppy me-1"></i> Save Configuration
+          </button>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card" style="background:rgba(0,0,0,0.08);">
+          <h5 style="font-size:14px;font-weight:600;margin-bottom:12px;">
+            <i class="bi bi-info-circle text-info me-1"></i> How it Works
+          </h5>
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;">
+            <p><strong>Log Analysis:</strong> Paste any server log content and AI will identify issues, patterns, and suggest fixes.</p>
+            <p><strong>Auto-Fix:</strong> Pre-defined fix patterns for common issues like port conflicts, disk full, service down, permission errors, and high resource usage.</p>
+            <p><strong>Predictive Alerts:</strong> Trend analysis using linear regression on historical monitoring data to predict resource exhaustion before it happens.</p>
+            <p><strong>Health Score:</strong> Overall system health score (0-100) based on service status, resource usage, and trend analysis.</p>
+            <div style="background:rgba(255,193,7,0.1);border:1px solid rgba(255,193,7,0.2);border-radius:8px;padding:10px;margin-top:10px;">
+              <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+              Auto-fix actions may restart services or kill processes. Enable with caution.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/ai-repair.js"></script>

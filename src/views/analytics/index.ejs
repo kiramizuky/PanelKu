@@ -1,0 +1,317 @@
+<style>
+  .anl-tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .anl-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.03);
+  }
+  .anl-tab.active {
+    color: var(--accent-primary);
+    background: rgba(99,102,241,0.08);
+    border-bottom-color: var(--accent-primary);
+  }
+  .anl-tab-content { display: none; }
+  .anl-tab-content.active { display: block; animation: fadeIn 0.25s ease-out; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
+      <i class="bi bi-bar-chart-fill text-info me-2"></i> Analytics Dashboard
+    </h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
+      Metrics history, log analytics, service health, and performance insights
+    </p>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <select id="anlTimeRange" class="lp-input" style="width:130px;display:inline-block;" onchange="AnalyticsPage.refresh()">
+      <option value="1">Last 1 hour</option>
+      <option value="6">Last 6 hours</option>
+      <option value="24" selected>Last 24 hours</option>
+      <option value="72">Last 3 days</option>
+      <option value="168">Last 7 days</option>
+      <option value="720">Last 30 days</option>
+    </select>
+    <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="AnalyticsPage.refresh()" title="Refresh">
+      <i class="bi bi-arrow-clockwise"></i> Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="lp-glass-card mb-4" style="padding:0;overflow:hidden;">
+  <div style="display:flex;border-bottom:1px solid var(--glass-border);overflow-x:auto;background:rgba(0,0,0,0.1);">
+    <button class="anl-tab active" data-tab="overview" onclick="AnalyticsPage.switchTab('overview')">
+      <i class="bi bi-speedometer2 me-1"></i> Overview
+    </button>
+    <button class="anl-tab" data-tab="metrics" onclick="AnalyticsPage.switchTab('metrics')">
+      <i class="bi bi-graph-up me-1"></i> Metrics
+    </button>
+    <button class="anl-tab" data-tab="logs" onclick="AnalyticsPage.switchTab('logs')">
+      <i class="bi bi-journal-text me-1"></i> Logs
+    </button>
+    <button class="anl-tab" data-tab="services" onclick="AnalyticsPage.switchTab('services')">
+      <i class="bi bi-hdd-rack me-1"></i> Services
+    </button>
+    <button class="anl-tab" data-tab="processes" onclick="AnalyticsPage.switchTab('processes')">
+      <i class="bi bi-cpu me-1"></i> Processes
+    </button>
+    <button class="anl-tab" data-tab="network" onclick="AnalyticsPage.switchTab('network')">
+      <i class="bi bi-diagram-3 me-1"></i> Network
+    </button>
+  </div>
+
+  <!-- ════════════ Tab: Overview ════════════ -->
+  <div id="tab-overview" class="anl-tab-content active" style="padding:20px;">
+    <!-- Aggregated Stats Cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="lp-glass-card p-3 text-center" style="border-left:3px solid var(--accent-primary);">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Avg CPU</div>
+          <div id="ovAvgCpu" style="font-size:24px;font-weight:700;color:var(--accent-primary);">—</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="lp-glass-card p-3 text-center" style="border-left:3px solid var(--accent-info);">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Avg RAM</div>
+          <div id="ovAvgRam" style="font-size:24px;font-weight:700;color:var(--accent-info);">—</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="lp-glass-card p-3 text-center" style="border-left:3px solid var(--accent-warning);">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Avg Disk</div>
+          <div id="ovAvgDisk" style="font-size:24px;font-weight:700;color:var(--accent-warning);">—</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="lp-glass-card p-3 text-center" style="border-left:3px solid var(--accent-success);">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Services Up</div>
+          <div id="ovServicesUp" style="font-size:24px;font-weight:700;color:var(--accent-success);">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Combined Chart -->
+    <div class="lp-glass-card p-4 mb-4" style="background:rgba(0,0,0,0.08);">
+      <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;">
+        <i class="bi bi-graph-up me-1"></i> CPU & RAM History
+      </h6>
+      <div style="height:250px;"><canvas id="ovCombinedChart"></canvas></div>
+    </div>
+
+    <!-- Quick insights -->
+    <div class="row g-4">
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:10px;">
+            <i class="bi bi-hdd-rack text-primary me-1"></i> Top Services
+          </h6>
+          <div id="ovTopServices" style="font-size:13px;">
+            <div style="padding:10px;text-align:center;color:var(--text-muted);">Loading...</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:10px;">
+            <i class="bi bi-cpu text-warning me-1"></i> Top Processes
+          </h6>
+          <div id="ovTopProcesses" style="font-size:13px;">
+            <div style="padding:10px;text-align:center;color:var(--text-muted);">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ Tab: Metrics ════════════ -->
+  <div id="tab-metrics" class="anl-tab-content" style="padding:20px;">
+    <div class="row g-4">
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;">
+            <i class="bi bi-cpu text-primary me-1"></i> CPU Usage %
+          </h6>
+          <div style="height:200px;"><canvas id="mtCpuChart"></canvas></div>
+          <div id="mtCpuStats" class="d-flex justify-content-between mt-2" style="font-size:11px;color:var(--text-muted);"></div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;">
+            <i class="bi bi-memory text-info me-1"></i> RAM Usage %
+          </h6>
+          <div style="height:200px;"><canvas id="mtRamChart"></canvas></div>
+          <div id="mtRamStats" class="d-flex justify-content-between mt-2" style="font-size:11px;color:var(--text-muted);"></div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;">
+            <i class="bi bi-hdd text-warning me-1"></i> Disk Usage %
+          </h6>
+          <div style="height:200px;"><canvas id="mtDiskChart"></canvas></div>
+          <div id="mtDiskStats" class="d-flex justify-content-between mt-2" style="font-size:11px;color:var(--text-muted);"></div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;">
+            <i class="bi bi-activity text-success me-1"></i> Network Traffic (MB/s)
+          </h6>
+          <div style="height:200px;"><canvas id="mtNetChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ Tab: Logs ════════════ -->
+  <div id="tab-logs" class="anl-tab-content" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+        <i class="bi bi-journal-text text-primary me-1"></i> Log Viewer
+      </h5>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="logSource" class="lp-input" style="width:140px;" onchange="AnalyticsPage.toggleLogSource()">
+          <option value="syslog">System (syslog)</option>
+          <option value="auth">Authentication</option>
+          <option value="kern">Kernel</option>
+          <option value="web-nginx-access">Nginx Access</option>
+          <option value="web-nginx-error">Nginx Error</option>
+          <option value="web-apache-access">Apache Access</option>
+          <option value="web-apache-error">Apache Error</option>
+        </select>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="AnalyticsPage.loadLogs()">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+      </div>
+    </div>
+    <div style="background:#0a0a0f;border-radius:10px;border:1px solid var(--glass-border);overflow:hidden;">
+      <div style="padding:8px 15px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center;">
+        <span id="logSourcePath" style="font-size:11px;color:var(--text-muted);font-family:monospace;"></span>
+        <span id="logErrorCount" style="font-size:11px;"></span>
+      </div>
+      <div id="logOutputArea" style="max-height:500px;overflow-y:auto;padding:0;">
+        <pre id="logOutputPre" style="margin:0;padding:12px;font-size:11px;font-family:monospace;color:#00ff88;white-space:pre-wrap;word-break:break-all;background:transparent;"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ Tab: Services ════════════ -->
+  <div id="tab-services" class="anl-tab-content" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+        <i class="bi bi-hdd-rack text-primary me-1"></i> Service Health
+      </h5>
+      <div style="display:flex;gap:8px;font-size:12px;">
+        <span id="svcTotal" class="text-muted"></span>
+        <span id="svcRunning" class="text-success"></span>
+        <span id="svcFailed" class="text-danger"></span>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="lp-table">
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Active</th>
+            <th>Sub</th>
+            <th>CPU %</th>
+            <th>RAM %</th>
+          </tr>
+        </thead>
+        <tbody id="servicesTableBody">
+          <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ════════════ Tab: Processes ════════════ -->
+  <div id="tab-processes" class="anl-tab-content" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 style="font-size:15px;font-weight:600;color:var(--text-primary);margin:0;">
+        <i class="bi bi-cpu text-primary me-1"></i> Top Processes
+      </h5>
+      <div class="btn-group btn-group-sm">
+        <button class="btn-lp btn-lp-ghost btn-lp-sm active" id="sortCpuBtn" onclick="AnalyticsPage.loadProcesses('cpu')">
+          <i class="bi bi-sort-down me-1"></i> CPU
+        </button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" id="sortMemBtn" onclick="AnalyticsPage.loadProcesses('mem')">
+          <i class="bi bi-sort-down me-1"></i> RAM
+        </button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="lp-table">
+        <thead>
+          <tr>
+            <th>PID</th>
+            <th>Name</th>
+            <th>CPU %</th>
+            <th>RAM %</th>
+            <th>User</th>
+            <th>State</th>
+          </tr>
+        </thead>
+        <tbody id="processesTableBody">
+          <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ════════════ Tab: Network ════════════ -->
+  <div id="tab-network" class="anl-tab-content" style="padding:20px;">
+    <div class="row g-4">
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;">
+            <i class="bi bi-lan text-primary me-1"></i> Network Interfaces
+          </h6>
+          <div id="netInterfaces" style="font-size:13px;">
+            <div style="padding:10px;text-align:center;color:var(--text-muted);">Loading...</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;">
+            <i class="bi bi-plug text-info me-1"></i> Connections
+          </h6>
+          <div id="netConnections" style="font-size:13px;">
+            <div style="padding:10px;text-align:center;color:var(--text-muted);">Loading...</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12">
+        <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
+          <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;">
+            <i class="bi bi-activity text-success me-1"></i> Listening Ports
+          </h6>
+          <div id="netListeningPorts" style="font-size:13px;">
+            <div style="padding:10px;text-align:center;color:var(--text-muted);">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/js/analytics.js"></script>

@@ -50,6 +50,9 @@ export const RESOURCES = {
   SYSTEM: 'system',
   WHATSAPP: 'whatsapp',
   AI: 'ai',
+  MONGODB: 'mongodb',
+  GPU: 'gpu',
+  POWER: 'power',
 };
 
 // Token types
