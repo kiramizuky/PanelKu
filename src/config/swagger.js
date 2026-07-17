@@ -628,6 +628,11 @@ Rate limit headers (\`RateLimit-*\`) are included in all responses.
       { name: 'WhatsApp', description: 'WhatsApp API session management' },
       { name: 'Plugins', description: 'Plugin management' },
       { name: 'Agent', description: 'Cluster agent communication endpoints' },
+      { name: 'GPU', description: 'NVIDIA GPU monitoring & management' },
+      { name: 'Power', description: 'CPU frequency scaling, power profiles, thermal & fan management' },
+      { name: 'Mail', description: 'Postfix/Dovecot mail server management' },
+      { name: 'CDN', description: 'Cloudflare CDN, Varnish cache, Redis cache & full page cache' },
+      { name: 'IoT', description: 'MQTT broker, Home Assistant, Node-RED & device discovery' },
     ],
     paths: {
       // ── Health ──
@@ -1293,12 +1298,200 @@ Rate limit headers (\`RateLimit-*\`) are included in all responses.
       '/agent/terminal/ws': {
         get: { tags: ['Agent'], summary: 'Agent terminal WebSocket (internal)', description: 'WebSocket upgrade endpoint for agent terminal sessions.' },
       },
+
+      // ═══════════════════════════════════════════════
+      //  GPU MANAGER
+      // ═══════════════════════════════════════════════
+      '/gpu/status': {
+        get: { tags: ['GPU'], summary: 'Get GPU status and info', description: 'Returns NVIDIA GPU info including driver version, CUDA/CUDNN versions, and per-GPU metrics (utilization, memory, temperature, fan, power, clocks).', security: [{ bearerAuth: [] }], responses: { 200: { description: 'GPU status with all GPU cards' } } },
+      },
+      '/gpu/processes': {
+        get: { tags: ['GPU'], summary: 'List GPU processes', description: 'List all processes currently using NVIDIA GPU resources.', security: [{ bearerAuth: [] }], parameters: [{ name: 'gpu', in: 'query', schema: { type: 'integer' }, description: 'Optional GPU index to filter' }], responses: { 200: { description: 'GPU process list with PID, name, memory usage' } } },
+      },
+      '/gpu/kill': {
+        post: { tags: ['GPU'], summary: 'Kill a GPU process', description: 'Force terminate a process using GPU resources by PID.', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { pid: { type: 'integer', description: 'Process ID to kill' } } } } } }, responses: { 200: { description: 'Process killed' } } },
+      },
+      '/gpu/reset': {
+        post: { tags: ['GPU'], summary: 'Reset GPU', description: 'Reset a specific NVIDIA GPU (requires privileged access).', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { gpuIndex: { type: 'integer', description: 'GPU index to reset' } } } } } }, responses: { 200: { description: 'GPU reset initiated' } } },
+      },
+      '/gpu/power-limit': {
+        post: { tags: ['GPU'], summary: 'Set GPU power limit', description: 'Set power consumption limit for a specific GPU in watts.', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { gpuIndex: { type: 'integer' }, watts: { type: 'integer', description: 'Power limit in watts' } } } } } }, responses: { 200: { description: 'Power limit updated' } } },
+      },
+
+      // ═══════════════════════════════════════════════
+      //  POWER MANAGER
+      // ═══════════════════════════════════════════════
+      '/power/cpu': {
+        get: { tags: ['Power'], summary: 'Get CPU info', description: 'Returns CPU model, cores, frequency, scaling governors, and per-core details.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'CPU info with core details' } } },
+      },
+      '/power/cpu/governor': {
+        post: { tags: ['Power'], summary: 'Set CPU governor', description: 'Set CPU frequency scaling governor (e.g., performance, powersave, ondemand, schedutil).', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { governor: { type: 'string', example: 'performance', description: 'CPU governor to set' } } } } } }, responses: { 200: { description: 'Governor set' } } },
+      },
+      '/power/cpu/frequency': {
+        post: { tags: ['Power'], summary: 'Set CPU frequency', description: 'Set specific CPU frequency in kHz for all cores.', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { khz: { type: 'integer', description: 'Frequency in kHz' } } } } } }, responses: { 200: { description: 'Frequency updated' } } },
+      },
+      '/power/profiles': {
+        get: { tags: ['Power'], summary: 'Get power profiles', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Available power profiles' } } },
+        post: { tags: ['Power'], summary: 'Set power profile', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { profile: { type: 'string', enum: ['performance', 'balanced', 'power-saver'] } } } } } }, responses: { 200: { description: 'Profile set' } } },
+      },
+      '/power/sleep': {
+        post: { tags: ['Power'], summary: 'System sleep (suspend)', security: [{ bearerAuth: [] }], responses: { 200: { description: 'System suspended' } } },
+      },
+      '/power/hibernate': {
+        post: { tags: ['Power'], summary: 'System hibernate', security: [{ bearerAuth: [] }], responses: { 200: { description: 'System hibernated' } } },
+      },
+      '/power/hybrid-sleep': {
+        post: { tags: ['Power'], summary: 'Hybrid sleep', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Hybrid sleep initiated' } } },
+      },
+      '/power/thermal': {
+        get: { tags: ['Power'], summary: 'Get thermal zones', description: 'Returns all thermal zone temperatures and critical thresholds.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Thermal zone data' } } },
+      },
+      '/power/fans': {
+        get: { tags: ['Power'], summary: 'Get fan speeds', description: 'Returns fan RPM data from hwmon devices.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Fan speed data' } } },
+        post: { tags: ['Power'], summary: 'Set fan speed', description: 'Set PWM value for a specific fan (0-255).', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { device: { type: 'string' }, fanIndex: { type: 'integer' }, pwmValue: { type: 'integer', minimum: 0, maximum: 255 } } } } } }, responses: { 200: { description: 'Fan speed updated' } } },
+      },
+      '/power/stats': {
+        get: { tags: ['Power'], summary: 'Get power statistics', description: 'Returns comprehensive power statistics including ACPI battery data, power supply info, and energy consumption.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Power statistics' } } },
+      },
+
+      // ═══════════════════════════════════════════════
+      //  MAIL SERVER
+      // ═══════════════════════════════════════════════
+      '/mail/status': {
+        get: { tags: ['Mail'], summary: 'Get mail server status', description: 'Returns Postfix, Dovecot, and SpamAssassin status, queue size, and version.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Mail server status' } } },
+      },
+      '/mail/install': {
+        post: { tags: ['Mail'], summary: 'Install mail server', description: 'Install Postfix, Dovecot, and SpamAssassin via apt.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Mail server installed' } } },
+      },
+      '/mail/uninstall': {
+        post: { tags: ['Mail'], summary: 'Uninstall mail server', description: 'Remove Postfix, Dovecot, and SpamAssassin packages.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Mail server uninstalled' } } },
+      },
+      '/mail/control': {
+        post: { tags: ['Mail'], summary: 'Control mail services', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { action: { type: 'string', enum: ['start', 'stop', 'restart'] } } } } } }, responses: { 200: { description: 'Service action executed' } } },
+      },
+      '/mail/domains': {
+        get: { tags: ['Mail'], summary: 'List mail domains', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Mail domain list' } } },
+        post: { tags: ['Mail'], summary: 'Add mail domain', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { domain: { type: 'string', example: 'example.com' } } } } } }, responses: { 200: { description: 'Domain added' } } },
+        delete: { tags: ['Mail'], summary: 'Remove mail domain', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { domain: { type: 'string' } } } } } }, responses: { 200: { description: 'Domain removed' } } },
+      },
+      '/mail/accounts': {
+        get: { tags: ['Mail'], summary: 'List email accounts', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Email account list' } } },
+        post: { tags: ['Mail'], summary: 'Create email account', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { email: { type: 'string', example: 'user@example.com' }, password: { type: 'string', minLength: 6 } } } } } }, responses: { 200: { description: 'Account created' } } },
+        delete: { tags: ['Mail'], summary: 'Delete email account', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { email: { type: 'string' } } } } } }, responses: { 200: { description: 'Account deleted' } } },
+      },
+      '/mail/accounts/password': {
+        post: { tags: ['Mail'], summary: 'Update email password', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { email: { type: 'string' }, password: { type: 'string', minLength: 6 } } } } } }, responses: { 200: { description: 'Password updated' } } },
+      },
+      '/mail/queue': {
+        get: { tags: ['Mail'], summary: 'Get mail queue', description: 'Returns mail queue entries with ID, sender, recipient, and size.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Mail queue entries' } } },
+        delete: { tags: ['Mail'], summary: 'Delete mail from queue', security: [{ bearerAuth: [] }], parameters: [{ name: 'id', in: 'query', schema: { type: 'string' } }], responses: { 200: { description: 'Mail deleted from queue' } } },
+      },
+      '/mail/queue/flush': {
+        post: { tags: ['Mail'], summary: 'Flush mail queue', description: 'Attempt immediate delivery of all queued mail.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Queue flush initiated' } } },
+      },
+      '/mail/spam': {
+        get: { tags: ['Mail'], summary: 'Get SpamAssassin config', security: [{ bearerAuth: [] }], responses: { 200: { description: 'SpamAssassin configuration' } } },
+        post: { tags: ['Mail'], summary: 'Update SpamAssassin config', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { requiredScore: { type: 'number', example: 5.0, description: 'Spam score threshold' } } } } } }, responses: { 200: { description: 'Spam config updated' } } },
+      },
+      '/mail/ssl': {
+        get: { tags: ['Mail'], summary: 'Get mail SSL certs', description: 'List SSL certificates found in Postfix and Dovecot directories.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'SSL certificates' } } },
+      },
+      '/mail/logs': {
+        get: { tags: ['Mail'], summary: 'Get mail logs', description: 'Fetch journalctl logs for postfix, dovecot, or spamassassin.', security: [{ bearerAuth: [] }], parameters: [{ name: 'service', in: 'query', schema: { type: 'string', enum: ['postfix', 'dovecot', 'spamassassin'], default: 'postfix' } }, { name: 'lines', in: 'query', schema: { type: 'integer', default: 50 } }], responses: { 200: { description: 'Log entries' } } },
+      },
+
+      // ═══════════════════════════════════════════════
+      //  CDN & CACHE MANAGER
+      // ═══════════════════════════════════════════════
+      '/cdn/cloudflare/zones': {
+        post: { tags: ['CDN'], summary: 'List Cloudflare zones', description: 'Fetch Cloudflare zones using API key and email (transient — never stored).', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { apiKey: { type: 'string' }, email: { type: 'string', format: 'email' } } } } } }, responses: { 200: { description: 'Zone list' } } },
+      },
+      '/cdn/cloudflare/purge': {
+        post: { tags: ['CDN'], summary: 'Purge Cloudflare cache', description: 'Purge entire cache for a Cloudflare zone.', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { apiKey: { type: 'string' }, email: { type: 'string' }, zoneId: { type: 'string' } } } } } }, responses: { 200: { description: 'Cache purged' } } },
+      },
+      '/cdn/cloudflare/purge-urls': {
+        post: { tags: ['CDN'], summary: 'Purge Cloudflare URLs', description: 'Purge specific URLs from Cloudflare cache.', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { apiKey: { type: 'string' }, email: { type: 'string' }, zoneId: { type: 'string' }, urls: { type: 'array', items: { type: 'string' }, example: ['https://example.com/page1'] } } } } } }, responses: { 200: { description: 'URLs purged' } } },
+      },
+      '/cdn/cloudflare/analytics': {
+        post: { tags: ['CDN'], summary: 'Get Cloudflare analytics', description: 'Fetch 24h analytics data (requests, bandwidth, threats) for a zone.', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { apiKey: { type: 'string' }, email: { type: 'string' }, zoneId: { type: 'string' } } } } } }, responses: { 200: { description: 'Analytics data' } } },
+      },
+      '/cdn/varnish/status': {
+        get: { tags: ['CDN'], summary: 'Get Varnish status', description: 'Returns Varnish service status, version, and cache statistics.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Varnish status' } } },
+      },
+      '/cdn/varnish/control': {
+        post: { tags: ['CDN'], summary: 'Control Varnish service', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { action: { type: 'string', enum: ['start', 'stop', 'restart', 'reload'] } } } } } }, responses: { 200: { description: 'Varnish action executed' } } },
+      },
+      '/cdn/varnish/config': {
+        get: { tags: ['CDN'], summary: 'Get Varnish VCL config', security: [{ bearerAuth: [] }], responses: { 200: { description: 'VCL config content' } } },
+        post: { tags: ['CDN'], summary: 'Save Varnish VCL config', description: 'Save and reload VCL configuration (syntax validated).', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { config: { type: 'string', description: 'VCL config content' } } } } } }, responses: { 200: { description: 'VCL saved and reloaded' } } },
+      },
+      '/cdn/varnish/purge': {
+        post: { tags: ['CDN'], summary: 'Purge Varnish cache', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Varnish cache purged' } } },
+      },
+      '/cdn/redis': {
+        get: { tags: ['CDN'], summary: 'Get Redis cache stats', description: 'Returns cache hit/miss statistics from Redis.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Redis cache stats' } } },
+      },
+      '/cdn/redis/flush': {
+        post: { tags: ['CDN'], summary: 'Flush Redis cache', description: 'Execute FLUSHALL on Redis.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Redis cache flushed' } } },
+      },
+      '/cdn/fpc': {
+        get: { tags: ['CDN'], summary: 'Get Full Page Cache status', description: 'Returns page count, cache size, and Nginx FPC status.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'FPC status' } } },
+      },
+      '/cdn/fpc/flush': {
+        post: { tags: ['CDN'], summary: 'Flush Full Page Cache', security: [{ bearerAuth: [] }], responses: { 200: { description: 'FPC flushed' } } },
+      },
+
+      // ═══════════════════════════════════════════════
+      //  IoT & EDGE DEVICE MANAGER
+      // ═══════════════════════════════════════════════
+      '/iot/mqtt/status': {
+        get: { tags: ['IoT'], summary: 'Get MQTT broker status', description: 'Returns Mosquitto service status, version, port, client count.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'MQTT broker status' } } },
+      },
+      '/iot/mqtt/install': {
+        post: { tags: ['IoT'], summary: 'Install Mosquitto', description: 'Install Mosquitto MQTT broker via apt.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Mosquitto installed' } } },
+      },
+      '/iot/mqtt/control': {
+        post: { tags: ['IoT'], summary: 'Control Mosquitto service', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { action: { type: 'string', enum: ['start', 'stop', 'restart'] } } } } } }, responses: { 200: { description: 'Mosquitto action executed' } } },
+      },
+      '/iot/mqtt/config': {
+        get: { tags: ['IoT'], summary: 'Get Mosquitto config', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Mosquitto configuration content' } } },
+        post: { tags: ['IoT'], summary: 'Save Mosquitto config', description: 'Save and restart Mosquitto with new configuration.', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { config: { type: 'string' } } } } } }, responses: { 200: { description: 'Config saved' } } },
+      },
+      '/iot/mqtt/users': {
+        get: { tags: ['IoT'], summary: 'List MQTT users', security: [{ bearerAuth: [] }], responses: { 200: { description: 'MQTT user list' } } },
+        post: { tags: ['IoT'], summary: 'Add MQTT user', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { username: { type: 'string' }, password: { type: 'string', minLength: 4 } } } } } }, responses: { 200: { description: 'User added' } } },
+        delete: { tags: ['IoT'], summary: 'Delete MQTT user', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { username: { type: 'string' } } } } } }, responses: { 200: { description: 'User deleted' } } },
+      },
+      '/iot/mqtt/acl': {
+        get: { tags: ['IoT'], summary: 'Get MQTT ACL', security: [{ bearerAuth: [] }], responses: { 200: { description: 'ACL content' } } },
+        post: { tags: ['IoT'], summary: 'Save MQTT ACL', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { acl: { type: 'string' } } } } } }, responses: { 200: { description: 'ACL saved' } } },
+      },
+      '/iot/mqtt/publish': {
+        post: { tags: ['IoT'], summary: 'Publish MQTT message', description: 'Publish a message to an MQTT topic with QoS 0, 1, or 2.', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { topic: { type: 'string', example: 'home/sensor/temp' }, message: { type: 'string', example: '23.5' }, qos: { type: 'integer', enum: [0, 1, 2], default: 0 } } } } } }, responses: { 200: { description: 'Message published' } } },
+      },
+      '/iot/homeassistant': {
+        get: { tags: ['IoT'], summary: 'Get Home Assistant status', description: 'Returns Home Assistant status (systemd or Docker).', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Home Assistant status' } } },
+      },
+      '/iot/homeassistant/install': {
+        post: { tags: ['IoT'], summary: 'Install Home Assistant', description: 'Deploy Home Assistant as a Docker container (network host mode).', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Home Assistant installed' } } },
+      },
+      '/iot/nodered': {
+        get: { tags: ['IoT'], summary: 'Get Node-RED status', description: 'Returns Node-RED status (systemd or Docker).', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Node-RED status' } } },
+      },
+      '/iot/nodered/install': {
+        post: { tags: ['IoT'], summary: 'Install Node-RED', description: 'Deploy Node-RED as a Docker container (port 1880).', security: [{ bearerAuth: [] }], responses: { 200: { description: 'Node-RED installed' } } },
+      },
+      '/iot/discover': {
+        post: { tags: ['IoT'], summary: 'Discover network devices', description: 'Scan the local network for IoT/edge devices using nmap or arp.', security: [{ bearerAuth: [] }], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { subnet: { type: 'string', example: '192.168.1.0/24' } } } } } }, responses: { 200: { description: 'Discovered devices with IP and hostname' } } },
+      },
+      '/iot/metrics': {
+        get: { tags: ['IoT'], summary: 'Get IoT metrics', description: 'Returns MQTT broker metrics: messages sent and bytes transferred.', security: [{ bearerAuth: [] }], responses: { 200: { description: 'IoT metrics' } } },
+      },
     },
   },
-  // swagger-jsdoc options — we define all paths manually in the spec above,
-  // so we just need the base configuration.
-  apis: [],
+  apis: []
+  }
 };
 
-export const swaggerSpec = swaggerJsdoc(options);
+export const swaggerSpec = swaggerJsdoc({ ...options, apis: [] });
 export default swaggerSpec;

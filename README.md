@@ -3,7 +3,7 @@
 > Lightweight, modern, realtime Linux server control panel — a blend of aaPanel, Portainer, CasaOS, and Cockpit, but far lighter.
 
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green)](https://nodejs.org)
-[![Version](https://img.shields.io/badge/version-1.8.0-blue)](CHANGELOG)
+[![Version](https://img.shields.io/badge/version-1.9.0-blue)](CHANGELOG)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
 ## Core Features
@@ -124,38 +124,52 @@ src/
 | Phase 6 (v1.6.0) | ✅ Done | Multi-Node Cluster, SQLite Auto-Backups, PTY Terminal Command Audit Log, GitHub Actions Docker Hub Integration |
 | Phase 7 (v1.7.0) | ✅ Done | OpenClaw AI Copilot Floating Assistant, Nginx Reverse Proxy Docker Mapper, PHP Pool Configuration Manager, Database Visual Explorer/Console, WhatsApp Alerting, Service Watchdog Auto-Healer, Visual Audit Log Dashboard, Security Advisor (One-Click Fix), Multi-Cloud S3 Backup, Terminal AI Suggestions, Git Webhook Auto-Build, Tailscale VPN Integration |
 | Phase 8 (v1.8.0) | ✅ Done | **Security Patch** — Shell injection fix (execFile), Zip Slip protection, upload extension filter, graceful shutdown WAL-safe, EISDIR crash guard, install dir fix (/opt/panelku), storage permission hardening (750→), multi-distro install.sh rewrite |
+| Phase 9 (v1.9.0) | ✅ Done | **Runtime Managers** — Node.js version management (nvm/nodenv), Python virtual environments (pyenv), Gunicorn/Uvicorn setup, MongoDB Manager, Redis Manager, Apache Manager |
+| Phase 10 (v1.9.0) | ✅ Done | **Backup & Disaster Recovery** — Rclone + S3 automated backups, scheduled snapshots, retention policies, one-click restore |
+| Phase 11 (v1.9.0) | ✅ Done | **Analytics & Monitoring** — Metrics & Logs Analytics Dashboard, historical trend analysis, log aggregation, Prometheus-style visualization |
+| Phase 12 (v1.9.0) | ✅ Done | **Multi-User RBAC + SSO/LDAP** — LDAP authentication, SAML/OpenID Connect SSO, fine-grained permissions, group-based role mapping |
+| Phase 13 (v1.9.0) | ✅ Done | **Service Mesh & Auto-Healing** — systemd health checks, auto-restart, alerting, service dependency management |
+| Phase 14 (v1.9.0) | ✅ Done | **Auto-Updater & Rollback** — One-click git update, pre-update health check, automatic rollback on failure, update history |
+| Phase 15 (v1.9.0) | ✅ Done | **Caddy Server Manager** — Full Caddyfile editor, automatic HTTPS, reverse proxy, static file serving |
+| Phase 16 (v1.9.0) | ✅ Done | **AI Auto-Repair** — GPT-powered log analysis, auto-fix suggestions, predictive alerts, self-healing engine |
+| Phase 17 (v1.9.0) | ✅ Done | **Enhanced Database Explorer** — 5-tab explorer (Browse/Structure/Query/Export/History), pagination, sorting, export/import JSON/CSV/SQL |
+| Phase 18 (v1.9.0) | ✅ Done | **GPU Manager** — NVIDIA GPU monitoring (nvidia-smi), CUDA/CUDNN detection, process management, power limit control |
+| Phase 19 (v1.9.0) | ✅ Done | **Power Manager** — CPU governor control, power profiles, suspend/hibernate, thermal zones, fan monitoring |
+| Phase 20 (v1.9.0) | ✅ Done | **Mail Server Manager** — Postfix/Dovecot/SpamAssassin, email accounts, mail queue, spam config, SSL certs |
+| Phase 21 (v1.9.0) | ✅ Done | **CDN & Cache Manager** — Cloudflare API, Varnish cache, Redis cache, Full Page Cache (Nginx FPC) |
+| Phase 22 (v1.9.0) | ✅ Done | **IoT & Edge Device Manager** — Mosquitto MQTT, Home Assistant, Node-RED, device discovery, MQTT metrics |
 
 ## Changelog
 
-### v1.8.0 — July 15, 2026 (Security Patch & Stability Release)
+### v1.9.0 — July 17, 2026 (Major Feature Release)
 
-> Critical security vulnerabilities patched. Recommended upgrade for all production deployments.
+> 12 new modules added — GPU management, power management, mail server, CDN/cache, IoT device manager, enhanced database explorer, runtime managers, and more.
 
-**🔴 Critical Fixes**
-- **[CRIT-1]** Fixed shell command injection in database password config — replaced shell string interpolation with `execFile()` + strict regex validation
-- **[CRIT-2]** Fixed Zip Slip attack in File Manager — each ZIP entry path validated before extraction
-- **[CRIT-3]** Added upload file extension filter — blocks `.php`, `.sh`, `.exe`, `.htaccess` and 15 other dangerous types
+**🚀 New Modules**
+- **GPU Manager** — Full NVIDIA GPU monitoring via nvidia-smi, CUDA/CUDNN detection, per-GPU utilization (GPU/Memory/Power), temperature, fan, clocks, process management with kill capability, power limit control
+- **Power Manager** — CPU frequency scaling & governor control, power profiles (Performance/Balanced/Power-Saver), suspend/hibernate/hybrid-sleep, thermal zone monitoring with threshold alerts, fan RPM monitoring
+- **Mail Server Manager** — Postfix/Dovecot/SpamAssassin: install/uninstall, domain management, email accounts (SHA512-CRYPT), mail queue view/flush/delete, SpamAssassin config, SSL viewer, journalctl logs
+- **CDN & Cache Manager** — Cloudflare API (zone list, cache purge, analytics), Varnish (status, VCL editor, cache purge), Redis cache stats/flush, Full Page Cache
+- **IoT & Edge Device Manager** — Mosquitto MQTT broker (config/users/ACL/publish QoS), Home Assistant & Node-RED Docker deploy, nmap device discovery, MQTT metrics
+- **Enhanced Database Explorer** — 5-tab explorer: Browse (paginated, sortable), Structure (columns/keys/FK), Query (SQL console with Ctrl+Enter), Export (JSON/CSV/SQL), Import (CSV/SQL), History (last 100 queries)
+- **Runtime Managers** — Node.js version management (nvm/nodenv), Python virtual environments (pyenv/Gunicorn/Uvicorn), MongoDB full management, Redis dashboard with keyspace monitor, Apache virtual host manager
+- **Caddy Server Manager** — Full Caddyfile editor, automatic HTTPS, reverse proxy config, import management
+- **AI Auto-Repair** — GPT-powered log analysis, intelligent fix suggestions with one-click apply, predictive alerting, trend analysis
+- **Auto-Updater & Rollback** — One-click git update with pre-update health check, automatic rollback on failure
+- **Multi-User RBAC + SSO/LDAP** — LDAP integration, SAML/OpenID Connect SSO, fine-grained permissions, group-based mapping
+- **Service Mesh & Auto-Healing** — systemd health checks, auto-restart, alerting on repeated failures
+- **Backup & Disaster Recovery** — Rclone + S3 automated backups with retention policies
+- **Analytics Dashboard** — Historical metrics with time-range selectors, log aggregation, trend charts
+- **Comprehensive Swagger API Docs** — OpenAPI 3.0 documentation for all modules with interactive Try-It-Out
 
-**🟠 High Severity Fixes**
-- **[HIGH-1]** Fixed graceful shutdown race condition — `server.close()` now called before SQLite/Redis close (prevents WAL corruption)
-- **[HIGH-2]** Fixed EISDIR crash on directory download — returns HTTP 400 instead of crashing the Node.js process
-- **[HIGH-3]** Upgraded `unzipper` from `^0.12.3` to `^0.12.5`
-- **[HIGH-4]** Fixed install directory mismatch (`/opt/linux-panel` → `/opt/panelku`, port `3000` → `23456`)
-
-**🟡 Medium Fixes**
-- **[MED-3]** Added File Manager API endpoints to WAF skip list (prevents false positives on `../` in config files)
-- **[MED-4]** Fixed path traversal via rename — `newName` now validated through `_resolvePath()`
-- **[MED-7]** Storage permission hardened from `777` to `750` in install scripts
-
-**🟢 Improvements**
-- **[LOW-1]** Added `npm rebuild node-pty` in install scripts
-- **install.sh** (both scripts): Rewritten with `set -euo pipefail`, multi-distro support (`yum`/`apk`/`zypper`), secure secrets via `openssl rand -hex 32`, dynamic Node.js binary URL, safer `sed` delimiter (`|`), systemd hardening
+### v1.8.0 — July 15, 2026 (Security Patch)
+🔴 Critical: Shell injection fix (execFile), Zip Slip protection, upload filter (18 types), graceful shutdown WAL-safe, EISDIR crash guard, install dir fix (/opt/panelku), storage 750, install.sh multi-distro rewrite.
 
 ### v1.7.0 — July 13, 2026
-Added OpenClaw AI Copilot, Nginx Reverse Proxy Docker Mapper, PHP Pool Manager, Database Visual Explorer, WhatsApp Alerting, Service Watchdog, Visual Audit Log Dashboard, Security Advisor, Multi-Cloud S3 Backup, Terminal AI Suggestions, Git Webhook Auto-Build, Tailscale VPN Integration.
+OpenClaw AI Copilot, Nginx Reverse Proxy Docker Mapper, PHP Pool Manager, Database Visual Explorer, WhatsApp Alerting, Service Watchdog, Audit Log Dashboard, Security Advisor, Multi-Cloud S3 Backup, Terminal AI, Git Webhooks, Tailscale VPN.
 
 ### v1.6.0 — July 9, 2026
-Introduced Multi-Node Cluster Manager, SQLite Auto-Backups, Terminal Audit Logs, GitHub Actions CI/CD pipeline.
+Multi-Node Cluster Manager, SQLite Auto-Backups, Terminal Audit Logs, GitHub Actions CI/CD.
 
 ### v1.5.0 — July 8, 2026
 PHP Manager, 2FA/MFA, SSH Key Manager, Let's Encrypt Auto-Renewal, Fail2Ban logs, distro-aware auto-updates.

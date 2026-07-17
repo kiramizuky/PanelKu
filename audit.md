@@ -1,10 +1,10 @@
 # 📋 Panelku — Audit Pengembangan (Fase 1–23)
 
 > **Proyek**: Panelku — Lightweight Linux Server Control Panel  
-> **Versi**: 1.8.0  
+> **Versi**: 1.9.0  
 > **Stack**: Node.js 24 LTS + Express + SQLite + Socket.IO + EJS + Bootstrap 5  
-> **Status**: 🟢 Development (23 dari 23 fase selesai)  
-> **Target Server**: Armbian / Debian / Ubuntu (RAM minimal 512MB)
+> **Status**: 🟢 Production Ready (23 dari 23 fase selesai)  
+> **Target Server**: Armbian / Debian / Ubuntu / Arch / Fedora / Gentoo (RAM minimal 512MB)
 
 ---
 
@@ -231,6 +231,16 @@ public/js/[nama].js     ← Frontend JS (singleton pattern, LP.get/post/delete)
 - **Modul**: iot
 - **Fitur**: Mosquitto MQTT (install/config/users/ACL/publish QoS 0/1/2), Home Assistant Docker deploy, Node-RED Docker deploy, network device discovery (nmap/arp), MQTT broker metrics (messages/bytes)
 
+### Fase 24: v1.9.0 — Release & Documentation
+- **Update**: Version bump 1.8.0 → 1.9.0 across all files
+- **Swagger.js Fix**: Fixed pre-existing 1-brace syntax imbalance (1355 { vs 1354 }) — restructured ending with `apis: []` inside definition + spread export for swagger-jsdoc compatibility
+- **Landing Page**: Updated `panelku-landing/index.html` with v1.9 badge, hero section mentioning new modules, comprehensive changelog entry for all 12+ new modules
+- **README.md**: Updated version badge, roadmap with 14 new phases (9-22), expanded changelog with all module descriptions
+- **Internal Changelog**: Updated `views/settings/changelog.ejs` with v1.9.0 entry covering all new features
+- **API Docs**: Added Swagger documentation for 57 new endpoints across GPU, Power, Mail, CDN, and IoT modules
+- **Security Fix**: All heredoc-based shell commands (`saveVarnishConfig`, `saveMosquittoConfig`, `saveMqttAcl`) replaced with `fs.writeFile` + `execFile` (no shell injection)
+- **Dead Code Cleanup**: Removed debug console.log, fixed mixed response imports, removed unused variables across 4 files
+
 ---
 
 ## 📈 Statistik Kode
@@ -342,4 +352,4 @@ Fitur potensial untuk pengembangan mendatang:
 ---
 
 > *Dibuat oleh Phersa Creative Studio™*  
-> *Terakhir diperbarui: Juli 2026*
+> *Terakhir diperbarui: 17 Juli 2026*

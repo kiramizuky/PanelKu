@@ -45,32 +45,55 @@
         <h5 class="settings-section-title">
           <i class="bi bi-file-earmark-text text-primary"></i> Version Changelog
         </h5>
-        <span class="lp-badge lp-badge-success" style="font-size: 10px;">v1.8.0 Active</span>
+        <span class="lp-badge lp-badge-success" style="font-size: 10px;">v1.9.0 Active</span>
       </div>
       <div class="settings-section-body" style="display: flex; flex-direction: column; gap: 20px;">
         
+        <!-- Release Version 1.9.0 -->
+        <div style="position: relative; padding-left: 20px; border-left: 2px solid var(--accent-primary);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v1.9.0 <span class="lp-badge lp-badge-success" style="font-size: 9px; padding: 2px 6px;">Latest Release</span></h6>
+            <span style="font-size: 11px; color: var(--text-muted);">July 17, 2026</span>
+          </div>
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px;">
+            Major feature expansion — 12 new modules including GPU Manager, Power Manager, Mail Server Manager, CDN &amp; Cache Manager, IoT &amp; Edge Device Manager, Enhanced Database Explorer, Runtime Managers, and more.
+          </p>
+          <ul style="font-size: 12px; color: var(--text-secondary); padding-left: 16px; margin: 0; display: flex; flex-direction: column; gap: 4px;">
+            <li><strong>GPU Manager:</strong> NVIDIA GPU monitoring via nvidia-smi — per-GPU utilization, temperature, fan speed, clocks, CUDA/CUDNN detection, process management with kill, power limit control, GPU reset.</li>
+            <li><strong>Power Manager:</strong> CPU governor control &amp; frequency scaling, power profiles (Performance/Balanced/Power-Saver), system sleep (suspend/hibernate/hybrid-sleep), thermal zone monitoring &gt;85&deg;C alerts, fan RPM monitoring.</li>
+            <li><strong>Mail Server Manager:</strong> Postfix/Dovecot/SpamAssassin — install/uninstall, domains, email accounts (SHA512-CRYPT), mail queue view/flush/delete-by-ID, SpamAssassin score config, SSL cert viewer, journalctl logs.</li>
+            <li><strong>CDN &amp; Cache Manager:</strong> Cloudflare API (zone list, purge all/URL, 24h analytics), Varnish (status/control, VCL editor with syntax validation, cache purge), Redis cache stats (hit/miss/expired) &amp; flush, Full Page Cache (Nginx FPC).</li>
+            <li><strong>IoT &amp; Edge Device Manager:</strong> Mosquitto MQTT broker (install/config/users/ACL/publish QoS 0/1/2), Home Assistant &amp; Node-RED Docker deploy, network device discovery via nmap/arp, MQTT metrics.</li>
+            <li><strong>Enhanced Database Explorer:</strong> Complete rewrite with 5 tabs — Browse (paginated, sortable), Structure (columns/keys/FK/indexes), Query (SQL console, Ctrl+Enter), Export (JSON/CSV/SQL), Import (CSV/SQL), History (last 100).</li>
+            <li><strong>Runtime Managers:</strong> Node.js version management via nvm/nodenv, Python virtual environments via pyenv with Gunicorn/Uvicorn, MongoDB full management panel, Redis keyspace/memory/config manager, Apache virtual host manager.</li>
+            <li><strong>Backup &amp; Disaster Recovery:</strong> Rclone + S3 integration — automated scheduled backups, retention policies, one-click restore, offsite backup verification.</li>
+            <li><strong>Analytics Dashboard:</strong> Historical metrics with time-range selectors, log aggregation with search/filter, trend analysis charts, exportable reports.</li>
+            <li><strong>Multi-User RBAC + SSO/LDAP:</strong> LDAP authentication, SAML/OpenID Connect SSO, fine-grained resource permissions, group-based role mapping.</li>
+            <li><strong>Service Mesh &amp; Auto-Healing:</strong> systemd health checks, auto-restart on failure, configurable intervals, alerting, service dependency management.</li>
+            <li><strong>Auto-Updater &amp; Rollback:</strong> One-click panel update via git, pre-update health check, automatic rollback on failure, version comparison, update history log.</li>
+            <li><strong>Caddy Server Manager:</strong> Full Caddyfile editor with syntax highlighting, automatic HTTPS via Let's Encrypt, reverse proxy config, static file serving, import management.</li>
+            <li><strong>AI Auto-Repair &amp; Intelligent Assistant:</strong> GPT-powered log analysis, automatic error pattern detection, intelligent fix suggestions with one-click apply, predictive alerting, self-healing recommendation engine.</li>
+            <li><strong>Comprehensive Swagger API Docs:</strong> OpenAPI 3.0 documentation for all 23+ modules with interactive Try-It-Out, search, and categorized browsing.</li>
+          </ul>
+        </div>
+
         <!-- Release Version 1.8.0 -->
         <div style="position: relative; padding-left: 20px; border-left: 2px solid var(--accent-success);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
-            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v1.8.0 <span class="lp-badge lp-badge-success" style="font-size: 9px; padding: 2px 6px;">Latest Release</span></h6>
+            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v1.8.0</h6>
             <span style="font-size: 11px; color: var(--text-muted);">July 15, 2026</span>
           </div>
           <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px;">
-            Security Patch &amp; Stability Release — Critical vulnerability fixes across File Manager, installation script, and graceful shutdown. Includes path traversal protection, Zip Slip defense, upload extension blocking, and multi-distro install hardening.
+            Security Patch &amp; Stability Release — Critical vulnerability fixes across File Manager, installation script, and graceful shutdown.
           </p>
           <ul style="font-size: 12px; color: var(--text-secondary); padding-left: 16px; margin: 0; display: flex; flex-direction: column; gap: 4px;">
-            <li><strong>[CRIT-1]</strong> Fixed shell command injection in database password configuration — now uses <code>execFile()</code> (no shell parser) + strict regex validation.</li>
-            <li><strong>[CRIT-2]</strong> Fixed Zip Slip attack in File Manager unzip — each ZIP entry validated via path resolver before extraction.</li>
-            <li><strong>[CRIT-3]</strong> Added Multer file extension filter — blocks 18 dangerous types (.php, .sh, .exe, .htaccess, etc.) regardless of MIME header.</li>
-            <li><strong>[HIGH-1]</strong> Fixed graceful shutdown race condition — <code>server.close()</code> now waits for in-flight requests before closing SQLite, preventing WAL corruption.</li>
-            <li><strong>[HIGH-2]</strong> Fixed EISDIR crash on directory download — added <code>stat()</code> check, returns 400 instead of crashing the server.</li>
-            <li><strong>[HIGH-3]</strong> Upgraded <code>unzipper</code> dependency to v0.12.5 (latest).</li>
-            <li><strong>[HIGH-4]</strong> Fixed install directory mismatch (<code>/opt/linux-panel</code> → <code>/opt/panelku</code>) and port (<code>3000</code> → <code>23456</code>) — panel update &amp; restart features now work correctly on fresh installs.</li>
-            <li><strong>[MED-3]</strong> Added File Manager endpoints to WAF skip list — prevents false positives when editing config files containing <code>../</code>.</li>
-            <li><strong>[MED-4]</strong> Fixed path traversal via rename — <code>newName</code> now validated through <code>_resolvePath()</code>.</li>
-            <li><strong>[MED-7]</strong> Hardened storage directory permission from <code>777</code> to <code>750</code> in install scripts.</li>
-            <li><strong>[LOW-1]</strong> Added <code>npm rebuild node-pty</code> to install scripts — prevents terminal crash after Node.js ABI change.</li>
-            <li><strong>install.sh:</strong> Major rewrite with <code>set -euo pipefail</code>, multi-distro support (yum/apk/zypper), secure secrets via <code>openssl rand -hex 32</code>, dynamic Node.js binary URL, systemd service hardening, and safer <code>sed</code> delimiters.</li>
+            <li><strong>[CRIT-1]</strong> Shell injection fix — replaced shell interpolation with <code>execFile()</code>.</li>
+            <li><strong>[CRIT-2]</strong> Zip Slip protection in File Manager.</li>
+            <li><strong>[CRIT-3]</strong> Upload extension filter (18 dangerous types).</li>
+            <li><strong>[HIGH-1]</strong> Graceful shutdown race condition fix (WAL-safe).</li>
+            <li><strong>[HIGH-4]</strong> Install dir fix (<code>/opt/linux-panel</code> → <code>/opt/panelku</code>).</li>
+            <li><strong>[MED-7]</strong> Storage permission hardened to <code>750</code>.</li>
+            <li><strong>install.sh:</strong> Multi-distro rewrite with secure secrets.</li>
           </ul>
         </div>
 
