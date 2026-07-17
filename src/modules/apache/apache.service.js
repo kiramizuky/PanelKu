@@ -1,4 +1,4 @@
-import { execFile, exec } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
@@ -32,7 +32,7 @@ function validateName(name) {
 /**
  * Safe shell command runner with validated args.
  */
-async function runCmd(cmd, args = [], opts = {}) {
+async function _runCmd(cmd, args = [], opts = {}) {
   if (process.platform === 'win32') return { stdout: '', stderr: '' };
   try {
     return await execFileAsync(cmd, args, { timeout: 30000, ...opts });

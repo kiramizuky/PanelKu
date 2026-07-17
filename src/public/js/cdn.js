@@ -1,5 +1,5 @@
 const CDN = (() => {
-  let cfKey = '', cfEmail = '', cfZoneId = '';
+  let cfKey = '', cfEmail = '', _cfZoneId = '';
 
   async function loadData() {
     await Promise.allSettled([loadVarnish(), loadRedis(), loadFpc()]);

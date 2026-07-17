@@ -57,7 +57,7 @@ const AuditLog = {
     });
   },
 
-  async countDocuments(filter = {}) {
+  async countDocuments(_filter = {}) {
     const db = getDb();
     return db.prepare('SELECT COUNT(*) as c FROM audit_logs').get().c;
   },

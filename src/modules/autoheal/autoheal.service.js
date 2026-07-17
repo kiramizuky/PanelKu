@@ -1,4 +1,4 @@
-import { exec, execFile } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import scheduler from '../../core/scheduler/Scheduler.js';
 import Notification from '../../models/Notification.js';
@@ -245,7 +245,7 @@ class AutoHealService {
   /**
    * Check website health via HTTP.
    */
-  async _checkWebsites(config) {
+  async _checkWebsites(_config) {
     const results = [];
     try {
       const { getDb, fromJson } = await import('../../core/db/sqlite.js');
@@ -441,7 +441,7 @@ class AutoHealService {
     if (!serviceName) throw new Error('Service name is required');
 
     try {
-      const { stdout } = await execAsync(`systemctl restart ${serviceName} 2>&1`, { timeout: 30000 });
+      await execAsync(`systemctl restart ${serviceName} 2>&1`, { timeout: 30000 });
       await new Promise(r => setTimeout(r, 2000));
 
       const { stdout: status } = await execAsync(`systemctl is-active ${serviceName} 2>/dev/null || echo "inactive"`, { timeout: 5000 });

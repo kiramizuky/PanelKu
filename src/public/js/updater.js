@@ -600,7 +600,7 @@ const UpdaterPage = (() => {
     const maxWait = 60000;
     const interval = 2000;
     const start = Date.now();
-    let dots = 0;
+    let _dots = 0;
 
     const poll = setInterval(async () => {
       dots++;

@@ -1,7 +1,6 @@
 import { execFile } from 'child_process';
 import util from 'util';
 import fs from 'fs/promises';
-import path from 'path';
 import Website from '../../models/Website.js';
 
 const execFileAsync = util.promisify(execFile);

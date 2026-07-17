@@ -3,9 +3,9 @@ import pkg from 'pg';
 const { Client } = pkg;
 import path from 'path';
 import fs from 'fs/promises';
-import { createReadStream, createWriteStream } from 'fs';
-import { pipeline } from 'stream/promises';
-import { createGzip, createGunzip } from 'zlib';
+
+
+
 
 class DatabaseService {
   constructor() {

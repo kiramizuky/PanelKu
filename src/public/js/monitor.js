@@ -221,7 +221,7 @@ const MonitorPage = (() => {
     renderProcessesTable();
   }
 
-  let pollInterval;
+  let _pollInterval;
 
   async function init() {
     await LP.init();

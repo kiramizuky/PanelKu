@@ -1,8 +1,5 @@
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
-import path from 'path';
-import fs from 'fs/promises';
-
 const execAsync = promisify(exec);
 
 class GpuService {

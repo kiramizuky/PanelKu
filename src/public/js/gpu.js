@@ -41,7 +41,7 @@ const GPU = (() => {
 
   function renderGpuCards(gpus) {
     const el = document.getElementById('gpuCards');
-    el.innerHTML = gpus.map((gpu, idx) => `
+    el.innerHTML = gpus.map((gpu, _idx) => `
       <div class="lp-glass-card" style="padding:20px;margin-bottom:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
           <div>

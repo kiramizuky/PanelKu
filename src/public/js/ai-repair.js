@@ -352,7 +352,7 @@ const AIRepairPage = {
 
     try {
       // Get nginx test output
-      const res = await fetch('/api/system/services/manage', {
+      const _res = await fetch('/api/system/services/manage', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${LP.state.accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ service: 'nginx', action: 'status' }),

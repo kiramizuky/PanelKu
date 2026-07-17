@@ -1,4 +1,4 @@
-import { exec, execFile } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
@@ -156,7 +156,7 @@ class MailService {
 
     try {
       // Remove from virtual mailbox
-      const { stdout } = await execAsync(`sudo sed -i "/^${email.replace(/\./g, '\\.')} /d" /etc/postfix/virtual_mailbox 2>/dev/null`);
+      await execAsync(`sudo sed -i "/^${email.replace(/\./g, '\\.')} /d" /etc/postfix/virtual_mailbox 2>/dev/null`);
       // Remove from dovecot users
       await execAsync(`sudo sed -i "/^${email.replace(/\./g, '\\.')}:/d" /etc/dovecot/users 2>/dev/null`);
       // Reload

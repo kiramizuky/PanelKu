@@ -170,7 +170,7 @@ const LP = {
   initSidebar() {
     const sidebar = document.querySelector('.lp-sidebar');
     const main = document.querySelector('.lp-main');
-    const floatTerminal = document.querySelector('.lp-float-terminal');
+    const _floatTerminal = document.querySelector('.lp-float-terminal');
     const toggleBtn = document.querySelector('#sidebarToggle');
 
     if (!sidebar) return;

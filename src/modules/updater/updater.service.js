@@ -11,11 +11,10 @@
  *   - Backup sebelum update: tar.gz dari seluruh direktori panel (excl node_modules, storage)
  */
 
-import { exec, spawn } from 'child_process';
+import { exec } from 'child_process';
 import util from 'util';
 import path from 'path';
 import fs from 'fs/promises';
-import { existsSync } from 'fs';
 import logger from '../../config/logger.js';
 
 const execAsync = util.promisify(exec);
@@ -126,7 +125,7 @@ class UpdaterService {
   async getVersionInfo() {
     const pkg = await this._readJSON(path.join(PANEL_DIR, 'package.json'), { version: '1.0.0' });
     const panelCfg = await this._readJSON(PANEL_CONFIG, {});
-    const systemCfg = await this._readJSON(SYSTEM_CONFIG, {});
+    const _systemCfg = await this._readJSON(SYSTEM_CONFIG, {});
 
     let activeBranch = 'main';
     let currentCommit = '';

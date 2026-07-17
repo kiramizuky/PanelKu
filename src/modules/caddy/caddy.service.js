@@ -519,7 +519,7 @@ class CaddyService {
     const caddyfilePath = await this._getCaddyfilePath();
 
     try {
-      const { stdout } = await execFileAsync(bin, ['fmt', '--overwrite', caddyfilePath], { timeout: 10000 });
+      await execFileAsync(bin, ['fmt', '--overwrite', caddyfilePath], { timeout: 10000 });
       const content = await fs.readFile(caddyfilePath, 'utf8');
       return { message: 'Caddyfile formatted successfully', content };
     } catch (err) {

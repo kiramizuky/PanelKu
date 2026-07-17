@@ -5,7 +5,7 @@ const DB = (() => {
   let activeTable = null;
   let currentPage = 1;
   let currentSort = { column: null, dir: 'ASC' };
-  let historyModal;
+  let _historyModal;
 
   // ── Initialization ───────────────────────────────────
 

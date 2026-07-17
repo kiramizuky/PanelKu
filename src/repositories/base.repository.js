@@ -27,7 +27,7 @@ export default class BaseRepository {
     return result;
   }
 
-  async paginate(filter = {}, page = 1, limit = 20, options = {}) {
+  async paginate(filter = {}, page = 1, limit = 20, _options = {}) {
     page  = parseInt(page);
     limit = parseInt(limit);
     const skip  = (page - 1) * limit;

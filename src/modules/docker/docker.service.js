@@ -181,7 +181,7 @@ class DockerService {
               if (err) return reject(err);
               resolve(output);
             }
-            function onProgress(event) {
+            function onProgress(_event) {
               // Can log progress
             }
           });

@@ -1,8 +1,6 @@
 import fileManagerService from './filemanager.service.js';
 import { success, error } from '../../helpers/response.js';
 import { createReadStream } from 'fs';
-import { join } from 'path';
-import logger from '../../config/logger.js';
 
 class FileManagerController {
   async list(req, res) {

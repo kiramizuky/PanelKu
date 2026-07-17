@@ -6,7 +6,6 @@
  * Record Types: A, AAAA, CNAME, TXT, MX, NS, SRV, CAA
  */
 
-import logger from '../../config/logger.js';
 import Setting from '../../models/Setting.js';
 
 class DnsService {

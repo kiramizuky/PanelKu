@@ -43,7 +43,7 @@ const CronPage = (() => {
   }
 
   function renderTasks(tasks) {
-    const tbody = document.getElementById('cronTableBody');
+    const _tbody = document.getElementById('cronTableBody');
     LP.paginate(tasks, 10, 'cronTableBody', 'cronPagination', t => `
       <tr>
         <td class="font-mono"><strong>${LP.escHtml(t.name)}</strong></td>

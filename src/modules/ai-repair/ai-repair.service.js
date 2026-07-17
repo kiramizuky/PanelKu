@@ -12,17 +12,14 @@
  *   - AI-powered incident response
  */
 
-import { exec, execFile } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
-import path from 'path';
 import fs from 'fs/promises';
 import logger from '../../config/logger.js';
 import Setting from '../../models/Setting.js';
 import Notification from '../../models/Notification.js';
-import alertsService from '../alerts/alerts.service.js';
 
 const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
 
 // ── Known fix patterns ─────────────────────────────────────────────
 const FIX_PATTERNS = {
@@ -235,7 +232,7 @@ class AIRepairService {
   //  LOG ANALYSIS
   // ═══════════════════════════════════════════════════════════════
 
-  async analyzeLog(logText, logType = 'system', maxLines = 200) {
+  async analyzeLog(logText, _logType = 'system', maxLines = 200) {
     const lines = logText.split('\n').filter(Boolean).slice(0, maxLines);
     const logSnippet = lines.join('\n');
 

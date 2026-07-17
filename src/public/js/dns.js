@@ -126,7 +126,7 @@ const DNSPage = {
 
   async loadRecords() {
     if (!this.activeProvider || !this.activeZoneId) return;
-    const tbody = document.getElementById('recordsTableBody');
+    const _tbody = document.getElementById('recordsTableBody');
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);"><div class="spinner-border spinner-border-sm me-1"></div>Loading records...</td></tr>';
 
     try {
@@ -143,7 +143,7 @@ const DNSPage = {
   },
 
   renderRecords() {
-    const tbody = document.getElementById('recordsTableBody');
+    const _tbody = document.getElementById('recordsTableBody');
     LP.paginate(this.records, 10, 'recordsTableBody', 'dnsPagination', r => `
       <tr>
         <td><span class="lp-badge lp-badge-info" style="font-size:10px;font-family:monospace;">${r.type}</span></td>
@@ -163,7 +163,7 @@ const DNSPage = {
     const filtered = this.records.filter(r =>
       r.name.toLowerCase().includes(q) || r.type.toLowerCase().includes(q) || (r.content || '').toLowerCase().includes(q)
     );
-    const tbody = document.getElementById('recordsTableBody');
+    const _tbody = document.getElementById('recordsTableBody');
     LP.paginate(filtered, 10, 'recordsTableBody', 'dnsPagination', r => `
       <tr>
         <td><span class="lp-badge lp-badge-info" style="font-size:10px;font-family:monospace;">${r.type}</span></td>

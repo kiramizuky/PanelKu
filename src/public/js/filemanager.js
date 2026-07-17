@@ -7,7 +7,7 @@ const FMPage = (() => {
   let currentPath = '/';
   let selectedItem = null;
   let viewMode = localStorage.getItem('lp_fm_view') || 'grid';
-  let clipboard = null;
+  let _clipboard = null;
 
   const FILE_ICONS = {
     dir: '📁',
@@ -185,7 +185,7 @@ const FMPage = (() => {
   async function bulkCompress() {
     const paths = getSelectedPaths();
     if (paths.length === 0) return;
-    const output = currentPath + '/archive-' + Date.now() + '.zip';
+    const _output = currentPath + '/archive-' + Date.now() + '.zip';
     
     LP.toast('Compressing files...', 'info');
     
@@ -463,7 +463,7 @@ const FMPage = (() => {
     const confirmed = await LP.confirm(`Delete <strong>${escHtml(selectedItem.name)}</strong>?<br><small class="text-danger">This action cannot be undone.</small>`, 'Delete File');
     if (!confirmed) return;
 
-    const res = await LP.del('/filemanager/delete', {
+    const _res = await LP.del('/filemanager/delete', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${LP.state.accessToken}` },
       body: JSON.stringify({ path: selectedItem.path }),

@@ -77,7 +77,7 @@ function populateRole(user) {
 
 const User = {
   // findById
-  async findById(id, _select) {
+  async findById(id) {
     const db  = getDb();
     const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     const user = rowToUser(row);
@@ -126,7 +126,7 @@ const User = {
     return rows.map(r => populateRole(rowToUser(r)));
   },
 
-  async countDocuments(filter = {}) {
+  async countDocuments(_filter = {}) {
     const db = getDb();
     const row = db.prepare('SELECT COUNT(*) as c FROM users').get();
     return row.c;

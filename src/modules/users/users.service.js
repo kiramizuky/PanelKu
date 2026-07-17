@@ -1,8 +1,6 @@
 import userRepository from '../../repositories/user.repository.js';
 import roleRepository from '../../repositories/role.repository.js';
-import permissionManager from '../../core/permissions/PermissionManager.js';
 import { generateApiKey } from '../../helpers/crypto.js';
-import { toSlug } from '../../helpers/validate.js';
 import eventBus, { EVENTS } from '../../core/events/EventBus.js';
 import bcrypt from 'bcryptjs';
 import { getDb } from '../../core/db/sqlite.js';
@@ -54,7 +52,7 @@ class UsersService {
   }
 
   async update(id, data) {
-    const { password, role: roleName, status, ...rest } = data;
+    const { password: _password, role: roleName, status, ...rest } = data;
     const db = getDb();
 
     const user = await userRepository.findById(id);

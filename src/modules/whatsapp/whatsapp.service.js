@@ -6,7 +6,7 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import path from 'path';
 import fs from 'fs/promises';
-import { existsSync, mkdirSync } from 'fs';
+import { mkdirSync } from 'fs';
 import pino from 'pino';
 import axios from 'axios';
 import WhatsappSession from '../../models/WhatsappSession.js';
@@ -152,7 +152,7 @@ class WhatsappService {
     const formattedTo = to.includes('@s.whatsapp.net') ? to : `${to}@s.whatsapp.net`;
 
     if (mediaUrl) {
-      const options = {};
+      const _options = {};
       if (mediaType === 'image') {
         return await sock.sendMessage(formattedTo, { image: { url: mediaUrl }, caption: text });
       } else if (mediaType === 'video') {

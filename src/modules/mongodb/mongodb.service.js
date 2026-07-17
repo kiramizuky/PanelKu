@@ -2,7 +2,6 @@ import { execFile, exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
-import logger from '../../config/logger.js';
 
 const execFileAsync = promisify(execFile);
 const execAsync = promisify(exec);
@@ -21,7 +20,7 @@ function validateName(name) {
 /**
  * Sanitize a MongoDB connection URI — only allow safe characters.
  */
-function validateMongoUri(uri) {
+function _validateMongoUri(uri) {
   if (!uri) return '';
   if (typeof uri !== 'string') throw new Error('Invalid connection URI');
   // Allow mongodb:// or mongodb+srv:// URIs

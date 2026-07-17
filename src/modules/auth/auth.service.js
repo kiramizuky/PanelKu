@@ -4,8 +4,6 @@ import qrcode from 'qrcode';
 import appConfig from '../../config/app.js';
 import userRepository from '../../repositories/user.repository.js';
 import sessionRepository from '../../repositories/session.repository.js';
-import roleRepository from '../../repositories/role.repository.js';
-import { generateToken } from '../../helpers/crypto.js';
 import { getDeviceInfo } from '../../helpers/system.js';
 import eventBus, { EVENTS } from '../../core/events/EventBus.js';
 import logger from '../../config/logger.js';

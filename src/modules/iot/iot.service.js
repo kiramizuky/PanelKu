@@ -126,7 +126,7 @@ class IotService {
 
   async getMqttTopics() {
     try {
-      const { stdout } = await execAsync("mosquitto_sub -t '$SYS/broker/#'' -C 1 -W 1 2>/dev/null; echo ''");
+      const { stdout: _stdout } = await execAsync("mosquitto_sub -t '$SYS/broker/#'' -C 1 -W 1 2>/dev/null; echo ''");
       return { topics: [] };
     } catch { return { topics: [] }; }
   }

@@ -111,8 +111,7 @@ class AnalyticsService {
     const loadData = load.value || {};
     const ioData = diskIO.value || {};
 
-    const primaryDisk = diskData[0] || {};
-
+    
     return {
       cpu: {
         usage: Math.round(cpuData.currentLoad || 0),
@@ -189,7 +188,7 @@ class AnalyticsService {
 
     // Fallback: try journalctl
     try {
-      const priority = type === 'auth' ? 'auth' : 'sys';
+      const _priority = type === 'auth' ? 'auth' : 'sys';
       const { stdout } = await execAsync(
         `journalctl -n ${Math.min(lines, 200)} --no-pager -p info 2>/dev/null | tail -${Math.min(lines, 200)} || echo ""`,
         { timeout: 10000 }
@@ -259,7 +258,7 @@ class AnalyticsService {
   /**
    * Parse log lines into structured format.
    */
-  _parseLogLines(rawLines, type) {
+  _parseLogLines(rawLines, _type) {
     return rawLines.map(line => {
       const timestamp = line.match(/^\w{3}\s+\d+\s+\d+:\d+:\d+/)?.[0] || '';
       const level = line.toLowerCase().includes('error') ? 'error'
@@ -317,7 +316,7 @@ class AnalyticsService {
       const enriched = await Promise.all(
         important.slice(0, 20).map(async svc => {
           try {
-            const pidMatch = svc.name.match(/\.service$/);
+            const _pidMatch = svc.name.match(/\.service$/);
             const svcName = svc.name.replace('.service', '');
             const { stdout: psOut } = await execAsync(
               `ps aux | grep -E "${svcName}" | grep -v grep | head -3 2>/dev/null || echo ""`,

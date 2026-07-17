@@ -56,7 +56,7 @@ const Website = {
     return rows.map(rowToWebsite);
   },
 
-  async countDocuments(filter = {}) {
+  async countDocuments(_filter = {}) {
     const db = getDb();
     return db.prepare('SELECT COUNT(*) as c FROM websites').get().c;
   },
@@ -88,7 +88,7 @@ const Website = {
     return this.findById(id);
   },
 
-  async findByIdAndUpdate(id, update, options = {}) {
+  async findByIdAndUpdate(id, update, _options = {}) {
     const db = getDb();
     const ts = now();
     const existing = await this.findById(id);

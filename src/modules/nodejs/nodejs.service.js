@@ -22,7 +22,7 @@ const NVM_DIR_CANDIDATES = [
  * Safe shell command runner with validated args.
  * Prevents shell injection by using execFile with args array.
  */
-async function runCmd(cmd, args = [], opts = {}) {
+async function _runCmd(cmd, args = [], opts = {}) {
   if (process.platform === 'win32') {
     return { stdout: '', stderr: '' };
   }
@@ -188,7 +188,7 @@ class NodeJSService {
     let currentVersion = 'Not found';
     let defaultVersion = 'Not set';
     let installedVersions = [];
-    let remoteVersions = [];
+    let _remoteVersions = [];
 
     try {
       const { stdout } = await execAsync('node --version 2>/dev/null || echo "Not found"');

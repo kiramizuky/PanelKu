@@ -23,7 +23,7 @@ function spawnPromise(cmd, args, opts = {}) {
 
 function execAsync(cmd, opts = {}) {
   return new Promise((resolve, reject) => {
-    const child = exec(cmd, { ...opts, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    const _child = exec(cmd, { ...opts, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) reject(new Error(stderr || err.message));
       else resolve(stdout);
     });

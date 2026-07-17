@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { join } from 'path';
 import fileManagerController from './filemanager.controller.js';
 import { authenticate } from '../../middleware/auth.js';
 import { rbac } from '../../middleware/rbac.js';

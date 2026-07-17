@@ -42,7 +42,7 @@ const AutoHealPage = {
       if (!res?.success) throw new Error(res?.message);
 
       const services = res.data?.status || [];
-      let healthy = 0, warning = 0, critical = 0, disabled = 0;
+      let healthy = 0, warning = 0, critical = 0, _disabled = 0;
 
       services.forEach(s => {
         if (s.status === 'healthy' || s.status === 'running') healthy++;
@@ -250,7 +250,7 @@ const AutoHealPage = {
   async checkService(serviceName) {
     LP.toast(`Checking ${serviceName}...`, 'info');
     try {
-      const statusEl = document.querySelector(`[onclick*="healService('${serviceName}')"]`)?.closest('.d-flex');
+      const _statusEl = document.querySelector(`[onclick*="healService('${serviceName}')"]`)?.closest('.d-flex');
       const res = await LP.get('/autoheal/status');
       const svc = res.data?.status?.find(s => s.serviceName === serviceName || s.name === serviceName);
       if (svc) {

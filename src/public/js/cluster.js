@@ -296,7 +296,7 @@ const ClusterPage = (() => {
     try {
       const res = await LP.get(`/cluster/nodes/${id}/metrics`);
       if (res?.success) {
-        const node = { id, status: 'online' };
+        const _node = { id, status: 'online' };
         await fetchAndRenderMetrics({ id, status: 'online' });
         LP.toast('Metrics diperbarui', 'success');
       } else {

@@ -1,6 +1,5 @@
 import Redis from 'ioredis';
 import redisConfig from '../../config/redis.js';
-import logger from '../../config/logger.js';
 
 class RedisService {
   constructor() {

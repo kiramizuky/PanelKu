@@ -108,7 +108,7 @@ Jika CPU terus-menerus mendekati 100%, Anda dapat membatasi resource CPU kontain
 3. Masuk ke terminal kontainer secara instan menggunakan tombol *Terminal Console* di baris kontainer.`;
       } else if (context.logType === 'fail2ban' || msg.includes('fail2ban') || msg.includes('blokir') || msg.includes('intrusion') || msg.includes('ban')) {
         // Fail2Ban log analysis
-        const logSnippet = (context.logText || '').slice(0, 800);
+        const _logSnippet = (context.logText || '').slice(0, 800);
         const bannedIps = (context.logText || '').match(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/g) || [];
         const uniqueIps = [...new Set(bannedIps)].slice(0, 5);
         response = `**Analisis Log Fail2Ban:**

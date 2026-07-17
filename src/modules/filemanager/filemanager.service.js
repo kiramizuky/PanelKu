@@ -1,6 +1,6 @@
 import { readdir, stat, rename, rm, mkdir, copyFile, writeFile, readFile } from 'fs/promises';
 import { createReadStream, createWriteStream } from 'fs';
-import { join, resolve, resolve as resolveUnzip, basename, extname, dirname, sep } from 'path';
+import { join, resolve, resolve as resolveUnzip, basename, dirname, sep } from 'path';
 import archiver from 'archiver';
 import unzipper from 'unzipper';
 import logger from '../../config/logger.js';
