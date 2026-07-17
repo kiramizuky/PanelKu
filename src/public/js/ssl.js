@@ -24,8 +24,8 @@ const SSLPage = {
           const daysLeft = Math.ceil((new Date(c.expiresAt) - Date.now()) / 86400000);
           return `
             <tr>
-              <td style="font-weight:500;">${c.domain}</td>
-              <td><span class="lp-badge lp-badge-primary">${c.provider}</span></td>
+              <td style="font-weight:500;">${LP.escHtml(c.domain)}</td>
+              <td><span class="lp-badge lp-badge-primary">${LP.escHtml(c.provider)}</span></td>
               <td>${new Date(c.expiresAt).toLocaleDateString()}</td>
               <td>
                 <span class="lp-badge ${isExpired ? 'lp-badge-danger' : daysLeft <= 14 ? 'lp-badge-warning' : 'lp-badge-success'}">
@@ -34,7 +34,7 @@ const SSLPage = {
                 </span>
               </td>
               <td style="text-align:right">
-                <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="SSLPage.renewCertificate('${c.id}')" style="color:var(--accent-info)" title="Renew">
+                <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SSLPage.renewCertificate', '${LP.encJsArg(c.id)}')" style="color:var(--accent-info)" title="Renew">
                   <i class="bi bi-arrow-repeat"></i>
                 </button>
               </td>

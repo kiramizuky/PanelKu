@@ -53,13 +53,13 @@ const DockerPage = (() => {
           <td style="font-size:12px;color:var(--text-muted)">${new Date(c.created * 1000).toLocaleString()}</td>
           <td style="text-align:right">
             ${isRunning 
-              ? `<button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.action('stop', '${c.id}')" title="Stop"><i class="bi bi-stop-fill text-danger"></i></button>
-                 <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.action('restart', '${c.id}')" title="Restart"><i class="bi bi-arrow-clockwise text-warning"></i></button>`
-              : `<button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.action('start', '${c.id}')" title="Start"><i class="bi bi-play-fill text-success"></i></button>`
+              ? `<button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('DockerPage.action', '${LP.encJsArg('stop')}', '${LP.encJsArg(c.id)}')" title="Stop"><i class="bi bi-stop-fill text-danger"></i></button>
+                 <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('DockerPage.action', '${LP.encJsArg('restart')}', '${LP.encJsArg(c.id)}')" title="Restart"><i class="bi bi-arrow-clockwise text-warning"></i></button>`
+              : `<button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('DockerPage.action', '${LP.encJsArg('start')}', '${LP.encJsArg(c.id)}')" title="Start"><i class="bi bi-play-fill text-success"></i></button>`
             }
-            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.viewLogs('${c.id}', '${c.names[0]}')" title="Logs"><i class="bi bi-justify-left"></i></button>
-            ${isRunning ? `<button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.viewConsole('${c.id}', '${c.names[0]}')" title="Terminal Console"><i class="bi bi-terminal"></i></button>` : ''}
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.action('delete', '${c.id}')" title="Delete"><i class="bi bi-trash"></i></button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('DockerPage.viewLogs', '${LP.encJsArg(c.id)}', '${LP.encJsArg(c.names[0])}')" title="Logs"><i class="bi bi-justify-left"></i></button>
+            ${isRunning ? `<button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('DockerPage.viewConsole', '${LP.encJsArg(c.id)}', '${LP.encJsArg(c.names[0])}')" title="Terminal Console"><i class="bi bi-terminal"></i></button>` : ''}
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DockerPage.action', '${LP.encJsArg('delete')}', '${LP.encJsArg(c.id)}')" title="Delete"><i class="bi bi-trash"></i></button>
           </td>
         </tr>
       `;
@@ -105,7 +105,7 @@ const DockerPage = (() => {
           <td style="font-size:12px">${LP.formatBytes(img.size)}</td>
           <td style="font-size:12px;color:var(--text-muted)">${new Date(img.created * 1000).toLocaleString()}</td>
           <td style="text-align:right">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.deleteImage('${img.id}', ${hasRunningContainers})" title="Delete"><i class="bi bi-trash"></i></button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DockerPage.deleteImage', '${LP.encJsArg(img.id)}', '${LP.encJsArg(hasRunningContainers)}')" title="Delete"><i class="bi bi-trash"></i></button>
           </td>
         </tr>
       `;
@@ -279,11 +279,11 @@ const DockerPage = (() => {
       resultsContainer.innerHTML = res.data.results.map(img => `
         <div style="padding:10px; border-bottom:1px solid var(--glass-border); display:flex; justify-content:space-between; align-items:center;">
           <div>
-            <div class="font-mono" style="font-weight:600; font-size:12px; color:var(--text-primary)">${img.name}</div>
-            <div style="font-size:10px; color:var(--text-muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${img.description || 'No description'}</div>
-            <div style="font-size:10px; color:var(--accent-info)">★ ${img.star_count} stars | Official: ${img.is_official ? 'Yes' : 'No'}</div>
+            <div class="font-mono" style="font-weight:600; font-size:12px; color:var(--text-primary)">${LP.escHtml(img.name)}</div>
+            <div style="font-size:10px; color:var(--text-muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${LP.escHtml(img.description || 'No description')}</div>
+            <div style="font-size:10px; color:var(--accent-info)">★ ${LP.escHtml(img.star_count)} stars | Official: ${img.is_official ? 'Yes' : 'No'}</div>
           </div>
-          <button class="btn-lp btn-lp-primary btn-lp-sm" style="padding: 2px 8px;" onclick="DockerPage.selectOnlineImage('${img.name}')">Select</button>
+          <button class="btn-lp btn-lp-primary btn-lp-sm" style="padding: 2px 8px;" onclick="LP.call('DockerPage.selectOnlineImage', '${LP.encJsArg(img.name)}')">Select</button>
         </div>
       `).join('');
     } else {

@@ -6,6 +6,8 @@ import { toSlug } from '../../helpers/validate.js';
 import eventBus, { EVENTS } from '../../core/events/EventBus.js';
 import bcrypt from 'bcryptjs';
 import { getDb } from '../../core/db/sqlite.js';
+import sessionRepository from '../../repositories/session.repository.js';
+import logger from '../../config/logger.js';
 
 class UsersService {
   async list(page = 1, limit = 20, search = '') {
@@ -81,6 +83,15 @@ class UsersService {
       rest.isActive = newActive;
     }
 
+    // [SECURITY] If deactivating user, invalidate all their sessions
+    if (rest.isActive === false) {
+      try {
+        await sessionRepository.deactivateAll(id);
+      } catch (e) {
+        logger.error('Failed to deactivate sessions for user ' + id + ': ' + e.message);
+      }
+    }
+
     const updatedUser = await userRepository.updateById(id, rest);
     if (!updatedUser) throw Object.assign(new Error('User not found'), { statusCode: 404 });
 
@@ -100,6 +111,13 @@ class UsersService {
     db.prepare('UPDATE users SET password = ?, updated_at = ? WHERE id = ?').run(
       hashed, new Date().toISOString(), id
     );
+
+    // [SECURITY] Invalidate all sessions so attacker can't use stolen refresh tokens
+    try {
+      await sessionRepository.deactivateAll(id);
+    } catch (e) {
+      logger.error('Failed to deactivate sessions after password change: ' + e.message);
+    }
   }
 
   async delete(id, requestingUserId) {
@@ -149,7 +167,18 @@ class UsersService {
       }
     }
 
-    return userRepository.updateById(id, { isActive: newActive });
+    const updatedUser = await userRepository.updateById(id, { isActive: newActive });
+
+    // [SECURITY] If deactivating user, invalidate all their sessions
+    if (!newActive && updatedUser) {
+      try {
+        await sessionRepository.deactivateAll(id);
+      } catch (e) {
+        logger.error('Failed to deactivate sessions for user ' + id + ': ' + e.message);
+      }
+    }
+
+    return updatedUser;
   }
 
   async regenerateApiKey(userId) {

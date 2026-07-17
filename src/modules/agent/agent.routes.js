@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.js';
+import { rbac } from '../../middleware/rbac.js';
+import { RESOURCES, ACTIONS } from '../../config/constants.js';
 import dashboardService from '../dashboard/dashboard.service.js';
 import { success, error } from '../../helpers/response.js';
 import appConfig from '../../config/app.js';
@@ -9,13 +11,14 @@ import logger from '../../config/logger.js';
  * Agent API — Endpoints specifically exposed for Cluster Node remote access.
  *
  * Authentication: X-API-Key header only.
- * Does NOT require RBAC — any valid user with an active API key can access.
- * This is intentional: the API key owner controls what master panels can see.
+ * Requires SYSTEM:READ permission (or super_admin bypass).
+ * This ensures a read_only user with an API key cannot access agent endpoints.
  */
 const router = Router();
 
 // All agent routes require API key auth
 router.use(authenticate);
+router.use(rbac(RESOURCES.SYSTEM, ACTIONS.READ));
 
 /**
  * GET /api/agent/health

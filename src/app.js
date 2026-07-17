@@ -42,19 +42,45 @@ const createApp = () => {
       useDefaults: true,
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'cdn.socket.io', 'static.cloudflareinsights.com'],
+        // [HARDEN] Removed 'unsafe-eval' — no eval/new Function used in codebase
+        scriptSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'cdn.socket.io', 'static.cloudflareinsights.com'],
+        // script-src-attr must include 'unsafe-inline' because LP.call() pattern
+        // renders inline onclick="LP.call(...)" attributes via innerHTML.
+        // helmet's default is 'none', which would block all inline event handlers,
+        // so we must explicitly set it here despite the CSP weakness.
         scriptSrcAttr: ["'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'fonts.googleapis.com'],
         fontSrc: ["'self'", 'fonts.gstatic.com', 'cdn.jsdelivr.net'],
         imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'", 'ws:', 'wss:', 'cdn.jsdelivr.net', 'cdn.socket.io', 'static.cloudflareinsights.com'],
+        // [HARDEN] Restrict form submissions to same origin
+        formAction: ["'self'"],
+        // [HARDEN] Restrict base URI to prevent base tag injection
+        baseUri: ["'self'"],
+        // [HARDEN] Prevent clickjacking — frame-ancestors 'none' is stricter than X-Frame-Options
+        frameAncestors: ["'none'"],
         upgradeInsecureRequests: null,
+      },
+    },
+    // [HARDEN] Restrict browser feature access
+    permissionsPolicy: {
+      permissions: {
+        camera: [],
+        microphone: [],
+        geolocation: [],
+        notifications: [],
+        payment: [],
+        usb: [],
+        'display-capture': [],
+        'clipboard-read': [],
+        'clipboard-write': ["'self'"],
       },
     },
   }));
 
+  // [HARDEN] CORS — single explicit origin even in dev mode (no more origin:true)
   app.use(cors({
-    origin: appConfig.isDev ? true : appConfig.appUrl,
+    origin: appConfig.appUrl,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],

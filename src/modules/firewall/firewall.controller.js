@@ -7,7 +7,7 @@ class FirewallController {
       const status = await firewallService.getStatus();
       return success(res, status);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Internal server error', 500);
     }
   }
 
@@ -21,14 +21,14 @@ class FirewallController {
       }
       return success(res, null, `Firewall ${enable ? 'enabled' : 'disabled'} successfully`);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Internal server error', 500);
     }
   }
 
   async addRule(req, res) {
     try {
       const { port, protocol, action } = req.body;
-      if (!port) return errorResponse(res, new Error('Port is required'), 400);
+      if (!port) return errorResponse(res, 'Port is required', 400);
 
       await firewallService.addRule(port, protocol || 'tcp', action || 'allow');
       return success(res, null, 'Firewall rule added successfully');
@@ -43,7 +43,7 @@ class FirewallController {
       await firewallService.deleteRule(id);
       return success(res, null, 'Firewall rule deleted successfully');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Internal server error', 500);
     }
   }
 }

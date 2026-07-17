@@ -16,16 +16,16 @@ const WAFPage = {
 
         LP.paginate(rules, 10, 'wafTableBody', 'wafPagination', r => `
           <tr>
-            <td style="font-weight:500;text-transform:uppercase;">${r.type.replace('_', ' ')}</td>
-            <td><span class="lp-badge lp-badge-primary" style="font-family:var(--font-mono);">${r.value}</span></td>
+            <td style="font-weight:500;text-transform:uppercase;">${LP.escHtml(r.type.replace('_', ' '))}</td>
+            <td><span class="lp-badge lp-badge-primary" style="font-family:var(--font-mono);">${LP.escHtml(r.value)}</span></td>
             <td>
               <span class="lp-badge ${r.action === 'allow' ? 'lp-badge-success' : 'lp-badge-danger'}">
-                ${r.action}
+                ${LP.escHtml(r.action)}
               </span>
             </td>
-            <td style="color:var(--text-secondary);font-size:12px;">${r.description || '-'}</td>
+            <td style="color:var(--text-secondary);font-size:12px;">${LP.escHtml(r.description || '-')}</td>
             <td style="text-align:right">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WAFPage.deleteRule('${r._id}')" style="color:var(--accent-danger)">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WAFPage.deleteRule', '${LP.encJsArg(r._id)}')" style="color:var(--accent-danger)">
                 <i class="bi bi-trash"></i> Delete
               </button>
             </td>
@@ -136,7 +136,7 @@ const WAFPage = {
                 <small class="text-info d-block" style="font-size:11px; margin-top:2px;"><i class="bi bi-lightbulb"></i> Recommendation: ${issue.recommendation}</small>
               </div>
               ${issue.fixable ? `
-                <button class="btn-lp btn-lp-primary btn-lp-sm" style="font-size:11px; padding:4px 8px; height: 28px;" onclick="WAFPage.fixIssue('${issue.id}')"><i class="bi bi-wrench"></i> Fix</button>
+                <button class="btn-lp btn-lp-primary btn-lp-sm" style="font-size:11px; padding:4px 8px; height: 28px;" onclick="LP.call('WAFPage.fixIssue', '${LP.encJsArg(issue.id)}')"><i class="bi bi-wrench"></i> Fix</button>
               ` : ''}
             </div>
           `).join('');

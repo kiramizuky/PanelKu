@@ -18,12 +18,12 @@ const BackupPage = (() => {
     const tbody = document.getElementById('backupTableBody');
     LP.paginate(backups, 10, 'backupTableBody', 'backupPagination', b => `
       <tr>
-        <td class="font-mono"><strong>${b.name}</strong></td>
+        <td class="font-mono"><strong>${LP.escHtml(b.name)}</strong></td>
         <td>${LP.formatBytes(b.size)}</td>
         <td>${new Date(b.created).toLocaleString()}</td>
         <td style="text-align:right">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="BackupPage.showRestoreModal('${b.name}')" title="Restore Backup"><i class="bi bi-clock-history"></i></button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="BackupPage.deleteBackup('${b.name}')"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="LP.call('BackupPage.showRestoreModal', '${LP.encJsArg(b.name)}')" title="Restore Backup"><i class="bi bi-clock-history"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('BackupPage.deleteBackup', '${LP.encJsArg(b.name)}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No backups found', 4);

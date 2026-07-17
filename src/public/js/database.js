@@ -88,10 +88,10 @@ const DatabasePage = (() => {
     }
     LP.paginate(dbs, 10, 'mysqlTableBody', 'mysqlPagination', db => `
       <tr>
-        <td class="font-mono"><strong>${db}</strong></td>
+        <td class="font-mono"><strong>${LP.escHtml(db)}</strong></td>
         <td style="text-align:right">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DatabasePage.openExplorer('mysql', '${db}')" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DatabasePage.deleteDb('mysql', '${db}')"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="LP.call('DatabasePage.openExplorer', '${LP.encJsArg('mysql')}', '${LP.encJsArg(db)}')" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DatabasePage.deleteDb', '${LP.encJsArg('mysql')}', '${LP.encJsArg(db)}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No MySQL databases found', 2);
@@ -108,10 +108,10 @@ const DatabasePage = (() => {
     }
     LP.paginate(dbs, 10, 'postgresTableBody', 'postgresPagination', db => `
       <tr>
-        <td class="font-mono"><strong>${db}</strong></td>
+        <td class="font-mono"><strong>${LP.escHtml(db)}</strong></td>
         <td style="text-align:right">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DatabasePage.openExplorer('postgres', '${db}')" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DatabasePage.deleteDb('postgres', '${db}')"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="LP.call('DatabasePage.openExplorer', '${LP.encJsArg('postgres')}', '${LP.encJsArg(db)}')" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DatabasePage.deleteDb', '${LP.encJsArg('postgres')}', '${LP.encJsArg(db)}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No PostgreSQL databases found', 2);
@@ -121,10 +121,10 @@ const DatabasePage = (() => {
     const tbody = document.getElementById('sqliteTableBody');
     LP.paginate(dbs, 10, 'sqliteTableBody', 'sqlitePagination', db => `
       <tr>
-        <td class="font-mono"><strong>${db}</strong></td>
+        <td class="font-mono"><strong>${LP.escHtml(db)}</strong></td>
         <td style="text-align:right">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DatabasePage.openExplorer('sqlite', '${db}')" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DatabasePage.deleteDb('sqlite', '${db}')"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="LP.call('DatabasePage.openExplorer', '${LP.encJsArg('sqlite')}', '${LP.encJsArg(db)}')" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DatabasePage.deleteDb', '${LP.encJsArg('sqlite')}', '${LP.encJsArg(db)}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No SQLite databases found', 2);
@@ -204,8 +204,8 @@ const DatabasePage = (() => {
           listEl.innerHTML = '<p class="text-muted" style="font-size:12px;">No tables found</p>';
         } else {
           listEl.innerHTML = res.data.tables.map(tbl => `
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-start w-100 mb-1" style="padding: 4px 8px; font-size:12px;" onclick="DatabasePage.loadTablePreview('${tbl}')">
-              <i class="bi bi-table text-info me-1"></i> ${tbl}
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-start w-100 mb-1" style="padding: 4px 8px; font-size:12px;" onclick="LP.call('DatabasePage.loadTablePreview', '${LP.encJsArg(tbl)}')">
+              <i class="bi bi-table text-info me-1"></i> ${LP.escHtml(tbl)}
             </button>
           `).join('');
         }

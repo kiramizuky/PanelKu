@@ -44,19 +44,19 @@ const UsersPage = (() => {
             : '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">Inactive</span>';
 
           const toggleBtn = u.status === 'active'
-            ? `<button class="btn-lp btn-lp-ghost text-warning" onclick="UsersPage.toggleStatus('${u._id}', 'inactive')" title="Deactivate"><i class="bi bi-pause-circle"></i></button>`
-            : `<button class="btn-lp btn-lp-ghost text-success" onclick="UsersPage.toggleStatus('${u._id}', 'active')" title="Activate"><i class="bi bi-play-circle"></i></button>`;
+            ? `<button class="btn-lp btn-lp-ghost text-warning" onclick="LP.call('UsersPage.toggleStatus', '${LP.encJsArg(u._id)}', '${LP.encJsArg('inactive')}')" title="Deactivate"><i class="bi bi-pause-circle"></i></button>`
+            : `<button class="btn-lp btn-lp-ghost text-success" onclick="LP.call('UsersPage.toggleStatus', '${LP.encJsArg(u._id)}', '${LP.encJsArg('active')}')" title="Activate"><i class="bi bi-play-circle"></i></button>`;
 
           return `
             <tr>
-              <td>${u.username}</td>
-              <td>${u.email}</td>
-              <td><span style="text-transform:uppercase;font-size:12px;font-weight:600;color:var(--accent-primary)">${u.role?.name || '-'}</span></td>
+              <td>${LP.escHtml(u.username)}</td>
+              <td>${LP.escHtml(u.email)}</td>
+              <td><span style="text-transform:uppercase;font-size:12px;font-weight:600;color:var(--accent-primary)">${LP.escHtml(u.role?.name || '-')}</span></td>
               <td>${statusBadge}</td>
               <td class="text-end" style="white-space:nowrap">
                 ${toggleBtn}
-                <button class="btn-lp btn-lp-ghost text-primary" onclick="UsersPage.editUser('${u._id}')" title="Edit"><i class="bi bi-pencil"></i></button>
-                <button class="btn-lp btn-lp-ghost text-danger" onclick="UsersPage.deleteUser('${u._id}')" title="Delete"><i class="bi bi-trash"></i></button>
+                <button class="btn-lp btn-lp-ghost text-primary" onclick="LP.call('UsersPage.editUser', '${LP.encJsArg(u._id)}')" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn-lp btn-lp-ghost text-danger" onclick="LP.call('UsersPage.deleteUser', '${LP.encJsArg(u._id)}')" title="Delete"><i class="bi bi-trash"></i></button>
               </td>
             </tr>
           `;

@@ -77,18 +77,18 @@ const RolesPage = (() => {
       }
 
       tbody.innerHTML = roles.map(r => {
-        const editBtn = `<button class="btn-lp btn-lp-ghost text-primary" onclick="RolesPage.editRole('${r._id}')" title="Edit"><i class="bi bi-pencil"></i></button>`;
+        const editBtn = `<button class="btn-lp btn-lp-ghost text-primary" onclick="LP.call('RolesPage.editRole', '${LP.encJsArg(r._id)}')" title="Edit"><i class="bi bi-pencil"></i></button>`;
         const delBtn = r.isSystem 
           ? `<button class="btn-lp btn-lp-ghost text-muted" disabled title="System Role"><i class="bi bi-trash"></i></button>`
-          : `<button class="btn-lp btn-lp-ghost text-danger" onclick="RolesPage.deleteRole('${r._id}')" title="Delete"><i class="bi bi-trash"></i></button>`;
+          : `<button class="btn-lp btn-lp-ghost text-danger" onclick="LP.call('RolesPage.deleteRole', '${LP.encJsArg(r._id)}')" title="Delete"><i class="bi bi-trash"></i></button>`;
 
         return `
           <tr>
             <td>
-              <span style="font-weight:600;color:var(--text-primary)">${r.name}</span>
+              <span style="font-weight:600;color:var(--text-primary)">${LP.escHtml(r.name)}</span>
               ${r.isSystem ? '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 ms-2">System</span>' : ''}
             </td>
-            <td><span class="text-muted" style="font-size:13px">${r.description || '-'}</span></td>
+            <td><span class="text-muted" style="font-size:13px">${LP.escHtml(r.description || '-')}</span></td>
             <td class="text-end" style="white-space:nowrap">
               ${editBtn}
               ${delBtn}

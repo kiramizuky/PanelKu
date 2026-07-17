@@ -68,21 +68,21 @@ const SystemPage = {
 
         tbody.innerHTML = services.map(svc => `
           <tr>
-            <td style="font-weight:500;">${svc}</td>
+            <td style="font-weight:500;">${LP.escHtml(svc)}</td>
             <td>
               <span class="lp-badge ${statuses[svc] ? 'lp-badge-success' : 'lp-badge-danger'}">
                 ${statuses[svc] ? 'Running' : 'Stopped'}
               </span>
             </td>
             <td style="text-align:right">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="SystemPage.manageService('${svc}', 'restart')" style="color:var(--accent-info)">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('restart')}')" style="color:var(--accent-info)">
                 <i class="bi bi-arrow-repeat"></i> Restart
               </button>
               ${statuses[svc] ? `
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="SystemPage.manageService('${svc}', 'stop')" style="color:var(--accent-danger)">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('stop')}')" style="color:var(--accent-danger)">
                 <i class="bi bi-stop-circle"></i> Stop
               </button>` : `
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="SystemPage.manageService('${svc}', 'start')" style="color:var(--accent-success)">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('start')}')" style="color:var(--accent-success)">
                 <i class="bi bi-play-circle"></i> Start
               </button>`}
             </td>
@@ -177,10 +177,10 @@ const SystemPage = {
         }
         tbody.innerHTML = keys.map(k => `
           <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); height:36px; vertical-align:middle;">
-            <td style="font-family:monospace; color:var(--accent-info); font-size:11px;">${k.type}</td>
-            <td style="word-break:break-all; font-size:11px; padding-right:10px;" title="${k.key.substring(0,30)}...">${k.comment}</td>
+            <td style="font-family:monospace; color:var(--accent-info); font-size:11px;">${LP.escHtml(k.type)}</td>
+            <td style="word-break:break-all; font-size:11px; padding-right:10px;" title="${LP.escHtml(k.key.substring(0,30))}...">${LP.escHtml(k.comment)}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger p-0" onclick="SystemPage.deleteSshKey(${k.id})" title="Delete Key"><i class="bi bi-trash"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger p-0" onclick="LP.call('SystemPage.deleteSshKey', '${LP.encJsArg(k.id)}')" title="Delete Key"><i class="bi bi-trash"></i></button>
             </td>
           </tr>
         `).join('');

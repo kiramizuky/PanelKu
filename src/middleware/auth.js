@@ -19,11 +19,10 @@ export const authenticate = async (req, res, next) => {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.slice(7);
     }
-    // Check cookie
-    else if (req.cookies?.access_token) {
-      token = req.cookies.access_token;
-    }
-    // Check X-API-Key header
+    // [CSRF MITIGATION] access_token cookie fallback removed.
+    // Cookies are vulnerable to CSRF. All clients MUST use
+    // Authorization: Bearer <token> header for API authentication.
+    // Check X-API-Key header (only if no Bearer token — else-if preserves priority)
     else if (req.headers['x-api-key']) {
       return authenticateApiKey(req, res, next);
     }
@@ -84,13 +83,12 @@ const authenticateApiKey = (req, res, next) => {
 /**
  * Optional auth — attaches user if token present but doesn't block.
  * [LOW-4 FIX] Only suppress 401/auth errors, not server errors.
+ * [CSRF MITIGATION] Does NOT check cookies — only Authorization header.
  */
 export const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    const cookieToken = req.cookies?.access_token;
-    const hasToken = (authHeader && authHeader.startsWith('Bearer ')) || cookieToken;
-    if (hasToken) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
       await authenticate(req, res, () => {});
     }
   } catch {

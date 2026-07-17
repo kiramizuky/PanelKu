@@ -1,41 +1,78 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import util from 'util';
 import logger from '../../config/logger.js';
 
-const execAsync = util.promisify(exec);
+const execFileAsync = util.promisify(execFile);
 
 class FirewallService {
   /**
-   * Run a UFW command. Needs sudo privileges in real usage.
-   * Since this is a test environment on Windows, we mock it if ufw is not found.
+   * Run a UFW command using execFile (no shell interpreter).
+   * Uses sudo if not running as root.
    */
-  async runCommand(args) {
+  async sudo(args = []) {
+    const bin = process.getuid && process.getuid() === 0 ? 'ufw' : 'sudo';
+    const cmdArgs = process.getuid && process.getuid() === 0 ? args : ['ufw', ...args];
+
     try {
-      // In a real Linux environment, you would run 'sudo ufw ...'
-      // If we are on Windows or ufw is not installed, we fallback to mock data
-      const { stdout } = await execAsync(`ufw ${args}`);
+      const { stdout } = await execFileAsync(bin, cmdArgs, { timeout: 15000 });
       return stdout;
     } catch (error) {
-      if (process.platform === 'win32' || error.message.includes('not found')) {
-        logger.warn(`UFW not available. Mocking command: ufw ${args}`);
-        return this.mockUfw(args);
+      if (process.platform === 'win32' || (error.stderr && error.stderr.includes('not found'))) {
+        logger.warn(`UFW not available. Mocking command: ufw ${args.join(' ')}`);
+        return this.mockUfw(args.join(' '));
       }
       throw new Error(`Firewall error: ${error.stderr || error.message}`);
     }
   }
 
-  mockUfw(args) {
-    if (args.includes('status numbered')) {
+  mockUfw(argsStr) {
+    if (argsStr.includes('status numbered')) {
       return `Status: active\n\n     To                         Action      From\n     --                         ------      ----\n[ 1] 22/tcp                     ALLOW IN    Anywhere\n[ 2] 80/tcp                     ALLOW IN    Anywhere\n[ 3] 443/tcp                    ALLOW IN    Anywhere\n[ 4] 3000/tcp                   ALLOW IN    Anywhere\n`;
     }
-    if (args.includes('status')) return 'Status: active';
-    if (args.includes('enable')) return 'Firewall is active and enabled on system startup';
-    if (args.includes('disable')) return 'Firewall stopped and disabled on system startup';
+    if (argsStr.includes('status')) return 'Status: active';
+    if (argsStr.includes('enable')) return 'Firewall is active and enabled on system startup';
+    if (argsStr.includes('disable')) return 'Firewall stopped and disabled on system startup';
     return 'Rule added/deleted (mock)';
   }
 
+  /** Validate port number (1-65535) */
+  _validatePort(port) {
+    const num = Number(port);
+    if (!Number.isInteger(num) || num < 1 || num > 65535) {
+      throw new Error(`Invalid port: "${port}". Must be a number between 1-65535.`);
+    }
+    return num;
+  }
+
+  /** Validate protocol — only tcp or udp */
+  _validateProtocol(protocol) {
+    const p = (protocol || 'tcp').toLowerCase();
+    if (p !== 'tcp' && p !== 'udp') {
+      throw new Error(`Invalid protocol: "${protocol}". Must be "tcp" or "udp".`);
+    }
+    return p;
+  }
+
+  /** Validate UFW action — only allow/deny/reject/limit */
+  _validateAction(action) {
+    const a = (action || 'allow').toLowerCase();
+    if (!['allow', 'deny', 'reject', 'limit'].includes(a)) {
+      throw new Error(`Invalid action: "${action}". Must be "allow", "deny", "reject", or "limit".`);
+    }
+    return a;
+  }
+
+  /** Validate rule ID — must be a positive integer */
+  _validateRuleId(id) {
+    const num = Number(id);
+    if (!Number.isInteger(num) || num < 1) {
+      throw new Error(`Invalid rule ID: "${id}". Must be a positive number.`);
+    }
+    return String(num);
+  }
+
   async getStatus() {
-    const stdout = await this.runCommand('status numbered');
+    const stdout = await this.sudo(['status', 'numbered']);
     const isActive = stdout.includes('Status: active');
     const rules = [];
 
@@ -67,23 +104,26 @@ class FirewallService {
   }
 
   async enable() {
-    await this.runCommand('--force enable');
+    await this.sudo(['--force', 'enable']);
     return true;
   }
 
   async disable() {
-    await this.runCommand('disable');
+    await this.sudo(['disable']);
     return true;
   }
 
   async addRule(port, protocol = 'tcp', action = 'allow') {
-    const cmd = `${action} ${port}/${protocol}`;
-    await this.runCommand(cmd);
+    const safePort = this._validatePort(port);
+    const safeProtocol = this._validateProtocol(protocol);
+    const safeAction = this._validateAction(action);
+    await this.sudo([safeAction, `${safePort}/${safeProtocol}`]);
     return true;
   }
 
   async deleteRule(id) {
-    await this.runCommand(`--force delete ${id}`);
+    const safeId = this._validateRuleId(id);
+    await this.sudo(['--force', 'delete', safeId]);
     return true;
   }
 }

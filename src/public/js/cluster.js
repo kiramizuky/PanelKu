@@ -131,7 +131,7 @@ const ClusterPage = (() => {
 
           <!-- Header: name + status badge -->
           <div class="d-flex justify-content-between align-items-start mb-3">
-            <div onclick="ClusterPage.showDetails('${node.id}')" style="cursor:pointer;" title="Klik untuk melihat detail info node">
+            <div onclick="LP.call('ClusterPage.showDetails', '${LP.encJsArg(node.id)}')" style="cursor:pointer;" title="Klik untuk melihat detail info node">
               <h5 class="text-white text-hover-underline" style="font-weight:700; margin:0 0 3px 0; font-size:15px; text-decoration: underline dotted rgba(255,255,255,0.4);">${node.name}</h5>
               <span style="font-size:10px; color:var(--text-muted);">Agent Node <i class="bi bi-info-circle ms-1"></i></span>
             </div>
@@ -148,7 +148,7 @@ const ClusterPage = (() => {
               <span>${hostLabel}</span>
             </div>
             <div class="d-flex gap-1">
-              <button class="btn-lp btn-lp-ghost" onclick="ClusterPage.copyHost('${hostLabel}')" title="Copy host" style="width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:12px;">
+              <button class="btn-lp btn-lp-ghost" onclick="LP.call('ClusterPage.copyHost', '${LP.encJsArg(hostLabel)}')" title="Copy host" style="width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:12px;">
                 <i class="bi bi-clipboard"></i>
               </button>
               <a href="${nodeUrl}" target="_blank" class="btn-lp btn-lp-ghost" title="Buka di tab baru" style="width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:12px; text-decoration:none;">
@@ -167,7 +167,7 @@ const ClusterPage = (() => {
 
           <!-- Actions -->
           <div class="d-flex gap-2 pt-2" style="border-top:1px solid var(--glass-border);">
-            <button class="btn-lp btn-lp-ghost" onclick="ClusterPage.pingNode('${node.id}', this)"
+            <button class="btn-lp btn-lp-ghost" onclick="LP.call('ClusterPage.pingNode', '${LP.encJsArg(node.id)}', this)"
               style="flex:1; font-size:12px; height:34px; padding:0 10px; display:flex; align-items:center; justify-content:center; gap:5px; border-radius:8px;"
               title="Ping node">
               <i class="bi bi-arrow-repeat"></i><span>Ping</span>
@@ -177,12 +177,12 @@ const ClusterPage = (() => {
               title="Open Remote Terminal">
               <i class="bi bi-terminal"></i><span>Terminal</span>
             </a>
-            <button class="btn-lp btn-lp-ghost" onclick="ClusterPage.refreshMetrics('${node.id}')"
+            <button class="btn-lp btn-lp-ghost" onclick="LP.call('ClusterPage.refreshMetrics', '${LP.encJsArg(node.id)}')"
               style="flex:1; font-size:12px; height:34px; padding:0 10px; display:flex; align-items:center; justify-content:center; gap:5px; border-radius:8px;"
               title="Refresh metrics" ${!isOnline ? 'disabled' : ''}>
               <i class="bi bi-activity"></i><span>Metrics</span>
             </button>
-            <button class="btn-lp" onclick="ClusterPage.deleteNode('${node.id}')"
+            <button class="btn-lp" onclick="LP.call('ClusterPage.deleteNode', '${LP.encJsArg(node.id)}')"
               style="width:34px; height:34px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid rgba(239,68,68,0.3); background:rgba(239,68,68,0.08); color:#ef4444; font-size:13px; transition:all .2s;"
               onmouseover="this.style.background='rgba(239,68,68,0.2)'" onmouseout="this.style.background='rgba(239,68,68,0.08)'"
               title="Hapus node">

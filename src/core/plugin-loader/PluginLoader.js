@@ -4,6 +4,7 @@ import { pathToFileURL, parse as parseUrl } from 'url';
 import { Router } from 'express';
 import http from 'http';
 import https from 'https';
+import { isIP } from 'net';
 import logger from '../../config/logger.js';
 
 /**
@@ -50,7 +51,12 @@ class PluginLoader {
       const proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
       for (const [id, url] of Object.entries(proxies)) {
         if (url) {
-          this._proxies.set(id, url);
+          // [SECURITY FIX] Use setProxy() instead of direct _proxies.set() — ensures URL validation
+          try {
+            this.setProxy(id, url);
+          } catch (validationErr) {
+            logger.warn(`PluginLoader: skipping invalid proxy for plugin ${id}: ${validationErr.message}`);
+          }
         }
       }
     } catch (e) {
@@ -133,9 +139,68 @@ class PluginLoader {
     return this._plugins.has(name);
   }
 
+  /**
+   * Validate a proxy URL — only http/https, no private/internal IPs.
+   * Prevents SSRF attacks.
+   */
+  _validateProxyUrl(url) {
+    if (!url || typeof url !== 'string') throw new Error('Proxy URL is required');
+
+    let parsed;
+    try {
+      parsed = new URL(url.trim());
+    } catch {
+      throw new Error('Invalid proxy URL format');
+    }
+
+    // Only allow http and https protocols
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Proxy URL must use http or https protocol');
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block private/internal IPs (SSRF protection)
+    const blockedPatterns = [
+      // Loopback
+      'localhost', '127.0.0.1', '::1', '0.0.0.0',
+      // Cloud metadata endpoints
+      '169.254.169.254',
+      // Docker internal
+      'host.docker.internal',
+    ];
+
+    if (blockedPatterns.includes(hostname)) {
+      throw new Error('Proxy URL cannot point to localhost or internal services');
+    }
+
+    // Block private IP ranges
+    if (isIP(hostname)) {
+      const parts = hostname.split('.').map(Number);
+      if (parts.length === 4) {
+        // 10.0.0.0/8
+        if (parts[0] === 10) throw new Error('Proxy URL cannot point to private IP range');
+        // 172.16.0.0/12
+        if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) throw new Error('Proxy URL cannot point to private IP range');
+        // 192.168.0.0/16
+        if (parts[0] === 192 && parts[1] === 168) throw new Error('Proxy URL cannot point to private IP range');
+        // 100.64.0.0/10 (CGNAT)
+        if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) throw new Error('Proxy URL cannot point to CGNAT range');
+      }
+    }
+
+    return url.trim();
+  }
+
   setProxy(id, proxyUrl) {
     if (proxyUrl) {
-      this._proxies.set(id, proxyUrl.trim());
+      try {
+        const validated = this._validateProxyUrl(proxyUrl);
+        this._proxies.set(id, validated);
+      } catch (err) {
+        logger.warn(`PluginLoader: invalid proxy URL for plugin ${id}: ${err.message}`);
+        throw err;
+      }
     } else {
       this._proxies.delete(id);
     }
@@ -147,6 +212,7 @@ class PluginLoader {
 
   /**
    * Middleware to check and reverse-proxy requests targeting a proxied plugin.
+   * [SECURITY] Target URL is validated on setProxy() — only http/https, no private IPs.
    */
   handleProxy(req, res, next) {
     const match = req.originalUrl.match(/^\/(api\/)?plugins\/([^\/?#]+)/);
@@ -182,6 +248,7 @@ class PluginLoader {
         headers: {
           ...req.headers,
         },
+        // [SECURITY FIX] Set a timeout to prevent hanging connections
         timeout: 30000,
       };
 
@@ -199,7 +266,7 @@ class PluginLoader {
       proxyReq.on('error', (err) => {
         logger.error(`PluginLoader Proxy error for ${targetUrl}: ${err.message}`);
         if (!res.headersSent) {
-          res.status(502).send(`Bad Gateway: Failed to proxy request to plugin ${pluginId}. Error: ${err.message}`);
+          res.status(502).send(`Bad Gateway: Failed to proxy request to plugin ${pluginId}.`);
         }
       });
 
@@ -224,7 +291,7 @@ class PluginLoader {
       req.pipe(proxyReq);
     } catch (err) {
       logger.error(`PluginLoader Proxy initialization error: ${err.message}`);
-      res.status(500).send(`Internal Server Error: Proxy failed. ${err.message}`);
+      res.status(500).send(`Internal Server Error: Proxy failed.`);
     }
   }
 }

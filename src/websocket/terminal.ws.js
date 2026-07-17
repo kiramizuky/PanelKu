@@ -43,12 +43,18 @@ export const registerTerminalSocket = (namespace) => {
           const isSsl = !node.port || node.port === 443;
           const protocol = isSsl ? 'wss' : 'ws';
           const portStr = node.port ? `:${node.port}` : '';
-          const wsUrl = `${protocol}://${node.ip_address}${portStr}/api/agent/terminal/ws?apiKey=${node.api_key}&cols=${cols}&rows=${rows}&osUser=${osUser}&shell=${shell}`;
+          const safeOsUser = /^[a-zA-Z0-9_.-]{1,32}$/.test(osUser) ? osUser : 'root';
+          const safeShell = /^[a-zA-Z0-9_-]{1,32}$/.test(shell) ? shell : 'bash';
+          const wsUrl = `${protocol}://${node.ip_address}${portStr}/api/agent/terminal/ws?cols=${cols}&rows=${rows}&osUser=${safeOsUser}&shell=${safeShell}`;
 
-          logger.info(`Connecting terminal proxy to remote node: ${node.name} (${wsUrl})`);
+          // Log URL without API key to prevent credential leakage
+          logger.info(`Connecting terminal proxy to remote node: ${node.name}`);
           
           const agentWs = new WebSocket(wsUrl, {
-            rejectUnauthorized: false // Allow self-signed certs for nodes
+            rejectUnauthorized: false, // Allow self-signed certs for nodes
+            headers: {
+              'X-API-Key': node.api_key
+            }
           });
 
           let remoteSessionId = null;

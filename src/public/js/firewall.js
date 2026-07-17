@@ -97,16 +97,16 @@ const FirewallPage = {
   renderRules(rules) {
     LP.paginate(rules, 10, 'firewallTableBody', 'firewallPagination', r => `
       <tr>
-        <td><span style="font-family:var(--font-mono);color:var(--text-muted)">[${r.id}]</span></td>
-        <td><span class="lp-badge lp-badge-primary" style="font-size:12px">${r.to}</span></td>
+        <td><span style="font-family:var(--font-mono);color:var(--text-muted)">[${LP.escHtml(r.id)}]</span></td>
+        <td><span class="lp-badge lp-badge-primary" style="font-size:12px">${LP.escHtml(r.to)}</span></td>
         <td>
           <span class="lp-badge ${r.action.toLowerCase() === 'allow' ? 'lp-badge-success' : 'lp-badge-danger'}">
-            ${r.action} ${r.direction}
+            ${LP.escHtml(r.action)} ${LP.escHtml(r.direction)}
           </span>
         </td>
-        <td style="color:var(--text-secondary)">${r.from}</td>
+        <td style="color:var(--text-secondary)">${LP.escHtml(r.from)}</td>
         <td style="text-align:right">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FirewallPage.deleteRule('${r.id}')" style="color:var(--accent-danger)">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('FirewallPage.deleteRule', '${LP.encJsArg(r.id)}')" style="color:var(--accent-danger)">
             <i class="bi bi-trash"></i> Delete
           </button>
         </td>

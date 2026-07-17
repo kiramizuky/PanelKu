@@ -372,7 +372,7 @@ const FMPage = (() => {
               <div class="me-auto font-mono" id="${id}_stats" style="font-size:11px; color:var(--text-muted);">Lines: 1 | Length: 0</div>
               <small class="text-muted me-3 d-none d-sm-inline" style="font-size:11px;"><kbd style="background:rgba(255,255,255,0.08); color:var(--text-muted); font-size:10px; padding:2px 5px; border-radius:3px;">Ctrl + S</kbd> to Quick Save</small>
               <button class="btn-lp btn-lp-ghost btn-lp-sm" data-bs-dismiss="modal">Cancel</button>
-              <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="FMPage._saveFile('${escHtml(path)}', '${id}', false)"><i class="bi bi-floppy me-1"></i> Save</button>
+              <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LP.call('FMPage._saveFile', '${LP.encJsArg(path)}', '${LP.encJsArg(id)}', false)"><i class="bi bi-floppy me-1"></i> Save</button>
             </div>
           </div>
         </div>
@@ -589,7 +589,7 @@ const FMPage = (() => {
           <span class="text-white text-truncate" style="font-size: 12.5px; font-weight: 500;">${escHtml(f.name)}</span>
           <span style="font-size: 10px; color: var(--text-muted);">${LP.formatBytes(f.size)}</span>
         </div>
-        <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FMPage.removeSelectedUpload(${index})" style="width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center; border-radius: 6px; color:#ef4444;" title="Remove">
+        <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('FMPage.removeSelectedUpload', '${LP.encJsArg(index)}')" style="width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center; border-radius: 6px; color:#ef4444;" title="Remove">
           <i class="bi bi-trash"></i>
         </button>
       </div>

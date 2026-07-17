@@ -16,6 +16,25 @@ export const registerDockerSocket = (namespace) => {
     let statsStream = null;
     let execStream = null;
 
+    /** Validate container ID/name — Docker accepts both hex IDs and names */
+    const _validateContainerId = (id) => {
+      if (!id || typeof id !== 'string') throw new Error('Container ID is required');
+      // Block path traversal (slashes, backslashes, dots that could escape)
+      if (id.includes('/') || id.includes('\\') || id === '..' || id === '.') {
+        throw new Error('Invalid container identifier');
+      }
+      // Only allow safe characters: alphanumeric, underscores, hyphens, dots
+      if (!/^[a-zA-Z0-9_.-]{1,64}$/.test(id)) throw new Error('Invalid container identifier format');
+      return id;
+    };
+
+    /** Validate shell executable name against whitelist */
+    const _validateShell = (shell) => {
+      const allowed = ['sh', 'bash', 'zsh', 'fish', '/bin/sh', '/bin/bash', '/bin/zsh', '/usr/bin/fish', 'ash', 'dash', 'powershell', 'pwsh'];
+      if (shell && !allowed.includes(shell)) return 'sh';
+      return shell || 'sh';
+    };
+
     // Exec terminal session inside a container
     socket.on('exec:create', async ({ containerId, shell = 'sh' }) => {
       try {
@@ -23,9 +42,12 @@ export const registerDockerSocket = (namespace) => {
           execStream.destroy();
         }
 
-        const container = dockerService.docker.getContainer(containerId);
+        const safeContainerId = _validateContainerId(containerId);
+        const safeShell = _validateShell(shell);
+
+        const container = dockerService.docker.getContainer(safeContainerId);
         const execInstance = await container.exec({
-          Cmd: [shell],
+          Cmd: [safeShell],
           AttachStdin: true,
           AttachStdout: true,
           AttachStderr: true,

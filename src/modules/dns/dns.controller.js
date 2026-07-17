@@ -13,7 +13,7 @@ class DnsController {
       const zones = await dnsService.getZones(token);
       return success(res, zones);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Internal server error', 500);
     }
   }
 
@@ -24,7 +24,7 @@ class DnsController {
       const records = await dnsService.getDnsRecords(token, zoneId);
       return success(res, records);
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Internal server error', 500);
     }
   }
 
@@ -46,7 +46,7 @@ class DnsController {
       await dnsService.deleteDnsRecord(token, zoneId, recordId);
       return success(res, null, 'DNS Record deleted');
     } catch (error) {
-      return errorResponse(res, error, 500);
+      return errorResponse(res, error.message || 'Internal server error', 500);
     }
   }
 }

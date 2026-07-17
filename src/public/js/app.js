@@ -216,14 +216,17 @@ const LP = {
     const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️', alert: '🚨' };
     const defaults = { success: 'Success', error: 'Error', warning: 'Warning', info: 'Info', alert: 'Alert' };
 
+    const safeMessage = this.escHtml(message);
+    const safeTitle = this.escHtml(title || defaults[type]);
+
     const container = document.querySelector('.lp-toasts');
     const el = document.createElement('div');
     el.className = `lp-toast ${type} fade-in`;
     el.innerHTML = `
       <span class="lp-toast-icon">${icons[type] || 'ℹ️'}</span>
       <div class="lp-toast-body">
-        <div class="lp-toast-title">${title || defaults[type]}</div>
-        <div class="lp-toast-msg">${message}</div>
+        <div class="lp-toast-title">${safeTitle}</div>
+        <div class="lp-toast-msg">${safeMessage}</div>
       </div>
       <button class="lp-toast-close" onclick="this.closest('.lp-toast').remove()">✕</button>
     `;
@@ -268,6 +271,61 @@ const LP = {
     }
   },
 
+  // ── HTML/Js String Escape ────────────────────────────────
+  escHtml(str) {
+    // Safe for text content (&, <, >) and double-quoted attributes (&quot;).
+    // NOTE: Do NOT escape ' here — &#39; would be decoded by innerHTML back to ',
+    // which breaks inline onclick handlers that use single-quoted JS strings.
+    // For onclick with user data, use data-* attributes + event delegation instead.
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  },
+
+  /**
+   * Safe string for inclusion in single-quoted JS strings inside onclick attributes.
+   * Uses URI encoding which escapes ' " \ and all other special chars as %XX.
+   * The handler must decode via decodeURIComponent().
+   * Example: onclick="handler(decodeURIComponent('${LP.escJsStr(val)}'))"
+   */
+  /**
+   * Encode a value for safe injection into a JS single-quoted string inside onclick.
+   * Uses JSON.stringify + encodeURIComponent so output contains NO raw single-quotes,
+   * double-quotes, backslashes, or other JS/HTML-special characters.
+   * Decode with decodeURIComponent(JSON.parse(...)) — handled automatically by LP.call().
+   */
+  encJsArg(val) {
+    return encodeURIComponent(JSON.stringify(val));
+  },
+
+  /**
+   * Call a namespaced function with URI-encoded JSON arguments.
+   * Automatically decodes and parses all arguments.
+   * Usage in template literal:
+   *   onclick="LP.call('Module.method', '${LP.encJsArg(val1)}', '${LP.encJsArg(val2)}')"
+   * The module method receives the decoded values directly — no changes needed to handlers.
+   */
+  call(fnPath, ...args) {
+    // Use indirect eval to access global lexical scope (works for both const and var globals)
+    // fnPath is always a developer-hardcoded string in template literals — no injection risk
+    let fn;
+    try { fn = (0, eval)(fnPath); } catch { fn = null; }
+    if (typeof fn !== 'function') {
+      console.warn(`LP.call: ${fnPath} is not a function`);
+      return;
+    }
+    // Decode string args (which were encJsArg'd), pass non-strings through unchanged (e.g. 'this' DOM refs)
+    const decoded = args.map(a => {
+      if (typeof a !== 'string') return a;
+      try { return JSON.parse(decodeURIComponent(a)); }
+      catch { return a; }
+    });
+    return fn(...decoded);
+  },
+
   // ── Util ──────────────────────────────────────────────
   formatBytes(bytes, decimals = 2) {
     if (!bytes || bytes === 0) return '0 B';
@@ -296,18 +354,19 @@ const LP = {
 
   confirm(message, title = 'Confirm') {
     return new Promise(resolve => {
-      // Simple modal confirm (Bootstrap 5)
       const id = 'lp_confirm_' + Date.now();
+      const safeTitle = this.escHtml(title);
+      const safeMessage = this.escHtml(message);
       const modal = document.createElement('div');
       modal.innerHTML = `
         <div class="modal fade" id="${id}" tabindex="-1">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
               <div class="modal-header border-0">
-                <h5 class="modal-title">${title}</h5>
+                <h5 class="modal-title">${safeTitle}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
               </div>
-              <div class="modal-body">${message}</div>
+              <div class="modal-body">${safeMessage}</div>
               <div class="modal-footer border-0">
                 <button class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
                 <button class="btn-lp btn-lp-danger" id="${id}_ok">Confirm</button>
@@ -332,17 +391,20 @@ const LP = {
   prompt(message, type = 'text', title = 'Input Required') {
     return new Promise(resolve => {
       const id = 'lp_prompt_' + Date.now();
+      const safeTitle = this.escHtml(title);
+      const safeMessage = this.escHtml(message);
+      // type is restricted to 'text', 'password', 'email', 'number' — safe
       const modal = document.createElement('div');
       modal.innerHTML = `
         <div class="modal fade" id="${id}" tabindex="-1">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius:12px;">
               <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title font-sans" style="font-size:15px; font-weight:600;">${title}</h5>
+                <h5 class="modal-title font-sans" style="font-size:15px; font-weight:600;">${safeTitle}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
               </div>
               <div class="modal-body pb-0">
-                <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">${message}</p>
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">${safeMessage}</p>
                 <input type="${type}" id="${id}_input" class="lp-input w-100" style="height:38px;">
               </div>
               <div class="modal-footer border-0">
@@ -370,16 +432,18 @@ const LP = {
   alert(message, title = 'Info') {
     return new Promise(resolve => {
       const id = 'lp_alert_' + Date.now();
+      const safeTitle = this.escHtml(title);
+      const safeMessage = this.escHtml(message);
       const modal = document.createElement('div');
       modal.innerHTML = `
         <div class="modal fade" id="${id}" tabindex="-1">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
               <div class="modal-header border-0">
-                <h5 class="modal-title">${title}</h5>
+                <h5 class="modal-title">${safeTitle}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
               </div>
-              <div class="modal-body">${message}</div>
+              <div class="modal-body">${safeMessage}</div>
               <div class="modal-footer border-0">
                 <button class="btn-lp btn-lp-primary" id="${id}_ok">OK</button>
               </div>
@@ -410,9 +474,11 @@ const LP = {
   paginate(data, itemsPerPage, tbodyId, paginationContainerId, renderRowFn, emptyMessage, colspan) {
     const tbody = document.getElementById(tbodyId);
     const pagContainer = document.getElementById(paginationContainerId);
+    const safeColspan = this.escHtml(String(colspan || 1));
+    const safeEmpty = this.escHtml(emptyMessage || '');
     
     if (!data || data.length === 0) {
-      if (tbody) tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center text-muted">${emptyMessage}</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="${safeColspan}" class="text-center text-muted">${safeEmpty}</td></tr>`;
       if (pagContainer) pagContainer.innerHTML = '';
       return;
     }

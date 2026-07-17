@@ -39,10 +39,10 @@ const DNSPage = {
         }
 
         document.getElementById('zonesList').innerHTML = zones.map(z => `
-          <div class="lp-zone-item" onclick="DNSPage.selectZone('${z.id}', '${z.name}')" 
+          <div class="lp-zone-item" onclick="DNSPage.selectZone('${LP.escHtml(z.id)}', '${LP.escHtml(z.name)}')" 
                style="padding:10px 15px; background:rgba(255,255,255,0.02); border:1px solid var(--glass-border); border-radius:8px; cursor:pointer; transition:all 0.2s;">
-            <div style="font-weight:600; font-family:var(--font-mono)">${z.name}</div>
-            <div style="font-size:11px; color:var(--text-muted)">${z.status}</div>
+            <div style="font-weight:600; font-family:var(--font-mono)">${LP.escHtml(z.name)}</div>
+            <div style="font-size:11px; color:var(--text-muted)">${LP.escHtml(z.status)}</div>
           </div>
         `).join('');
       } else {
@@ -73,16 +73,16 @@ const DNSPage = {
         const records = res.data;
         LP.paginate(records, 10, 'recordsTableBody', 'dnsPagination', r => `
           <tr>
-            <td style="font-weight:600;color:var(--accent-info)">${r.type}</td>
-            <td class="font-mono">${r.name}</td>
-            <td class="font-mono" style="font-size:13px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;">${r.content}</td>
+            <td style="font-weight:600;color:var(--accent-info)">${LP.escHtml(r.type)}</td>
+            <td class="font-mono">${LP.escHtml(r.name)}</td>
+            <td class="font-mono" style="font-size:13px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;">${LP.escHtml(r.content)}</td>
             <td>
               ${r.proxied 
                 ? '<i class="bi bi-cloud-fill" style="color:#f6821f" title="Proxied"></i>' 
                 : '<i class="bi bi-cloud" style="color:var(--text-muted)" title="DNS Only"></i>'}
             </td>
             <td style="text-align:right">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DNSPage.deleteRecord('${r.id}')">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DNSPage.deleteRecord', '${LP.encJsArg(r.id)}')">
                 <i class="bi bi-trash"></i> Delete
               </button>
             </td>

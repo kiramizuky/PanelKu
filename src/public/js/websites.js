@@ -45,12 +45,12 @@ const WebsitesPage = (() => {
             <td style="font-size:14px">${sslStatus}</td>
             <td style="text-align:right">
               ${w.gitRepo ? `
-                ${w.autoDeploy ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="WebsitesPage.showWebhook('${w._id}', '${w.webhookToken}')" title="Show Webhook URL"><i class="bi bi-link-45deg"></i></button>` : ''}
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="WebsitesPage.deployGit('${w._id}')" title="Deploy from Git"><i class="bi bi-cloud-arrow-down"></i></button>
+                ${w.autoDeploy ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('WebsitesPage.showWebhook', '${LP.encJsArg(w._id)}', '${LP.encJsArg(w.webhookToken)}')" title="Show Webhook URL"><i class="bi bi-link-45deg"></i></button>` : ''}
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="LP.call('WebsitesPage.deployGit', '${LP.encJsArg(w._id)}')" title="Deploy from Git"><i class="bi bi-cloud-arrow-down"></i></button>
               ` : ''}
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WebsitesPage.configSSL('${w._id}')" title="SSL Settings"><i class="bi bi-shield"></i></button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WebsitesPage.openFolder('${w.rootDirectory}')" title="File Manager"><i class="bi bi-folder"></i></button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="WebsitesPage.deleteWebsite('${w._id}', '${w.domain}')" title="Delete"><i class="bi bi-trash"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WebsitesPage.configSSL', '${LP.encJsArg(w._id)}')" title="SSL Settings"><i class="bi bi-shield"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WebsitesPage.openFolder', '${LP.encJsArg(w.rootDirectory)}')" title="File Manager"><i class="bi bi-folder"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('WebsitesPage.deleteWebsite', '${LP.encJsArg(w._id)}', '${LP.encJsArg(w.domain)}')" title="Delete"><i class="bi bi-trash"></i></button>
             </td>
           </tr>
         `;
@@ -194,15 +194,47 @@ const WebsitesPage = (() => {
 
     async showWebhook(id, token) {
       const url = `${window.location.origin}/api/websites/${id}/deploy/${token}`;
-      await LP.alert(`
-        <div class="text-start">
-          <p>Configure this URL in your Git repository's Webhook settings (e.g. GitHub, GitLab). Set the content type to <code>application/json</code>.</p>
-          <div class="input-group mt-2">
-            <input type="text" class="form-control font-mono" style="font-size:12px; background:rgba(0,0,0,0.2); color:#fff; border-color:var(--glass-border);" value="${url}" readonly id="webhookUrlCopy">
-            <button class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('webhookUrlCopy').value); LP.toast('Copied to clipboard', 'success');">Copy</button>
+
+      // Build modal with DOM methods to avoid innerHTML injection
+      const modalEl = document.createElement('div');
+      modalEl.innerHTML = `
+        <div class="modal fade" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
+              <div class="modal-header border-0">
+                <h5 class="modal-title">Webhook URL</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <p style="font-size:13px;">Configure this URL in your Git repository's Webhook settings (e.g. GitHub, GitLab). Set the content type to <code>application/json</code>.</p>
+                <div class="input-group mt-2">
+                  <input type="text" class="form-control font-mono" style="font-size:12px; background:rgba(0,0,0,0.2); color:#fff; border-color:var(--glass-border);" readonly>
+                  <button class="btn btn-outline-secondary" style="font-size:12px;">Copy</button>
+                </div>
+              </div>
+              <div class="modal-footer border-0">
+                <button class="btn-lp btn-lp-primary" data-bs-dismiss="modal">OK</button>
+              </div>
+            </div>
           </div>
-        </div>
-      `, 'Webhook URL');
+        </div>`;
+
+      // Set URL with textContent (safe, no innerHTML)
+      const input = modalEl.querySelector('input');
+      input.value = url;
+      document.body.appendChild(modalEl);
+
+      // Copy button
+      const copyBtn = modalEl.querySelector('.btn-outline-secondary');
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(url).then(() => {
+          LP.toast('Copied to clipboard', 'success');
+        });
+      });
+
+      const bsModal = new bootstrap.Modal(modalEl.querySelector('.modal'));
+      bsModal.show();
+      modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
     },
 
     async installPackage(pkgName) {

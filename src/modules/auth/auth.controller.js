@@ -60,6 +60,16 @@ class AuthController {
       if (!refreshToken) return unauthorized(res, 'Refresh token required');
 
       const result = await authService.refreshToken(refreshToken);
+
+      // [ROTATION] Set the new refresh token as HTTP-only cookie
+      res.cookie('refresh_token', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: '/api/auth/refresh',
+      });
+
       return success(res, { accessToken: result.accessToken }, 'Token refreshed');
     } catch (err) {
       return error(res, err.message, err.statusCode || 401);
@@ -71,7 +81,6 @@ class AuthController {
       const refreshToken = req.cookies?.refresh_token || req.body?.refreshToken;
       await authService.logout(refreshToken);
       res.clearCookie('refresh_token', { path: '/api/auth/refresh' });
-      res.clearCookie('access_token');
       return success(res, {}, 'Logged out successfully');
     } catch (err) {
       return error(res, err.message, 500);

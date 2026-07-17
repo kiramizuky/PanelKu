@@ -91,24 +91,52 @@ class AuthService {
    * Verify 2FA OTP and complete login
    */
   async verifyTwoFactor(tempToken, otp, req) {
+    const deviceInfo = getDeviceInfo(req);
+    const ip = deviceInfo?.ip || req?.ip || 'unknown';
+
     let payload;
     try {
       payload = jwt.verify(tempToken, appConfig.appSecret);
     } catch {
+      // Don't audit log for invalid temp tokens — they are untrusted
       throw Object.assign(new Error('Invalid or expired temp token'), { statusCode: 401 });
     }
 
     const user = await userRepository.findById(payload.sub, { select: '+twoFactorSecret' });
-    if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
+    if (!user) {
+      auditRepository.log({
+        userId:   null,
+        username: 'unknown',
+        action:   '2FA_FAILED',
+        resource: 'auth',
+        details:  'User not found for temp token',
+        ip,
+        userAgent: req?.headers?.['user-agent'] || '',
+        status:   'failure',
+      }).catch((e) => logger.error('Failed to write audit log: ' + e.message));
+      throw Object.assign(new Error('User not found'), { statusCode: 404 });
+    }
 
     const valid = speakeasy.totp.verify({
       secret: user.twoFactorSecret,
       encoding: 'base32',
       token: otp,
-      window: 2,
+      window: 1,
     });
 
-    if (!valid) throw Object.assign(new Error('Invalid OTP'), { statusCode: 401 });
+    if (!valid) {
+      auditRepository.log({
+        userId:   user._id,
+        username: user.username,
+        action:   '2FA_FAILED',
+        resource: 'auth',
+        details:  'Invalid OTP',
+        ip,
+        userAgent: req?.headers?.['user-agent'] || '',
+        status:   'failure',
+      }).catch((e) => logger.error('Failed to write audit log: ' + e.message));
+      throw Object.assign(new Error('Invalid OTP'), { statusCode: 401 });
+    }
 
     // Fetch fresh user with role
     const fullUser = await userRepository.findByUsername(user.username);
@@ -117,6 +145,7 @@ class AuthService {
 
   /**
    * Refresh access token using refresh token
+   * [SECURITY FIX] Token rotation: old session deactivated, new session created
    */
   async refreshToken(token) {
     const session = await sessionRepository.findByRefreshToken(token);
@@ -135,13 +164,27 @@ class AuthService {
 
     const user = await userRepository.findById(payload.sub, { populate: 'role' });
     if (!user || !user.isActive) {
+      await sessionRepository.deactivate(session._id);
       throw Object.assign(new Error('User not found or inactive'), { statusCode: 401 });
     }
 
-    const { accessToken } = this._generateTokens(user);
-    await sessionRepository.touch(session._id);
+    // [ROTATION] Deactivate old session, create new one with fresh refresh token
+    await sessionRepository.deactivate(session._id);
 
-    return { accessToken };
+    const deviceInfo = session.deviceInfo || {};
+    const { accessToken, refreshToken } = this._generateTokens(user);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await sessionRepository.create({
+      userId: user._id,
+      refreshToken,
+      deviceInfo: typeof deviceInfo === 'object' ? deviceInfo : {},
+      userAgent: session.userAgent || '',
+      ip: session.ip || '',
+      expiresAt,
+    });
+
+    return { accessToken, refreshToken };
   }
 
   /**
@@ -231,8 +274,6 @@ class AuthService {
   _generateTokens(user) {
     const payload = {
       sub: user._id,
-      username: user.username,
-      role: user.role?.slug,
     };
 
     const accessToken = jwt.sign(payload, appConfig.jwt.secret, {

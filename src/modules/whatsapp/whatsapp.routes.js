@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import whatsappController from './whatsapp.controller.js';
 import { requireAuth } from '../../middleware/auth.js';
+import { rbac } from '../../middleware/rbac.js';
+import { RESOURCES, ACTIONS } from '../../config/constants.js';
 
 const router = Router();
 
-// Require authenticated panel users
+// Require authenticated panel users with WHATSAPP:EXECUTE permission
 router.use(requireAuth);
+router.use(rbac(RESOURCES.WHATSAPP, ACTIONS.EXECUTE));
 
 router.get('/accounts', whatsappController.listAccounts);
 router.post('/accounts', whatsappController.initSession);

@@ -21,25 +21,23 @@ const WhatsappPage = (() => {
     if (accounts.length === 0) {
       tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted)">No WhatsApp accounts configured yet.</td></tr>`;
       return;
-    }
-
-    tbody.innerHTML = accounts.map(acc => {
+    }      tbody.innerHTML = accounts.map(acc => {
       let badgeClass = 'lp-badge-danger';
       if (acc.status === 'connected') badgeClass = 'lp-badge-success';
       else if (acc.status === 'connecting') badgeClass = 'lp-badge-warning';
 
       return `
         <tr>
-          <td><strong style="color:var(--text-primary)">${acc.sessionName}</strong></td>
-          <td><span class="lp-badge ${badgeClass}"><span class="lp-badge-dot"></span>${acc.status}</span></td>
-          <td class="font-mono" style="font-size:12px">${acc.webhookUrl || '<span class="text-muted">Not configured</span>'}</td>
+          <td><strong style="color:var(--text-primary)">${LP.escHtml(acc.sessionName)}</strong></td>
+          <td><span class="lp-badge ${badgeClass}"><span class="lp-badge-dot"></span>${LP.escHtml(acc.status)}</span></td>
+          <td class="font-mono" style="font-size:12px">${acc.webhookUrl ? LP.escHtml(acc.webhookUrl) : '<span class="text-muted">Not configured</span>'}</td>
           <td style="text-align:right">
             ${acc.status !== 'connected' 
-              ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="WhatsappPage.startQrScan('${acc.sessionName}')" title="Scan QR"><i class="bi bi-qr-code"></i> Scan</button>`
-              : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="WhatsappPage.showTestModal('${acc.sessionName}')" title="Test Send"><i class="bi bi-send-fill"></i> Test</button>`
+              ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('WhatsappPage.startQrScan', '${LP.encJsArg(acc.sessionName)}')" title="Scan QR"><i class="bi bi-qr-code"></i> Scan</button>`
+              : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="LP.call('WhatsappPage.showTestModal', '${LP.encJsArg(acc.sessionName)}')" title="Test Send"><i class="bi bi-send-fill"></i> Test</button>`
             }
-            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WhatsappPage.showWebhookModal('${acc.sessionName}', '${acc.webhookUrl || ''}')" title="Webhook"><i class="bi bi-link"></i> Webhook</button>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="WhatsappPage.deleteSession('${acc.sessionName}')" title="Delete"><i class="bi bi-trash"></i></button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WhatsappPage.showWebhookModal', '${LP.encJsArg(acc.sessionName)}', '${LP.encJsArg(acc.webhookUrl || '')}')" title="Webhook"><i class="bi bi-link"></i> Webhook</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('WhatsappPage.deleteSession', '${LP.encJsArg(acc.sessionName)}')" title="Delete"><i class="bi bi-trash"></i></button>
           </td>
         </tr>
       `;

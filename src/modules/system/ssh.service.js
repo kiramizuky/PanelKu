@@ -1,10 +1,10 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import logger from '../../config/logger.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 class SSHService {
   constructor() {
@@ -18,9 +18,21 @@ class SSHService {
     }
   }
 
-  async runCommand(cmd) {
+  /**
+   * [SECURITY FIX] Run a command using execFile with args array — no shell interpreter.
+   * Prevents command injection entirely.
+   *
+   * Usage: sudo('mv', ['/tmp/src', '/etc/dest'])
+   */
+  async sudo(cmd, args) {
     if (this.isWindows) return 'Mock command output';
-    const { stdout } = await execAsync(cmd);
+    // If we're root, skip sudo
+    if (process.getuid && process.getuid() === 0) {
+      const { stdout } = await execFileAsync(cmd, args, { timeout: 10000 });
+      return stdout.trim();
+    }
+    // Otherwise, use sudo with the command and args
+    const { stdout } = await execFileAsync('sudo', [cmd, ...args], { timeout: 10000 });
     return stdout.trim();
   }
 
@@ -53,9 +65,17 @@ class SSHService {
     const trimmedKey = keyString.trim();
     if (!trimmedKey) throw new Error('Key cannot be empty');
     
-    // Simple verification
-    if (!trimmedKey.startsWith('ssh-') && !trimmedKey.startsWith('ecdsa-')) {
+    // [SECURITY FIX] Validate SSH key format to prevent command injection
+    // Authorized_keys lines can have options before type, but we accept:
+    // - Starts with a known key type prefix: ssh-rsa, ssh-ed25519, ecdsa-sha2-*, sk-*, etc.
+    // - Contains base64-encoded key material
+    // - Shell metacharacters are explicitly blocked
+    if (!/^(ssh-|ecdsa-|sk-)/.test(trimmedKey)) {
       throw new Error('Invalid SSH public key format');
+    }
+    // Block shell metacharacters — no semicolons, pipes, backticks, $(), etc.
+    if (/[;|&$`(){}<>]/.test(trimmedKey)) {
+      throw new Error('SSH key contains invalid characters');
     }
 
     try {
@@ -66,13 +86,18 @@ class SSHService {
       if (exists) throw new Error('Key already exists in authorized_keys');
 
       if (!this.isWindows) {
-        // Ensure .ssh dir exists with right perms
-        await this.runCommand('sudo mkdir -p /root/.ssh && sudo chmod 700 /root/.ssh');
-        // Append key
-        await this.runCommand(`echo "${trimmedKey}" | sudo tee -a ${this.authorizedKeysPath} > /dev/null`);
-        await this.runCommand(`sudo chmod 600 ${this.authorizedKeysPath}`);
+        // [SECURITY FIX] Use fs + execFile instead of shell commands.
+        // [BUG FIX] Read existing authorized_keys, append new key, write all back
+        const tmpPath = '/tmp/authorized_keys_add';
+        const existingContent = await fs.readFile(this.authorizedKeysPath, 'utf8').catch(() => '');
+        await fs.writeFile(tmpPath, existingContent + trimmedKey + '\n', 'utf8');
+        await this.sudo('mkdir', ['-p', '/root/.ssh']);
+        await this.sudo('chmod', ['700', '/root/.ssh']);
+        await this.sudo('cp', [tmpPath, this.authorizedKeysPath]);
+        await this.sudo('chmod', ['600', this.authorizedKeysPath]);
+        await fs.unlink(tmpPath).catch(() => {});
       } else {
-        await fs.appendFile(this.authorizedKeysPath, `${trimmedKey}\n`, 'utf8');
+        await fs.appendFile(this.authorizedKeysPath, trimmedKey + '\n', 'utf8');
       }
 
       logger.info('SSH public key added successfully');
@@ -94,10 +119,12 @@ class SSHService {
       const updatedKeys = keys.filter((_, i) => i !== idx).map(k => k.raw).join('\n') + '\n';
       
       if (!this.isWindows) {
+        // [SECURITY FIX] Use execFile with args — no shell string interpolation
         const tmpPath = '/tmp/authorized_keys_temp';
         await fs.writeFile(tmpPath, updatedKeys, 'utf8');
-        await this.runCommand(`sudo mv ${tmpPath} ${this.authorizedKeysPath}`);
-        await this.runCommand(`sudo chmod 600 ${this.authorizedKeysPath}`);
+        await this.sudo('mv', [tmpPath, this.authorizedKeysPath]);
+        await this.sudo('chmod', ['600', this.authorizedKeysPath]);
+        await fs.unlink(tmpPath).catch(() => {});
       } else {
         await fs.writeFile(this.authorizedKeysPath, updatedKeys, 'utf8');
       }
@@ -158,12 +185,22 @@ class SSHService {
       }
 
       if (!this.isWindows) {
-        const tmpPath = '/tmp/sshd_config_temp';
+        // [SECURITY FIX] Use execFile with args — no shell string interpolation
+        const tmpPath = '/tmp/sshd_config_temp_' + Date.now();
         await fs.writeFile(tmpPath, content, 'utf8');
-        await this.runCommand(`sudo mv ${tmpPath} ${this.sshdConfigPath}`);
-        await this.runCommand(`sudo chmod 644 ${this.sshdConfigPath}`);
-        // Restart ssh daemon
-        await this.runCommand('sudo systemctl restart ssh || sudo systemctl restart sshd');
+        await this.sudo('cp', [tmpPath, this.sshdConfigPath]);
+        await this.sudo('chmod', ['644', this.sshdConfigPath]);
+        await fs.unlink(tmpPath).catch(() => {});
+        // Restart ssh daemon — try ssh then sshd
+        try {
+          await this.sudo('systemctl', ['restart', 'ssh']);
+        } catch {
+          try {
+            await this.sudo('systemctl', ['restart', 'sshd']);
+          } catch (e) {
+            logger.warn('Failed to restart SSH service: ' + e.message);
+          }
+        }
       } else {
         await fs.writeFile(this.sshdConfigPath, content, 'utf8');
       }

@@ -3,6 +3,23 @@ import Setting from '../../models/Setting.js';
 import pluginLoader from '../../core/plugin-loader/PluginLoader.js';
 import fs from 'fs/promises';
 import path from 'path';
+import { execFile } from 'child_process';
+import util from 'util';
+
+const execFileAsync = util.promisify(execFile);
+
+/**
+ * Validate a plugin ID — prevent path traversal and command injection.
+ * Only allow safe characters: alphanumeric, hyphens, underscores.
+ */
+function validatePluginId(id) {
+  if (!id || typeof id !== 'string') throw new Error('Plugin ID is required');
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Invalid plugin ID: use only letters, numbers, hyphens, and underscores');
+  if (id.length > 64) throw new Error('Plugin ID too long');
+  // Prevent path traversal
+  if (id.includes('..') || id.includes('/') || id.includes('\\')) throw new Error('Path traversal detected in plugin ID');
+  return id;
+}
 
 class PluginsController {
   async getPlugins(req, res) {
@@ -73,21 +90,23 @@ class PluginsController {
     try {
       const { id, proxyUrl } = req.body;
       if (!id) return errorResponse(res, 'Plugin ID is required', 400);
+      // [SECURITY FIX] Validate plugin ID to prevent path traversal
+      const safeId = validatePluginId(id);
 
       // Verify directory exists
-      const pluginPath = path.resolve('./plugins', id);
+      const pluginPath = path.resolve('./plugins', safeId);
       try {
         await fs.access(pluginPath);
       } catch {
-        return errorResponse(res, `Plugin folder ${id} not found`, 404);
+        return errorResponse(res, `Plugin folder ${safeId} not found`, 404);
       }
 
       // Add to SQLite settings
       const installedStr = await Setting.get('installed_plugins') || '[]';
       const installedIds = JSON.parse(typeof installedStr === 'string' ? installedStr : JSON.stringify(installedStr));
 
-      if (!installedIds.includes(id)) {
-        installedIds.push(id);
+      if (!installedIds.includes(safeId)) {
+        installedIds.push(safeId);
         await Setting.set('installed_plugins', JSON.stringify(installedIds), 'json');
       }
 
@@ -96,18 +115,20 @@ class PluginsController {
         const proxiesStr = await Setting.get('plugin_proxies') || '{}';
         const proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
         if (proxyUrl) {
-          proxies[id] = proxyUrl.trim();
+          // [SECURITY FIX] Validate proxy URL via pluginLoader
+          pluginLoader._validateProxyUrl(proxyUrl);
+          proxies[safeId] = proxyUrl.trim();
         } else {
-          delete proxies[id];
+          delete proxies[safeId];
         }
         await Setting.set('plugin_proxies', JSON.stringify(proxies), 'json');
-        pluginLoader.setProxy(id, proxyUrl);
+        pluginLoader.setProxy(safeId, proxyUrl);
       }
 
       // Load it dynamically into memory
-      await pluginLoader._loadPlugin(id, req.app, req.app.get('io'));
+      await pluginLoader._loadPlugin(safeId, req.app, req.app.get('io'));
 
-      return successResponse(res, null, `Plugin ${id} installed successfully`);
+      return successResponse(res, null, `Plugin ${safeId} installed successfully`);
     } catch (error) {
       return errorResponse(res, error.message, 500);
     }
@@ -117,20 +138,24 @@ class PluginsController {
     try {
       const { id, proxyUrl } = req.body;
       if (!id) return errorResponse(res, 'Plugin ID is required', 400);
+      // [SECURITY FIX] Validate plugin ID to prevent path traversal
+      const safeId = validatePluginId(id);
 
       const proxiesStr = await Setting.get('plugin_proxies') || '{}';
       const proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
 
       if (proxyUrl) {
-        proxies[id] = proxyUrl.trim();
+        // [SECURITY FIX] Validate proxy URL against SSRF
+        pluginLoader._validateProxyUrl(proxyUrl);
+        proxies[safeId] = proxyUrl.trim();
       } else {
-        delete proxies[id];
+        delete proxies[safeId];
       }
 
       await Setting.set('plugin_proxies', JSON.stringify(proxies), 'json');
-      pluginLoader.setProxy(id, proxyUrl);
+      pluginLoader.setProxy(safeId, proxyUrl);
 
-      return successResponse(res, null, `Plugin ${id} proxy updated successfully`);
+      return successResponse(res, null, `Plugin ${safeId} proxy updated successfully`);
     } catch (error) {
       return errorResponse(res, error.message, 500);
     }
@@ -140,12 +165,14 @@ class PluginsController {
     try {
       const { id } = req.body;
       if (!id) return errorResponse(res, 'Plugin ID is required', 400);
+      // [SECURITY FIX] Validate plugin ID to prevent path traversal
+      const safeId = validatePluginId(id);
 
       // Remove from SQLite settings
       const installedStr = await Setting.get('installed_plugins') || '[]';
       const installedIds = JSON.parse(typeof installedStr === 'string' ? installedStr : JSON.stringify(installedStr));
 
-      const index = installedIds.indexOf(id);
+      const index = installedIds.indexOf(safeId);
       if (index !== -1) {
         installedIds.splice(index, 1);
         await Setting.set('installed_plugins', JSON.stringify(installedIds), 'json');
@@ -154,16 +181,16 @@ class PluginsController {
       // Remove from proxies
       const proxiesStr = await Setting.get('plugin_proxies') || '{}';
       const proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
-      if (proxies[id]) {
-        delete proxies[id];
+      if (proxies[safeId]) {
+        delete proxies[safeId];
         await Setting.set('plugin_proxies', JSON.stringify(proxies), 'json');
       }
-      pluginLoader.setProxy(id, null);
+      pluginLoader.setProxy(safeId, null);
 
       // Unload from memory
-      pluginLoader._plugins.delete(id);
+      pluginLoader._plugins.delete(safeId);
 
-      return successResponse(res, null, `Plugin ${id} uninstalled successfully. Please restart panel if necessary.`);
+      return successResponse(res, null, `Plugin ${safeId} uninstalled successfully. Please restart panel if necessary.`);
     } catch (error) {
       return errorResponse(res, error.message, 500);
     }
@@ -173,6 +200,8 @@ class PluginsController {
     try {
       const { id } = req.body;
       if (!id) return errorResponse(res, 'Plugin ID is required', 400);
+      // [SECURITY FIX] Validate plugin ID to prevent path traversal AND command injection
+      const safeId = validatePluginId(id);
 
       const serverVersions = {
         'php-manager': '1.2.0',
@@ -182,10 +211,10 @@ class PluginsController {
         'nextcloud-manager': '1.3.0'
       };
 
-      const targetVersion = serverVersions[id];
+      const targetVersion = serverVersions[safeId];
       if (!targetVersion) return errorResponse(res, 'No updates found for this plugin on the server', 404);
 
-      const pluginPath = path.resolve('./plugins', id);
+      const pluginPath = path.resolve('./plugins', safeId);
       const manifestPath = path.join(pluginPath, 'plugin.json');
       
       let manifest;
@@ -201,16 +230,15 @@ class PluginsController {
       const pmInfo = packageManager.getPMInfo();
       
       // Perform one-click update actions
-      // 1. Simulate downloading latest files by rewriting the local manifest version
+      // 1. Update the local manifest version
       manifest.version = targetVersion;
       await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
 
-      // 2. Perform distro/arch specific setup commands
-      const { exec } = await import('child_process');
-      const { promisify } = await import('util');
-      const execAsync = promisify(exec);
-      
       let updateLog = `Updating ${manifest.name} on ${pmInfo.name} (${pmInfo.arch})...\n`;
+
+      // 2. Perform install/setup commands safely
+      // [SECURITY FIX] Use execFile with args array — no shell string interpolation.
+      // The plugin directory is already validated by validatePluginId, so safeId is safe.
 
       // If the plugin has a package.json, run npm install inside it
       let hasPackageJson = false;
@@ -222,8 +250,15 @@ class PluginsController {
       if (hasPackageJson) {
         updateLog += 'Running npm install --production...\n';
         if (process.platform !== 'win32') {
-          const { stdout } = await execAsync(`cd "${pluginPath}" && npm install --production`);
-          updateLog += stdout + '\n';
+          try {
+            const { stdout } = await execFileAsync('npm', ['install', '--production'], {
+              cwd: pluginPath,
+              timeout: 180000
+            });
+            updateLog += stdout + '\n';
+          } catch (cmdErr) {
+            updateLog += `npm install failed: ${cmdErr.message}\n`;
+          }
         } else {
           updateLog += 'Mock npm install completed on Windows.\n';
         }
@@ -238,14 +273,22 @@ class PluginsController {
 
       if (hasUpdateScript && process.platform !== 'win32') {
         updateLog += 'Running update.sh...\n';
-        const { stdout } = await execAsync(`cd "${pluginPath}" && chmod +x update.sh && ./update.sh`);
-        updateLog += stdout + '\n';
+        try {
+          await execFileAsync('chmod', ['+x', path.join(pluginPath, 'update.sh')], { timeout: 10000 });
+          const { stdout } = await execFileAsync('./update.sh', [], {
+            cwd: pluginPath,
+            timeout: 300000
+          });
+          updateLog += stdout + '\n';
+        } catch (cmdErr) {
+          updateLog += `update.sh failed: ${cmdErr.message}\n`;
+        }
       }
 
       // 3. Reload plugin in memory
-      await pluginLoader._loadPlugin(id, req.app, req.app.get('io'));
+      await pluginLoader._loadPlugin(safeId, req.app, req.app.get('io'));
 
-      return successResponse(res, { log: updateLog }, `Plugin ${id} updated to v${targetVersion} successfully`);
+      return successResponse(res, { log: updateLog }, `Plugin ${safeId} updated to v${targetVersion} successfully`);
     } catch (error) {
       return errorResponse(res, error.message, 500);
     }

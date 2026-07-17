@@ -46,18 +46,18 @@ const CronPage = (() => {
     const tbody = document.getElementById('cronTableBody');
     LP.paginate(tasks, 10, 'cronTableBody', 'cronPagination', t => `
       <tr>
-        <td class="font-mono"><strong>${t.name}</strong></td>
-        <td class="font-mono" title="${t.schedule}">${CronPage.parseCronToText ? CronPage.parseCronToText(t.schedule) : parseCronToText(t.schedule)}</td>
-        <td class="font-mono" style="font-size:12px;color:var(--text-secondary)">${t.command}</td>
+        <td class="font-mono"><strong>${LP.escHtml(t.name)}</strong></td>
+        <td class="font-mono" title="${LP.escHtml(t.schedule)}">${CronPage.parseCronToText ? CronPage.parseCronToText(t.schedule) : parseCronToText(t.schedule)}</td>
+        <td class="font-mono" style="font-size:12px;color:var(--text-secondary)">${LP.escHtml(t.command)}</td>
         <td>${t.lastRun ? new Date(t.lastRun).toLocaleString() : 'Never'}</td>
         <td>
           <span class="lp-badge ${t.status === 'active' ? 'lp-badge-success' : 'lp-badge-warning'}">
-            <span class="lp-badge-dot"></span> ${t.status}
+            <span class="lp-badge-dot"></span> ${LP.escHtml(t.status)}
           </span>
         </td>
         <td style="text-align:right">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="CronPage.toggleTask('${t.id}')"><i class="bi ${t.status === 'active' ? 'bi-pause-fill text-warning' : 'bi-play-fill text-success'}"></i></button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="CronPage.deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('CronPage.toggleTask', '${LP.encJsArg(t.id)}')"><i class="bi ${t.status === 'active' ? 'bi-pause-fill text-warning' : 'bi-play-fill text-success'}"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('CronPage.deleteTask', '${LP.encJsArg(t.id)}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No scheduled tasks found', 6);

@@ -48,6 +48,8 @@ export const RESOURCES = {
   SETTINGS: 'settings',
   AUDIT: 'audit',
   SYSTEM: 'system',
+  WHATSAPP: 'whatsapp',
+  AI: 'ai',
 };
 
 // Token types
