@@ -1,6 +1,6 @@
 {
   "name": "panelku",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Panelku - Lightweight Linux Server Control Panel",
   "type": "module",
   "main": "src/server.js",
@@ -11,6 +11,8 @@
     "setup": "bash scripts/install.sh",
     "reset-db": "node scripts/reset-db.js",
     "lint": "eslint src/",
+    "prepare": "husky",
+    "format": "eslint src/ --fix",
     "lint:fix": "eslint src/ --fix",
     "lint:check": "eslint src/ --max-warnings 0",
     "test": "node --experimental-vm-modules node_modules/.bin/jest"
@@ -57,10 +59,17 @@
   },
   "devDependencies": {
     "eslint": "^9.18.0",
-    "jest": "^29.7.0"
+    "husky": "^9.1.7",
+    "jest": "^29.7.0",
+    "lint-staged": "^16.4.0"
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "lint-staged": {
+    "*.{js,jsx}": [
+      "eslint --fix"
+    ]
   },
   "allowScripts": {
     "@whiskeysockets/baileys": true,
