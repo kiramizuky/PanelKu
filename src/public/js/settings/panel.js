@@ -161,7 +161,7 @@ const PanelPage = (() => {
     let _dots = 0;
 
     const poll = setInterval(async () => {
-      dots++;
+      _dots++;
       const elapsed = Math.round((Date.now() - start) / 1000);
 
       if (Date.now() - start > maxWait) {

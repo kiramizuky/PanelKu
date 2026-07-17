@@ -234,9 +234,7 @@ const MonitorPage = (() => {
     if (memCtx) memChartInstance = new Chart(memCtx, chartConfig('#06b6d4', 'RAM %', chartData.mem));
 
     await loadSysInfo();
-    await pollMetrics();
-
-    pollInterval = setInterval(pollMetrics, 3000);
+    await pollMetrics();      _pollInterval = setInterval(pollMetrics, 3000);
   }
 
   return { init, openProcessesModal, sortProcesses };

@@ -127,7 +127,7 @@ const DNSPage = {
   async loadRecords() {
     if (!this.activeProvider || !this.activeZoneId) return;
     const _tbody = document.getElementById('recordsTableBody');
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);"><div class="spinner-border spinner-border-sm me-1"></div>Loading records...</td></tr>';
+    _tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);"><div class="spinner-border spinner-border-sm me-1"></div>Loading records...</td></tr>';
 
     try {
       const res = await LP.get(`/dns/${this.activeProvider}/zones/${this.activeZoneId}/records`);
@@ -135,10 +135,10 @@ const DNSPage = {
         this.records = res.data || [];
         this.renderRecords();
       } else {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger);">${LP.escHtml(res?.message || 'Failed to load records')}</td></tr>`;
+        _tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger);">${LP.escHtml(res?.message || 'Failed to load records')}</td></tr>`;
       }
     } catch {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger);">Failed to load records</td></tr>';
+      _tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger);">Failed to load records</td></tr>';
     }
   },
 

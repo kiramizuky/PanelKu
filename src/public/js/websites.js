@@ -167,7 +167,7 @@ const WebsitesPage = (() => {
       window.location.href = `/filemanager?path=${encodeURIComponent(path)}`;
     },
 
-    configSSL(id) {
+    configSSL(_id) {
       LP.toast('SSL Configuration module coming soon', 'info');
     },
 

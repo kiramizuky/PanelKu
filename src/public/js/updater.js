@@ -223,7 +223,7 @@ const UpdaterPage = (() => {
 
     container.innerHTML = updates.map(entry => {
       const statusColor = entry.status === 'success' ? 'var(--accent-success)' : (entry.status === 'failed_rolled_back' ? 'var(--accent-warning)' : 'var(--accent-danger)');
-      const statusIcon = entry.status === 'success' ? 'bi-check-circle-fill' : (entry.status === 'failed_rolled_back' ? 'bi-arrow-counterclockwise' : 'bi-x-circle-fill');
+      const _statusIcon = entry.status === 'success' ? 'bi-check-circle-fill' : (entry.status === 'failed_rolled_back' ? 'bi-arrow-counterclockwise' : 'bi-x-circle-fill');
       const typeIcon = entry.type === 'rollback' ? 'bi-arrow-counterclockwise' : 'bi-cloud-download';
       const typeColor = entry.type === 'rollback' ? 'var(--accent-warning)' : 'var(--accent-primary)';
 
@@ -603,7 +603,7 @@ const UpdaterPage = (() => {
     let _dots = 0;
 
     const poll = setInterval(async () => {
-      dots++;
+      _dots++;
       const elapsed = Math.round((Date.now() - start) / 1000);
 
       if (Date.now() - start > maxWait) {

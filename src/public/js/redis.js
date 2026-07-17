@@ -240,7 +240,7 @@ const RedisPage = {
     }
   },
 
-  async editConfig(key, value) {
+  async editConfig(key, _value) {
     const newValue = await LP.prompt(`Edit config: ${key}`, 'text', 'Edit Config');
     if (newValue === null) return;
     try {

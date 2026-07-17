@@ -487,13 +487,13 @@ const FMPage = (() => {
 
   function copySelected() {
     if (!selectedItem) return;
-    clipboard = { ...selectedItem, action: 'copy' };
+    _clipboard = { ...selectedItem, action: 'copy' };
     LP.toast(`${selectedItem.name} copied to clipboard`, 'info');
   }
 
   function moveSelected() {
     if (!selectedItem) return;
-    clipboard = { ...selectedItem, action: 'move' };
+    _clipboard = { ...selectedItem, action: 'move' };
     LP.toast(`${selectedItem.name} cut to clipboard`, 'info');
   }
 

@@ -48,7 +48,7 @@ const AutoHealPage = {
         if (s.status === 'healthy' || s.status === 'running') healthy++;
         else if (s.status === 'warning') warning++;
         else if (s.status === 'critical') critical++;
-        else if (s.status === 'disabled') disabled++;
+        else if (s.status === 'disabled') _disabled++;
       });
 
       document.getElementById('ahHealthyCount').textContent = healthy;

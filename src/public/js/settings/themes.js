@@ -94,7 +94,7 @@ const ThemesPage = {
 
         // Handle CSS files
         if (file.name.endsWith('.css')) {
-          const themeName = file.name.replace('.css', '');
+          const _themeName = file.name.replace('.css', '');
           localStorage.setItem('lp_custom_css_' + this.currentTheme, content);
           this.applyCustomCSS();
           LP.toast(`Theme CSS "${file.name}" loaded!`, 'success');
