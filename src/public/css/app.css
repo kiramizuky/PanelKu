@@ -882,6 +882,7 @@ html.light-mode body {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  height: fit-content;
 }
 
 .system-pm-card {
@@ -956,6 +957,7 @@ html.light-mode body {
   -webkit-backdrop-filter: blur(15px);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
+  height: fit-content;
 }
 
 .settings-sidebar-header {
