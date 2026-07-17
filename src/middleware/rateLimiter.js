@@ -16,18 +16,21 @@ export const apiLimiter = rateLimit({
     const ip = req.ip || req.socket?.remoteAddress || '';
     if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return true;
     
+    // NOTE: req.path includes the '/api' prefix because apiLimiter is mounted at app.use('/api', apiLimiter)
+    // as a middleware function (not a Router). Express does NOT strip the mount prefix for middleware functions.
+    
     // Exempt auth endpoints from general API limit (they are protected by authLimiter separately)
-    if (req.path === '/auth/login' || req.path === '/auth/2fa/verify') return true;
+    if (req.path === '/api/auth/login' || req.path === '/api/auth/2fa/verify') return true;
     
     // Skip high-frequency dashboard polling endpoints
-    if (req.path.startsWith('/dashboard/metrics') || req.path.startsWith('/dashboard/info')) return true;
+    if (req.path.startsWith('/api/dashboard/metrics') || req.path.startsWith('/api/dashboard/info')) return true;
+    
+    // Exempt system power/restart endpoints to avoid 'too many requests' during reboot
+    if (req.path === '/api/system/reboot' || req.path === '/api/system/panel/restart') return true;
     return false;
   },
 });
 
-/**
- * Strict auth rate limiter to prevent brute force.
- */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 min
   max: appConfig.rateLimit.authMax,

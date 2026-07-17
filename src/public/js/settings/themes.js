@@ -35,14 +35,9 @@ const ThemesPage = {
     this.currentTheme = theme;
     this.loadThemeOptions();
 
-    // Apply theme by toggling body class
-    document.documentElement.setAttribute('data-theme', theme);
-
-    // Set theme attributes directly (don't call LP.toggleTheme which only toggles dark↔light)
-    const isLight = theme === 'light';
-    document.documentElement.style.colorScheme = isLight ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-bs-theme', isLight ? 'light' : 'dark');
-    document.documentElement.setAttribute('data-theme', theme);
+    // Use LP.applyTheme() for consistent dark/light mode across the entire panel
+    // This ensures: light-mode class, colorScheme, data-bs-theme, data-theme, theme icon
+    LP.applyTheme(theme);
 
     LP.toast(`Theme changed to ${this._themeName(theme)}`, 'success');
 

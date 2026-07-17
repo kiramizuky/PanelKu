@@ -58,8 +58,8 @@ export default {
 
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
-    max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
-    authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX) || 10,
+    max: parseInt(process.env.RATE_LIMIT_MAX) || 200,
+    authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX) || 20,
   },
 
   isDev: (process.env.NODE_ENV || 'development') === 'development',

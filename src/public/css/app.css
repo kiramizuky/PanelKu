@@ -742,7 +742,8 @@ html.light-mode body {
 
 .system-services-scroll {
   overflow: auto;
-  max-height: 380px;
+  max-height: 45vh;
+  min-height: 200px;
   flex: 1;
 }
 

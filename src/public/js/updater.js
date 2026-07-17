@@ -122,7 +122,7 @@ const UpdaterPage = (() => {
       const shortHash = e.hash ? e.hash.substring(0, 8) : '????';
       return `<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;line-height:1.5;">
         <code style="color:var(--accent-warning);font-family:monospace;white-space:nowrap;min-width:70px;">${shortHash}</code>
-        <span style="color:var(--text-secondary);">${LP.escapeHtml(e.message)}</span>
+        <span style="color:var(--text-secondary);">${LP.escHtml(e.message)}</span>
       </div>`;
     }).join('');
   }
@@ -165,7 +165,7 @@ const UpdaterPage = (() => {
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
         <span style="font-size:12px;color:var(--text-secondary);">${r.name}</span>
         <span style="font-size:12px;color:${statusColor};">
-          <i class="bi ${statusIcon} me-1"></i> <span title="${LP.escapeHtml(r.detail || '')}">${r.status}</span>
+          <i class="bi ${statusIcon} me-1"></i> <span title="${LP.escHtml(r.detail || '')}">${r.status}</span>
         </span>
       </div>`;
     }).join('');
@@ -252,7 +252,7 @@ const UpdaterPage = (() => {
         </div>
         ${entry.log ? `<div style="margin-top:4px;">
           <button class="btn-lp btn-lp-ghost btn-lp-sm" style="font-size:10px;padding:2px 6px;" onclick="UpdaterPage.toggleHistoryLog(this)">Show Log</button>
-          <pre style="display:none;margin-top:6px;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;font-family:monospace;font-size:11px;color:var(--text-secondary);max-height:150px;overflow-y:auto;white-space:pre-wrap;">${LP.escapeHtml(entry.log)}</pre>
+          <pre style="display:none;margin-top:6px;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;font-family:monospace;font-size:11px;color:var(--text-secondary);max-height:150px;overflow-y:auto;white-space:pre-wrap;">${LP.escHtml(entry.log)}</pre>
         </div>` : ''}
       </div>`;
     }).join('');
@@ -313,7 +313,7 @@ const UpdaterPage = (() => {
       const ts = b.createdAt ? new Date(b.createdAt).toLocaleString() : '—';
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;">
         <div>
-          <div style="color:var(--text-primary);font-weight:500;">${LP.escapeHtml(b.name)}</div>
+          <div style="color:var(--text-primary);font-weight:500;">${LP.escHtml(b.name)}</div>
           <div style="color:var(--text-muted);font-size:10px;">${ts} · ${size}</div>
         </div>
         <span class="lp-badge lp-badge-success" style="font-size:9px;">${b.type || 'backup'}</span>
@@ -331,7 +331,7 @@ const UpdaterPage = (() => {
     }
 
     select.innerHTML = backups.map(b =>
-      `<option value="${LP.escapeHtml(b.name)}">${LP.escapeHtml(b.name)} (${b.size ? formatSize(b.size) : '?'})</option>`
+      `<option value="${LP.escHtml(b.name)}">${LP.escHtml(b.name)} (${b.size ? formatSize(b.size) : '?'})</option>`
     ).join('');
   }
 
@@ -527,9 +527,9 @@ const UpdaterPage = (() => {
     // Show confirmation
     const details = document.getElementById('rbConfirmDetails');
     if (method === 'commit') {
-      details.innerHTML = `<li>Type: Git Rollback</li><li>Commit: <code style="color:var(--accent-warning);">${LP.escapeHtml(commit)}</code></li>`;
+      details.innerHTML = `<li>Type: Git Rollback</li><li>Commit: <code style="color:var(--accent-warning);">${LP.escHtml(commit)}</code></li>`;
     } else {
-      details.innerHTML = `<li>Type: Backup Restore</li><li>Backup: <code style="color:var(--accent-warning);">${LP.escapeHtml(backup)}</code></li>`;
+      details.innerHTML = `<li>Type: Backup Restore</li><li>Backup: <code style="color:var(--accent-warning);">${LP.escHtml(backup)}</code></li>`;
     }
 
     const confirmBtn = document.getElementById('btnConfirmRollback');
