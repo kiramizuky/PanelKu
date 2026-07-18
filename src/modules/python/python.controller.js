@@ -36,6 +36,7 @@ class PythonController {
       return successResponse(res, {
         current: status.currentVersion,
         installed: status.installedVersions,
+        pyenvInstalled: status.pyenvInstalled,
       });
     } catch (error) {
       return errorResponse(res, error.message, 500);

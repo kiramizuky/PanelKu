@@ -40,6 +40,7 @@ class NodeJSController {
         current: status.currentVersion,
         default: status.defaultVersion,
         installed: status.installedVersions,
+        nvmInstalled: status.nvmInstalled,
       });
     } catch (error) {
       return errorResponse(res, error.message, 500);

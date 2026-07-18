@@ -351,6 +351,11 @@ html.light-mode body {
   padding: 20px;
   box-shadow: var(--glass-shadow);
   transition: transform 0.2s ease, border-color 0.2s ease;
+  height: auto;
+}
+
+/* Use this when you explicitly want the card to fill its column height */
+.lp-glass-card-fill {
   height: 100%;
 }
 

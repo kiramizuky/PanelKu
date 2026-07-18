@@ -138,6 +138,7 @@ const createApp = () => {
   app.get('/system', (req, res) => res.render('system/index', { title: 'System' }));
   app.get('/ssl', (req, res) => res.render('ssl/index', { title: 'SSL Certificates' }));
   app.get('/waf', (req, res) => res.render('waf/index', { title: 'WAF' }));
+  app.get('/dns', (req, res) => res.render('dns/index', { title: 'DNS Manager' }));
   app.get('/cloudflare', (req, res) => res.render('cloudflare/index', { title: 'Cloudflare Tunnel' }));
   app.get('/n8n', (req, res) => res.render('n8n/index', { title: 'n8n Automation' }));
   app.get('/tailscale', (req, res) => res.render('tailscale/index', { title: 'Tailscale VPN' }));

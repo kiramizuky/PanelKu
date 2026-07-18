@@ -96,13 +96,13 @@ const NodeJSPage = {
       const res = await LP.get('/nodejs/versions/local');
       if (!res?.success) throw new Error(res?.message);
 
-      const { installed, current, default: defaultVer } = res.data;
+      const { installed, current, default: defaultVer, nvmInstalled } = res.data;
       const container = document.getElementById('installedVersionsList');
 
       // Show/hide NVM not installed banner
       const nvmBanner = document.getElementById('nvmNotInstalledBanner');
       const nvmSection = document.getElementById('nvmAvailableSection');
-      if (installed.length === 0 && (!current || current === 'Not found')) {
+      if (!nvmInstalled) {
         if (nvmBanner) nvmBanner.style.display = 'block';
         if (nvmSection) nvmSection.style.display = 'none';
         container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No Node.js versions installed. Install NVM first, then install a version.</div>';

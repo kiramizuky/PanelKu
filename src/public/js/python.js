@@ -72,12 +72,12 @@ const PythonPage = {
     try {
       const res = await LP.get('/python/versions/local');
       if (!res?.success) throw new Error(res?.message);
-      const { installed, current } = res.data;
+      const { installed, current, pyenvInstalled } = res.data;
       const container = document.getElementById('installedVersionsList');
       const banner = document.getElementById('pyenvNotInstalledBanner');
       const section = document.getElementById('pyenvAvailableSection');
 
-      if (!installed || installed.length === 0) {
+      if (!pyenvInstalled) {
         if (banner) banner.style.display = 'block';
         if (section) section.style.display = 'none';
         container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">No Python versions found. Install Pyenv first.</div>';
@@ -85,6 +85,11 @@ const PythonPage = {
       }
       if (banner) banner.style.display = 'none';
       if (section) section.style.display = 'block';
+
+      if (!installed || installed.length === 0) {
+        container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">No Python versions found via Pyenv.</div>';
+        return;
+      }
 
       container.innerHTML = installed.map(ver => {
         const isCurrent = current?.includes(ver) || `v${ver}` === current;
