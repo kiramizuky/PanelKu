@@ -129,19 +129,46 @@ export default {
                   
                   if (modal) modal.hide();
                   
-                  // Show global spinner
+                  // Show global spinner with dynamic status messages
                   const spinner = document.createElement('div');
                   spinner.id = 'ncDeploySpinner';
                   spinner.innerHTML = \`
-                    <div style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-                      <div class="spinner-border text-info" style="width: 3rem; height: 3rem;" role="status"></div>
-                      <h4 style="color:#fff; margin-top:20px;">Deploying Nextcloud... This might take a minute.</h4>
+                    <div style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;">
+                      <div class="spinner-border text-info" style="width: 3.5rem; height: 3.5rem;" role="status"></div>
+                      <h4 id="ncDeployMsg" style="color:#fff; margin:0; font-size:18px;">Deploying Nextcloud...</h4>
+                      <p id="ncDeploySubMsg" style="color:#94a3b8; font-size:13px; margin:0; text-align:center; max-width:420px;">Pulling Docker image. This might take a few minutes on first run.</p>
                     </div>
                   \`;
                   document.body.appendChild(spinner);
 
+                  // Cycle status messages so user knows it's still working
+                  const msgs = [
+                    ['Deploying Nextcloud...', 'Pulling Docker image. This may take a few minutes on first run.'],
+                    ['Checking dependencies...', 'Verifying docker-compose is installed on the server.'],
+                    ['Still working...', 'If docker-compose was missing, it is being installed automatically.'],
+                    ['Almost there...', 'Starting the Nextcloud container. Hang tight!'],
+                  ];
+                  let msgIdx = 0;
+                  const msgTimer = setInterval(() => {
+                    msgIdx = (msgIdx + 1) % msgs.length;
+                    const el1 = document.getElementById('ncDeployMsg');
+                    const el2 = document.getElementById('ncDeploySubMsg');
+                    if (el1) el1.textContent = msgs[msgIdx][0];
+                    if (el2) el2.textContent = msgs[msgIdx][1];
+                  }, 8000);
+
                   try {
-                    const res = await LP.post('/plugins/nextcloud-manager/deploy', { port });
+                    // Use a 10-minute fetch timeout to survive docker-compose auto-install
+                    const controller = new AbortController();
+                    const fetchTimeout = setTimeout(() => controller.abort(), 600000);
+                    const rawRes = await fetch('/plugins/nextcloud-manager/deploy', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ port }),
+                      signal: controller.signal,
+                    });
+                    clearTimeout(fetchTimeout);
+                    const res = await rawRes.json();
                     if (res?.success) {
                       LP.toast('Nextcloud deployed successfully!', 'success');
                       window.location.reload();
@@ -149,8 +176,9 @@ export default {
                       LP.toast(res?.message || 'Deployment failed', 'error');
                     }
                   } catch (err) {
-                    LP.toast('Deployment error', 'error');
+                    LP.toast(err.name === 'AbortError' ? 'Deploy timed out (10 min). Check server logs.' : 'Deployment error: ' + err.message, 'error');
                   } finally {
+                    clearInterval(msgTimer);
                     document.getElementById('ncDeploySpinner')?.remove();
                   }
                 }
@@ -203,6 +231,9 @@ export default {
 
     // 2. Deploy API
     app.post('/plugins/nextcloud-manager/deploy', async (req, res) => {
+      // Extend timeout to 10 minutes — docker-compose auto-install can take several minutes
+      req.setTimeout(600000);
+      res.setTimeout(600000);
       try {
         const { port = 8080 } = req.body;
         
