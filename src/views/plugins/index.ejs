@@ -176,6 +176,8 @@ plugin-name/
     }
 
     function renderInstalled(plugins) {
+      plugins = plugins.filter(p => p.installed);
+      
       const container = document.getElementById('pluginsContainer');
       if (!plugins || plugins.length === 0) {
         container.innerHTML = '<div class="col-12"><div style="text-align:center;padding:40px;color:var(--text-muted);"><i class="bi bi-inbox" style="font-size:40px;display:block;margin-bottom:10px;"></i>No plugins installed yet.<br>Check the Marketplace tab to install available plugins.</div></div>';

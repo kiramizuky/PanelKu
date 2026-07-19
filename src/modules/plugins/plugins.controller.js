@@ -200,6 +200,9 @@ class PluginsController {
 
   async getMarketplace(req, res) {
     try {
+      const installedStr = await Setting.get('installed_plugins') || '[]';
+      const installedIds = JSON.parse(typeof installedStr === 'string' ? installedStr : JSON.stringify(installedStr));
+
       // In production, this would fetch from a remote registry API.
       // For now, return curated list of available plugins with installation instructions.
       const marketplace = [
@@ -213,7 +216,7 @@ class PluginsController {
           color: '#787cb5',
           category: 'runtime',
           downloads: 1240,
-          installed: true,
+          
         },
         {
           id: 'home-assistant-manager',
@@ -225,7 +228,7 @@ class PluginsController {
           color: '#41bdf5',
           category: 'smarthome',
           downloads: 890,
-          installed: true,
+          
         },
         {
           id: 'adguard-manager',
@@ -237,7 +240,7 @@ class PluginsController {
           color: '#68bd59',
           category: 'security',
           downloads: 750,
-          installed: true,
+          
         },
         {
           id: 'fail2ban-manager',
@@ -249,7 +252,7 @@ class PluginsController {
           color: '#ef4444',
           category: 'security',
           downloads: 1100,
-          installed: true,
+          
         },
         {
           id: 'nextcloud-manager',
@@ -261,7 +264,7 @@ class PluginsController {
           color: '#0082c9',
           category: 'storage',
           downloads: 650,
-          installed: true,
+          
         },
         {
           id: 'uptime-kuma-manager',
@@ -273,7 +276,7 @@ class PluginsController {
           color: '#5cdd8b',
           category: 'monitoring',
           downloads: 520,
-          installed: true,
+          
         },
         {
           id: 'wireguard-manager',
@@ -285,7 +288,7 @@ class PluginsController {
           color: '#38bdf8',
           category: 'network',
           downloads: 430,
-          installed: true,
+          
         },
         {
           id: 'redis-manager',
@@ -297,7 +300,7 @@ class PluginsController {
           color: '#dc382d',
           category: 'database',
           downloads: 380,
-          installed: true,
+          
         },
         {
           id: 'rclone-manager',
@@ -309,7 +312,7 @@ class PluginsController {
           color: '#6366f1',
           category: 'storage',
           downloads: 310,
-          installed: true,
+          
         },
         {
           id: 'rclone-backuper',
@@ -321,7 +324,7 @@ class PluginsController {
           color: '#10b981',
           category: 'backup',
           downloads: 290,
-          installed: true,
+          
         },
         {
           id: 'log-analyzer-manager',
@@ -333,7 +336,7 @@ class PluginsController {
           color: '#f59e0b',
           category: 'monitoring',
           downloads: 270,
-          installed: true,
+          
         },
         {
           id: 'lvm-manager',
@@ -345,7 +348,7 @@ class PluginsController {
           color: '#8b5cf6',
           category: 'storage',
           downloads: 150,
-          installed: true,
+          
         },
         {
           id: 'pm2-manager',
@@ -357,7 +360,7 @@ class PluginsController {
           color: '#2b4ad4',
           category: 'runtime',
           downloads: 200,
-          installed: true,
+          
         },
       ];
 

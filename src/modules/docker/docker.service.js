@@ -271,6 +271,9 @@ class DockerService {
             stdout = res.stdout;
             stderr = res.stderr;
           } catch (fallbackErr) {
+            if (fallbackErr.message.includes('not found')) {
+              throw new Error(`Docker Compose is not installed on this system. Please install 'docker-compose-plugin' (V2) or 'docker-compose' (V1) via your package manager.`);
+            }
             throw new Error(`Compose deployment failed on both 'docker compose' and 'docker-compose'. Fallback error: ${fallbackErr.message}`);
           }
         } else {
