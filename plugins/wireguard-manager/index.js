@@ -1,8 +1,11 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import QRCode from 'qrcode';
+import { requireAuth } from '../../src/middleware/auth.js';
+import { ensureCommand } from '../shared/dep-installer.js';
 
 const execAsync = promisify(exec);
+
 
 export default {
   register(app, io) {
@@ -385,12 +388,8 @@ AllowedIPs = 0.0.0.0/0`;
     // API: Auto-Install WireGuard on host
     app.post('/api/plugins/wireguard/install-host', requireAuth, async (req, res) => {
       try {
-        const packageManager = (await import('../../modules/system/package-manager.js')).default;
-        await packageManager.init();
-        const installCmd = packageManager.getInstallCommand('wireguard');
-        
-        const { stdout, stderr } = await execAsync(installCmd);
-        res.json({ success: true, message: 'WireGuard installation complete', data: stdout + stderr });
+        await ensureCommand('wg', 'wireguard', { timeout: 300000 });
+        res.json({ success: true, message: 'WireGuard installation complete' });
       } catch (err) {
         res.json({ success: false, message: `Installation failed: ${err.message}` });
       }

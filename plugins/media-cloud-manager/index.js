@@ -1,6 +1,8 @@
 import dockerService from '../../src/modules/docker/docker.service.js';
 import firewallService from '../../src/modules/firewall/firewall.service.js';
 import { successResponse, errorResponse } from '../../src/helpers/response.js';
+import { ensureDockerCompose, withDeployTimeout } from '../shared/dep-installer.js';
+
 
 export default {
   register(app, io) {
@@ -239,10 +241,11 @@ export default {
     });
 
     // 2. Deploy API
-    app.post('/plugins/media-cloud-manager/deploy', async (req, res) => {
+    app.post('/plugins/media-cloud-manager/deploy', withDeployTimeout(600000), async (req, res) => {
       try {
         const { package: pkg, port, mediaPath } = req.body;
-        
+        await ensureDockerCompose();
+
         let composeYaml = '';
         if (pkg === 'jellyfin') {
           composeYaml = `

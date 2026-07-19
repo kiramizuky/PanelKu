@@ -1,6 +1,8 @@
 import dockerService from '../../src/modules/docker/docker.service.js';
 import firewallService from '../../src/modules/firewall/firewall.service.js';
 import { successResponse, errorResponse } from '../../src/helpers/response.js';
+import { ensureDockerCompose, withDeployTimeout } from '../shared/dep-installer.js';
+
 
 export default {
   register(app, io) {
@@ -156,15 +158,39 @@ export default {
                   const spinner = document.createElement('div');
                   spinner.id = 'minioDeploySpinner';
                   spinner.innerHTML = \`
-                    <div style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-                      <div class="spinner-border text-danger" style="width: 3rem; height: 3rem;" role="status"></div>
-                      <h4 style="color:#fff; margin-top:20px;">Deploying MinIO Server... This might take a minute.</h4>
+                    <div style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;">
+                      <div class="spinner-border text-danger" style="width: 3.5rem; height: 3.5rem;" role="status"></div>
+                      <h4 id="minioDeployMsg" style="color:#fff; margin:0; font-size:18px;">Deploying MinIO Server...</h4>
+                      <p id="minioDeploySubMsg" style="color:#94a3b8; font-size:13px; margin:0;">Pulling Docker image. This might take a few minutes.</p>
                     </div>
                   \`;
                   document.body.appendChild(spinner);
+                  const msgs = [
+                    ['Deploying MinIO Server...', 'Pulling Docker image. This might take a few minutes.'],
+                    ['Checking dependencies...', 'Verifying docker-compose is installed on the server.'],
+                    ['Still working...', 'If docker-compose was missing, it is being installed automatically.'],
+                    ['Almost there...', 'Starting the MinIO container. Hang tight!'],
+                  ];
+                  let msgIdx = 0;
+                  const msgTimer = setInterval(() => {
+                    msgIdx = (msgIdx + 1) % msgs.length;
+                    const el1 = document.getElementById('minioDeployMsg');
+                    const el2 = document.getElementById('minioDeploySubMsg');
+                    if (el1) el1.textContent = msgs[msgIdx][0];
+                    if (el2) el2.textContent = msgs[msgIdx][1];
+                  }, 8000);
 
                   try {
-                    const res = await LP.post('/plugins/minio-manager/deploy', { port, consolePort, user, password });
+                    const controller = new AbortController();
+                    const fetchTimeout = setTimeout(() => controller.abort(), 600000);
+                    const rawRes = await fetch('/plugins/minio-manager/deploy', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ port, consolePort, user, password }),
+                      signal: controller.signal,
+                    });
+                    clearTimeout(fetchTimeout);
+                    const res = await rawRes.json();
                     if (res?.success) {
                       LP.toast('MinIO Server deployed successfully!', 'success');
                       window.location.reload();
@@ -172,8 +198,9 @@ export default {
                       LP.toast(res?.message || 'Deployment failed', 'error');
                     }
                   } catch (err) {
-                    LP.toast('Deployment error', 'error');
+                    LP.toast(err.name === 'AbortError' ? 'Deploy timed out. Check server logs.' : 'Deployment error: ' + err.message, 'error');
                   } finally {
+                    clearInterval(msgTimer);
                     document.getElementById('minioDeploySpinner')?.remove();
                   }
                 }
@@ -225,11 +252,11 @@ export default {
     });
 
     // 2. Deploy API
-    app.post('/plugins/minio-manager/deploy', async (req, res) => {
+    app.post('/plugins/minio-manager/deploy', withDeployTimeout(600000), async (req, res) => {
       try {
         const { port = 9000, consolePort = 9001, user, password } = req.body;
         if (!user || !password) return errorResponse(res, 'Credentials are required', 400);
-
+        await ensureDockerCompose();
         const composeYaml = `
 version: '3'
 services:

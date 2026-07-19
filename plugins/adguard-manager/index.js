@@ -1,6 +1,8 @@
 import dockerService from '../../src/modules/docker/docker.service.js';
 import firewallService from '../../src/modules/firewall/firewall.service.js';
 import { successResponse, errorResponse } from '../../src/helpers/response.js';
+import { ensureDockerCompose, withDeployTimeout } from '../shared/dep-installer.js';
+
 
 export default {
   register(app, io) {
@@ -207,10 +209,11 @@ export default {
     });
 
     // 2. Deploy API
-    app.post('/plugins/adguard-manager/deploy', async (req, res) => {
+    app.post('/plugins/adguard-manager/deploy', withDeployTimeout(600000), async (req, res) => {
       try {
         const { port = 3000, dnsPort = 53 } = req.body;
-        
+        // Ensure docker-compose is installed before deploying
+        await ensureDockerCompose();
         // Define docker-compose yml
         const composeYaml = `
 version: '3'

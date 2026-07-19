@@ -1,9 +1,11 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
-import { requireAuth } from '../../middleware/auth.js';
+import { requireAuth } from '../../src/middleware/auth.js';
+import { ensureCommand } from '../shared/dep-installer.js';
 
 const execAsync = promisify(exec);
+
 
 export default {
   register(app, io) {
@@ -274,12 +276,8 @@ export default {
     // API: Auto-Install Fail2ban on host
     app.post('/api/plugins/fail2ban/install-host', requireAuth, async (req, res) => {
       try {
-        const packageManager = (await import('../../modules/system/package-manager.js')).default;
-        await packageManager.init();
-        const installCmd = packageManager.getInstallCommand('fail2ban');
-        
-        const { stdout, stderr } = await execAsync(installCmd);
-        res.json({ success: true, message: 'Fail2ban installation complete', data: stdout + stderr });
+        await ensureCommand('fail2ban-client', 'fail2ban', { timeout: 300000 });
+        res.json({ success: true, message: 'Fail2ban installation complete' });
       } catch (err) {
         res.json({ success: false, message: `Installation failed: ${err.message}` });
       }
