@@ -68,7 +68,7 @@ class UpdaterService {
 
   _mockCommand(cmd) {
     if (cmd.includes('git rev-parse HEAD')) return 'abc123def456abc123def456abc123def456abc1\n';
-    if (cmd.includes('git rev-parse --abbrev-ref HEAD')) return 'main\n';
+    if (cmd.includes('git rev-parse --abbrev-ref HEAD')) return 'master\n';
     if (cmd.includes('git fetch')) return '';
     if (cmd.includes('git log HEAD..origin')) return '3\n';
     if (cmd.includes('git config --global --add safe.directory')) return '';
@@ -127,11 +127,11 @@ class UpdaterService {
     const panelCfg = await this._readJSON(PANEL_CONFIG, {});
     const _systemCfg = await this._readJSON(SYSTEM_CONFIG, {});
 
-    let activeBranch = 'main';
+    let activeBranch = 'master';
     let currentCommit = '';
     try {
       const branchOut = await this._runCommand('git rev-parse --abbrev-ref HEAD 2>/dev/null');
-      activeBranch = branchOut.trim() || 'main';
+      activeBranch = branchOut.trim() || 'master';
       activeBranch = this._validateGitRef(activeBranch);
     } catch { /* ignore */ }
 
@@ -298,7 +298,7 @@ class UpdaterService {
   // ── Perform Update ──────────────────────────────────────────────
   async performUpdate(options = {}) {
     const method = options.method || 'git';
-    const branch = options.branch || 'main';
+    const branch = options.branch || 'master';
     const channel = options.channel || 'stable';
     const skipBackup = options.skipBackup || false;
     const dryRun = options.dryRun || false;
@@ -601,7 +601,7 @@ class UpdaterService {
       enabled: cfg.autoUpdate?.enabled || false,
       frequency: cfg.autoUpdate?.frequency || 'daily',
       time: cfg.autoUpdate?.time || '03:00',
-      branch: cfg.autoUpdate?.branch || 'main',
+      branch: cfg.autoUpdate?.branch || 'master',
       channel: cfg.autoUpdate?.channel || 'stable',
       maxBackups: cfg.autoUpdate?.maxBackups || 5,
       healthCheckTimeout: cfg.autoUpdate?.healthCheckTimeout || 60,
@@ -614,7 +614,7 @@ class UpdaterService {
       enabled: !!config.enabled,
       frequency: config.frequency || 'daily',
       time: config.time || '03:00',
-      branch: config.branch || 'main',
+      branch: config.branch || 'master',
       channel: config.channel || 'stable',
       maxBackups: Math.min(Math.max(parseInt(config.maxBackups) || 5, 1), 20),
       healthCheckTimeout: Math.min(Math.max(parseInt(config.healthCheckTimeout) || 60, 10), 300),
