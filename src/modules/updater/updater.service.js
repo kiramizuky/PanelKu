@@ -581,6 +581,9 @@ class UpdaterService {
     panelCfg.lastRestartRequested = new Date().toISOString();
     await this._writeJSON(PANEL_CONFIG, panelCfg);
 
+    // Give 2 seconds for the HTTP response to be fully sent, then restart.
+    // (The outer 5s delay from performUpdate/performRollback ensures the browser
+    //  receives the full log before the server goes down.)
     setTimeout(async () => {
       logger.info('Updater: Executing restart via systemctl...');
       try {
@@ -589,7 +592,7 @@ class UpdaterService {
         logger.warn('Updater: systemctl restart failed, falling back to process.exit(0)');
         process.exit(0);
       }
-    }, 3000);
+    }, 2000);
 
     return true;
   }

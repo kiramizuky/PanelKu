@@ -57,7 +57,11 @@ class PluginsController {
           const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
           const currentVersion = manifest.version || '1.0.0';
           const latestVersion = serverVersions[entry.name] || currentVersion;
-          const isInstalled = installedIds.includes(entry.name) && (pluginLoader.isLoaded(entry.name) || proxies[entry.name]);
+          const isInstalled = installedIds.includes(entry.name) && (
+            proxies[entry.name]   // proxy plugin — no local route needed
+              ? true
+              : pluginLoader.isLoaded(entry.name) && pluginLoader.hasRoute(entry.name) // local plugin must have route
+          );
           // Basic semver check
           const updateAvailable = isInstalled && (currentVersion !== latestVersion);
 

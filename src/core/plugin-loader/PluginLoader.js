@@ -16,6 +16,7 @@ class PluginLoader {
   constructor() {
     this._plugins = new Map();
     this._proxies = new Map();
+    this._routedPlugins = new Set(); // plugins that registered at least 1 route
     this._pluginsDir = resolve('./plugins');
     this.router = Router();
   }
@@ -92,10 +93,16 @@ class PluginLoader {
       this.validateManifest(manifest, name);
 
       const entryPath = join(this._pluginsDir, name, manifest.entry || 'index.js');
+
+      // Track whether this plugin registers any routes
+      const self = this;
       const wrappedApp = new Proxy(app, {
         get: (target, prop) => {
           if (['get', 'post', 'put', 'delete', 'patch'].includes(prop)) {
-            return (...args) => this.router[prop](...args);
+            return (...args) => {
+              self._routedPlugins.add(name);
+              return self.router[prop](...args);
+            };
           }
           const val = target[prop];
           if (typeof val === 'function') {
@@ -114,7 +121,7 @@ class PluginLoader {
 
       await plugin.register(wrappedApp, io);
       this._plugins.set(name, { ...manifest, status: 'active' });
-      logger.info(`PluginLoader: plugin [${name}] v${manifest.version} loaded.`);
+      logger.info(`PluginLoader: plugin [${name}] v${manifest.version} loaded. Routes registered: ${this._routedPlugins.has(name)}`);
     } catch (err) {
       logger.error(`PluginLoader: failed to load plugin [${name}]: ${err.message}`);
     }
@@ -137,6 +144,14 @@ class PluginLoader {
 
   isLoaded(name) {
     return this._plugins.has(name);
+  }
+
+  /**
+   * Returns true if plugin was loaded AND registered at least one route.
+   * Plugins with proxyUrl don't need to register routes.
+   */
+  hasRoute(name) {
+    return this._routedPlugins.has(name);
   }
 
   /**
