@@ -1,5 +1,6 @@
 import Docker from 'dockerode';
 import logger from '../../config/logger.js';
+import packageManager from '../system/package-manager.js';
 
 
 class DockerService {
@@ -257,30 +258,72 @@ class DockerService {
       const composePath = path.join(composeDir, 'docker-compose.yml');
       await fs.writeFile(composePath, composeYaml, 'utf-8');
 
-      // Run docker-compose up
-      let stdout, stderr;
-      try {
-        const res = await execAsync(`docker compose -p ${projectName} -f "${composePath}" up -d`);
-        stdout = res.stdout;
-        stderr = res.stderr;
-      } catch (err) {
-        if (err.message.includes('unknown shorthand flag') || err.message.includes('is not a docker command')) {
-          try {
-            logger.info('docker compose failed, trying fallback to docker-compose...');
+      /** Run the compose command, trying V2 first then V1 */
+      const runCompose = async () => {
+        try {
+          const res = await execAsync(`docker compose -p ${projectName} -f "${composePath}" up -d`);
+          return { stdout: res.stdout, stderr: res.stderr };
+        } catch (err) {
+          if (err.message.includes('unknown shorthand flag') || err.message.includes('is not a docker command')) {
+            logger.info('docker compose (V2) unavailable, trying docker-compose (V1)...');
             const res = await execAsync(`docker-compose -p ${projectName} -f "${composePath}" up -d`);
-            stdout = res.stdout;
-            stderr = res.stderr;
-          } catch (fallbackErr) {
-            if (fallbackErr.message.includes('not found')) {
-              throw new Error(`Docker Compose is not installed on this system. Please install 'docker-compose-plugin' (V2) or 'docker-compose' (V1) via your package manager.`);
-            }
-            throw new Error(`Compose deployment failed on both 'docker compose' and 'docker-compose'. Fallback error: ${fallbackErr.message}`);
+            return { stdout: res.stdout, stderr: res.stderr };
           }
-        } else {
           throw err;
         }
+      };
+
+      /** Auto-install docker-compose when it is completely missing */
+      const autoInstall = async () => {
+        logger.warn('Docker Compose not found — attempting automatic installation...');
+        await packageManager.init();
+
+        // Build install command based on distro
+        let installCmd;
+        switch (packageManager.pmType) {
+          case 'pacman':
+            installCmd = 'sudo pacman -S --noconfirm --needed docker-compose';
+            break;
+          case 'dnf':
+            installCmd = 'sudo dnf install -y docker-compose-plugin || sudo dnf install -y docker-compose';
+            break;
+          case 'emerge':
+            installCmd = 'sudo emerge -v app-containers/docker-compose';
+            break;
+          case 'apt':
+          default:
+            // Prefer V2 plugin; fall back to standalone V1 if plugin unavailable
+            installCmd =
+              'sudo apt-get update -qq && ' +
+              '(sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker-compose-plugin 2>/dev/null || ' +
+              ' sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker-compose)';
+            break;
+        }
+
+        logger.info(`Running: ${installCmd}`);
+        const { stdout, stderr } = await execAsync(installCmd, { timeout: 300000 });
+        logger.info(`Install output: ${stdout || stderr}`);
+      };
+
+      // First attempt
+      try {
+        const { stdout, stderr } = await runCompose();
+        return { success: true, log: stdout || stderr };
+      } catch (firstErr) {
+        // Check if the error indicates compose is simply not found
+        const notFound =
+          firstErr.message.includes('not found') ||
+          firstErr.message.includes('No such file') ||
+          firstErr.message.includes('command not found');
+
+        if (!notFound) throw firstErr;
+
+        // Auto-install then retry once
+        await autoInstall();
+        logger.info('Retrying Docker Compose deploy after installation...');
+        const { stdout, stderr } = await runCompose();
+        return { success: true, log: stdout || stderr };
       }
-      return { success: true, log: stdout || stderr };
     } catch (error) {
       throw new Error(`Failed to deploy Docker Compose: ${error.message}`);
     }
