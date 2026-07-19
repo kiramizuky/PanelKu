@@ -367,9 +367,6 @@ class PluginsController {
         },
       ];
 
-      // Get installed plugins
-      const installedStr = await Setting.get('installed_plugins') || '[]';
-      const installedIds = JSON.parse(typeof installedStr === 'string' ? installedStr : JSON.stringify(installedStr));
 
       const result = marketplace.map(p => ({
         ...p,
