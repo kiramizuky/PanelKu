@@ -20,7 +20,7 @@ export const apiLimiter = rateLimit({
     const url = req.originalUrl.split('?')[0];
     
     // Exempt auth endpoints from general API limit (they are protected by authLimiter separately)
-    if (url === '/api/auth/login' || url === '/api/auth/2fa/verify') return true;
+    if (url === '/api/auth/login' || url === '/api/auth/2fa/verify' || url === '/api/auth/profile' || url === '/api/auth/refresh') return true;
     
     // Skip high-frequency dashboard polling endpoints
     if (url.startsWith('/api/dashboard/metrics') || url.startsWith('/api/dashboard/info')) return true;

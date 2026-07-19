@@ -431,6 +431,7 @@ class UpdaterService {
 
       log.push('\n✅ Update completed successfully!');
       log.push('⏳ Panel will restart in 5 seconds...');
+      setTimeout(() => { this.restartPanel().catch(() => {}); }, 5000);
     } catch (err) {
       log.push(`\n❌ Update failed: ${err.message}`);
 
@@ -548,6 +549,7 @@ class UpdaterService {
         : '\n⚠️ Rollback completed but syntax check failed — panel may not start correctly.'
       );
       log.push('⏳ Panel will restart in 5 seconds...');
+      setTimeout(() => { this.restartPanel().catch(() => {}); }, 5000);
     } catch (err) {
       log.push(`\n❌ Rollback failed: ${err.message}`);
       await this._saveUpdateHistory({
