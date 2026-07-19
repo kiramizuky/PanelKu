@@ -40,6 +40,17 @@ class SSLService {
       return true; // Already installed
     } catch {
       try {
+        // [FIX] Clean up partial acme.sh directory that may block reinstall
+        // acme.sh installer refuses if ~/.acme.sh directory already exists
+        const acmeDir = '/root/.acme.sh';
+        try {
+          await fs.access(acmeDir);
+          // Dir exists but acme.sh confirmed missing above — remove it
+          await fs.rm(acmeDir, { recursive: true, force: true });
+        } catch {
+          // Dir doesn't exist — no cleanup needed
+        }
+
         // [FIX] Use execFile with args array — no shell interpreter
         await execFileAsync('curl', ['-fsSL', 'https://get.acme.sh'], { timeout: 30000 });
         // Pipe via shell is still needed for | sh, but we verify the URL is hardcoded

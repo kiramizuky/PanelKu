@@ -142,6 +142,27 @@ class NodeJSService {
       return { message: 'NVM is already installed', nvmDir: existingDir };
     }
 
+    // Clean up partial NVM directories that may block the installer.
+    // Only use hardcoded paths (NOT process.env.NVM_DIR) to avoid
+    // accidentally removing user data if NVM_DIR is set to a broad path.
+    const NVM_CLEANUP_DIRS = [
+      '/usr/local/nvm',
+      `${process.env.HOME}/.nvm`,
+      '/root/.nvm',
+      `${process.env.HOME}/.config/nvm`,
+    ].filter(Boolean);
+    for (const dir of NVM_CLEANUP_DIRS) {
+      if (!dir) continue;
+      try {
+        await fs.access(dir);
+        // dir exists but _findNvmDir() confirmed it's NOT a valid installation.
+        // The nvm installer refuses to proceed if the dir already exists.
+        await fs.rm(dir, { recursive: true, force: true });
+      } catch {
+        // Dir doesn't exist or can't be accessed — skip
+      }
+    }
+
     try {
       // Download and run the official install script
       const { stdout, stderr } = await execAsync(

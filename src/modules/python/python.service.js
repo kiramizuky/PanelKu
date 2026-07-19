@@ -141,6 +141,23 @@ class PythonService {
     const existing = await this._findPyenvDir();
     if (existing) return { message: 'Pyenv is already installed', pyenvRoot: existing };
 
+    // Remove leftover/incomplete pyenv directories that pyenv.run refuses to overwrite
+    // pyenv.run checks if dir exists (not just if bin/shims are present)
+    for (const candidate of [
+      '/root/.pyenv',
+      `${process.env.HOME || '/root'}/.pyenv`,
+    ].filter(Boolean)) {
+      // Only remove if it's NOT a valid installation (incomplete/aborted install)
+      // _findPyenvDir already checked valid installations above and returned
+      try {
+        await fs.access(candidate);
+        logger.warn(`Removing incomplete pyenv directory: ${candidate}`);
+        await fs.rm(candidate, { recursive: true, force: true });
+      } catch {
+        // Directory doesn't exist or already removed — proceed
+      }
+    }
+
     try {
       const { stdout, stderr } = await execAsync(
         'curl -fsSL https://pyenv.run | bash',
