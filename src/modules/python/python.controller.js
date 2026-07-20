@@ -19,6 +19,9 @@ class PythonController {
    * POST /api/python/pyenv/install
    */
   async installPyenv(req, res) {
+    // Pyenv download + compile can take several minutes — extend HTTP timeout
+    req.setTimeout(660000);
+    res.setTimeout(660000);
     try {
       const result = await pythonService.installPyenv();
       return successResponse(res, result, result.message);

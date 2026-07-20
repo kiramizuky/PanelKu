@@ -77,8 +77,8 @@ class PythonService {
     for (const dir of candidates) {
       if (!dir) continue;
       try {
+        // Only check bin/pyenv — shims/ is empty until first 'pyenv install' is run
         await fs.access(`${dir}/bin/pyenv`);
-        await fs.access(`${dir}/shims/pyenv`);
         this.pyenvRoot = dir;
         return dir;
       } catch {
@@ -86,17 +86,27 @@ class PythonService {
       }
     }
 
-    // Try to find via which
+    // Try to find via which / PATH
     try {
-      const { stdout } = await execAsync('which pyenv 2>/dev/null || echo ""');
+      const { stdout } = await execAsync('which pyenv 2>/dev/null || command -v pyenv 2>/dev/null || echo ""');
       const pyenvPath = stdout.trim();
       if (pyenvPath) {
-        // Resolve pyenv root
-        const { stdout: root } = await execAsync('pyenv root 2>/dev/null || echo ""');
+        // Derive root from the binary location
+        const { stdout: root } = await execAsync(
+          `PYENV_ROOT=$(dirname $(dirname ${pyenvPath})) && echo $PYENV_ROOT`
+        ).catch(() => ({ stdout: '' }));
         const found = root.trim();
         if (found) {
           this.pyenvRoot = found;
           return found;
+        }
+        // Try pyenv root command with full PATH
+        const { stdout: root2 } = await execAsync(
+          `export PATH="$(dirname $(dirname ${pyenvPath}))/bin:$PATH" && pyenv root 2>/dev/null || echo ""`
+        ).catch(() => ({ stdout: '' }));
+        if (root2.trim()) {
+          this.pyenvRoot = root2.trim();
+          return root2.trim();
         }
       }
     } catch {
@@ -141,53 +151,85 @@ class PythonService {
     const existing = await this._findPyenvDir();
     if (existing) return { message: 'Pyenv is already installed', pyenvRoot: existing };
 
+    // Determine target install directory
+    const homeDir = process.env.HOME || '/root';
+    const targetDir = `${homeDir}/.pyenv`;
+
     // Remove leftover/incomplete pyenv directories that pyenv.run refuses to overwrite
-    // pyenv.run checks if dir exists (not just if bin/shims are present)
-    for (const candidate of [
-      '/root/.pyenv',
-      `${process.env.HOME || '/root'}/.pyenv`,
-    ].filter(Boolean)) {
-      // Only remove if it's NOT a valid installation (incomplete/aborted install)
-      // _findPyenvDir already checked valid installations above and returned
+    for (const candidate of [targetDir, '/root/.pyenv'].filter((v, i, a) => a.indexOf(v) === i)) {
       try {
         await fs.access(candidate);
         logger.warn(`Removing incomplete pyenv directory: ${candidate}`);
         await fs.rm(candidate, { recursive: true, force: true });
       } catch {
-        // Directory doesn't exist or already removed — proceed
+        // Directory doesn't exist — proceed
       }
     }
+
+    let installOutput = '';
 
     try {
+      // Method 1: pyenv.run installer script
+      logger.info('Pyenv: Installing via pyenv.run...');
       const { stdout, stderr } = await execAsync(
         'curl -fsSL https://pyenv.run | bash',
-        { timeout: 120000 }
+        { timeout: 600000, env: { ...process.env, HOME: homeDir } }
       );
-
-      // Add to profile
-      try {
-        const root = await this._findPyenvDir() || `${process.env.HOME}/.pyenv`;
-        const profileContent = `
-# Pyenv
-export PYENV_ROOT="${root}"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)"
-eval "$(pyenv virtualenv-init -)"
-`;
-        await fs.writeFile('/etc/profile.d/pyenv.sh', profileContent, 'utf8');
-        await execAsync('chmod +x /etc/profile.d/pyenv.sh').catch(() => {});
-      } catch {
-        // Non-critical
-      }
-
-      const newRoot = await this._findPyenvDir();
-      if (!newRoot) throw new Error('Pyenv installation completed but directory not found.');
-
-      this.pyenvRoot = newRoot;
-      return { message: 'Pyenv installed successfully', pyenvRoot: newRoot, output: stdout + stderr };
+      installOutput = (stdout || '') + (stderr || '');
+      logger.info('Pyenv: pyenv.run completed');
     } catch (err) {
-      throw new Error(`Failed to install Pyenv: ${err.message}`);
+      logger.warn(`Pyenv: pyenv.run failed (${err.message}), falling back to git clone...`);
+      try {
+        // Method 2: direct git clone
+        await execAsync(
+          `git clone https://github.com/pyenv/pyenv.git "${targetDir}"`,
+          { timeout: 300000 }
+        );
+        // Also clone pyenv-virtualenv
+        await execAsync(
+          `git clone https://github.com/pyenv/pyenv-virtualenv.git "${targetDir}/plugins/pyenv-virtualenv"`,
+          { timeout: 300000 }
+        ).catch(() => {}); // non-critical
+        logger.info('Pyenv: git clone completed');
+      } catch (gitErr) {
+        throw new Error(`Pyenv installation failed via both pyenv.run and git clone: ${gitErr.message}`);
+      }
     }
+
+    // Write pyenv profile config
+    try {
+      const profileContent = [
+        '# Pyenv',
+        `export PYENV_ROOT="${targetDir}"`,
+        'export PATH="$PYENV_ROOT/bin:$PATH"',
+        'eval "$(pyenv init --path)"',
+        'eval "$(pyenv virtualenv-init -)"',
+      ].join('\n') + '\n';
+      await fs.writeFile('/etc/profile.d/pyenv.sh', profileContent, 'utf8');
+      await execAsync('chmod +x /etc/profile.d/pyenv.sh').catch(() => {});
+    } catch {
+      // Non-critical — panel still works without this
+    }
+
+    // Verify: check for bin/pyenv directly (shims/ is empty until first version install)
+    const pyenvBin = `${targetDir}/bin/pyenv`;
+    try {
+      await fs.access(pyenvBin);
+    } catch {
+      // Try other common locations before giving up
+      const altRoot = await this._findPyenvDir();
+      if (!altRoot) {
+        throw new Error(
+          `Pyenv installation script ran but bin/pyenv not found at ${pyenvBin}. ` +
+          'Check that curl and git are installed on the server.'
+        );
+      }
+      this.pyenvRoot = altRoot;
+      return { message: 'Pyenv installed successfully', pyenvRoot: altRoot, output: installOutput };
+    }
+
+    this.pyenvRoot = targetDir;
+    return { message: 'Pyenv installed successfully', pyenvRoot: targetDir, output: installOutput };
   }
 
   // ── Python Version Management ─────────────────────────
