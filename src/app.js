@@ -149,6 +149,7 @@ const createApp = () => {
   app.get('/settings/profile', (req, res) => res.render('settings/profile', { title: 'Profile' }));
   app.get('/settings/audit', (req, res) => res.render('settings/audit', { title: 'Audit Log' }));
   app.get('/settings/changelog', (req, res) => res.render('settings/changelog', { title: 'Changelog' }));
+  app.get('/settings/auth', (req, res) => res.render('settings/auth', { title: 'SSO / LDAP' }));
   app.get('/settings/themes', (req, res) => res.render('settings/themes', { title: 'Themes' }));
   app.get('/whatsapp', (req, res) => res.render('whatsapp/index', { title: 'WhatsApp API' }));
   app.get('/api-docs', (req, res) => res.render('api-docs/index', { title: 'API Documentation' }));

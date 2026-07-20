@@ -41,15 +41,17 @@ class SSOController {
 
   /**
    * GET /api/auth/sso/:provider/authorize
-   * Generate OAuth2 authorize URL for a provider.
+   * Redirect user to OAuth2 provider authorize URL.
    */
   async authorize(req, res) {
     try {
       const { provider } = req.params;
       const result = await ssoService.getAuthorizeUrl(provider);
-      return successResponse(res, result);
+      return res.redirect(result.url);
     } catch (error) {
-      return errorResponse(res, error.message, 400);
+      // Redirect to login page with error
+      const redirectUrl = `${req.protocol}://${req.get('host')}/?error=${encodeURIComponent(error.message)}`;
+      return res.redirect(redirectUrl);
     }
   }
 

@@ -85,9 +85,12 @@ class LDAPService {
     } catch {
       throw new Error('ldapjs package is not installed. Run: npm install ldapjs');
     }
+    // ldapjs v3+ wraps exports in a default object
+    const ldapClient = ldap.default?.createClient || ldap.createClient;
+    if (!ldapClient) throw new Error('ldapjs createClient not found. Try: npm install ldapjs@2');
 
     return new Promise((resolve, reject) => {
-      const client = ldap.createClient({
+      const client = ldapClient({
         url: config.url,
         tlsOptions: config.tls ? {} : { rejectUnauthorized: false },
         timeout: 10000,
@@ -251,9 +254,11 @@ class LDAPService {
     } catch {
       throw new Error('ldapjs package is not installed. Run: npm install ldapjs');
     }
+    const ldapClient = ldap.default?.createClient || ldap.createClient;
+    if (!ldapClient) throw new Error('ldapjs createClient not found. Try: npm install ldapjs@2');
 
     return new Promise((resolve, reject) => {
-      const client = ldap.createClient({
+      const client = ldapClient({
         url: config.url,
         tlsOptions: config.tls ? {} : { rejectUnauthorized: false },
         timeout: 10000,

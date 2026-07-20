@@ -248,6 +248,19 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // SSO callback handler — extract token from URL hash (#token=xxx)
+    (function() {
+      if (window.location.hash && window.location.hash.startsWith('#token=')) {
+        const token = window.location.hash.substring(7); // strip '#token='
+        if (token) {
+          localStorage.setItem('lp_token', token);
+          // Clean hash from URL without page reload
+          history.replaceState(null, '', window.location.pathname);
+        }
+      }
+    })();
+  </script>
   <script src="/js/app.js"></script>
   <%- typeof script !== 'undefined' ? script : '' %>
   

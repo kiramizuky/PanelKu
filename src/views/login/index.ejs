@@ -215,17 +215,17 @@
 
             <!-- SSO Login Buttons -->
             <div id="ssoButtons" class="mt-4" style="border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;">
-              <p style="color:var(--text-muted);font-size:12px;text-align:center;margin-bottom:12px;">Or continue with</p>
+              <p id="ssoLabel" style="color:var(--text-muted);font-size:12px;text-align:center;margin-bottom:12px;">Or continue with</p>
               <div style="display:flex;gap:8px;">
-                <button type="button" id="ssoGoogleBtn" class="btn-lp btn-lp-ghost" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;font-size:13px;border-radius:10px;" onclick="window.location.href='/api/auth/sso/google/authorize'" data-provider="google">
+                <button type="button" id="ssoGoogleBtn" class="btn-lp btn-lp-ghost" style="display:none;flex:1;align-items:center;justify-content:center;gap:8px;padding:8px;font-size:13px;border-radius:10px;" onclick="window.location.href='/api/auth/sso/google/authorize'" data-provider="google">
                   <i class="bi bi-google" style="font-size:16px;"></i> Google
                 </button>
-                <button type="button" id="ssoGithubBtn" class="btn-lp btn-lp-ghost" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;font-size:13px;border-radius:10px;" onclick="window.location.href='/api/auth/sso/github/authorize'" data-provider="github">
+                <button type="button" id="ssoGithubBtn" class="btn-lp btn-lp-ghost" style="display:none;flex:1;align-items:center;justify-content:center;gap:8px;padding:8px;font-size:13px;border-radius:10px;" onclick="window.location.href='/api/auth/sso/github/authorize'" data-provider="github">
                   <i class="bi bi-github" style="font-size:16px;"></i> GitHub
                 </button>
               </div>
               <div style="text-align:center;margin-top:8px;">
-                <button type="button" id="ldapLoginBtn" class="btn-lp btn-lp-ghost btn-lp-sm" style="font-size:11px;color:var(--text-muted);" onclick="showLdapLogin()">
+                <button type="button" id="ldapLoginBtn" class="btn-lp btn-lp-ghost btn-lp-sm" style="display:none;font-size:11px;color:var(--text-muted);" onclick="showLdapLogin()">
                   <i class="bi bi-building me-1"></i> LDAP / Enterprise Login
                 </button>
               </div>
@@ -302,6 +302,52 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/js/app.js"></script>
   <script>
+    // ── SSO/LDAP Provider Status Check ──
+    // Fetches config on page load; shows buttons only if configured/enabled.
+    // Buttons start hidden, so no flash of unconfigured buttons.
+    (async function() {
+      let anyEnabled = false;
+
+      // SSO providers (Google, GitHub)
+      try {
+        const ssoRes = await fetch('/api/auth/sso/config');
+        const ssoData = await ssoRes.json();
+        if (ssoData?.success && ssoData.data?.config) {
+          const config = ssoData.data.config;
+          ['google', 'github'].forEach(function(provider) {
+            const btn = document.getElementById('sso' + provider.charAt(0).toUpperCase() + provider.slice(1) + 'Btn');
+            if (btn && config[provider]?.enabled) {
+              btn.style.display = 'flex';
+              anyEnabled = true;
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to fetch SSO config:', e);
+      }
+
+      // LDAP
+      try {
+        const ldapRes = await fetch('/api/auth/ldap/config');
+        const ldapData = await ldapRes.json();
+        if (ldapData?.success && ldapData.data?.config) {
+          const ldapBtn = document.getElementById('ldapLoginBtn');
+          if (ldapBtn && ldapData.data.config.enabled) {
+            ldapBtn.style.display = 'inline-block';
+            anyEnabled = true;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch LDAP config:', e);
+      }
+
+      // Hide entire SSO/LDAP section if no provider is enabled
+      if (!anyEnabled) {
+        const section = document.getElementById('ssoButtons');
+        if (section) section.style.display = 'none';
+      }
+    })();
+
     function showLdapLogin() {
       const modal = new bootstrap.Modal(document.getElementById('ldapModal'));
       modal.show();
