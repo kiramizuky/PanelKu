@@ -1,6 +1,8 @@
 import fileManagerService from './filemanager.service.js';
 import { success, error } from '../../helpers/response.js';
 import { createReadStream } from 'fs';
+import { createDownloadToken, verifyDownloadToken } from '../../helpers/crypto.js';
+import appConfig from '../../config/app.js';
 
 class FileManagerController {
   async list(req, res) {
@@ -118,6 +120,53 @@ class FileManagerController {
       }
 
       // Sanitize filename to prevent Content-Disposition header injection
+      const filename = filePath.split('/').pop().replace(/[\r\n"]/g, '_');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', stats.size);
+      createReadStream(full).pipe(res);
+    } catch (err) {
+      return error(res, err.message, err.statusCode || 500);
+    }
+  }
+
+  async generateDownloadToken(req, res) {
+    try {
+      const { path: filePath } = req.body;
+      if (!filePath || typeof filePath !== 'string') {
+        return error(res, 'File path is required', 400);
+      }
+      // Validate path exists and is a regular file before issuing token
+      const full = fileManagerService._resolvePath(filePath);
+      const { stat } = await import('fs/promises');
+      const stats = await stat(full);
+      if (stats.isDirectory()) {
+        return error(res, 'Cannot download a directory directly. Please compress it first.', 400);
+      }
+      const token = createDownloadToken(filePath, appConfig.appSecret);
+      return success(res, {
+        token,
+        url: `/api/filemanager/download-token/${token}`,
+      });
+    } catch (err) {
+      return error(res, err.message, err.statusCode || 500);
+    }
+  }
+
+  async downloadByToken(req, res) {
+    try {
+      const { token } = req.params;
+      if (!token) return error(res, 'Token is required', 400);
+
+      const filePath = verifyDownloadToken(token, appConfig.appSecret);
+      if (!filePath) return error(res, 'Invalid or expired download token', 401);
+
+      const full = fileManagerService._resolvePath(filePath);
+      const { stat } = await import('fs/promises');
+      const stats = await stat(full);
+      if (stats.isDirectory()) {
+        return error(res, 'Cannot download a directory. Please compress it first.', 400);
+      }
+
       const filename = filePath.split('/').pop().replace(/[\r\n"]/g, '_');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', stats.size);

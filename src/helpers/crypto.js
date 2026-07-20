@@ -51,3 +51,29 @@ export const decrypt = (encryptedText, key) => {
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
 };
+
+/**
+ * Generate a short-lived, signed download token (HMAC-SHA256).
+ * Token expires after `ttlMs` (default 60 seconds).
+ */
+export const createDownloadToken = (path, secret, ttlMs = 60000) => {
+  const payload = JSON.stringify({ path, exp: Date.now() + ttlMs });
+  const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return Buffer.from(JSON.stringify({ payload, hmac })).toString('base64url');
+};
+
+/**
+ * Verify and decode a download token. Returns the path if valid, or null.
+ */
+export const verifyDownloadToken = (tokenStr, secret) => {
+  try {
+    const { payload, hmac } = JSON.parse(Buffer.from(tokenStr, 'base64url').toString('utf8'));
+    const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expected))) return null;
+    const { path, exp } = JSON.parse(payload);
+    if (Date.now() > exp) return null;
+    return path;
+  } catch {
+    return null;
+  }
+};

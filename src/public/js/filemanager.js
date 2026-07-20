@@ -209,10 +209,11 @@ const FMPage = (() => {
     
     LP.toast('Downloading selected files...', 'info');
     
-    // Download files concurrently using window trigger
-    paths.forEach(p => {
+    // Download files concurrently using short-lived download tokens
+    paths.forEach(async p => {
+      const url = await _getDownloadUrl(p);
       const frame = document.createElement('iframe');
-      frame.src = `/api/filemanager/download?path=${encodeURIComponent(p)}&token=${LP.state.accessToken}`;
+      frame.src = url;
       frame.style.display = 'none';
       document.body.appendChild(frame);
       setTimeout(() => frame.remove(), 5000);
@@ -296,7 +297,7 @@ const FMPage = (() => {
                   <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body text-center" style="padding:20px; background:#04060b;">
-                  <img src="/api/filemanager/download?path=${encodeURIComponent(item.path)}&token=${LP.state.accessToken}" style="max-width:100%; max-height:70vh; object-fit:contain; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                  <img id="${id}_img" style="max-width:100%; max-height:70vh; object-fit:contain; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
                 </div>
               </div>
             </div>
@@ -304,6 +305,10 @@ const FMPage = (() => {
         document.body.appendChild(modal);
         const bsModal = new bootstrap.Modal(document.getElementById(id));
         bsModal.show();
+        // Set image src after modal opens to avoid blocking
+        _getDownloadUrl(item.path).then(url => {
+          document.getElementById(`${id}_img`).src = url;
+        });
         document.getElementById(id).addEventListener('hidden.bs.modal', () => modal.remove());
         return;
       }
@@ -321,7 +326,7 @@ const FMPage = (() => {
                   <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" style="padding:0; height:calc(100% - 50px);">
-                  <iframe src="/api/filemanager/download?path=${encodeURIComponent(item.path)}&token=${LP.state.accessToken}" style="width:100%; height:100%; border:none;"></iframe>
+                  <iframe id="${id}_iframe" style="width:100%; height:100%; border:none;"></iframe>
                 </div>
               </div>
             </div>
@@ -329,6 +334,10 @@ const FMPage = (() => {
         document.body.appendChild(modal);
         const bsModal = new bootstrap.Modal(document.getElementById(id));
         bsModal.show();
+        // Set iframe src after modal opens
+        _getDownloadUrl(item.path).then(url => {
+          document.getElementById(`${id}_iframe`).src = url;
+        });
         document.getElementById(id).addEventListener('hidden.bs.modal', () => modal.remove());
         return;
       }
@@ -624,7 +633,8 @@ const FMPage = (() => {
 
   async function downloadSelected() {
     if (!selectedItem) return;
-    window.open(`/api/filemanager/download?path=${encodeURIComponent(selectedItem.path)}&token=${LP.state.accessToken}`, '_blank');
+    const url = await _getDownloadUrl(selectedItem.path);
+    window.open(url, '_blank');
   }
 
   async function zipSelected() {
@@ -671,6 +681,28 @@ const FMPage = (() => {
       if (overlay) overlay.classList.remove('visible');
       if (e.dataTransfer.files.length) upload(e.dataTransfer.files);
     });
+  }
+
+  // ── Download Token Cache ─────────────────────────
+  let _downloadTokenCache = {};
+
+  async function _getDownloadUrl(path) {
+    // Check cache first (tokens are valid for 60s)
+    if (_downloadTokenCache[path] && _downloadTokenCache[path].expires > Date.now()) {
+      return _downloadTokenCache[path].url;
+    }
+    try {
+      const res = await LP.post('/filemanager/generate-download-token', { path });
+      if (res?.success && res.data?.url) {
+        _downloadTokenCache[path] = {
+          url: res.data.url,
+          expires: Date.now() + 55000, // slightly under 60s to be safe
+        };
+        return res.data.url;
+      }
+    } catch {}
+    // Fallback: use token directly in URL (legacy)
+    return `/api/filemanager/download?path=${encodeURIComponent(path)}&token=${LP.state.accessToken}`;
   }
 
   function escHtml(str) {

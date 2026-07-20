@@ -3,7 +3,7 @@ import multer from 'multer';
 import fileManagerController from './filemanager.controller.js';
 import { authenticate } from '../../middleware/auth.js';
 import { rbac } from '../../middleware/rbac.js';
-import { uploadLimiter } from '../../middleware/rateLimiter.js';
+import { uploadLimiter, downloadTokenLimiter } from '../../middleware/rateLimiter.js';
 import { RESOURCES, ACTIONS } from '../../config/constants.js';
 import appConfig from '../../config/app.js';
 
@@ -37,6 +37,9 @@ router.get('/list', rbac(RESOURCES.FILEMANAGER, ACTIONS.READ), fileManagerContro
 router.get('/info', rbac(RESOURCES.FILEMANAGER, ACTIONS.READ), fileManagerController.info.bind(fileManagerController));
 router.get('/read', rbac(RESOURCES.FILEMANAGER, ACTIONS.READ), fileManagerController.readFile.bind(fileManagerController));
 router.get('/download', rbac(RESOURCES.FILEMANAGER, ACTIONS.READ), fileManagerController.download.bind(fileManagerController));
+router.post('/generate-download-token', downloadTokenLimiter, rbac(RESOURCES.FILEMANAGER, ACTIONS.READ), fileManagerController.generateDownloadToken.bind(fileManagerController));
+// No JWT middleware — token is HMAC-signed, short-lived (60s), and self-authenticating
+router.get('/download-token/:token', fileManagerController.downloadByToken.bind(fileManagerController));
 router.get('/search', rbac(RESOURCES.FILEMANAGER, ACTIONS.READ), fileManagerController.search.bind(fileManagerController));
 
 // Write operations

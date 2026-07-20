@@ -60,3 +60,17 @@ export const apiKeyLimiter = rateLimit({
   keyGenerator: (req) => req.headers['x-api-key'] || req.ip,
   message: { success: false, message: 'Too many API key requests. Please slow down.' },
 });
+
+/**
+ * Download token rate limiter — prevent brute-force on generate-download-token endpoint.
+ * Limits per-user (via req.user.id) to avoid IP-based bypass across shared networks.
+ * 20 requests/minute gives headroom for legitimate multi-file downloads while stopping brute force.
+ */
+export const downloadTokenLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 min
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { success: false, message: 'Too many download token requests. Please slow down.' },
+});
