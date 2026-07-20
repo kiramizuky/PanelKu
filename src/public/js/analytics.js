@@ -479,12 +479,12 @@ const AnalyticsPage = {
         ifacesEl.innerHTML = ifaces.map(i => `
           <div class="d-flex justify-content-between py-2" style="border-bottom:1px solid rgba(255,255,255,0.04);">
             <div>
-              <strong>${i.name}</strong>
-              <div style="font-size:11px;color:var(--text-muted);">${i.ip4 || 'No IP'}</div>
+              <strong>${LP.escHtml(i.name)}</strong>
+              <div style="font-size:11px;color:var(--text-muted);">${LP.escHtml(i.ip4 || 'No IP')}</div>
             </div>
             <div style="font-size:11px;color:var(--text-muted);text-align:right;">
-              <div>${i.type || '?'}</div>
-              ${i.speed ? `<div>${i.speed} Mbps</div>` : ''}
+              <div>${LP.escHtml(i.type || '?')}</div>
+              ${i.speed ? `<div>${LP.escHtml(String(i.speed))} Mbps</div>` : ''}
             </div>
           </div>
         `).join('');
@@ -531,7 +531,7 @@ const AnalyticsPage = {
           </div>
           ${stateKeys.map(state => `
             <div class="d-flex justify-content-between py-1" style="border-bottom:1px solid rgba(255,255,255,0.03);">
-              <span style="color:var(--text-muted);font-size:12px;">${state}</span>
+              <span style="color:var(--text-muted);font-size:12px;">${LP.escHtml(state)}</span>
               <span style="font-weight:600;">${byState[state]}</span>
             </div>
           `).join('')}
@@ -546,7 +546,7 @@ const AnalyticsPage = {
       } else {
         portsEl.innerHTML = ports.map(p => `
           <span class="lp-badge" style="font-size:11px;margin:3px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);">
-            :${p.port} <span style="color:var(--text-muted);font-size:10px;">${p.process}</span>
+            :${p.port} <span style="color:var(--text-muted);font-size:10px;">${LP.escHtml(p.process)}</span>
           </span>
         `).join('');
       }

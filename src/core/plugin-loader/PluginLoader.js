@@ -40,7 +40,11 @@ class PluginLoader {
     try {
       const Setting = (await import('../../models/Setting.js')).default;
       const installedStr = await Setting.get('installed_plugins') || '[]';
-      installedIds = JSON.parse(typeof installedStr === 'string' ? installedStr : JSON.stringify(installedStr));
+      try {
+        installedIds = JSON.parse(typeof installedStr === 'string' ? installedStr : JSON.stringify(installedStr));
+      } catch {
+        installedIds = [];
+      }
     } catch (e) {
       logger.warn('PluginLoader: failed to query installed plugins from database:', e.message);
     }
@@ -49,7 +53,12 @@ class PluginLoader {
     try {
       const Setting = (await import('../../models/Setting.js')).default;
       const proxiesStr = await Setting.get('plugin_proxies') || '{}';
-      const proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
+      let proxies = {};
+      try {
+        proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
+      } catch {
+        proxies = {};
+      }
       for (const [id, url] of Object.entries(proxies)) {
         if (url) {
           // [SECURITY FIX] Use setProxy() instead of direct _proxies.set() — ensures URL validation

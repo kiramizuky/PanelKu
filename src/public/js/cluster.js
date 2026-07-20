@@ -132,12 +132,12 @@ const ClusterPage = (() => {
           <!-- Header: name + status badge -->
           <div class="d-flex justify-content-between align-items-start mb-3">
             <div onclick="LP.call('ClusterPage.showDetails', '${LP.encJsArg(node.id)}')" style="cursor:pointer;" title="Klik untuk melihat detail info node">
-              <h5 class="text-white text-hover-underline" style="font-weight:700; margin:0 0 3px 0; font-size:15px; text-decoration: underline dotted rgba(255,255,255,0.4);">${node.name}</h5>
+              <h5 class="text-white text-hover-underline" style="font-weight:700; margin:0 0 3px 0; font-size:15px; text-decoration: underline dotted rgba(255,255,255,0.4);">${LP.escHtml(node.name)}</h5>
               <span style="font-size:10px; color:var(--text-muted);">Agent Node <i class="bi bi-info-circle ms-1"></i></span>
             </div>
             <div class="d-flex align-items-center gap-2">
               ${isOnline ? '<span class="status-pulse-green"></span>' : ''}
-              <span class="lp-badge ${badgeCls}" id="badge-${node.id}" style="font-size:9px; text-transform:uppercase; font-weight:800; letter-spacing:.5px;">${node.status}</span>
+              <span class="lp-badge ${badgeCls}" id="badge-${LP.escHtml(node.id)}" style="font-size:9px; text-transform:uppercase; font-weight:800; letter-spacing:.5px;">${LP.escHtml(node.status)}</span>
             </div>
           </div>
 
@@ -145,7 +145,7 @@ const ClusterPage = (() => {
           <div class="mb-3" style="font-family:monospace; font-size:12px; color:var(--text-secondary); background:rgba(0,0,0,0.15); padding:9px 12px; border-radius:8px; border:1px solid var(--glass-border); display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; gap:7px;">
               <i class="bi bi-hdd-network" style="color:var(--text-muted);"></i>
-              <span>${hostLabel}</span>
+              <span>${LP.escHtml(hostLabel)}</span>
             </div>
             <div class="d-flex gap-1">
               <button class="btn-lp btn-lp-ghost" onclick="LP.call('ClusterPage.copyHost', '${LP.encJsArg(hostLabel)}')" title="Copy host" style="width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:12px;">
@@ -162,7 +162,7 @@ const ClusterPage = (() => {
 
           <!-- Last updated -->
           <div style="font-size:10.5px; color:var(--text-muted); margin-bottom:14px; flex:1;">
-            <i class="bi bi-clock me-1"></i>Last updated: ${updatedAt}
+            <i class="bi bi-clock me-1"></i>Last updated: ${LP.escHtml(updatedAt)}
           </div>
 
           <!-- Actions -->
@@ -378,7 +378,7 @@ const ClusterPage = (() => {
       }
 
       const m = res.data;
-      document.getElementById('detailNodeName').textContent = nodeObj ? `${nodeObj.name} (${nodeObj.ipAddress})` : 'Agent Node';
+      document.getElementById('detailNodeName').textContent = nodeObj ? `${LP.escHtml(nodeObj.name)} (${LP.escHtml(nodeObj.ipAddress)})` : 'Agent Node';
 
       // 1. System Info
       const sys = m.system || {};
@@ -389,18 +389,18 @@ const ClusterPage = (() => {
       document.getElementById('detailSystemInfo').innerHTML = `
         <div class="col-12 col-md-6">
           <table class="table table-dark table-sm table-borderless m-0" style="background:transparent; font-size:12.5px;">
-            <tr><td style="color:var(--text-muted); width:110px;">OS Distro</td><td class="text-white font-mono">${sys.distro || 'Linux'} ${sys.release || ''}</td></tr>
-            <tr><td style="color:var(--text-muted);">Kernel</td><td class="text-white font-mono">${sys.kernel || 'N/A'}</td></tr>
-            <tr><td style="color:var(--text-muted);">Architecture</td><td class="text-white font-mono">${sys.arch || 'N/A'} (${sys.platform || ''})</td></tr>
+            <tr><td style="color:var(--text-muted); width:110px;">OS Distro</td><td class="text-white font-mono">${LP.escHtml(sys.distro || 'Linux')} ${LP.escHtml(sys.release || '')}</td></tr>
+            <tr><td style="color:var(--text-muted);">Kernel</td><td class="text-white font-mono">${LP.escHtml(sys.kernel || 'N/A')}</td></tr>
+            <tr><td style="color:var(--text-muted);">Architecture</td><td class="text-white font-mono">${LP.escHtml(sys.arch || 'N/A')} (${LP.escHtml(sys.platform || '')})</td></tr>
             <tr><td style="color:var(--text-muted);">Uptime</td><td class="text-white font-mono">${upDays} (${(sys.uptime || 0).toFixed(0)}s)</td></tr>
           </table>
         </div>
         <div class="col-12 col-md-6">
           <table class="table table-dark table-sm table-borderless m-0" style="background:transparent; font-size:12.5px;">
-            <tr><td style="color:var(--text-muted); width:110px;">CPU Cores</td><td class="text-white font-mono">${cpu.cores || 1} core(s) @ ${cpu.speed || 0}MHz</td></tr>
-            <tr><td style="color:var(--text-muted);">Load Average</td><td class="text-white font-mono">${cpu.loadAvg ? cpu.loadAvg.join(', ') : 'N/A'}</td></tr>
-            <tr><td style="color:var(--text-muted);">Temperature</td><td class="text-white font-mono">${temp}</td></tr>
-            <tr><td style="color:var(--text-muted);">Response Time</td><td class="text-white font-mono">${new Date(m.timestamp || Date.now()).toLocaleTimeString()}</td></tr>
+            <tr><td style="color:var(--text-muted); width:110px;">CPU Cores</td><td class="text-white font-mono">${LP.escHtml(String(cpu.cores || 1))} core(s) @ ${LP.escHtml(String(cpu.speed || 0))}MHz</td></tr>
+            <tr><td style="color:var(--text-muted);">Load Average</td><td class="text-white font-mono">${cpu.loadAvg ? LP.escHtml(cpu.loadAvg.join(', ')) : 'N/A'}</td></tr>
+            <tr><td style="color:var(--text-muted);">Temperature</td><td class="text-white font-mono">${LP.escHtml(temp)}</td></tr>
+            <tr><td style="color:var(--text-muted);">Response Time</td><td class="text-white font-mono">${LP.escHtml(new Date(m.timestamp || Date.now()).toLocaleTimeString())}</td></tr>
           </table>
         </div>
       `;
@@ -412,8 +412,8 @@ const ClusterPage = (() => {
           <div class="col-12 col-md-6">
             <div style="background:rgba(255,255,255,0.03); border:1px solid var(--glass-border); padding:10px 14px; border-radius:8px;">
               <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                <span class="text-white font-mono" style="font-weight:700;">${n.iface}</span>
-                <span class="lp-badge lp-badge-success" style="font-size:9.5px;">${n.ip4 || 'No IP'}</span>
+                <span class="text-white font-mono" style="font-weight:700;">${LP.escHtml(n.iface)}</span>
+                <span class="lp-badge lp-badge-success" style="font-size:9.5px;">${LP.escHtml(n.ip4 || 'No IP')}</span>
               </div>
               <div style="font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between;">
                 <span><i class="bi bi-arrow-down-short"></i> In: ${fmtBytes(n.rxTotal)} (${fmtBytes(n.rxSec)}/s)</span>
@@ -433,9 +433,9 @@ const ClusterPage = (() => {
           const usedPct = typeof d.usedPercent === 'number' ? d.usedPercent.toFixed(1) : d.usedPercent;
           return `
             <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
-              <td class="font-mono text-white text-truncate" style="max-width:180px;" title="${d.fs}">${d.fs}</td>
-              <td class="font-mono text-white text-truncate" style="max-width:120px;" title="${d.mount}">${d.mount}</td>
-              <td class="font-mono text-muted">${d.type}</td>
+              <td class="font-mono text-white text-truncate" style="max-width:180px;" title="${LP.escHtml(d.fs)}">${LP.escHtml(d.fs)}</td>
+              <td class="font-mono text-white text-truncate" style="max-width:120px;" title="${LP.escHtml(d.mount)}">${LP.escHtml(d.mount)}</td>
+              <td class="font-mono text-muted">${LP.escHtml(d.type)}</td>
               <td>
                 <div style="display:flex; align-items:center; gap:8px;">
                   <div style="width:80px; height:5px; background:rgba(255,255,255,0.08); border-radius:9px; overflow:hidden;">

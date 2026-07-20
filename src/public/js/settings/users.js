@@ -21,7 +21,7 @@ const UsersPage = (() => {
       if (res.data && res.data.roles) {
         allRoles = res.data.roles;
         const roleSelect = document.getElementById('role');
-        roleSelect.innerHTML = allRoles.map(r => `<option value="${r.slug}">${r.name}</option>`).join('');
+        roleSelect.innerHTML = allRoles.map(r => `<option value="${LP.escHtml(r.slug)}">${LP.escHtml(r.name)}</option>`).join('');
       }
     } catch (err) {
       console.error('Failed to load roles', err);

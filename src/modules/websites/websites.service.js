@@ -116,9 +116,35 @@ class WebsiteService {
     return Website.find({});
   }
 
+  /**
+   * [SECURITY] Validate a file path to prevent path traversal.
+   * Only allow absolute paths starting with / and containing safe characters.
+   */
+  _validateRootDirectory(dir) {
+    if (!dir || typeof dir !== 'string') {
+      throw new Error('Root directory is required');
+    }
+    // Must be an absolute path
+    if (!dir.startsWith('/')) {
+      throw new Error('Root directory must be an absolute path');
+    }
+    // Block path traversal
+    if (dir.includes('..')) {
+      throw new Error('Path traversal detected in root directory');
+    }
+    // Block shell metacharacters
+    if (/[;&|`$(){}]/.test(dir)) {
+      throw new Error('Root directory contains invalid characters');
+    }
+    return dir;
+  }
+
   async createWebsite(data, userId) {
     const exists = await Website.findOne({ domain: data.domain });
     if (exists) throw new Error('Domain already configured');
+
+    // [SECURITY] Validate rootDirectory to prevent path traversal and shell injection
+    const rootDirectory = data.rootDirectory ? this._validateRootDirectory(data.rootDirectory) : `/var/www/${data.domain}`;
 
     const webhookToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
@@ -126,7 +152,7 @@ class WebsiteService {
       domain:        data.domain,
       aliases:       data.aliases || [],
       type:          data.type || 'static',
-      rootDirectory: data.rootDirectory || `/var/www/${data.domain}`,
+      rootDirectory,
       port:          data.port || null,
       phpVersion:    data.phpVersion || '8.2',
       owner:         userId,

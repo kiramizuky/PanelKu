@@ -89,7 +89,7 @@ const SystemPage = {
           </tr>
         `).join('');
       } else {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${res.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${LP.escHtml(res.message)}</td></tr>`;
       }
     } catch (err) {
       tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--accent-danger)">Failed to load services</td></tr>';

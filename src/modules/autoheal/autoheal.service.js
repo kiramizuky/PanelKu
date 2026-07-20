@@ -32,7 +32,12 @@ class AutoHealService {
 
   async _getConfig() {
     const raw = await Setting.get('autoheal_config') || '{}';
-    const config = JSON.parse(typeof raw === 'string' ? raw : JSON.stringify(raw));
+    let config = {};
+    try {
+      config = JSON.parse(typeof raw === 'string' ? raw : JSON.stringify(raw));
+    } catch {
+      config = {};
+    }
     return {
       enabled: config.enabled !== false,
       checkInterval: config.checkInterval || 180, // seconds

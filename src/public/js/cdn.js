@@ -20,7 +20,7 @@ const CDN = (() => {
           <div class="lp-glass-card" style="padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
             <div>
               <strong>${LP.escHtml(z.name)}</strong>
-              <span class="text-muted" style="font-size:11px;margin-left:10px;">${z.status} | ${z.plan || 'Free'}</span>
+              <span class="text-muted" style="font-size:11px;margin-left:10px;">${LP.escHtml(z.status)} | ${LP.escHtml(z.plan || 'Free')}</span>
             </div>
             <div style="display:flex;gap:6px;">
               <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="CDN.purgeZone('${z.id}','${LP.encJsArg(z.name)}')"><i class="bi bi-trash"></i> Purge</button>
@@ -95,9 +95,9 @@ const CDN = (() => {
         el.innerHTML = `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div>Status: ${s.active ? '<span class="text-success"><i class="bi bi-check-circle"></i> Active</span>' : '<span class="text-danger"><i class="bi bi-x-circle"></i> Inactive</span>'}</div>
-            <div>Version: ${s.version || '—'}</div>
+            <div>Version: ${LP.escHtml(s.version || '—')}</div>
           </div>
-          ${s.stats ? '<pre style="font-size:11px;margin-top:10px;background:rgba(0,0,0,0.2);padding:10px;border-radius:8px;">' + Object.entries(s.stats).slice(0, 10).map(([k, v]) => k + ': ' + v).join('\n') + '</pre>' : ''}
+          ${s.stats ? '<pre style="font-size:11px;margin-top:10px;background:rgba(0,0,0,0.2);padding:10px;border-radius:8px;">' + Object.entries(s.stats).slice(0, 10).map(([k, v]) => LP.escHtml(k) + ': ' + LP.escHtml(v)).join('\n') + '</pre>' : ''}
         `;
         document.getElementById('varnishControls').style.display = 'flex';
 

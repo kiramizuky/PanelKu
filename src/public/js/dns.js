@@ -107,7 +107,7 @@ const DNSPage = {
             onclick="DNSPage.selectZone('${z.id}','${LP.escHtml(z.name)}')" onmouseover="this.style.borderColor='var(--accent-primary)'" onmouseout="this.style.borderColor='${this.activeZoneId === z.id ? 'var(--accent-primary)' : 'transparent'}'">
         <div style="font-weight:600;font-size:13px;color:var(--text-primary);">${LP.escHtml(z.name)}</div>
         <div style="font-size:11px;color:var(--text-muted);">
-          ${z.status || 'active'} ${z.plan ? '· ' + z.plan : ''}
+          ${LP.escHtml(z.status || 'active')} ${z.plan ? '· ' + LP.escHtml(z.plan) : ''}
         </div>
       </div>`
     ).join('');
@@ -389,11 +389,11 @@ const DNSPage = {
           <div style="margin-top:16px;">
             <h6 style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:10px;">DS Record Details</h6>
             <div style="background:rgba(0,0,0,0.15);border-radius:8px;padding:12px;font-family:monospace;font-size:11px;line-height:1.6;">
-              <div>Key Tag: <span style="color:var(--accent-warning);">${d.keyTag || '—'}</span></div>
-              <div>Algorithm: <span style="color:var(--accent-info);">${d.algorithm || '—'}</span></div>
-              <div>Digest Type: <span style="color:var(--accent-info);">${d.digestType || '—'}</span></div>
-              <div style="word-break:break-all;margin-top:4px;">Digest: <span style="color:var(--text-secondary);">${d.digest || '—'}</span></div>
-              ${d.ds ? `<div style="word-break:break-all;margin-top:4px;">DS: <span style="color:var(--accent-success);">${d.ds}</span></div>` : ''}
+              <div>Key Tag: <span style="color:var(--accent-warning);">${LP.escHtml(d.keyTag || '—')}</span></div>
+              <div>Algorithm: <span style="color:var(--accent-info);">${LP.escHtml(d.algorithm || '—')}</span></div>
+              <div>Digest Type: <span style="color:var(--accent-info);">${LP.escHtml(d.digestType || '—')}</span></div>
+              <div style="word-break:break-all;margin-top:4px;">Digest: <span style="color:var(--text-secondary);">${LP.escHtml(d.digest || '—')}</span></div>
+              ${d.ds ? `<div style="word-break:break-all;margin-top:4px;">DS: <span style="color:var(--accent-success);">${LP.escHtml(d.ds)}</span></div>` : ''}
             </div>
           </div>` : ''}
         `;

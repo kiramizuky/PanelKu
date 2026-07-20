@@ -156,15 +156,15 @@ const DB = (() => {
           </div>
           <h6 style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Columns</h6>
           <table class="lp-table" style="font-size:12px;"><thead><tr><th>Field</th><th>Type</th><th>Null</th><th>Key</th><th>Default</th><th>Extra</th></tr></thead>
-          <tbody>${info.columns.map(c => `<tr><td>${c.field}</td><td style="color:var(--accent-warning);">${c.type}</td><td>${c.nullable ? 'YES' : 'NO'}</td><td>${c.key || ''}</td><td>${c.default !== null ? c.default : '<span class="text-muted">null</span>'}</td><td style="color:#888;">${c.extra || ''}</td></tr>`).join('')}</tbody></table>
+          <tbody>${info.columns.map(c => `<tr><td>${LP.escHtml(c.field)}</td><td style="color:var(--accent-warning);">${LP.escHtml(c.type)}</td><td>${c.nullable ? 'YES' : 'NO'}</td><td>${LP.escHtml(c.key || '')}</td><td>${c.default !== null ? LP.escHtml(c.default) : '<span class="text-muted">null</span>'}</td><td style="color:#888;">${LP.escHtml(c.extra || '')}</td></tr>`).join('')}</tbody></table>
           ${info.indexes?.length > 0 ? `
           <h6 style="font-size:12px;color:var(--text-muted);margin:20px 0 10px;">Indexes</h6>
           <table class="lp-table" style="font-size:12px;"><thead><tr><th>Name</th><th>Unique</th></tr></thead>
-          <tbody>${info.indexes.map(i => `<tr><td>${i.name}</td><td>${i.unique ? '<span class="text-success">Yes</span>' : 'No'}</td></tr>`).join('')}</tbody></table>` : ''}
+          <tbody>${info.indexes.map(i => `<tr><td>${LP.escHtml(i.name)}</td><td>${i.unique ? '<span class="text-success">Yes</span>' : 'No'}</td></tr>`).join('')}</tbody></table>` : ''}
           ${info.foreignKeys?.length > 0 ? `
           <h6 style="font-size:12px;color:var(--text-muted);margin:20px 0 10px;">Foreign Keys</h6>
           <table class="lp-table" style="font-size:12px;"><thead><tr><th>Column</th><th>References Table</th><th>References Column</th></tr></thead>
-          <tbody>${info.foreignKeys.map(fk => `<tr><td>${fk.COLUMN_NAME || fk.column_name || fk.from}</td><td>${fk.REFERENCED_TABLE_NAME || fk.foreign_table_name || fk.table}</td><td>${fk.REFERENCED_COLUMN_NAME || fk.foreign_column_name || fk.to}</td></tr>`).join('')}</tbody></table>` : ''}
+          <tbody>${info.foreignKeys.map(fk => `<tr><td>${LP.escHtml(fk.COLUMN_NAME || fk.column_name || fk.from)}</td><td>${LP.escHtml(fk.REFERENCED_TABLE_NAME || fk.foreign_table_name || fk.table)}</td><td>${LP.escHtml(fk.REFERENCED_COLUMN_NAME || fk.foreign_column_name || fk.to)}</td></tr>`).join('')}</tbody></table>` : ''}
           ${info.createTable ? `<h6 style="font-size:12px;color:var(--text-muted);margin:20px 0 10px;">CREATE TABLE</h6><pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;font-size:11px;overflow-x:auto;white-space:pre-wrap;">${LP.escHtml(info.createTable)}</pre>` : ''}
         `;
       }
@@ -305,7 +305,7 @@ const DB = (() => {
         document.getElementById('historyList').innerHTML = res.data.history.slice(0, 50).map(h => `
           <div class="lp-glass-card" style="padding:10px;margin-bottom:5px;font-size:12px;cursor:pointer;" onclick="document.getElementById('queryInput').value='${LP.escHtml(h.query).replace(/'/g, "\\'")}';DB.switchExplorerTab('query')">
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-              <span class="text-info" style="font-size:10px;text-transform:uppercase;">${h.type} / ${h.database}</span>
+              <span class="text-info" style="font-size:10px;text-transform:uppercase;">${LP.escHtml(h.type)} / ${LP.escHtml(h.database)}</span>
               <span style="color:var(--text-muted);font-size:10px;">${new Date(h.timestamp).toLocaleString()}</span>
             </div>
             <code style="color:#e0e0e0;">${LP.escHtml(h.query.substring(0, 120))}${h.query.length > 120 ? '...' : ''}</code>

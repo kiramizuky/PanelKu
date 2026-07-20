@@ -129,11 +129,11 @@ const WAFPage = {
             <div class="d-flex justify-content-between align-items-center p-2 rounded mb-2" style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05);">
               <div>
                 <span class="d-block" style="font-size:12.5px; font-weight:600; color:#fff;">
-                  <span class="badge bg-${issue.severity === 'danger' ? 'danger' : 'warning'} me-1" style="font-size:9px;">${issue.severity.toUpperCase()}</span>
-                  ${issue.title}
+                  <span class="badge bg-${issue.severity === 'danger' ? 'danger' : 'warning'} me-1" style="font-size:9px;">${LP.escHtml(issue.severity.toUpperCase())}</span>
+                  ${LP.escHtml(issue.title)}
                 </span>
-                <small class="text-muted d-block" style="font-size:11px; margin-top:2px;">${issue.description}</small>
-                <small class="text-info d-block" style="font-size:11px; margin-top:2px;"><i class="bi bi-lightbulb"></i> Recommendation: ${issue.recommendation}</small>
+                <small class="text-muted d-block" style="font-size:11px; margin-top:2px;">${LP.escHtml(issue.description)}</small>
+                <small class="text-info d-block" style="font-size:11px; margin-top:2px;"><i class="bi bi-lightbulb"></i> Recommendation: ${LP.escHtml(issue.recommendation)}</small>
               </div>
               ${issue.fixable ? `
                 <button class="btn-lp btn-lp-primary btn-lp-sm" style="font-size:11px; padding:4px 8px; height: 28px;" onclick="LP.call('WAFPage.fixIssue', '${LP.encJsArg(issue.id)}')"><i class="bi bi-wrench"></i> Fix</button>

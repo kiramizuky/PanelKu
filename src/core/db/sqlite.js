@@ -226,22 +226,30 @@ function initSchema(db) {
   try {
     db.exec("ALTER TABLE alert_configs ADD COLUMN whatsapp TEXT NOT NULL DEFAULT '{\"enabled\":false,\"phoneNumber\":\"\"}'");
   } catch (e) {
-    // Column already exists
+    if (!e.message.includes('duplicate column')) {
+      logger.warn(`Migration alert_configs.whatsapp failed: ${e.message}`);
+    }
   }
   try {
     db.exec("ALTER TABLE users ADD COLUMN ai_settings TEXT NOT NULL DEFAULT '{\"provider\":\"openai\",\"apiKey\":\"\",\"model\":\"gpt-4o-mini\"}'");
   } catch (e) {
-    // Column already exists
+    if (!e.message.includes('duplicate column')) {
+      logger.warn(`Migration users.ai_settings failed: ${e.message}`);
+    }
   }
   try {
     db.exec("ALTER TABLE users ADD COLUMN is_ldap_user INTEGER NOT NULL DEFAULT 0");
   } catch (e) {
-    // Column already exists
+    if (!e.message.includes('duplicate column')) {
+      logger.warn(`Migration users.is_ldap_user failed: ${e.message}`);
+    }
   }
   try {
     db.exec("ALTER TABLE users ADD COLUMN sso_links TEXT NOT NULL DEFAULT '{}'");
   } catch (e) {
-    // Column already exists
+    if (!e.message.includes('duplicate column')) {
+      logger.warn(`Migration users.sso_links failed: ${e.message}`);
+    }
   }
 }
 

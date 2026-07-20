@@ -35,9 +35,13 @@ const FIX_PATTERNS = {
       port = parseInt(port) || 0;
       if (port > 0) {
         const { stdout } = await execAsync(`lsof -ti :${port} 2>/dev/null | head -1`).catch(() => ({ stdout: '' }));
-        if (stdout.trim()) {
-          await execAsync(`kill -9 ${stdout.trim()}`).catch(() => {});
-          return `Killed process on port ${port} (PID: ${stdout.trim()})`;
+        const pidStr = stdout.trim();
+        // [SECURITY] Validate PID before passing to kill — must be a positive integer
+        if (pidStr && /^\d+$/.test(pidStr)) {
+          await execAsync(`kill -9 ${pidStr}`).catch(() => {});
+          return `Killed process on port ${port} (PID: ${pidStr})`;
+        } else if (pidStr) {
+          return `Invalid PID format from lsof output: "${pidStr}". Skipping kill.`;
         }
       }
       return 'No process found on that port. Try a different port.';

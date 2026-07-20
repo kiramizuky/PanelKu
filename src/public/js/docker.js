@@ -78,7 +78,7 @@ const DockerPage = (() => {
 
     const res = await LP.get('/docker/images');
     if (!res?.success) {
-      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">${res?.message || 'Error'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">${LP.escHtml(res?.message || 'Error')}</td></tr>`;
       return;
     }
 
@@ -93,7 +93,7 @@ const DockerPage = (() => {
         hasRunningContainers = img.containers.some(c => c.state === 'running');
         inUseHtml = img.containers.map(c => {
           const color = c.state === 'running' ? 'var(--accent-success)' : 'var(--text-muted)';
-          return `<span style="color:${color};font-size:11px;margin-right:4px;" title="State: ${c.state}">${c.names[0]}</span>`;
+          return `<span style="color:${color};font-size:11px;margin-right:4px;" title="State: ${LP.escHtml(c.state)}">${LP.escHtml(c.names[0])}</span>`;
         }).join('');
       }
 
@@ -272,7 +272,7 @@ const DockerPage = (() => {
     const res = await LP.get(`/docker/images/search?term=${encodeURIComponent(term)}`);
     if (res?.success && res.data.results) {
       if (res.data.results.length === 0) {
-        resultsContainer.innerHTML = `<p class="text-muted text-center py-3">No images found for "${term}"</p>`;
+        resultsContainer.innerHTML = `<p class="text-muted text-center py-3">No images found for "${LP.escHtml(term)}"</p>`;
         return;
       }
 

@@ -230,7 +230,19 @@ class CdnService {
 
   async flushFpc() {
     try {
-      await execAsync('rm -rf /tmp/panelku-page-cache/* 2>/dev/null');
+      // [SECURITY] Validate that the path exists and is a directory before running rm
+      const cacheDir = '/tmp/panelku-page-cache';
+      try {
+        const stat = await fs.stat(cacheDir);
+        if (!stat.isDirectory()) {
+          throw new Error('Cache path is not a directory');
+        }
+      } catch (e) {
+        if (e.message.includes('not a directory')) throw e;
+        // Directory doesn't exist, nothing to flush
+        return { success: true, message: 'Cache directory does not exist' };
+      }
+      await execAsync('rm -rf ' + cacheDir + '/* 2>/dev/null');
       return { success: true };
     } catch (err) {
       throw new Error('FPC flush failed: ' + err.message);

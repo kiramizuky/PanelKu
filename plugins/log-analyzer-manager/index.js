@@ -77,6 +77,12 @@ export default {
                   if (res?.success) {
                     // Render colorized logs
                     const lines = res.data.lines;
+                    // [SECURITY] Escape HTML entities to prevent XSS from log content
+                    function escapeHtml(str) {
+                      const div = document.createElement('div');
+                      div.textContent = str;
+                      return div.innerHTML;
+                    }
                     container.innerHTML = lines.map(line => {
                       let color = '#94a3b8'; // default slate
                       if (line.includes('Failed') || line.includes('invalid') || line.includes('error')) {
@@ -84,7 +90,7 @@ export default {
                       } else if (line.includes('Accepted') || line.includes('success') || line.includes('session opened')) {
                         color = '#4ade80'; // green
                       }
-                      return \`<div style="color:\${color}">\${line}</div>\`;
+                      return \`<div style="color:\${color}">\${escapeHtml(line)}</div>\`;
                     }).join('');
 
                     // Update anomaly counters

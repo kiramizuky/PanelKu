@@ -23,20 +23,35 @@ class DnsService {
 
   async _getProviderConfig(provider) {
     const cfgStr = await Setting.get('dns_provider_configs') || '{}';
-    const configs = JSON.parse(typeof cfgStr === 'string' ? cfgStr : JSON.stringify(cfgStr));
+    let configs = {};
+    try {
+      configs = JSON.parse(typeof cfgStr === 'string' ? cfgStr : JSON.stringify(cfgStr));
+    } catch {
+      configs = {};
+    }
     return configs[provider] || {};
   }
 
   async _saveProviderConfig(provider, config) {
     const cfgStr = await Setting.get('dns_provider_configs') || '{}';
-    const configs = JSON.parse(typeof cfgStr === 'string' ? cfgStr : JSON.stringify(cfgStr));
+    let configs = {};
+    try {
+      configs = JSON.parse(typeof cfgStr === 'string' ? cfgStr : JSON.stringify(cfgStr));
+    } catch {
+      configs = {};
+    }
     configs[provider] = config;
     await Setting.set('dns_provider_configs', JSON.stringify(configs), 'json');
   }
 
   async getProviders() {
     const cfgStr = await Setting.get('dns_provider_configs') || '{}';
-    const configs = JSON.parse(typeof cfgStr === 'string' ? cfgStr : JSON.stringify(cfgStr));
+    let configs = {};
+    try {
+      configs = JSON.parse(typeof cfgStr === 'string' ? cfgStr : JSON.stringify(cfgStr));
+    } catch {
+      configs = {};
+    }
     return Object.entries(this.providers).map(([id, info]) => ({
       id,
       name: info.name,

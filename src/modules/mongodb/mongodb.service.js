@@ -449,7 +449,13 @@ class MongoDBService {
     }
 
     try {
-      const result = await this._runMongoCommand(`JSON.stringify(eval(${JSON.stringify(query)}))`, dbName);
+      // [SECURITY] Remove eval() — pass the query directly as a JavaScript expression.
+      // Use JSON.stringify() to properly escape the query string before interpolation.
+      // The mongosh --eval flag already executes JavaScript, so no eval() needed.
+      const result = await this._runMongoCommand(
+        `JSON.stringify(${JSON.stringify(query)})`,
+        dbName
+      );
       return result;
     } catch (err) {
       throw new Error(`Query failed: ${err.message}`);

@@ -159,9 +159,9 @@ const CaddyPage = {
         const httpsLabel = s.domain.includes('*') ? 'Wildcard' : 'Auto HTTPS';
 
         return `<tr>
-          <td><strong style="color:var(--text-primary);">${LP.escapeHtml(s.domain)}</strong></td>
+          <td><strong style="color:var(--text-primary);">${LP.escHtml(s.domain)}</strong></td>
           <td><span class="lp-badge lp-badge-${typeColor}"><i class="bi ${typeIcon} me-1"></i>${s.type}</span></td>
-          <td style="font-size:12px;color:var(--text-secondary);font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${LP.escapeHtml(target)}">${LP.escapeHtml(target)}</td>
+          <td style="font-size:12px;color:var(--text-secondary);font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${LP.escHtml(target)}">${LP.escHtml(target)}</td>
           <td><span class="lp-badge lp-badge-success"><i class="bi bi-lock-fill me-1"></i>${httpsLabel}</span></td>
           <td style="text-align:right;white-space:nowrap;">
             <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="CaddyPage.viewSiteConfig('${LP.encJsArg(s.name)}')" title="View Config"><i class="bi bi-file-earmark-text"></i></button>
@@ -367,7 +367,7 @@ const CaddyPage = {
       container.innerHTML = res.data.certificates.map(c =>
         `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);">
           <div>
-            <span style="font-weight:600;color:var(--text-primary);">${LP.escapeHtml(c.domain)}</span>
+            <span style="font-weight:600;color:var(--text-primary);">${LP.escHtml(c.domain)}</span>
             <span style="font-size:11px;color:var(--text-muted);margin-left:10px;">${c.fileCount} file(s)</span>
           </div>
           <span class="lp-badge lp-badge-success"><i class="bi bi-lock-fill me-1"></i> Auto</span>

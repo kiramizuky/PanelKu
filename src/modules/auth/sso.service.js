@@ -45,7 +45,12 @@ class SSOService {
    */
   async _getProviderConfig(provider) {
     const raw = await Setting.get('sso_config') || '{}';
-    const config = JSON.parse(typeof raw === 'string' ? raw : JSON.stringify(raw));
+    let config = {};
+    try {
+      config = JSON.parse(typeof raw === 'string' ? raw : JSON.stringify(raw));
+    } catch {
+      config = {};
+    }
     const providerCfg = config[provider];
     if (!providerCfg || !providerCfg.enabled || !providerCfg.clientId || !providerCfg.clientSecret) {
       throw new Error(`SSO provider "${provider}" is not configured or disabled`);
@@ -58,7 +63,11 @@ class SSOService {
    */
   async getConfig() {
     const raw = await Setting.get('sso_config') || '{}';
-    return JSON.parse(typeof raw === 'string' ? raw : JSON.stringify(raw));
+    try {
+      return JSON.parse(typeof raw === 'string' ? raw : JSON.stringify(raw));
+    } catch {
+      return {};
+    }
   }
 
   /**
@@ -96,7 +105,12 @@ class SSOService {
     const nonce = crypto.randomBytes(16).toString('hex');
 
     // Store state temporarily in settings (expires in 10 min)
-    const states = JSON.parse(await Setting.get('sso_states') || '{}');
+    let states = {};
+    try {
+      states = JSON.parse(await Setting.get('sso_states') || '{}');
+    } catch {
+      states = {};
+    }
     states[state] = { provider, nonce, createdAt: Date.now() };
     await Setting.set('sso_states', JSON.stringify(states), 'json');
 
@@ -117,7 +131,12 @@ class SSOService {
    */
   async handleCallback(provider, code, state) {
     // Verify state
-    const states = JSON.parse(await Setting.get('sso_states') || '{}');
+    let states = {};
+    try {
+      states = JSON.parse(await Setting.get('sso_states') || '{}');
+    } catch {
+      states = {};
+    }
     const stateData = states[state];
     if (!stateData) throw Object.assign(new Error('Invalid or expired state parameter'), { statusCode: 401 });
     if (stateData.provider !== provider) throw Object.assign(new Error('State-provider mismatch'), { statusCode: 401 });

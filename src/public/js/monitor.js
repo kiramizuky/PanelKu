@@ -75,7 +75,7 @@ const MonitorPage = (() => {
       return `
         <div class="mb-3">
           <div class="d-flex justify-content-between mb-1" style="font-size:12px;">
-            <span class="font-mono" style="color: #cbd5e1;">${d.fs || d.mount}</span>
+            <span class="font-mono" style="color: #cbd5e1;">${LP.escHtml(d.fs || d.mount)}</span>
             <span style="color: #f8fafc;">${usedPct}% (${LP.formatBytes(d.used)} / ${LP.formatBytes(d.total)})</span>
           </div>
           <div class="progress" style="height:6px; background:rgba(255,255,255,0.1)">
@@ -95,8 +95,8 @@ const MonitorPage = (() => {
     container.innerHTML = networks.map(n => `
       <div class="d-flex justify-content-between align-items-center mb-2" style="font-size:13px; padding: 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
         <div>
-          <div style="font-weight:600; color:#f8fafc">${n.iface}</div>
-          <div class="font-mono" style="font-size:11px; color:#cbd5e1">${n.ip4 || 'No IP'}</div>
+          <div style="font-weight:600; color:#f8fafc">${LP.escHtml(n.iface)}</div>
+          <div class="font-mono" style="font-size:11px; color:#cbd5e1">${LP.escHtml(n.ip4 || 'No IP')}</div>
         </div>
         <div class="text-end" style="font-size:12px;">
           <div><span class="text-info"><i class="bi bi-arrow-down"></i></span> ${LP.formatBytes(n.rxSec || n.rx_sec || 0)}/s</div>
@@ -172,7 +172,7 @@ const MonitorPage = (() => {
         processesList = res.data || [];
         renderProcessesTable();
       } else {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Failed to fetch processes: ${res?.message || 'Unknown error'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Failed to fetch processes: ${LP.escHtml(res?.message || 'Unknown error')}</td></tr>`;
       }
     } catch (err) {
       tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error loading processes.</td></tr>`;
@@ -207,10 +207,10 @@ const MonitorPage = (() => {
     tbody.innerHTML = sorted.map(p => `
       <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle;">
         <td style="font-family: monospace; font-weight: 600; color: var(--text-muted);">${p.pid}</td>
-        <td style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 180px;" title="${p.name}">${p.name}</td>
+        <td style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 180px;" title="${LP.escHtml(p.name)}">${LP.escHtml(p.name)}</td>
         <td class="font-mono ${currentSortField === 'cpu' ? 'text-success font-weight-bold' : ''}">${(p.cpu || 0).toFixed(1)}%</td>
         <td class="font-mono ${currentSortField === 'mem' ? 'text-info font-weight-bold' : ''}">${(p.mem || 0).toFixed(1)}%</td>
-        <td style="color: var(--text-muted);">${p.user || 'root'}</td>
+        <td style="color: var(--text-muted);">${LP.escHtml(p.user || 'root')}</td>
         <td><span class="badge bg-dark text-muted" style="font-size:10px;">${p.state || 'running'}</span></td>
       </tr>
     `).join('');

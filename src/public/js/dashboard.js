@@ -203,7 +203,7 @@ const Dashboard = (() => {
     const tbl = document.getElementById('servicesTable');
     if (services.length) {
       tbl.innerHTML = services.slice(0, 8).map(s =>
-        `<tr><td style="color:var(--text-secondary)">${s.name || '—'}</td>
+        `<tr><td style="color:var(--text-secondary)">${LP.escHtml(s.name || '—')}</td>
          <td><span class="lp-badge lp-badge-success"><span class="lp-badge-dot"></span>running</span></td></tr>`
       ).join('');
     } else {

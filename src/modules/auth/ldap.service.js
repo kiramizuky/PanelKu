@@ -16,7 +16,12 @@ class LDAPService {
    */
   async getConfig() {
     const raw = await Setting.get('ldap_config') || '{}';
-    const config = JSON.parse(typeof raw === 'string' ? raw : JSON.stringify(raw));
+    let config = {};
+    try {
+      config = JSON.parse(typeof raw === 'string' ? raw : JSON.stringify(raw));
+    } catch {
+      config = {};
+    }
     return {
       enabled: !!config.enabled,
       url: config.url || '',
