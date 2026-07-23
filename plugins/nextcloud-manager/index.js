@@ -300,6 +300,8 @@ services:
       - "${port}:80"
     volumes:
       - nextcloud_data:/var/www/html
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
 volumes:
