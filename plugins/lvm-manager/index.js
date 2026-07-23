@@ -76,6 +76,37 @@ function parseLvs(raw) {
 }
 
 // ─────────────────────────────────────────────
+// Ensure LVM2 and disk dependencies are installed
+// ─────────────────────────────────────────────
+async function ensureLvmInstalled() {
+  if (process.platform !== 'linux') return true;
+  try {
+    await run('which lvm || which pvs || which pvcreate');
+    return true;
+  } catch (_) {
+    let installCmd = '';
+    if (await run('which apt-get').catch(() => '')) {
+      installCmd = 'DEBIAN_FRONTEND=noninteractive apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y lvm2 smartmontools e2fsprogs xfsprogs 2>&1';
+    } else if (await run('which dnf').catch(() => '')) {
+      installCmd = 'dnf install -y lvm2 smartmontools e2fsprogs xfsprogs 2>&1';
+    } else if (await run('which yum').catch(() => '')) {
+      installCmd = 'yum install -y lvm2 smartmontools e2fsprogs xfsprogs 2>&1';
+    } else if (await run('which pacman').catch(() => '')) {
+      installCmd = 'pacman -S --noconfirm lvm2 smartmontools e2fsprogs xfsprogs 2>&1';
+    } else {
+      throw new Error('Permintaan gagal: paket "lvm2" (pvcreate) belum terinstal di server dan package manager tidak ditemukan. Silakan jalankan "sudo apt install lvm2" secara manual.');
+    }
+
+    try {
+      await run(installCmd);
+      return true;
+    } catch (err) {
+      throw new Error(`Permintaan gagal: Perintah "pvcreate" / "lvm2" belum terpasang dan instalasi otomatis gagal: ${err.message}. Silakan jalankan "sudo apt install lvm2 smartmontools" pada server.`);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
 // Gather full LVM + health data
 // ─────────────────────────────────────────────
 async function getLvmData() {
@@ -83,7 +114,17 @@ async function getLvmData() {
   let lvmAvailable = false;
 
   if (isLinux) {
-    try { await run('which lvm || which pvs'); lvmAvailable = true; } catch (_) {}
+    try {
+      await run('which lvm || which pvs');
+      lvmAvailable = true;
+    } catch (_) {
+      try {
+        await ensureLvmInstalled();
+        lvmAvailable = true;
+      } catch (_) {
+        lvmAvailable = false;
+      }
+    }
   }
 
   if (!lvmAvailable) {
@@ -1140,6 +1181,7 @@ const LvmPage = (() => {
     // ── API: Init disk
     app.post('/api/plugins/lvm-manager/init-disk', async (req, res) => {
       try {
+        await ensureLvmInstalled();
         const { device, vg } = req.body;
         if (!device || !/^\/dev\/[\w]+$/.test(device)) return errorResponse(res, 'Invalid device', 400);
         let out = await run(`pvcreate -y ${device} 2>&1`);
@@ -1153,6 +1195,7 @@ const LvmPage = (() => {
     // ── API: Create LV
     app.post('/api/plugins/lvm-manager/create-lv', async (req, res) => {
       try {
+        await ensureLvmInstalled();
         const { name, vg, size, fs, mount } = req.body;
         if (!name || !/^[\w-]+$/.test(name)) return errorResponse(res, 'Invalid LV name', 400);
         if (!vg   || !/^[\w-]+$/.test(vg))   return errorResponse(res, 'Invalid VG name', 400);
@@ -1173,6 +1216,7 @@ const LvmPage = (() => {
     // ── API: Extend LV
     app.post('/api/plugins/lvm-manager/extend-lv', async (req, res) => {
       try {
+        await ensureLvmInstalled();
         const { name, vg, size, resizeFs } = req.body;
         if (!name || !/^[\w-]+$/.test(name)) return errorResponse(res, 'Invalid LV name', 400);
         if (!vg   || !/^[\w-]+$/.test(vg))   return errorResponse(res, 'Invalid VG name', 400);
@@ -1194,6 +1238,7 @@ const LvmPage = (() => {
     // ── API: Extend VG
     app.post('/api/plugins/lvm-manager/extend-vg', async (req, res) => {
       try {
+        await ensureLvmInstalled();
         const { vg, device } = req.body;
         if (!vg     || !/^[\w-]+$/.test(vg))       return errorResponse(res, 'Invalid VG name', 400);
         if (!device || !/^\/dev\/[\w]+$/.test(device)) return errorResponse(res, 'Invalid device', 400);
@@ -1206,6 +1251,7 @@ const LvmPage = (() => {
     // ── API: Snapshot
     app.post('/api/plugins/lvm-manager/snapshot', async (req, res) => {
       try {
+        await ensureLvmInstalled();
         const { origin, vg, name, size } = req.body;
         if (!origin || !/^[\w-]+$/.test(origin)) return errorResponse(res, 'Invalid origin', 400);
         if (!vg     || !/^[\w-]+$/.test(vg))     return errorResponse(res, 'Invalid VG', 400);
@@ -1219,6 +1265,7 @@ const LvmPage = (() => {
     // ── API: Restore Snapshot
     app.post('/api/plugins/lvm-manager/restore-snapshot', async (req, res) => {
       try {
+        await ensureLvmInstalled();
         const { snapName, vg } = req.body;
         if (!snapName || !/^[\w-]+$/.test(snapName)) return errorResponse(res, 'Invalid snapshot name', 400);
         if (!vg       || !/^[\w-]+$/.test(vg))       return errorResponse(res, 'Invalid VG', 400);
