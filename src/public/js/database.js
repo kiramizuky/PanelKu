@@ -38,8 +38,8 @@ const DB = (() => {
         <td class="font-mono"><strong>${LP.escHtml(db)}</strong></td>
         <td style="text-align:center;"><span style="font-size:11px;color:var(--text-muted);">—</span></td>
         <td style="text-align:right">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DB.openExplorer('${LP.encJsArg(type)}', '${LP.encJsArg(db)}')" title="Explore"><i class="bi bi-eye"></i> Explore</button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DB.deleteDb('${LP.encJsArg(type)}', '${LP.encJsArg(db)}')"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DB.openExplorer('${LP.escHtml(type)}', '${LP.escHtml(db)}')" title="Explore"><i class="bi bi-eye"></i> Explore</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DB.deleteDb('${LP.escHtml(type)}', '${LP.escHtml(db)}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No ' + type + ' databases found', 2);
@@ -131,6 +131,8 @@ const DB = (() => {
   }
 
   async function deleteDb(type, name) {
+    type = String(type || '').replace(/^["']|["']$/g, '').trim();
+    name = String(name || '').replace(/^["']|["']$/g, '').trim();
     if (!(await LP.confirm(`Delete ${type} database "${name}"?`, 'Delete Database'))) return;
     try {
       const res = await LP.delete('/database', { type, name });
@@ -159,12 +161,12 @@ const DB = (() => {
   // ── Explorer ─────────────────────────────────────────
 
   async function openExplorer(type, db) {
-    activeType = type;
-    activeDb = db;
+    activeType = String(type || '').replace(/^["']|["']$/g, '').trim();
+    activeDb = String(db || '').replace(/^["']|["']$/g, '').trim();
     activeTable = null;
     currentPage = 1;
 
-    document.getElementById('exploreDbTitle').textContent = `Explorer: ${db} (${type.toUpperCase()})`;
+    document.getElementById('exploreDbTitle').textContent = `Explorer: ${activeDb} (${activeType.toUpperCase()})`;
     if (!explorerModal) explorerModal = new bootstrap.Modal(document.getElementById('exploreDbModal'));
     explorerModal.show();
 

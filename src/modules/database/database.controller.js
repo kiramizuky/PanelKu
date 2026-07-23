@@ -1,6 +1,11 @@
 import databaseService from './database.service.js';
 import { success, error } from '../../helpers/response.js';
 
+function cleanStr(str) {
+  if (!str) return '';
+  return String(str).replace(/^["']|["']$/g, '').trim();
+}
+
 class DatabaseController {
   async getDatabases(req, res) {
     try {
@@ -15,7 +20,8 @@ class DatabaseController {
 
   async createDatabase(req, res) {
     try {
-      const { type, name } = req.body;
+      const type = cleanStr(req.body.type);
+      const name = cleanStr(req.body.name);
       if (!name) return error(res, 'Database name is required', 400);
       if (type === 'mysql') await databaseService.createMysqlDatabase(name);
       else if (type === 'postgres') await databaseService.createPgDatabase(name);
@@ -29,7 +35,8 @@ class DatabaseController {
 
   async deleteDatabase(req, res) {
     try {
-      const { type, name } = req.body;
+      const type = cleanStr(req.body.type);
+      const name = cleanStr(req.body.name);
       if (!name) return error(res, 'Database name is required', 400);
       if (type === 'mysql') await databaseService.deleteMysqlDatabase(name);
       else if (type === 'postgres') await databaseService.deletePgDatabase(name);
@@ -43,7 +50,8 @@ class DatabaseController {
 
   async getTables(req, res) {
     try {
-      const { type, name } = req.query;
+      const type = cleanStr(req.query.type);
+      const name = cleanStr(req.query.name);
       if (!type || !name) return error(res, 'Type and name are required', 400);
       const tables = await databaseService.getTables(type, name);
       return success(res, { tables });
@@ -54,7 +62,9 @@ class DatabaseController {
 
   async getTableInfo(req, res) {
     try {
-      const { type, database, table } = req.query;
+      const type = cleanStr(req.query.type);
+      const database = cleanStr(req.query.database);
+      const table = cleanStr(req.query.table);
       if (!type || !database || !table) return error(res, 'Type, database, and table are required', 400);
       const info = await databaseService.getTableInfo(type, database, table);
       return success(res, info);
@@ -65,7 +75,10 @@ class DatabaseController {
 
   async getTableData(req, res) {
     try {
-      const { type, database, table, page = 1, limit = 50, sortColumn, sortDir } = req.query;
+      const type = cleanStr(req.query.type);
+      const database = cleanStr(req.query.database);
+      const table = cleanStr(req.query.table);
+      const { page = 1, limit = 50, sortColumn, sortDir } = req.query;
       if (!type || !database || !table) return error(res, 'Type, database, and table are required', 400);
       const data = await databaseService.getTableData(type, database, table, parseInt(page), parseInt(limit), sortColumn || null, sortDir || 'ASC');
       return success(res, data);
@@ -76,7 +89,8 @@ class DatabaseController {
 
   async getDatabaseStats(req, res) {
     try {
-      const { type, database } = req.query;
+      const type = cleanStr(req.query.type);
+      const database = cleanStr(req.query.database);
       if (!type || !database) return error(res, 'Type and database are required', 400);
       const stats = await databaseService.getDatabaseStats(type, database);
       return success(res, stats);
@@ -87,7 +101,9 @@ class DatabaseController {
 
   async runQuery(req, res) {
     try {
-      const { type, name, query } = req.body;
+      const type = cleanStr(req.body.type);
+      const name = cleanStr(req.body.name);
+      const query = req.body.query;
       if (!type || !name || !query) return error(res, 'Type, name, and query are required', 400);
       const result = await databaseService.runQuery(type, name, query);
       return success(res, result);
