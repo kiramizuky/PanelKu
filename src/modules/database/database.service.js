@@ -1,16 +1,14 @@
 import mysql from 'mysql2/promise';
 import pkg from 'pg';
-const { Client } = pkg;
+const { Client, Pool } = pkg;
 import path from 'path';
 import fs from 'fs/promises';
-
-
-
 
 class DatabaseService {
   constructor() {
     this.mysqlPool = null;
-    this.pgClient = null;
+    this.pgPool = null;
+    this._lastPgConfigKey = null;
     this.queryHistory = [];
   }
 
@@ -69,10 +67,11 @@ class DatabaseService {
       try { await this.mysqlPool.end(); } catch (_) {}
       this.mysqlPool = null;
     }
-    if (this.pgClient) {
-      try { await this.pgClient.end(); } catch (_) {}
-      this.pgClient = null;
+    if (this.pgPool) {
+      try { await this.pgPool.end(); } catch (_) {}
+      this.pgPool = null;
     }
+    this._lastPgConfigKey = null;
   }
 
   async getMysqlConnection() {
@@ -84,69 +83,86 @@ class DatabaseService {
   }
 
   async getPgConnection() {
-    if (this.pgClient) {
-      try {
-        await this.pgClient.query('SELECT 1');
-        return this.pgClient;
-      } catch (_) {
-        this.pgClient = null;
-      }
-    }
-
     const config = await this.loadPgConfig();
-    let lastErr = null;
+    const configKey = JSON.stringify(config);
 
-    // 1. If Linux and no password provided, try Unix Domain Socket first (/var/run/postgresql) for peer auth
-    if (process.platform === 'linux' && (config.host === 'localhost' || config.host === '127.0.0.1') && !config.password) {
+    if (this.pgPool && this._lastPgConfigKey !== configKey) {
+      try { await this.pgPool.end(); } catch (_) {}
+      this.pgPool = null;
+    }
+
+    if (!this.pgPool) {
+      this._lastPgConfigKey = configKey;
+      let lastErr = null;
+
+      // 1. If Linux and no password provided, try Unix Domain Socket first (/var/run/postgresql) for peer auth
+      if (process.platform === 'linux' && (config.host === 'localhost' || config.host === '127.0.0.1') && !config.password) {
+        try {
+          const socketPool = new Pool({
+            host: '/var/run/postgresql',
+            port: config.port,
+            user: config.user || 'postgres',
+            database: config.database || 'postgres',
+            max: 10,
+            idleTimeoutMillis: 30000,
+          });
+          const client = await socketPool.connect();
+          client.release();
+          this.pgPool = socketPool;
+          return this.pgPool;
+        } catch (_) {}
+      }
+
+      // 2. Primary TCP Pool
+      const poolOptions = {
+        host: config.host,
+        port: config.port,
+        user: config.user,
+        password: String(config.password ?? ''),
+        database: config.database || 'postgres',
+        max: 10,
+        idleTimeoutMillis: 30000,
+      };
+
       try {
-        const socketClient = new Client({
-          host: '/var/run/postgresql',
-          user: config.user || 'postgres',
-          database: config.database || 'postgres',
-        });
-        await socketClient.connect();
-        this.pgClient = socketClient;
-        return this.pgClient;
-      } catch (_) {}
+        const pool = new Pool(poolOptions);
+        const client = await pool.connect();
+        client.release();
+        this.pgPool = pool;
+        return this.pgPool;
+      } catch (err) {
+        lastErr = err;
+      }
+
+      // 3. Fallback on Linux: Try Unix Domain Socket if TCP connection failed
+      if (process.platform === 'linux' && (config.host === 'localhost' || config.host === '127.0.0.1')) {
+        try {
+          const socketPool = new Pool({
+            host: '/var/run/postgresql',
+            port: config.port,
+            user: config.user || 'postgres',
+            database: config.database || 'postgres',
+            max: 10,
+            idleTimeoutMillis: 30000,
+          });
+          const client = await socketPool.connect();
+          client.release();
+          this.pgPool = socketPool;
+          return this.pgPool;
+        } catch (_) {}
+      }
+
+      this.pgPool = null;
+      this._lastPgConfigKey = null;
+
+      if (lastErr?.message?.includes('SASL') || lastErr?.message?.includes('password') || lastErr?.message?.includes('authentication failed')) {
+        throw new Error(`PostgreSQL authentication failed for user '${config.user}'. Password does not match or is invalid.`);
+      }
+
+      throw new Error('Failed to connect to PostgreSQL: ' + (lastErr?.message || 'Connection failed'));
     }
 
-    // 2. TCP Client
-    const clientOptions = {
-      host: config.host,
-      port: config.port,
-      user: config.user,
-      password: String(config.password ?? ''),
-      database: config.database || 'postgres',
-    };
-
-    try {
-      const client = new Client(clientOptions);
-      await client.connect();
-      this.pgClient = client;
-      return this.pgClient;
-    } catch (err) {
-      lastErr = err;
-    }
-
-    // 3. Fallback on Linux: Try Unix Domain Socket if TCP connection failed
-    if (process.platform === 'linux' && (config.host === 'localhost' || config.host === '127.0.0.1')) {
-      try {
-        const socketClient = new Client({
-          host: '/var/run/postgresql',
-          user: config.user || 'postgres',
-          database: config.database || 'postgres',
-        });
-        await socketClient.connect();
-        this.pgClient = socketClient;
-        return this.pgClient;
-      } catch (_) {}
-    }
-
-    if (lastErr?.message?.includes('SASL') || lastErr?.message?.includes('password')) {
-      throw new Error(`PostgreSQL authentication failed for user '${config.user}'. Please check DB Credentials in settings.`);
-    }
-
-    throw new Error('Failed to connect to PostgreSQL: ' + (lastErr?.message || 'Connection failed'));
+    return this.pgPool;
   }
 
   async getCredentials() {
@@ -179,6 +195,13 @@ class DatabaseService {
       await Setting.set('db_credentials_pg', payload, 'json');
     }
     await this.resetConnections();
+
+    // Verify connection immediately with new credentials
+    if (type === 'postgres') {
+      await this.getPgConnection();
+    } else if (type === 'mysql') {
+      await this.getMysqlConnection();
+    }
   }
 
   _sanitizeDbName(name) {
