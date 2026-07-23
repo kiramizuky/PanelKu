@@ -109,15 +109,25 @@ class BackupService {
     }
 
     try {
-      const { stdout } = await execAsync(
-        'curl -fsSL https://rclone.org/install.sh | bash 2>&1',
-        { timeout: 180000 }
-      );
+      let output = '';
+      try {
+        // Try system package manager first (apt / dnf / yum / pacman)
+        const pmCmd = 'if command -v apt-get >/dev/null 2>&1; then DEBIAN_FRONTEND=noninteractive apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y rclone 2>&1; elif command -v dnf >/dev/null 2>&1; then dnf install -y rclone 2>&1; elif command -v yum >/dev/null 2>&1; then yum install -y rclone 2>&1; elif command -v pacman >/dev/null 2>&1; then pacman -S --noconfirm rclone 2>&1; else false; fi';
+        const res = await execAsync(pmCmd, { timeout: 180000 });
+        output = res.stdout;
+      } catch (_) {
+        // Fallback to rclone official install script
+        const res = await execAsync(
+          'curl -fsSL https://rclone.org/install.sh | bash 2>&1 || wget -qO- https://rclone.org/install.sh | bash 2>&1',
+          { timeout: 180000 }
+        );
+        output = res.stdout;
+      }
 
       const info = await detectRclone();
-      if (!info.installed) throw new Error('Installation completed but rclone not found');
+      if (!info.installed) throw new Error('Installation completed but rclone executable was not found in PATH');
 
-      return { message: 'Rclone installed successfully', version: info.version, output: stdout };
+      return { message: 'Rclone installed successfully', version: info.version, output };
     } catch (err) {
       throw new Error(`Failed to install Rclone: ${err.message}`);
     }
