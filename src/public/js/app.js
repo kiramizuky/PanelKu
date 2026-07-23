@@ -475,6 +475,112 @@ const LP = {
     });
   },
 
+  // ── Manual Installation Modal Helper ──────────────────
+  showManualInstallModal(name, errorMsg = '', customCmd = '') {
+    const safeName = this.escHtml(name || 'Package/Plugin');
+    const safeError = this.escHtml(errorMsg || 'Installation failed or timed out.');
+    const modalId = `manual_install_${Date.now()}`;
+    const cleanPkg = (name || '').toLowerCase().trim();
+
+    let cmd = customCmd;
+    if (!cmd) {
+      if (cleanPkg.includes('rclone')) {
+        cmd = 'sudo apt update && sudo apt install -y rclone';
+      } else if (cleanPkg.includes('docker')) {
+        cmd = 'sudo apt update && sudo apt install -y docker.io docker-compose';
+      } else if (cleanPkg.includes('postgres')) {
+        cmd = 'sudo apt update && sudo apt install -y postgresql postgresql-contrib';
+      } else if (cleanPkg.includes('mysql') || cleanPkg.includes('mariadb')) {
+        cmd = 'sudo apt update && sudo apt install -y mariadb-server mariadb-client';
+      } else if (cleanPkg.includes('redis')) {
+        cmd = 'sudo apt update && sudo apt install -y redis-server';
+      } else if (cleanPkg.includes('nginx')) {
+        cmd = 'sudo apt update && sudo apt install -y nginx';
+      } else if (cleanPkg.includes('python')) {
+        cmd = 'sudo apt update && sudo apt install -y python3 python3-pip python3-venv';
+      } else if (cleanPkg.includes('node') || cleanPkg.includes('npm')) {
+        cmd = 'curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs';
+      } else {
+        const sanitizedPkg = name.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        cmd = `sudo apt update && sudo apt install -y ${sanitizedPkg}`;
+      }
+    }
+
+    const safeCmd = this.escHtml(cmd);
+
+    const modalHtml = `
+      <div class="modal fade" id="${modalId}" tabindex="-1" style="z-index: 1060;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+          <div class="modal-content lp-glass-card" style="background: var(--bg-secondary); border: 1px solid var(--glass-border, rgba(255,255,255,0.15)); color: var(--text-primary); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--glass-border, rgba(255,255,255,0.1)); padding: 18px 24px;">
+              <h5 class="modal-title font-mono" style="font-size: 16px; font-weight: 700;">
+                <i class="bi bi-terminal-fill text-warning me-2"></i>Petunjuk Instalasi Manual: ${safeName}
+              </h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+              <div class="alert alert-danger d-flex align-items-start gap-3 mb-4" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; border-radius: 10px; padding: 14px 18px;">
+                <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0 mt-1"></i>
+                <div style="font-size: 13px;">
+                  <strong style="font-size: 14px;">Instalasi Otomatis Gagal:</strong>
+                  <div style="margin-top: 6px; font-family: monospace; word-break: break-all; opacity: 0.95; font-size: 12px; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px;">${safeError}</div>
+                </div>
+              </div>
+
+              <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+                Anda dapat memasang paket/komponen <strong>${safeName}</strong> secara manual dengan membuka <strong>Terminal Server</strong> (atau SSH) dan menjalankan perintah di bawah ini:
+              </p>
+
+              <div style="position: relative; background: #0d1117; border: 1px solid #30363d; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+                <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" id="${modalId}_copyBtn" style="position: absolute; right: 12px; top: 12px; font-size: 11px; color: #58a6ff; background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.2); border-radius: 6px; padding: 4px 10px;">
+                  <i class="bi bi-clipboard me-1"></i>Salin Perintah
+                </button>
+                <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-bottom: 8px; font-weight: 600; letter-spacing: 0.5px;">Terminal Bash Command</div>
+                <code id="${modalId}_code" style="color: #58a6ff; font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all;">${safeCmd}</code>
+              </div>
+
+              <div class="p-3" style="background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.2); border-radius: 10px; font-size: 12px; color: var(--text-muted);">
+                <i class="bi bi-info-circle text-info me-1"></i> Setelah perintah di atas selesai dieksekusi di terminal server, silakan refresh halaman web ini atau klik tombol <strong>Refresh Halaman</strong>.
+              </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--glass-border, rgba(255,255,255,0.1)); padding: 14px 24px;">
+              <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Tutup</button>
+              <button type="button" class="btn-lp btn-lp-primary" onclick="location.reload()">
+                <i class="bi bi-arrow-clockwise me-1"></i>Refresh Halaman
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const container = document.createElement('div');
+    container.innerHTML = modalHtml;
+    document.body.appendChild(container.firstElementChild);
+
+    const bsModal = new bootstrap.Modal(document.getElementById(modalId));
+    bsModal.show();
+
+    const copyBtn = document.getElementById(`${modalId}_copyBtn`);
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(cmd).then(() => {
+          copyBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Tersalin!';
+          LP.toast('Perintah berhasil disalin ke clipboard!', 'success');
+          setTimeout(() => {
+            copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Salin Perintah';
+          }, 3000);
+        }).catch(() => {
+          LP.toast('Gagal menyalin perintah', 'error');
+        });
+      });
+    }
+
+    document.getElementById(modalId).addEventListener('hidden.bs.modal', function () {
+      this.remove();
+    });
+  },
+
   // Format numbers
   num(n) {
     return typeof n === 'number' ? n.toLocaleString() : n;

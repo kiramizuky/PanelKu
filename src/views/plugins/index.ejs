@@ -306,6 +306,7 @@ plugin-name/
       const id = document.getElementById('configPluginId').value;
       const mode = document.getElementById('configMode').value;
       const proxyUrl = document.getElementById('configProxyUrl').value;
+      const pluginName = document.getElementById('configPluginName').value || id;
       try {
         const endpoint = mode === 'install' ? '/plugins/install' : '/plugins/proxy';
         const res = await LP.post(endpoint, { id, proxyUrl });
@@ -315,9 +316,19 @@ plugin-name/
           loadInstalled();
           if (marketplaceData.length > 0) loadMarketplace();
         } else {
-          LP.toast(res?.message || 'Action failed', 'error');
+          const errMsg = res?.message || 'Action failed';
+          LP.toast(errMsg, 'error');
+          if (mode === 'install') {
+            LP.showManualInstallModal(pluginName, errMsg);
+          }
         }
-      } catch { LP.toast('Error submitting configuration', 'error'); }
+      } catch (err) {
+        const errMsg = err?.message || 'Error submitting configuration';
+        LP.toast(errMsg, 'error');
+        if (mode === 'install') {
+          LP.showManualInstallModal(pluginName, errMsg);
+        }
+      }
     }
 
     async function uninstall(id) {
@@ -335,8 +346,16 @@ plugin-name/
       try {
         const res = await LP.post('/plugins/update', { id });
         if (res?.success) { LP.toast(res.message, 'success'); loadInstalled(); }
-        else LP.toast(res?.message || 'Update failed', 'error');
-      } catch { LP.toast('Update error', 'error'); }
+        else {
+          const errMsg = res?.message || 'Update failed';
+          LP.toast(errMsg, 'error');
+          LP.showManualInstallModal(id, errMsg);
+        }
+      } catch (err) {
+        const errMsg = err?.message || 'Update error';
+        LP.toast(errMsg, 'error');
+        LP.showManualInstallModal(id, errMsg);
+      }
       finally { btn.innerHTML = orig; btn.disabled = false; }
     }
 

@@ -544,10 +544,14 @@ volumes:
         LP.toast(`${pkgName} installed successfully!`, 'success');
         loadData();
       } else {
-        LP.toast(`Failed to install ${pkgName}: ${res?.message}`, 'error');
+        const errMsg = res?.message || 'Installation failed';
+        LP.toast(`Failed to install ${pkgName}: ${errMsg}`, 'error');
+        LP.showManualInstallModal(pkgName, errMsg);
       }
     } catch (e) {
+      const errMsg = e?.message || 'Error installing package';
       LP.toast(`Error installing ${pkgName}`, 'error');
+      LP.showManualInstallModal(pkgName, errMsg);
     } finally {
       document.getElementById('installSpinner')?.remove();
     }

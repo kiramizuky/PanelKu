@@ -151,10 +151,19 @@ const DB = (() => {
     document.body.appendChild(spinner);
     try {
       const res = await LP.post('/system/install', { package: pkg });
-      if (res?.success) LP.toast(`${pkg} installed!`, 'success');
-      else LP.toast('Failed', 'error');
-      loadData();
-    } catch { LP.toast('Error', 'error'); }
+      if (res?.success) {
+        LP.toast(`${pkg} installed!`, 'success');
+        loadData();
+      } else {
+        const errMsg = res?.message || 'Installation failed';
+        LP.toast('Failed', 'error');
+        LP.showManualInstallModal(pkg, errMsg);
+      }
+    } catch (err) {
+      const errMsg = err?.message || 'Installation error';
+      LP.toast('Error', 'error');
+      LP.showManualInstallModal(pkg, errMsg);
+    }
     finally { document.getElementById('installSpinner')?.remove(); }
   }
 

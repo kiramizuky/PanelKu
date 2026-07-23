@@ -472,10 +472,14 @@ const BackupPage = {
         LP.toast('Rclone installed!', 'success');
         this.loadRcloneStatus();
       } else {
-        LP.toast(res?.message || 'Installation failed', 'error');
+        const errMsg = res?.message || 'Installation failed';
+        LP.toast(errMsg, 'error');
+        LP.showManualInstallModal('Rclone', errMsg, 'sudo apt update && sudo apt install -y rclone');
       }
-    } catch {
-      LP.toast('Installation error', 'error');
+    } catch (err) {
+      const errMsg = err?.message || 'Installation error';
+      LP.toast(errMsg, 'error');
+      LP.showManualInstallModal('Rclone', errMsg, 'sudo apt update && sudo apt install -y rclone');
     } finally {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-download me-1"></i> Install Rclone'; }
     }
