@@ -59,7 +59,7 @@ const IOT = (() => {
           usrList.innerHTML = usr.data.users.map(u => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid rgba(255,255,255,0.05);">
               <span>${LP.escHtml(u.username)}</span>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="IOT.deleteMqttUser('${LP.encJsArg(u.username)}')"><i class="bi bi-trash"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('IOT.deleteMqttUser', '${LP.encJsArg(u.username)}')"><i class="bi bi-trash"></i></button>
             </div>
           `).join('');
         } else usrList.innerHTML = '<p class="text-muted">No MQTT users configured.</p>';

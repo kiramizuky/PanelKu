@@ -103,8 +103,8 @@ const PythonPage = {
               </div>
             </div>
             <div class="d-flex gap-2">
-              ${!isCurrent && ver !== 'system' ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="PythonPage.setGlobal('${LP.encJsArg(ver)}')" title="Set global"><i class="bi bi-globe"></i> Global</button>` : ''}
-              ${ver !== 'system' ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="PythonPage.confirmUninstall('${LP.encJsArg(ver)}')" title="Uninstall"><i class="bi bi-trash"></i></button>` : ''}
+              ${!isCurrent && ver !== 'system' ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('PythonPage.setGlobal', '${LP.encJsArg(ver)}')" title="Set global"><i class="bi bi-globe"></i> Global</button>` : ''}
+              ${ver !== 'system' ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('PythonPage.confirmUninstall', '${LP.encJsArg(ver)}')" title="Uninstall"><i class="bi bi-trash"></i></button>` : ''}
             </div>
           </div>
         `;
@@ -132,7 +132,7 @@ const PythonPage = {
       container.innerHTML = show.map(v =>
         `<div class="p-2 px-3 rounded d-flex justify-content-between align-items-center" style="background:rgba(0,0,0,0.08);border:1px solid var(--glass-border);">
           <span style="font-family:monospace;font-size:14px;color:var(--text-primary);">${LP.escHtml(v)}</span>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="PythonPage.installSpecific('${LP.encJsArg(v)}')"><i class="bi bi-download"></i> Install</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="LP.call('PythonPage.installSpecific', '${LP.encJsArg(v)}')"><i class="bi bi-download"></i> Install</button>
         </div>`
       ).join('');
 

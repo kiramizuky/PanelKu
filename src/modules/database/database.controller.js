@@ -3,7 +3,9 @@ import { success, error } from '../../helpers/response.js';
 
 function cleanStr(str) {
   if (!str) return '';
-  return String(str).replace(/^["']|["']$/g, '').trim();
+  let val = String(str);
+  try { val = decodeURIComponent(val); } catch (_) {}
+  return val.replace(/^["']|["']$/g, '').trim();
 }
 
 class DatabaseController {

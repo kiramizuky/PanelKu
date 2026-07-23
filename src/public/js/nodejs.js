@@ -133,9 +133,9 @@ const NodeJSPage = {
               </div>
             </div>
             <div class="d-flex gap-2">
-              ${!isCurrent ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="NodeJSPage.useVersion('${LP.encJsArg(ver)}')" title="Use this version"><i class="bi bi-check-circle"></i> Use</button>` : ''}
-              ${!isDefault ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="NodeJSPage.setDefault('${LP.encJsArg(ver)}')" title="Set as default"><i class="bi bi-star"></i> Default</button>` : ''}
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="NodeJSPage.confirmUninstall('${LP.encJsArg(ver)}')" title="Uninstall"><i class="bi bi-trash"></i></button>
+              ${!isCurrent ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="LP.call('NodeJSPage.useVersion', '${LP.encJsArg(ver)}')" title="Use this version"><i class="bi bi-check-circle"></i> Use</button>` : ''}
+              ${!isDefault ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('NodeJSPage.setDefault', '${LP.encJsArg(ver)}')" title="Set as default"><i class="bi bi-star"></i> Default</button>` : ''}
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('NodeJSPage.confirmUninstall', '${LP.encJsArg(ver)}')" title="Uninstall"><i class="bi bi-trash"></i></button>
             </div>
           </div>
         `;

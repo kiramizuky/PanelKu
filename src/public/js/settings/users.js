@@ -46,8 +46,8 @@ const UsersPage = (() => {
             : '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">Inactive</span>';
 
           const toggleBtn = isActive
-            ? `<button class="btn-lp btn-lp-ghost text-warning me-1" onclick="UsersPage.toggleStatus('${LP.encJsArg(userId)}', 'inactive')" title="Deactivate"><i class="bi bi-pause-circle"></i></button>`
-            : `<button class="btn-lp btn-lp-ghost text-success me-1" onclick="UsersPage.toggleStatus('${LP.encJsArg(userId)}', 'active')" title="Activate"><i class="bi bi-play-circle"></i></button>`;
+            ? `<button class="btn-lp btn-lp-ghost text-warning me-1" onclick="LP.call('UsersPage.toggleStatus', '${LP.encJsArg(userId)}', 'inactive')" title="Deactivate"><i class="bi bi-pause-circle"></i></button>`
+            : `<button class="btn-lp btn-lp-ghost text-success me-1" onclick="LP.call('UsersPage.toggleStatus', '${LP.encJsArg(userId)}', 'active')" title="Activate"><i class="bi bi-play-circle"></i></button>`;
 
           return `
             <tr>

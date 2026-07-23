@@ -195,7 +195,7 @@ const DB = (() => {
           listEl.innerHTML = '<p class="text-muted" style="font-size:12px;">No tables found</p>';
         } else {
           listEl.innerHTML = res.data.tables.map(tbl => `
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-start w-100" style="padding:5px 8px;font-size:12px;${activeTable === tbl ? 'background:rgba(99,102,241,0.15);color:var(--accent-primary);' : ''}" onclick="DB.selectTable('${LP.encJsArg(tbl)}')">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-start w-100" style="padding:5px 8px;font-size:12px;${activeTable === tbl ? 'background:rgba(99,102,241,0.15);color:var(--accent-primary);' : ''}" onclick="DB.selectTable('${LP.escHtml(tbl)}')">
               <i class="bi bi-table text-info me-1"></i> ${LP.escHtml(tbl)}
             </button>
           `).join('');
@@ -205,6 +205,10 @@ const DB = (() => {
   }
 
   async function selectTable(table) {
+    if (typeof table === 'string') {
+      try { table = decodeURIComponent(table); } catch (_) {}
+      table = table.replace(/^["']|["']$/g, '').trim();
+    }
     activeTable = table;
     currentPage = 1;
     currentSort = { column: null, dir: 'ASC' };
@@ -299,6 +303,10 @@ const DB = (() => {
   }
 
   function sortColumn(col) {
+    if (typeof col === 'string') {
+      try { col = decodeURIComponent(col); } catch (_) {}
+      col = col.replace(/^["']|["']$/g, '').trim();
+    }
     if (currentSort.column === col) {
       currentSort.dir = currentSort.dir === 'ASC' ? 'DESC' : 'ASC';
     } else {

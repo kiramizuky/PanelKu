@@ -364,7 +364,15 @@ class DatabaseService {
     throw new Error(`Failed to connect to PostgreSQL database "${database}": ${lastErr?.message || 'Connection failed'}`);
   }
 
+  _cleanStr(str) {
+    if (!str) return '';
+    let val = String(str);
+    try { val = decodeURIComponent(val); } catch (_) {}
+    return val.replace(/^["']|["']$/g, '').trim();
+  }
+
   _sanitizeDbName(name) {
+    name = this._cleanStr(name);
     if (!name || !/^[a-zA-Z_][a-zA-Z0-9_$]{0,63}$/.test(name)) {
       throw new Error(`Invalid database name: "${name}". Use only letters, numbers, and underscores.`);
     }
@@ -372,6 +380,7 @@ class DatabaseService {
   }
 
   _sanitizeTableName(name) {
+    name = this._cleanStr(name);
     if (!name || !/^[a-zA-Z_][a-zA-Z0-9_$]{0,127}$/.test(name)) {
       throw new Error(`Invalid table name: "${name}".`);
     }
@@ -379,6 +388,7 @@ class DatabaseService {
   }
 
   _sanitizeColumnName(name) {
+    name = this._cleanStr(name);
     if (!name || !/^[a-zA-Z_][a-zA-Z0-9_$]{0,127}$/.test(name)) {
       throw new Error(`Invalid column name: "${name}".`);
     }

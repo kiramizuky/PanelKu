@@ -137,9 +137,9 @@ const RedisPage = {
             <td><span class="${typeColors[k.type] || ''}" style="font-size:12px;">${LP.escHtml(k.type)}</span></td>
             <td style="font-family:monospace;font-size:12px;color:var(--text-muted);">${ttlDisplay}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="RedisPage.loadKeyValue('${LP.encJsArg(k.key)}')" title="View"><i class="bi bi-eye"></i></button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="RedisPage.showTtlModal('${LP.encJsArg(k.key)}', ${k.ttl})" title="Set TTL"><i class="bi bi-clock"></i></button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="RedisPage.confirmDeleteKey('${LP.encJsArg(k.key)}')" title="Delete"><i class="bi bi-trash3"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('RedisPage.loadKeyValue', '${LP.encJsArg(k.key)}')" title="View"><i class="bi bi-eye"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="LP.call('RedisPage.showTtlModal', '${LP.encJsArg(k.key)}', ${k.ttl})" title="Set TTL"><i class="bi bi-clock"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('RedisPage.confirmDeleteKey', '${LP.encJsArg(k.key)}')" title="Delete"><i class="bi bi-trash3"></i></button>
             </td>
           </tr>`;
         }).join('');
@@ -230,7 +230,7 @@ const RedisPage = {
             <td style="font-family:monospace;font-size:12px;">${LP.escHtml(c.key)}</td>
             <td style="font-family:monospace;font-size:12px;color:var(--text-muted);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${LP.escHtml(c.value)}">${LP.escHtml(c.value)}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="RedisPage.editConfig('${LP.encJsArg(c.key)}','${LP.encJsArg(c.value)}')" title="Edit"><i class="bi bi-pencil"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('RedisPage.editConfig', '${LP.encJsArg(c.key)}', '${LP.encJsArg(c.value)}')" title="Edit"><i class="bi bi-pencil"></i></button>
             </td>
           </tr>
         `).join('');
@@ -274,7 +274,7 @@ const RedisPage = {
             <td>${c.db}</td>
             <td style="font-family:monospace;font-size:11px;">${LP.escHtml(c.cmd)}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="RedisPage.killClient('${LP.encJsArg(c.addr)}')" title="Kill"><i class="bi bi-x-circle"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('RedisPage.killClient', '${LP.encJsArg(c.addr)}')" title="Kill"><i class="bi bi-x-circle"></i></button>
             </td>
           </tr>
         `).join('');

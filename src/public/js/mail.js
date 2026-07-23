@@ -47,7 +47,7 @@ const MAIL = (() => {
         }
         body.innerHTML = res.data.domains.map(d => `
           <tr><td><strong>${LP.escHtml(d)}</strong></td>
-            <td style="text-align:right;"><button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="MAIL.removeDomain('${LP.encJsArg(d)}')"><i class="bi bi-trash"></i></button></td>
+            <td style="text-align:right;"><button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('MAIL.removeDomain', '${LP.encJsArg(d)}')"><i class="bi bi-trash"></i></button></td>
           </tr>
         `).join('');
       }
@@ -67,7 +67,7 @@ const MAIL = (() => {
           <tr><td><strong>${LP.escHtml(a.email)}</strong></td>
             <td style="font-size:12px;color:var(--text-muted);">${a.mailbox}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="MAIL.deleteAccount('${LP.encJsArg(a.email)}')"><i class="bi bi-trash"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('MAIL.deleteAccount', '${LP.encJsArg(a.email)}')"><i class="bi bi-trash"></i></button>
             </td>
           </tr>
         `).join('');

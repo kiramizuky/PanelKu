@@ -43,13 +43,55 @@ const LP = {
   },
 
   // ── API ───────────────────────────────────────────────
+  _cleanApiData(obj) {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'string') {
+      let str = obj;
+      if (str.includes('%22') || str.includes('%27')) {
+        try { str = decodeURIComponent(str); } catch (_) {}
+      }
+      return str.replace(/^["']|["']$/g, '').trim();
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(item => this._cleanApiData(item));
+    }
+    if (typeof obj === 'object') {
+      const cleaned = {};
+      for (const k of Object.keys(obj)) {
+        cleaned[k] = this._cleanApiData(obj[k]);
+      }
+      return cleaned;
+    }
+    return obj;
+  },
+
   async api(method, endpoint, data = null, opts = {}) {
-    const url = `${this.config.apiBase}${endpoint}`;
+    // Clean %22 and quotes from endpoint URL query parameters
+    let cleanEndpoint = endpoint;
+    if (cleanEndpoint.includes('%22') || cleanEndpoint.includes('%27') || cleanEndpoint.includes('"')) {
+      const parts = cleanEndpoint.split('?');
+      if (parts.length > 1) {
+        const queryParams = new URLSearchParams(parts[1]);
+        const cleanedParams = new URLSearchParams();
+        for (const [k, v] of queryParams.entries()) {
+          let val = v;
+          if (val.includes('%22') || val.includes('%27')) {
+            try { val = decodeURIComponent(val); } catch (_) {}
+          }
+          cleanedParams.set(k, val.replace(/^["']|["']$/g, '').trim());
+        }
+        cleanEndpoint = `${parts[0]}?${cleanedParams.toString()}`;
+      }
+    }
+
+    const url = `${this.config.apiBase}${cleanEndpoint}`;
     const headers = { 'Content-Type': 'application/json' };
 
     if (this.state.accessToken) {
       headers['Authorization'] = `Bearer ${this.state.accessToken}`;
     }
+
+    const cleanBodyData = data ? this._cleanApiData(data) : undefined;
 
     let res;
     try {
@@ -57,7 +99,7 @@ const LP = {
         method: method.toUpperCase(),
         headers,
         credentials: 'include',
-        body: data ? JSON.stringify(data) : undefined,
+        body: cleanBodyData ? JSON.stringify(cleanBodyData) : undefined,
         ...opts,
       });
     } catch (netErr) {

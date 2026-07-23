@@ -131,7 +131,7 @@ const MongoDBPage = {
         }
 
         container.innerHTML = dbs.map(d => `
-          <div class="p-3 rounded d-flex justify-content-between align-items-center" style="background:rgba(0,0,0,0.12);border:1px solid var(--glass-border);cursor:pointer;" onclick="MongoDBPage.showCollections('${LP.encJsArg(d.name)}')">
+          <div class="p-3 rounded d-flex justify-content-between align-items-center" style="background:rgba(0,0,0,0.12);border:1px solid var(--glass-border);cursor:pointer;" onclick="LP.call('MongoDBPage.showCollections', '${LP.encJsArg(d.name)}')">
             <div class="d-flex align-items-center gap-3">
               <i class="bi bi-database ${d.empty ? 'text-muted' : 'text-success'}" style="font-size:18px;"></i>
               <div>
@@ -142,11 +142,11 @@ const MongoDBPage = {
               </div>
             </div>
             <div class="d-flex gap-2">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="event.stopPropagation();MongoDBPage.showCollections('${LP.encJsArg(d.name)}')" title="View Collections">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="event.stopPropagation();LP.call('MongoDBPage.showCollections', '${LP.encJsArg(d.name)}')" title="View Collections">
                 <i class="bi bi-collection"></i> Collections
               </button>
               ${!['admin','config','local'].includes(d.name) ? `
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="event.stopPropagation();MongoDBPage.confirmDropDb('${LP.encJsArg(d.name)}')" title="Drop Database">
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="event.stopPropagation();LP.call('MongoDBPage.confirmDropDb', '${LP.encJsArg(d.name)}')" title="Drop Database">
                   <i class="bi bi-trash3"></i>
                 </button>
               ` : ''}
@@ -207,7 +207,7 @@ const MongoDBPage = {
               <span style="font-family:monospace;font-size:14px;color:var(--text-primary);">${LP.escHtml(c.name)}</span>
               <span class="lp-badge lp-badge-ghost" style="font-size:9px;">${c.count || 0} docs</span>
             </div>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="MongoDBPage.confirmDropCollection('${LP.encJsArg(dbName)}','${LP.encJsArg(c.name)}')" title="Drop Collection">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('MongoDBPage.confirmDropCollection', '${LP.encJsArg(dbName)}', '${LP.encJsArg(c.name)}')" title="Drop Collection">
               <i class="bi bi-trash3"></i>
             </button>
           </div>
@@ -258,7 +258,7 @@ const MongoDBPage = {
               <td style="font-size:12px;">${LP.escHtml(roles)}</td>
               <td style="font-size:12px;color:var(--text-muted);">${(u.mechanisms || []).join(', ') || 'SCRAM-SHA-256'}</td>
               <td style="text-align:right;">
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="MongoDBPage.confirmDropUser('${LP.encJsArg(u.user)}')" title="Drop User"><i class="bi bi-trash3"></i></button>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('MongoDBPage.confirmDropUser', '${LP.encJsArg(u.user)}')" title="Drop User"><i class="bi bi-trash3"></i></button>
               </td>
             </tr>
           `;
