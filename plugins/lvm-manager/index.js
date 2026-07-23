@@ -1197,9 +1197,12 @@ const LvmPage = (() => {
         try {
           out = await run(`pvcreate -y ${device} 2>&1`);
         } catch (e1) {
-          // If standard pvcreate fails (e.g. existing filesystem/partition signatures), try wiping signatures & force pvcreate
+          // Fallback: If device is partitioned or has existing filesystem signatures,
+          // wipe filesystem signatures, zero partition table headers (MBR/GPT), and refresh kernel device mapping
           try {
-            await run(`wipefs -a ${device} 2>/dev/null || true`);
+            await run(`wipefs -af ${device} 2>/dev/null || true`);
+            await run(`dd if=/dev/zero of=${device} bs=1M count=10 conv=notrunc 2>/dev/null || true`);
+            await run(`partprobe ${device} 2>/dev/null || true`);
             out = await run(`pvcreate -y -ff ${device} 2>&1`);
           } catch (e2) {
             throw new Error(`Inisialisasi ${device} gagal: ${e2.message}`);
@@ -1272,7 +1275,9 @@ const LvmPage = (() => {
         try {
           out = await run(`pvcreate -y ${device} 2>&1`);
         } catch (_) {
-          await run(`wipefs -a ${device} 2>/dev/null || true`);
+          await run(`wipefs -af ${device} 2>/dev/null || true`);
+          await run(`dd if=/dev/zero of=${device} bs=1M count=10 conv=notrunc 2>/dev/null || true`);
+          await run(`partprobe ${device} 2>/dev/null || true`);
           out = await run(`pvcreate -y -ff ${device} 2>&1`);
         }
 
