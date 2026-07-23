@@ -260,8 +260,38 @@ const ProfilePage = (() => {
     }
   }
 
-  return { init, changePassword, regenerateApiKey, toggleApiKeyVisibility, copyApiKey, toggle2FA, confirmEnable2FA, toggleAiFields, saveAiSettings, loadAiSettings };
+  async function updateProfile(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSaveProfile');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+    }
+    const username = document.getElementById('profUsername').value.trim();
+    const email = document.getElementById('profEmail').value.trim();
+
+    try {
+      const res = await LP.put('/users/me/profile', { username, email });
+      if (res?.success) {
+        LP.toast('Account details updated successfully!', 'success');
+        loadProfile();
+      } else {
+        LP.toast(res?.message || 'Failed to update profile', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Error updating profile', 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Save Account Details';
+      }
+    }
+  }
+
+  return { init, updateProfile, changePassword, regenerateApiKey, toggleApiKeyVisibility, copyApiKey, toggle2FA, confirmEnable2FA, toggleAiFields, saveAiSettings, loadAiSettings };
 })();
+
+window.ProfilePage = ProfilePage;
 
 document.addEventListener('DOMContentLoaded', () => {
   ProfilePage.init();

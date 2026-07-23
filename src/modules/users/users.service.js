@@ -52,11 +52,33 @@ class UsersService {
   }
 
   async update(id, data) {
-    const { password: _password, role: roleName, status, ...rest } = data;
+    const { password, role: roleName, status, username, ...rest } = data;
     const db = getDb();
 
     const user = await userRepository.findById(id);
     if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
+
+    if (username && username.trim()) {
+      const lowerUsername = username.trim().toLowerCase();
+      const existing = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(lowerUsername, id);
+      if (existing) {
+        throw Object.assign(new Error('Username is already taken by another user'), { statusCode: 409 });
+      }
+      rest.username = lowerUsername;
+    }
+
+    if (data.email && data.email.trim()) {
+      const lowerEmail = data.email.trim().toLowerCase();
+      const existing = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(lowerEmail, id);
+      if (existing) {
+        throw Object.assign(new Error('Email is already taken by another user'), { statusCode: 409 });
+      }
+      rest.email = lowerEmail;
+    }
+
+    if (password && String(password).trim()) {
+      rest.password = await bcrypt.hash(String(password).trim(), 10);
+    }
 
     if (roleName) {
       const role = await roleRepository.findBySlug(roleName);

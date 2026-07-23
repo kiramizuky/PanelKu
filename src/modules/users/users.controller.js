@@ -39,10 +39,21 @@ class UsersController {
     }
   }
 
+  async updateMyProfile(req, res) {
+    try {
+      const { username, email } = req.body;
+      const userId = req.user._id || req.user.id;
+      const user = await usersService.update(userId, { username, email });
+      return success(res, { user }, 'Profile updated successfully');
+    } catch (err) {
+      return error(res, err.message, err.statusCode || 500);
+    }
+  }
+
   async changePassword(req, res) {
     try {
       const { currentPassword, newPassword } = req.body;
-      await usersService.changePassword(req.user._id, currentPassword, newPassword);
+      await usersService.changePassword(req.user._id || req.user.id, currentPassword, newPassword);
       return success(res, {}, 'Password changed successfully');
     } catch (err) {
       return error(res, err.message, err.statusCode || 500);

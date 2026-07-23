@@ -31,7 +31,7 @@ const UsersPage = (() => {
   async function fetchUsers() {
     try {
       const res = await LP.get('/users');
-      const users = Array.isArray(res.data) ? res.data : (res.data?.users || []);
+      const users = Array.isArray(res.data) ? res.data : (res.data?.users || res.data?.data || []);
       
       LP.paginate(
         users, 
@@ -39,24 +39,26 @@ const UsersPage = (() => {
         'usersTableBody', 
         'usersPagination', 
         (u) => {
-          const statusBadge = u.status === 'active' 
+          const userId = u._id || u.id;
+          const isActive = u.isActive !== false && u.status !== 'inactive';
+          const statusBadge = isActive 
             ? '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Active</span>'
             : '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">Inactive</span>';
 
-          const toggleBtn = u.status === 'active'
-            ? `<button class="btn-lp btn-lp-ghost text-warning" onclick="LP.call('UsersPage.toggleStatus', '${LP.encJsArg(u._id)}', '${LP.encJsArg('inactive')}')" title="Deactivate"><i class="bi bi-pause-circle"></i></button>`
-            : `<button class="btn-lp btn-lp-ghost text-success" onclick="LP.call('UsersPage.toggleStatus', '${LP.encJsArg(u._id)}', '${LP.encJsArg('active')}')" title="Activate"><i class="bi bi-play-circle"></i></button>`;
+          const toggleBtn = isActive
+            ? `<button class="btn-lp btn-lp-ghost text-warning me-1" onclick="UsersPage.toggleStatus('${LP.encJsArg(userId)}', 'inactive')" title="Deactivate"><i class="bi bi-pause-circle"></i></button>`
+            : `<button class="btn-lp btn-lp-ghost text-success me-1" onclick="UsersPage.toggleStatus('${LP.encJsArg(userId)}', 'active')" title="Activate"><i class="bi bi-play-circle"></i></button>`;
 
           return `
             <tr>
-              <td>${LP.escHtml(u.username)}</td>
-              <td>${LP.escHtml(u.email)}</td>
-              <td><span style="text-transform:uppercase;font-size:12px;font-weight:600;color:var(--accent-primary)">${LP.escHtml(u.role?.name || '-')}</span></td>
+              <td><strong>${LP.escHtml(u.username)}</strong> ${u.isSuperAdmin ? '<span class="badge bg-warning text-dark ms-1" style="font-size:9px">SUPERADMIN</span>' : ''}</td>
+              <td>${LP.escHtml(u.email || '-')}</td>
+              <td><span style="text-transform:uppercase;font-size:12px;font-weight:600;color:var(--accent-primary)">${LP.escHtml(u.role?.name || u.role?.slug || u.role || '-')}</span></td>
               <td>${statusBadge}</td>
               <td class="text-end" style="white-space:nowrap">
                 ${toggleBtn}
-                <button class="btn-lp btn-lp-ghost text-primary" onclick="LP.call('UsersPage.editUser', '${LP.encJsArg(u._id)}')" title="Edit"><i class="bi bi-pencil"></i></button>
-                <button class="btn-lp btn-lp-ghost text-danger" onclick="LP.call('UsersPage.deleteUser', '${LP.encJsArg(u._id)}')" title="Delete"><i class="bi bi-trash"></i></button>
+                <button class="btn-lp btn-lp-ghost text-primary me-1" onclick="UsersPage.editUser('${LP.encJsArg(userId)}')" title="Edit"><i class="bi bi-pencil"></i> Edit</button>
+                <button class="btn-lp btn-lp-ghost text-danger" onclick="UsersPage.deleteUser('${LP.encJsArg(userId)}')" title="Delete"><i class="bi bi-trash"></i></button>
               </td>
             </tr>
           `;
@@ -75,26 +77,34 @@ const UsersPage = (() => {
     document.getElementById('userModalTitle').innerText = 'Add User';
     document.getElementById('password').required = true;
     document.getElementById('passwordHelp').innerText = 'Password is required for new users.';
+    if (!userModal) userModal = new bootstrap.Modal(document.getElementById('userModal'));
     userModal.show();
   }
 
   async function editUser(id) {
     try {
       const res = await LP.get(`/users/${id}`);
-      const user = res.data?.user;
+      const user = res.data?.user || res.data;
       if (!user) throw new Error('User not found');
 
-      document.getElementById('userId').value = user._id;
-      document.getElementById('username').value = user.username;
-      document.getElementById('email').value = user.email;
-      document.getElementById('role').value = user.role?.slug || user.role;
-      document.getElementById('status').value = user.status;
+      const userId = user._id || user.id || id;
+      document.getElementById('userId').value = userId;
+      document.getElementById('username').value = user.username || '';
+      document.getElementById('email').value = user.email || '';
       
-      document.getElementById('userModalTitle').innerText = 'Edit User';
+      const roleSlug = user.role?.slug || (typeof user.role === 'string' ? user.role : 'super_admin');
+      const roleSelect = document.getElementById('role');
+      if (roleSelect) roleSelect.value = roleSlug;
+
+      const isActive = user.isActive !== false && user.status !== 'inactive';
+      document.getElementById('status').value = isActive ? 'active' : 'inactive';
+      
+      document.getElementById('userModalTitle').innerText = `Edit User: ${user.username}`;
       document.getElementById('password').required = false;
       document.getElementById('password').value = '';
-      document.getElementById('passwordHelp').innerText = 'Leave blank to keep current password.';
+      document.getElementById('passwordHelp').innerText = 'Leave blank to keep current password. Enter new password to change.';
 
+      if (!userModal) userModal = new bootstrap.Modal(document.getElementById('userModal'));
       userModal.show();
     } catch (err) {
       LP.toast(err.message || 'Failed to load user', 'error');
@@ -106,13 +116,13 @@ const UsersPage = (() => {
     const id = document.getElementById('userId').value;
     
     const payload = {
-      username: document.getElementById('username').value,
-      email: document.getElementById('email').value,
+      username: document.getElementById('username').value.trim(),
+      email: document.getElementById('email').value.trim(),
       role: document.getElementById('role').value,
       status: document.getElementById('status').value
     };
 
-    const password = document.getElementById('password').value;
+    const password = document.getElementById('password').value.trim();
     if (password) {
       payload.password = password;
     }
@@ -125,7 +135,7 @@ const UsersPage = (() => {
         await LP.post('/users', payload);
         LP.toast('User created successfully', 'success');
       }
-      userModal.hide();
+      if (userModal) userModal.hide();
       fetchUsers();
     } catch (err) {
       LP.toast(err.message || 'Failed to save user', 'error');
@@ -156,6 +166,8 @@ const UsersPage = (() => {
 
   return { init, showCreateModal, editUser, saveUser, deleteUser, toggleStatus };
 })();
+
+window.UsersPage = UsersPage;
 
 document.addEventListener('DOMContentLoaded', () => {
   UsersPage.init();

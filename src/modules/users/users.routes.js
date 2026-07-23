@@ -16,6 +16,7 @@ router.delete('/:id', rbac(RESOURCES.USERS, ACTIONS.DELETE), usersController.del
 router.patch('/:id/toggle', rbac(RESOURCES.USERS, ACTIONS.UPDATE), usersController.toggleStatus.bind(usersController));
 
 // Self-service (no admin required)
+router.put('/me/profile', usersController.updateMyProfile.bind(usersController));
 router.post('/me/password', usersController.changePassword.bind(usersController));
 router.post('/me/api-key', usersController.regenerateApiKey.bind(usersController));
 router.delete('/me/api-key', usersController.revokeApiKey.bind(usersController));
