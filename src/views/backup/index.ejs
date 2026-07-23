@@ -391,9 +391,57 @@
           </select>
         </div>
         <div class="lp-form-group mb-2">
-          <label class="lp-label">Cron Schedule</label>
-          <input type="text" id="cjSchedule" class="lp-input font-mono" placeholder="0 2 * * *" value="0 2 * * *">
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Default: daily at 2 AM</div>
+          <label class="lp-label">Schedule Frequency / Jadwal Backup</label>
+          <select id="cjCronType" class="lp-input" onchange="BackupPage.toggleCronType()">
+            <option value="tiap_jam">Tiap Jam (Every Hour)</option>
+            <option value="n_jam">Setiap N Jam (Every N Hours)</option>
+            <option value="tiap_hari" selected>Tiap Hari (Every Day)</option>
+            <option value="n_hari">Setiap N Hari (Every N Days)</option>
+            <option value="n_bulan">Tiap Bulan (Tanggal N & Interval B Bulan)</option>
+            <option value="manual">Custom Cron Expression (Manual)</option>
+          </select>
+        </div>
+
+        <!-- Dynamic Helper Fields for Backup Cron -->
+        <div id="cjCronOptions">
+          <!-- N Jam -->
+          <div id="cjOptNjam" class="lp-form-group mb-2 cj-cron-opt" style="display:none;">
+            <label class="lp-label">Interval Jam (1-23 Jam)</label>
+            <input type="number" id="cjInpNjam" class="lp-input" min="1" max="23" value="6" oninput="BackupPage.updateCalculatedCron()">
+          </div>
+
+          <!-- Time (Jam & Menit) for Daily / N-Days / Monthly -->
+          <div id="cjOptTime" class="lp-form-group mb-2 cj-cron-opt">
+            <label class="lp-label">Waktu Eksekusi (Jam:Menit)</label>
+            <input type="time" id="cjInpTime" class="lp-input" value="02:00" onchange="BackupPage.updateCalculatedCron()">
+          </div>
+
+          <!-- N Hari -->
+          <div id="cjOptNhari" class="lp-form-group mb-2 cj-cron-opt" style="display:none;">
+            <label class="lp-label">Interval Hari (Berapa Hari Sekali)</label>
+            <input type="number" id="cjInpNhari" class="lp-input" min="1" max="31" value="2" oninput="BackupPage.updateCalculatedCron()">
+          </div>
+
+          <!-- N-Bulan + N-Hari -->
+          <div id="cjOptNbulan" class="lp-form-group mb-2 cj-cron-opt" style="display:none;">
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="lp-label">Tanggal (1-31)</label>
+                <input type="number" id="cjInpTanggal" class="lp-input" min="1" max="31" value="1" oninput="BackupPage.updateCalculatedCron()">
+              </div>
+              <div class="col-6">
+                <label class="lp-label">Interval Bulan</label>
+                <input type="number" id="cjInpBulanInterval" class="lp-input" min="1" max="12" value="1" placeholder="1 = Tiap Bulan, 2 = 2 Bulan Sekali" oninput="BackupPage.updateCalculatedCron()">
+              </div>
+            </div>
+          </div>
+
+          <!-- Final Cron Output / Manual Input -->
+          <div class="lp-form-group mb-2">
+            <label class="lp-label">Cron Expression</label>
+            <input type="text" id="cjSchedule" class="lp-input font-mono" placeholder="0 2 * * *" value="0 2 * * *" oninput="BackupPage.updateCalculatedCron()">
+            <div id="cjSchedulePreview" class="font-mono text-info mt-1" style="font-size:11px;">Setiap Hari pukul 02:00</div>
+          </div>
         </div>
         <div class="lp-form-group mb-2">
           <label class="lp-label">Retention (number of backup copies to keep, 0 = unlimited)</label>

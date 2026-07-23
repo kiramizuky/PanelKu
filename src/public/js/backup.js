@@ -194,7 +194,7 @@ const BackupPage = {
               <span><strong>Source:</strong> <code>${LP.escHtml(j.source)}</code></span>
               <span><strong>Dest:</strong> <code>${LP.escHtml(j.remote)}:${LP.escHtml(j.destPath)}</code></span>
               <span><strong>Type:</strong> ${j.type || 'sync'}</span>
-              <span><strong>Schedule:</strong> <code>${LP.escHtml(j.schedule)}</code></span>
+              <span><strong>Schedule:</strong> <span class="text-info font-mono">${LP.escHtml(this.parseCronToText(j.schedule))}</span> <code style="font-size:10px;opacity:0.7;">(${LP.escHtml(j.schedule)})</code></span>
               ${j.retention ? `<span><strong>Retention:</strong> ${j.retention} copies</span>` : ''}
             </div>
             <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">
@@ -210,14 +210,117 @@ const BackupPage = {
     }
   },
 
+  parseCronToText(cronStr) {
+    if (!cronStr) return '-';
+    const parts = cronStr.trim().split(/\s+/);
+    if (parts.length !== 5) return cronStr;
+    const [min, hour, day, month, dow] = parts;
+
+    if (min === '0' && hour === '*' && day === '*' && month === '*' && dow === '*') {
+      return 'Tiap Jam';
+    }
+    if (min === '0' && hour.startsWith('*/') && day === '*' && month === '*' && dow === '*') {
+      return `Setiap ${hour.substring(2)} Jam`;
+    }
+    if (!min.includes('*') && !hour.includes('*') && day === '*' && month === '*' && dow === '*') {
+      return `Setiap Hari pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    }
+    if (!min.includes('*') && !hour.includes('*') && day.startsWith('*/') && month === '*' && dow === '*') {
+      return `Setiap ${day.substring(2)} Hari pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    }
+    if (!min.includes('*') && !hour.includes('*') && day !== '*' && month.startsWith('*/') && dow === '*') {
+      const intervalBln = month.substring(2);
+      return `Setiap Tanggal ${day} (Tiap ${intervalBln} Bulan) pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    }
+    if (!min.includes('*') && !hour.includes('*') && day !== '*' && month === '*' && dow === '*') {
+      return `Setiap Tanggal ${day} (Tiap Bulan) pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    }
+    if (!min.includes('*') && !hour.includes('*') && day !== '*' && month !== '*' && dow === '*') {
+      const months = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+      return `Setiap Tanggal ${day} ${months[month] || month} pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    }
+    if (!min.includes('*') && !hour.includes('*') && day === '*' && month === '*' && dow !== '*') {
+      const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+      return `Setiap Hari ${days[dow] || dow} pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    }
+    return cronStr;
+  },
+
+  toggleCronType() {
+    const type = document.getElementById('cjCronType')?.value || 'tiap_hari';
+    const optNjam = document.getElementById('cjOptNjam');
+    const optTime = document.getElementById('cjOptTime');
+    const optNhari = document.getElementById('cjOptNhari');
+    const optNbulan = document.getElementById('cjOptNbulan');
+
+    if (optNjam) optNjam.style.display = type === 'n_jam' ? 'block' : 'none';
+    if (optTime) optTime.style.display = ['tiap_hari', 'n_hari', 'n_bulan'].includes(type) ? 'block' : 'none';
+    if (optNhari) optNhari.style.display = type === 'n_hari' ? 'block' : 'none';
+    if (optNbulan) optNbulan.style.display = type === 'n_bulan' ? 'block' : 'none';
+
+    this.updateCalculatedCron();
+  },
+
+  updateCalculatedCron() {
+    const type = document.getElementById('cjCronType')?.value || 'tiap_hari';
+    const schedInput = document.getElementById('cjSchedule');
+    const previewEl = document.getElementById('cjSchedulePreview');
+
+    if (!schedInput) return;
+
+    if (type === 'manual') {
+      schedInput.readOnly = false;
+      const text = this.parseCronToText(schedInput.value);
+      if (previewEl) previewEl.textContent = text;
+      return;
+    }
+
+    schedInput.readOnly = true;
+    let expr = '0 2 * * *';
+
+    if (type === 'tiap_jam') {
+      expr = '0 * * * *';
+    } else if (type === 'n_jam') {
+      const nJam = parseInt(document.getElementById('cjInpNjam')?.value) || 6;
+      expr = `0 */${nJam} * * *`;
+    } else {
+      const timeVal = document.getElementById('cjInpTime')?.value || '02:00';
+      const [h, m] = timeVal.split(':');
+      const hour = parseInt(h, 10) || 0;
+      const min = parseInt(m, 10) || 0;
+
+      if (type === 'tiap_hari') {
+        expr = `${min} ${hour} * * *`;
+      } else if (type === 'n_hari') {
+        const nHari = parseInt(document.getElementById('cjInpNhari')?.value) || 2;
+        expr = `${min} ${hour} */${nHari} * *`;
+      } else if (type === 'n_bulan') {
+        const tgl = parseInt(document.getElementById('cjInpTanggal')?.value) || 1;
+        const bInterval = parseInt(document.getElementById('cjInpBulanInterval')?.value) || 1;
+        if (bInterval <= 1) {
+          expr = `${min} ${hour} ${tgl} * *`;
+        } else {
+          expr = `${min} ${hour} ${tgl} */${bInterval} *`;
+        }
+      }
+    }
+
+    schedInput.value = expr;
+    const text = this.parseCronToText(expr);
+    if (previewEl) previewEl.textContent = text;
+  },
+
   showCreateJobModal() {
     document.getElementById('cjName').value = '';
     document.getElementById('cjSource').value = '';
     document.getElementById('cjDestPath').value = 'backups';
     document.getElementById('cjType').value = 'sync';
+    document.getElementById('cjCronType').value = 'tiap_hari';
+    document.getElementById('cjInpTime').value = '02:00';
     document.getElementById('cjSchedule').value = '0 2 * * *';
     document.getElementById('cjRetention').value = '7';
     document.getElementById('cjExclude').value = '';
+    this.toggleCronType();
     this._populateJobRemoteSelect();
     this.createJobBsModal.show();
   },

@@ -7,6 +7,9 @@ const CronPage = (() => {
     if (parts.length !== 5) return cronStr;
     const [min, hour, day, month, dow] = parts;
     
+    if (min === '0' && hour === '*' && day === '*' && month === '*' && dow === '*') {
+      return 'Tiap Jam';
+    }
     if (min === '0' && hour.startsWith('*/') && day === '*' && month === '*' && dow === '*') {
       return `Setiap ${hour.substring(2)} Jam`;
     }
@@ -16,9 +19,9 @@ const CronPage = (() => {
     if (!min.includes('*') && !hour.includes('*') && day.startsWith('*/') && month === '*' && dow === '*') {
       return `Setiap ${day.substring(2)} Hari pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
     }
-    if (!min.includes('*') && !hour.includes('*') && day === '*' && month === '*' && dow !== '*') {
-      const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-      return `Setiap Hari ${days[dow] || dow} pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    if (!min.includes('*') && !hour.includes('*') && day !== '*' && month.startsWith('*/') && dow === '*') {
+      const intervalBln = month.substring(2);
+      return `Setiap Tanggal ${day} (Tiap ${intervalBln} Bulan) pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
     }
     if (!min.includes('*') && !hour.includes('*') && day !== '*' && month === '*' && dow === '*') {
       return `Setiap Tanggal ${day} pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
@@ -26,6 +29,10 @@ const CronPage = (() => {
     if (!min.includes('*') && !hour.includes('*') && day !== '*' && month !== '*' && dow === '*') {
       const months = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
       return `Setiap ${day} ${months[month] || month} pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    }
+    if (!min.includes('*') && !hour.includes('*') && day === '*' && month === '*' && dow !== '*') {
+      const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+      return `Setiap Hari ${days[dow] || dow} pukul ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
     }
     return cronStr;
   }
@@ -74,12 +81,18 @@ const CronPage = (() => {
     const type = document.getElementById('cronType').value;
     document.querySelectorAll('.cron-opt').forEach(el => el.style.display = 'none');
     
-    if (type === 'n_jam') {
+    if (type === 'tiap_jam') {
+      // No extra inputs
+    } else if (type === 'n_jam') {
       document.getElementById('cronNjam').style.display = 'block';
     } else if (type === 'harian') {
       document.getElementById('cronTime').style.display = 'block';
     } else if (type === 'n_hari') {
       document.getElementById('cronNhari').style.display = 'block';
+      document.getElementById('cronTime').style.display = 'block';
+    } else if (type === 'n_bulan') {
+      document.getElementById('cronTanggal').style.display = 'block';
+      document.getElementById('cronNbulan').style.display = 'block';
       document.getElementById('cronTime').style.display = 'block';
     } else if (type === 'mingguan') {
       document.getElementById('cronMingguan').style.display = 'block';
@@ -104,19 +117,29 @@ const CronPage = (() => {
     const command = document.getElementById('cronCommand').value;
 
     if (type !== 'manual') {
-      const t = document.getElementById('inpTime').value;
+      const t = document.getElementById('inpTime')?.value || '00:00';
       const [h, m] = t.split(':');
-      const hour = parseInt(h, 10);
-      const min = parseInt(m, 10);
+      const hour = parseInt(h, 10) || 0;
+      const min = parseInt(m, 10) || 0;
       
-      if (type === 'n_jam') {
-        const nJam = document.getElementById('inpNjam').value;
+      if (type === 'tiap_jam') {
+        schedule = '0 * * * *';
+      } else if (type === 'n_jam') {
+        const nJam = document.getElementById('inpNjam').value || '1';
         schedule = `0 */${nJam} * * *`;
       } else if (type === 'harian') {
         schedule = `${min} ${hour} * * *`;
       } else if (type === 'n_hari') {
-        const nHari = document.getElementById('inpNhari').value;
+        const nHari = document.getElementById('inpNhari').value || '2';
         schedule = `${min} ${hour} */${nHari} * *`;
+      } else if (type === 'n_bulan') {
+        const tgl = document.getElementById('inpTanggal').value || '1';
+        const bInterval = document.getElementById('inpBulanInterval').value || '1';
+        if (parseInt(bInterval, 10) <= 1) {
+          schedule = `${min} ${hour} ${tgl} * *`;
+        } else {
+          schedule = `${min} ${hour} ${tgl} */${bInterval} *`;
+        }
       } else if (type === 'mingguan') {
         const dow = document.getElementById('inpMingguan').value;
         schedule = `${min} ${hour} * * ${dow}`;

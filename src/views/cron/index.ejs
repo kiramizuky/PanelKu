@@ -44,12 +44,14 @@
           <div class="lp-form-group">
             <label class="lp-label">Tipe Cron</label>
             <select id="cronType" class="lp-input" onchange="CronPage.toggleCronType()">
+              <option value="tiap_jam">Tiap Jam (Every Hour)</option>
               <option value="n_jam">Setiap N Jam</option>
-              <option value="harian">Harian</option>
+              <option value="harian" selected>Harian (Tiap Hari)</option>
               <option value="n_hari">Setiap N Hari</option>
+              <option value="n_bulan">Tiap Bulan (Tanggal N & Interval B Bulan)</option>
               <option value="mingguan">Mingguan</option>
-              <option value="bulanan">Bulanan</option>
-              <option value="tanggal">Tanggal Tertentu</option>
+              <option value="bulanan">Bulanan (Tiap Tanggal N)</option>
+              <option value="tanggal">Bulan & Tanggal Tertentu</option>
               <option value="manual">Kustom (Manual)</option>
             </select>
           </div>
@@ -92,6 +94,12 @@
             <div id="cronTanggal" class="lp-form-group cron-opt" style="display:none;">
               <label class="lp-label">Tanggal (1-31)</label>
               <input type="number" id="inpTanggal" class="lp-input" min="1" max="31" value="1">
+            </div>
+
+            <!-- Interval Bulan -->
+            <div id="cronNbulan" class="lp-form-group cron-opt" style="display:none;">
+              <label class="lp-label">Interval Bulan (Berapa Bulan Sekali)</label>
+              <input type="number" id="inpBulanInterval" class="lp-input" min="1" max="12" value="1" placeholder="1 = Tiap Bulan, 2 = 2 Bulan Sekali">
             </div>
 
             <!-- Bulan (for Tanggal Tertentu) -->
