@@ -57,8 +57,8 @@ const UsersPage = (() => {
               <td>${statusBadge}</td>
               <td class="text-end" style="white-space:nowrap">
                 ${toggleBtn}
-                <button class="btn-lp btn-lp-ghost text-primary me-1" onclick="UsersPage.editUser('${LP.encJsArg(userId)}')" title="Edit"><i class="bi bi-pencil"></i> Edit</button>
-                <button class="btn-lp btn-lp-ghost text-danger" onclick="UsersPage.deleteUser('${LP.encJsArg(userId)}')" title="Delete"><i class="bi bi-trash"></i></button>
+                <button class="btn-lp btn-lp-ghost text-primary me-1" onclick="UsersPage.editUser('${LP.escHtml(userId)}')" title="Edit"><i class="bi bi-pencil"></i> Edit</button>
+                <button class="btn-lp btn-lp-ghost text-danger" onclick="UsersPage.deleteUser('${LP.escHtml(userId)}')" title="Delete"><i class="bi bi-trash"></i> Delete</button>
               </td>
             </tr>
           `;
@@ -82,12 +82,13 @@ const UsersPage = (() => {
   }
 
   async function editUser(id) {
+    id = String(id || '').replace(/^"|"$/g, '').trim();
     try {
       const res = await LP.get(`/users/${id}`);
       const user = res.data?.user || res.data;
       if (!user) throw new Error('User not found');
 
-      const userId = user._id || user.id || id;
+      const userId = String(user._id || user.id || id).replace(/^"|"$/g, '').trim();
       document.getElementById('userId').value = userId;
       document.getElementById('username').value = user.username || '';
       document.getElementById('email').value = user.email || '';
@@ -113,7 +114,7 @@ const UsersPage = (() => {
 
   async function saveUser(e) {
     e.preventDefault();
-    const id = document.getElementById('userId').value;
+    const id = String(document.getElementById('userId').value || '').replace(/^"|"$/g, '').trim();
     
     const payload = {
       username: document.getElementById('username').value.trim(),
@@ -143,6 +144,7 @@ const UsersPage = (() => {
   }
 
   async function deleteUser(id) {
+    id = String(id || '').replace(/^"|"$/g, '').trim();
     if (await LP.confirm('Are you sure you want to delete this user?')) {
       try {
         await LP.delete(`/users/${id}`);
@@ -155,6 +157,7 @@ const UsersPage = (() => {
   }
 
   async function toggleStatus(id, newStatus) {
+    id = String(id || '').replace(/^"|"$/g, '').trim();
     try {
       await LP.patch(`/users/${id}/toggle`, { status: newStatus });
       LP.toast('User status updated', 'success');

@@ -12,9 +12,15 @@ class UsersController {
     }
   }
 
+  _cleanId(id) {
+    if (!id) return '';
+    return String(id).replace(/^["']|["']$/g, '').trim();
+  }
+
   async getById(req, res) {
     try {
-      const user = await usersService.getById(req.params.id);
+      const id = this._cleanId(req.params.id);
+      const user = await usersService.getById(id);
       return success(res, { user });
     } catch (err) {
       return error(res, err.message, err.statusCode || 500);
@@ -32,7 +38,8 @@ class UsersController {
 
   async update(req, res) {
     try {
-      const user = await usersService.update(req.params.id, req.body);
+      const id = this._cleanId(req.params.id);
+      const user = await usersService.update(id, req.body);
       return success(res, { user }, 'User updated successfully');
     } catch (err) {
       return error(res, err.message, err.statusCode || 500);
@@ -42,7 +49,7 @@ class UsersController {
   async updateMyProfile(req, res) {
     try {
       const { username, email } = req.body;
-      const userId = req.user._id || req.user.id;
+      const userId = this._cleanId(req.user._id || req.user.id);
       const user = await usersService.update(userId, { username, email });
       return success(res, { user }, 'Profile updated successfully');
     } catch (err) {
@@ -53,7 +60,8 @@ class UsersController {
   async changePassword(req, res) {
     try {
       const { currentPassword, newPassword } = req.body;
-      await usersService.changePassword(req.user._id || req.user.id, currentPassword, newPassword);
+      const userId = this._cleanId(req.user._id || req.user.id);
+      await usersService.changePassword(userId, currentPassword, newPassword);
       return success(res, {}, 'Password changed successfully');
     } catch (err) {
       return error(res, err.message, err.statusCode || 500);
@@ -62,7 +70,9 @@ class UsersController {
 
   async delete(req, res) {
     try {
-      await usersService.delete(req.params.id, req.user._id);
+      const id = this._cleanId(req.params.id);
+      const requestingUserId = this._cleanId(req.user._id || req.user.id);
+      await usersService.delete(id, requestingUserId);
       return success(res, {}, 'User deleted successfully');
     } catch (err) {
       return error(res, err.message, err.statusCode || 500);
@@ -71,7 +81,8 @@ class UsersController {
 
   async toggleStatus(req, res) {
     try {
-      const user = await usersService.toggleStatus(req.params.id);
+      const id = this._cleanId(req.params.id);
+      const user = await usersService.toggleStatus(id);
       return success(res, { user }, 'User status updated');
     } catch (err) {
       return error(res, err.message, err.statusCode || 500);
