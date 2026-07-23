@@ -339,8 +339,9 @@ class UpdaterService {
         log.push('🔧 Configuring git safe directory...');
         await this._runCommand('git config --global --add safe.directory /opt/panelku 2>&1').catch(() => {});
 
-        // Checkout package-lock.json to avoid merge conflicts
-        log.push('📝 Resetting local changes...');
+        // Stash local changes to avoid merge conflicts
+        log.push('📝 Stashing local changes...');
+        await this._runCommand('git stash 2>&1').catch(() => {});
         await this._runCommand('git checkout package-lock.json 2>&1').catch(() => {});
         await this._runCommand('git checkout package.json 2>&1').catch(() => {});
 
