@@ -1,12 +1,12 @@
 import dockerService from './docker.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
 
-class DockerController {
-  _cleanId(id) {
-    if (!id) return '';
-    return String(id).replace(/^["']|["']$/g, '').trim();
-  }
+function cleanId(id) {
+  if (!id) return '';
+  return String(id).replace(/^["']|["']$/g, '').trim();
+}
 
+class DockerController {
   async getSummary(req, res) {
     try {
       const summary = await dockerService.getDashboardSummary();
@@ -29,7 +29,7 @@ class DockerController {
 
   async getContainer(req, res) {
     try {
-      const id = this._cleanId(req.params.id);
+      const id = cleanId(req.params.id);
       const info = await dockerService.getContainerInfo(id);
       return successResponse(res, { container: info }, 'Container details retrieved');
     } catch (error) {
@@ -39,7 +39,7 @@ class DockerController {
 
   async startContainer(req, res) {
     try {
-      const id = this._cleanId(req.params.id);
+      const id = cleanId(req.params.id);
       await dockerService.startContainer(id);
       return successResponse(res, null, 'Container started');
     } catch (error) {
@@ -49,7 +49,7 @@ class DockerController {
 
   async stopContainer(req, res) {
     try {
-      const id = this._cleanId(req.params.id);
+      const id = cleanId(req.params.id);
       await dockerService.stopContainer(id);
       return successResponse(res, null, 'Container stopped');
     } catch (error) {
@@ -59,7 +59,7 @@ class DockerController {
 
   async restartContainer(req, res) {
     try {
-      const id = this._cleanId(req.params.id);
+      const id = cleanId(req.params.id);
       await dockerService.restartContainer(id);
       return successResponse(res, null, 'Container restarted');
     } catch (error) {
@@ -69,7 +69,7 @@ class DockerController {
 
   async killContainer(req, res) {
     try {
-      const id = this._cleanId(req.params.id);
+      const id = cleanId(req.params.id);
       await dockerService.killContainer(id);
       return successResponse(res, null, 'Container killed');
     } catch (error) {
@@ -79,7 +79,7 @@ class DockerController {
 
   async removeContainer(req, res) {
     try {
-      const id = this._cleanId(req.params.id);
+      const id = cleanId(req.params.id);
       const force = req.query.force === 'true';
       await dockerService.removeContainer(id, force);
       return successResponse(res, null, 'Container removed');
@@ -99,7 +99,7 @@ class DockerController {
 
   async removeImage(req, res) {
     try {
-      const id = this._cleanId(req.params.id);
+      const id = cleanId(req.params.id);
       const force = req.query.force === 'true';
       await dockerService.removeImage(id, force);
       return successResponse(res, null, 'Image removed');

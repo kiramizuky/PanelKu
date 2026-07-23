@@ -1,6 +1,11 @@
 import usersService from './users.service.js';
 import { success, created, error, paginated } from '../../helpers/response.js';
 
+function cleanId(id) {
+  if (!id) return '';
+  return String(id).replace(/^["']|["']$/g, '').trim();
+}
+
 class UsersController {
   async list(req, res) {
     try {
@@ -12,14 +17,9 @@ class UsersController {
     }
   }
 
-  _cleanId(id) {
-    if (!id) return '';
-    return String(id).replace(/^["']|["']$/g, '').trim();
-  }
-
   async getById(req, res) {
     try {
-      const id = this._cleanId(req.params.id);
+      const id = cleanId(req.params.id);
       const user = await usersService.getById(id);
       return success(res, { user });
     } catch (err) {
@@ -38,7 +38,7 @@ class UsersController {
 
   async update(req, res) {
     try {
-      const id = this._cleanId(req.params.id);
+      const id = cleanId(req.params.id);
       const user = await usersService.update(id, req.body);
       return success(res, { user }, 'User updated successfully');
     } catch (err) {
@@ -49,7 +49,7 @@ class UsersController {
   async updateMyProfile(req, res) {
     try {
       const { username, email } = req.body;
-      const userId = this._cleanId(req.user._id || req.user.id);
+      const userId = cleanId(req.user._id || req.user.id);
       const user = await usersService.update(userId, { username, email });
       return success(res, { user }, 'Profile updated successfully');
     } catch (err) {
@@ -60,7 +60,7 @@ class UsersController {
   async changePassword(req, res) {
     try {
       const { currentPassword, newPassword } = req.body;
-      const userId = this._cleanId(req.user._id || req.user.id);
+      const userId = cleanId(req.user._id || req.user.id);
       await usersService.changePassword(userId, currentPassword, newPassword);
       return success(res, {}, 'Password changed successfully');
     } catch (err) {
@@ -70,8 +70,8 @@ class UsersController {
 
   async delete(req, res) {
     try {
-      const id = this._cleanId(req.params.id);
-      const requestingUserId = this._cleanId(req.user._id || req.user.id);
+      const id = cleanId(req.params.id);
+      const requestingUserId = cleanId(req.user._id || req.user.id);
       await usersService.delete(id, requestingUserId);
       return success(res, {}, 'User deleted successfully');
     } catch (err) {
@@ -81,7 +81,7 @@ class UsersController {
 
   async toggleStatus(req, res) {
     try {
-      const id = this._cleanId(req.params.id);
+      const id = cleanId(req.params.id);
       const user = await usersService.toggleStatus(id);
       return success(res, { user }, 'User status updated');
     } catch (err) {
