@@ -10,7 +10,7 @@ const router = Router();
 // ── Existing auth routes ──
 router.post('/login', authLimiter, authController.login.bind(authController));
 router.post('/2fa/verify', authLimiter, authController.verifyTwoFactor.bind(authController));
-router.post('/refresh', authLimiter, authController.refresh.bind(authController));
+router.post('/refresh', authController.refresh.bind(authController));
 
 // ── Public SSO & LDAP status endpoints ──
 // Safe: only returns enabled/disabled status (no secrets)
