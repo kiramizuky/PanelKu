@@ -45,7 +45,8 @@ async function checkAndInstallSystemDependencies(pluginPath) {
         try {
           await execFileAsync('which', ['apt-get']);
           cmd = 'apt-get';
-          args = ['install', '-y', ...pkgsToInstall];
+          const aptPkgs = pkgsToInstall.map(p => p === 'docker' ? 'docker.io' : p);
+          args = ['install', '-y', ...aptPkgs];
         } catch (_) {
           try {
             await execFileAsync('which', ['dnf']);
@@ -68,6 +69,16 @@ async function checkAndInstallSystemDependencies(pluginPath) {
 
         if (cmd) {
           await execFileAsync(cmd, args, { env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' } });
+        }
+
+        if (pkgsToInstall.includes('docker')) {
+          try {
+            await execFileAsync('systemctl', ['enable', '--now', 'docker']);
+          } catch (_) {
+            try {
+              await execFileAsync('service', ['docker', 'start']);
+            } catch (_) {}
+          }
         }
       }
     }

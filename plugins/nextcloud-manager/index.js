@@ -7,8 +7,15 @@ export default {
     // 1. Nextcloud Manager Dashboard View
     app.get('/plugins/nextcloud-manager', async (req, res) => {
       try {
-        const containers = await dockerService.listContainers(true);
-        const ncContainer = containers.find(c => c.names.includes('nextcloud-app'));
+        let containers = [];
+        let dockerError = null;
+        try {
+          containers = await dockerService.listContainers(true);
+        } catch (err) {
+          dockerError = err.message || 'Docker daemon is not running';
+        }
+
+        const ncContainer = containers.find(c => c.names && c.names.includes('nextcloud-app'));
         
         let containerStatus = 'Not Installed';
         let containerState = '';
@@ -32,6 +39,22 @@ export default {
                 <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Deploy and manage your personal Cloud Storage service</p>
               </div>
             </div>
+
+            ${dockerError ? `
+            <div class="lp-glass-card p-3 mb-4" style="border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.06);">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size:22px;"></i>
+                  <div>
+                    <div style="font-weight:700;font-size:14px;color:#ef4444;">Docker Service Unavailable</div>
+                    <div style="font-size:12px;color:var(--text-muted);">${dockerError} — Docker daemon is required to deploy Nextcloud.</div>
+                  </div>
+                </div>
+                <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="NextcloudPage.startDocker()">
+                  <i class="bi bi-play-circle me-1"></i>Start / Install Docker
+                </button>
+              </div>
+            </div>` : ''}
 
             <div class="row g-4">
               <!-- Left side: Status & Actions -->
@@ -218,7 +241,18 @@ export default {
                   }
                 }
 
-                return { showDeployModal, deploy, start, stop, destroy };
+                async function startDocker() {
+                  LP.toast('Starting / Installing Docker service...', 'info');
+                  const res = await LP.post('/plugins/nextcloud-manager/start-docker');
+                  if (res?.success) {
+                    LP.toast('Docker started successfully!', 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                  } else {
+                    LP.toast(res?.message || 'Failed to start Docker', 'error');
+                  }
+                }
+
+                return { showDeployModal, deploy, start, stop, destroy, startDocker };
               })();
             </script>
           `,
@@ -226,6 +260,24 @@ export default {
         });
       } catch (err) {
         res.status(500).send('Internal Server Error: ' + err.message);
+      }
+    });
+
+    // Start / Install Docker API
+    app.post('/plugins/nextcloud-manager/start-docker', async (req, res) => {
+      try {
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+        let out = '';
+        try {
+          out = (await execAsync('systemctl enable --now docker || service docker start 2>&1')).stdout;
+        } catch (_) {
+          out = (await execAsync('DEBIAN_FRONTEND=noninteractive apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io && systemctl enable --now docker 2>&1')).stdout;
+        }
+        return successResponse(res, { output: out }, 'Docker started');
+      } catch (error) {
+        return errorResponse(res, error.message, 500);
       }
     });
 

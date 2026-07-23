@@ -270,8 +270,8 @@ plugin-name/
             </div>
             <div>
               ${p.installed
-                ? '<span class="lp-badge lp-badge-success w-100 text-center" style="padding:8px;"><i class="bi bi-check-circle me-1"></i> Installed</span>'
-                : `<button class="btn-lp btn-lp-primary w-100" onclick="PluginsPage.showConfigModal('${p.id}','${p.name.replace(/'/g,"\\'")}','','install')"><i class="bi bi-download me-1"></i> Install</button>`
+                ? `<a href="${p.path}" target="${p.proxyUrl ? '_blank' : '_self'}" class="btn-lp btn-lp-primary w-100 text-center" style="padding:8px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;"><i class="bi bi-box-arrow-up-right me-1"></i> Open</a>`
+                : `<button class="btn-lp btn-lp-primary w-100" onclick="PluginsPage.showConfigModal('${p.id}','${p.name.replace(/'/g,"\\'")}','','install')"><i class="bi bi-rocket-takeoff me-1"></i> Deploy</button>`
               }
             </div>
           </div>
