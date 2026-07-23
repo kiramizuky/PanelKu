@@ -403,9 +403,6 @@ class BackupService {
 
   async createBackup(type, target) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const mysqlUser = process.env.MYSQL_BACKUP_USER || 'root';
-    const mysqlPass = process.env.MYSQL_BACKUP_PASSWORD || '';
-    const pgUser = process.env.POSTGRES_BACKUP_USER || 'postgres';
 
     try {
       let filepath;
@@ -414,19 +411,45 @@ class BackupService {
         validateDbName(target);
         const filename = `mysql_${target}_${timestamp}.sql`;
         filepath = path.join(this.backupDir, filename);
-        const args = ['-u', mysqlUser, target];
+
+        let mysqlConfig = { host: '127.0.0.1', port: 3306, user: 'root', password: '' };
+        try {
+          const { default: databaseService } = await import('../database/database.service.js');
+          mysqlConfig = await databaseService.loadMysqlConfig();
+        } catch (_) {}
+
+        const mysqlUser = mysqlConfig.user || process.env.MYSQL_BACKUP_USER || 'root';
+        const mysqlPass = mysqlConfig.password !== undefined ? mysqlConfig.password : (process.env.MYSQL_BACKUP_PASSWORD || '');
+        const mysqlHost = mysqlConfig.host || '127.0.0.1';
+        const mysqlPort = String(mysqlConfig.port || 3306);
+
+        const args = ['-h', mysqlHost, '-P', mysqlPort, '-u', mysqlUser, target];
         const env = { ...process.env };
         if (mysqlPass) env.MYSQL_PWD = mysqlPass;
+
         const sqlData = await spawnPromise('mysqldump', args, { env });
         await fs.writeFile(filepath, sqlData);
       } else if (type === 'postgres') {
         validateDbName(target);
         const filename = `postgres_${target}_${timestamp}.sql`;
         filepath = path.join(this.backupDir, filename);
-        const pgPass = process.env.POSTGRES_BACKUP_PASSWORD || '';
+
+        let pgConfig = { host: '127.0.0.1', port: 5432, user: 'postgres', password: '' };
+        try {
+          const { default: databaseService } = await import('../database/database.service.js');
+          pgConfig = await databaseService.loadPgConfig();
+        } catch (_) {}
+
+        const pgUser = pgConfig.user || process.env.POSTGRES_BACKUP_USER || 'postgres';
+        const pgPass = pgConfig.password !== undefined ? pgConfig.password : (process.env.POSTGRES_BACKUP_PASSWORD || '');
+        const pgHost = pgConfig.host || '127.0.0.1';
+        const pgPort = String(pgConfig.port || 5432);
+
         const env = { ...process.env };
         if (pgPass) env.PGPASSWORD = pgPass;
-        await spawnPromise('pg_dump', ['-U', pgUser, '-d', target, '-f', filepath], { env });
+
+        const args = ['-U', pgUser, '-h', pgHost, '-p', pgPort, '-d', target, '-f', filepath];
+        await spawnPromise('pg_dump', args, { env });
       } else if (type === 'files') {
         validatePath(target, false);
         const filename = `files_${target.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.tar.gz`;
