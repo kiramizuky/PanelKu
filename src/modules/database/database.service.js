@@ -95,61 +95,54 @@ class DatabaseService {
       this._lastPgConfigKey = configKey;
       let lastErr = null;
 
-      // 1. If Linux and no password provided, try Unix Domain Socket first (/var/run/postgresql) for peer auth
-      if (process.platform === 'linux' && (config.host === 'localhost' || config.host === '127.0.0.1') && !config.password) {
+      // Hosts to attempt in order (127.0.0.1 IPv4 first to avoid localhost IPv6 resolution mismatch)
+      const hostsToTry = [];
+      if (config.host === 'localhost') {
+        hostsToTry.push('127.0.0.1', 'localhost');
+      } else {
+        hostsToTry.push(config.host);
+      }
+
+      // 1. Try TCP hosts
+      for (const h of hostsToTry) {
         try {
-          const socketPool = new Pool({
-            host: '/var/run/postgresql',
-            port: config.port,
+          const pool = new Pool({
+            host: h,
+            port: config.port || 5432,
             user: config.user || 'postgres',
+            password: String(config.password ?? ''),
             database: config.database || 'postgres',
             max: 10,
             idleTimeoutMillis: 30000,
           });
-          const client = await socketPool.connect();
+          const client = await pool.connect();
           client.release();
-          this.pgPool = socketPool;
+          this.pgPool = pool;
           return this.pgPool;
-        } catch (_) {}
+        } catch (err) {
+          lastErr = err;
+        }
       }
 
-      // 2. Primary TCP Pool
-      const poolOptions = {
-        host: config.host,
-        port: config.port,
-        user: config.user,
-        password: String(config.password ?? ''),
-        database: config.database || 'postgres',
-        max: 10,
-        idleTimeoutMillis: 30000,
-      };
-
-      try {
-        const pool = new Pool(poolOptions);
-        const client = await pool.connect();
-        client.release();
-        this.pgPool = pool;
-        return this.pgPool;
-      } catch (err) {
-        lastErr = err;
-      }
-
-      // 3. Fallback on Linux: Try Unix Domain Socket if TCP connection failed
-      if (process.platform === 'linux' && (config.host === 'localhost' || config.host === '127.0.0.1')) {
-        try {
-          const socketPool = new Pool({
-            host: '/var/run/postgresql',
-            port: config.port,
-            user: config.user || 'postgres',
-            database: config.database || 'postgres',
-            max: 10,
-            idleTimeoutMillis: 30000,
-          });
-          const client = await socketPool.connect();
-          client.release();
-          this.pgPool = socketPool;
-          return this.pgPool;
-        } catch (_) {}
+      // 2. Try Unix domain sockets on Linux (/var/run/postgresql, /tmp)
+      if (process.platform === 'linux') {
+        for (const sockDir of ['/var/run/postgresql', '/tmp']) {
+          try {
+            const socketPool = new Pool({
+              host: sockDir,
+              port: config.port || 5432,
+              user: config.user || 'postgres',
+              password: String(config.password ?? ''),
+              database: config.database || 'postgres',
+              max: 10,
+              idleTimeoutMillis: 30000,
+            });
+            const client = await socketPool.connect();
+            client.release();
+            this.pgPool = socketPool;
+            return this.pgPool;
+          } catch (_) {}
+        }
       }
 
       this.pgPool = null;
