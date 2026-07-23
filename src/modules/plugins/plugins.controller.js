@@ -439,6 +439,7 @@ class PluginsController {
 
       const result = marketplace.map(p => ({
         ...p,
+        path: `/plugins/${p.id}`,
         installed: installedIds.includes(p.id),
       }));
 
