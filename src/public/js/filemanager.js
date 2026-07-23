@@ -737,6 +737,7 @@ const FMPage = (() => {
     downloadSelected,
     zipSelected,
     showContextMenu,
+    saveFile: _saveFile,
     _saveFile,
     updateBulkBar,
     toggleSelectAll,
@@ -749,3 +750,5 @@ const FMPage = (() => {
 
 document.addEventListener('DOMContentLoaded', () => FMPage.init());
 window.FMPage = FMPage;
+window.FM = FMPage;
+window.FileManager = FMPage;

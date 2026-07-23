@@ -549,3 +549,5 @@ const DB = (() => {
 })();
 
 window.DB = DB;
+window.DatabasePage = DB;
+window.DBPage = DB;

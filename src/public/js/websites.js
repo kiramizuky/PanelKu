@@ -268,3 +268,6 @@ const WebsitesPage = (() => {
 })();
 
 document.addEventListener('DOMContentLoaded', () => WebsitesPage.init());
+window.WebsitesPage = WebsitesPage;
+window.Websites = WebsitesPage;
+window.WebsitesManager = WebsitesPage;

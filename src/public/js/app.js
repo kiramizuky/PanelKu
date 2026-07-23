@@ -389,20 +389,65 @@ const LP = {
    * The module method receives the decoded values directly — no changes needed to handlers.
    */
   call(fnPath, ...args) {
-    // Use indirect eval to access global lexical scope (works for both const and var globals)
-    // fnPath is always a developer-hardcoded string in template literals — no injection risk
-    let fn;
-    try { fn = (0, eval)(fnPath); } catch { fn = null; }
+    let fn = null;
+    try { fn = (0, eval)(fnPath); } catch (_) {}
+
+    // Fallback resolution for aliases & underscored method names
+    if (typeof fn !== 'function') {
+      const parts = String(fnPath || '').split('.');
+      if (parts.length === 2) {
+        const [modName, methName] = parts;
+        const modCandidates = [
+          modName,
+          modName + 'Page',
+          modName.replace(/Page$/, ''),
+          modName.toUpperCase(),
+          modName.toLowerCase()
+        ];
+        const methCandidates = [
+          methName,
+          methName.startsWith('_') ? methName.slice(1) : '_' + methName
+        ];
+
+        for (const mName of modCandidates) {
+          const mod = window[mName];
+          if (mod && (typeof mod === 'object' || typeof mod === 'function')) {
+            for (const fName of methCandidates) {
+              if (typeof mod[fName] === 'function') {
+                fn = mod[fName].bind(mod);
+                break;
+              }
+            }
+          }
+          if (fn) break;
+        }
+      }
+    }
+
     if (typeof fn !== 'function') {
       console.warn(`LP.call: ${fnPath} is not a function`);
       return;
     }
-    // Decode string args (which were encJsArg'd), pass non-strings through unchanged (e.g. 'this' DOM refs)
+
+    // Decode string args (which were encJsArg'd), pass non-strings through unchanged
     const decoded = args.map(a => {
       if (typeof a !== 'string') return a;
-      try { return JSON.parse(decodeURIComponent(a)); }
-      catch { return a; }
+      try {
+        let val = a;
+        if (val.includes('%22') || val.includes('%27')) {
+          try { val = decodeURIComponent(val); } catch (_) {}
+        }
+        val = val.replace(/^["']|["']$/g, '').trim();
+        return JSON.parse(val);
+      } catch {
+        let str = a;
+        if (str.includes('%22') || str.includes('%27')) {
+          try { str = decodeURIComponent(str); } catch (_) {}
+        }
+        return str.replace(/^["']|["']$/g, '').trim();
+      }
     });
+
     return fn(...decoded);
   },
 

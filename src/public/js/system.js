@@ -327,3 +327,6 @@ const SystemPage = {
 document.addEventListener('DOMContentLoaded', () => {
   SystemPage.init();
 });
+window.SystemPage = SystemPage;
+window.System = SystemPage;
+window.SystemManager = SystemPage;

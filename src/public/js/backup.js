@@ -741,3 +741,6 @@ const BackupPage = {
 };
 
 document.addEventListener('DOMContentLoaded', () => BackupPage.init());
+window.BackupPage = BackupPage;
+window.Backup = BackupPage;
+window.BackupManager = BackupPage;
