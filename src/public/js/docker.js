@@ -40,26 +40,28 @@ const DockerPage = (() => {
       const isRunning = c.state === 'running';
       const badgeClass = isRunning ? 'lp-badge-success' : 'lp-badge-danger';
       const ports = c.ports?.map(p => `${p.PublicPort || p.PrivatePort}/${p.Type}`).join(', ') || '—';
+      const containerId = String(c.id || '').replace(/^["']|["']$/g, '').trim();
+      const containerName = String(c.names[0] || '').replace(/^["']|["']$/g, '').trim();
 
       return `
         <tr>
           <td>
-            <div class="font-mono" style="font-weight:600;color:var(--text-primary)">${c.names[0]}</div>
-            <div style="font-size:11px;color:var(--text-muted)">ID: ${c.id}</div>
+            <div class="font-mono" style="font-weight:600;color:var(--text-primary)">${LP.escHtml(containerName)}</div>
+            <div style="font-size:11px;color:var(--text-muted)">ID: ${LP.escHtml(containerId.substring(0, 12))}</div>
           </td>
-          <td><span class="lp-badge ${badgeClass}"><span class="lp-badge-dot"></span>${c.state}</span></td>
-          <td class="font-mono" style="font-size:12px">${c.image}</td>
-          <td class="font-mono" style="font-size:11px">${ports}</td>
+          <td><span class="lp-badge ${badgeClass}"><span class="lp-badge-dot"></span>${LP.escHtml(c.state)}</span></td>
+          <td class="font-mono" style="font-size:12px">${LP.escHtml(c.image)}</td>
+          <td class="font-mono" style="font-size:11px">${LP.escHtml(ports)}</td>
           <td style="font-size:12px;color:var(--text-muted)">${new Date(c.created * 1000).toLocaleString()}</td>
           <td style="text-align:right">
             ${isRunning 
-              ? `<button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('DockerPage.action', '${LP.encJsArg('stop')}', '${LP.encJsArg(c.id)}')" title="Stop"><i class="bi bi-stop-fill text-danger"></i></button>
-                 <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('DockerPage.action', '${LP.encJsArg('restart')}', '${LP.encJsArg(c.id)}')" title="Restart"><i class="bi bi-arrow-clockwise text-warning"></i></button>`
-              : `<button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('DockerPage.action', '${LP.encJsArg('start')}', '${LP.encJsArg(c.id)}')" title="Start"><i class="bi bi-play-fill text-success"></i></button>`
+              ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger me-1" onclick="DockerPage.action('stop', '${LP.escHtml(containerId)}')" title="Stop"><i class="bi bi-stop-fill"></i> Stop</button>
+                 <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning me-1" onclick="DockerPage.action('restart', '${LP.escHtml(containerId)}')" title="Restart"><i class="bi bi-arrow-clockwise"></i> Restart</button>`
+              : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success me-1" onclick="DockerPage.action('start', '${LP.escHtml(containerId)}')" title="Start"><i class="bi bi-play-fill"></i> Start</button>`
             }
-            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('DockerPage.viewLogs', '${LP.encJsArg(c.id)}', '${LP.encJsArg(c.names[0])}')" title="Logs"><i class="bi bi-justify-left"></i></button>
-            ${isRunning ? `<button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('DockerPage.viewConsole', '${LP.encJsArg(c.id)}', '${LP.encJsArg(c.names[0])}')" title="Terminal Console"><i class="bi bi-terminal"></i></button>` : ''}
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DockerPage.action', '${LP.encJsArg('delete')}', '${LP.encJsArg(c.id)}')" title="Delete"><i class="bi bi-trash"></i></button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info me-1" onclick="DockerPage.viewLogs('${LP.escHtml(containerId)}', '${LP.escHtml(containerName)}')" title="Logs"><i class="bi bi-justify-left"></i> Logs</button>
+            ${isRunning ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-light me-1" onclick="DockerPage.viewConsole('${LP.escHtml(containerId)}', '${LP.escHtml(containerName)}')" title="Terminal Console"><i class="bi bi-terminal"></i> Console</button>` : ''}
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.action('delete', '${LP.escHtml(containerId)}')" title="Delete"><i class="bi bi-trash"></i> Delete</button>
           </td>
         </tr>
       `;
@@ -85,6 +87,7 @@ const DockerPage = (() => {
     const { images } = res.data;
     LP.paginate(images, 10, 'imagesTableBody', 'imagesPagination', img => {
       const tag = img.tags[0] || '<none>:<none>';
+      const imgId = String(img.id || '').replace(/^["']|["']$/g, '').trim();
       
       let inUseHtml = '<span class="text-muted">—</span>';
       let hasRunningContainers = false;
@@ -99,13 +102,13 @@ const DockerPage = (() => {
 
       return `
         <tr>
-          <td class="font-mono" style="color:var(--text-primary)">${tag}</td>
-          <td class="font-mono" style="font-size:12px;color:var(--text-muted)">${img.id}</td>
+          <td class="font-mono" style="color:var(--text-primary)">${LP.escHtml(tag)}</td>
+          <td class="font-mono" style="font-size:12px;color:var(--text-muted)">${LP.escHtml(imgId.substring(0, 12))}</td>
           <td>${inUseHtml}</td>
           <td style="font-size:12px">${LP.formatBytes(img.size)}</td>
           <td style="font-size:12px;color:var(--text-muted)">${new Date(img.created * 1000).toLocaleString()}</td>
           <td style="text-align:right">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DockerPage.deleteImage', '${LP.encJsArg(img.id)}', '${LP.encJsArg(hasRunningContainers)}')" title="Delete"><i class="bi bi-trash"></i></button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.deleteImage('${LP.escHtml(imgId)}', ${hasRunningContainers})" title="Delete"><i class="bi bi-trash"></i> Delete</button>
           </td>
         </tr>
       `;
@@ -113,6 +116,9 @@ const DockerPage = (() => {
   }
 
   async function action(type, id) {
+    type = String(type || '').replace(/^["']|["']$/g, '').trim();
+    id = String(id || '').replace(/^["']|["']$/g, '').trim();
+
     if (type === 'delete') {
       const confirmed = await LP.confirm('Delete this container?', 'Delete Container');
       if (!confirmed) return;
@@ -137,6 +143,7 @@ const DockerPage = (() => {
   }
 
   async function deleteImage(id, hasRunningContainers) {
+    id = String(id || '').replace(/^["']|["']$/g, '').trim();
     if (hasRunningContainers) {
       LP.toast('Cannot delete image: It is currently used by running container(s). Please stop them first.', 'error');
       return;
