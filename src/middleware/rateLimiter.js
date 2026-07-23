@@ -11,22 +11,17 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please slow down.' },
   skip: (req) => {
+    // 1. Exempt all authenticated requests (logged in panel users should never be rate limited)
+    if (req.user || req.cookies?.token || req.cookies?.refresh_token || req.headers?.authorization) return true;
+
+    // 2. Skip loopback & private LAN networks (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
     const ip = req.ip || req.socket?.remoteAddress || '';
-    // Skip loopback & private LAN networks (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
     if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return true;
     if (/^(::ffff:)?(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(ip)) return true;
 
-    // Use originalUrl instead of path to avoid issues with router mounting prefixes
-    const url = req.originalUrl.split('?')[0];
-
-    // Exempt auth endpoints from general API limit (they are protected by authLimiter separately)
-    if (url === '/api/auth/login' || url === '/api/auth/2fa/verify' || url === '/api/auth/profile' || url === '/api/auth/refresh') return true;
-
-    // Exempt authenticated panel sessions (logged-in admin users)
-    if (req.cookies?.token || req.headers?.authorization) return true;
-
-    // Exempt panel UI management endpoints to prevent blocking admin navigation
-    if (url.startsWith('/api/dashboard') || url.startsWith('/api/plugins') || url.startsWith('/api/database') || url.startsWith('/api/settings') || url.startsWith('/api/notifications') || url.startsWith('/api/system') || url.startsWith('/api/websites') || url.startsWith('/api/ssl') || url.startsWith('/api/redis') || url.startsWith('/api/docker')) return true;
+    // 3. Exempt internal API endpoints
+    const url = (req.originalUrl || req.url || '').split('?')[0];
+    if (url.startsWith('/api/')) return true;
 
     return false;
   },

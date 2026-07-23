@@ -32,6 +32,7 @@ const LP = {
       try {
         await this.fetchProfile();
         this.updateUserUI();
+        this.startSessionKeepAlive();
         this.checkPanelUpdateDaily().catch(() => {});
       } catch {
         this.logout();
@@ -50,20 +51,33 @@ const LP = {
       headers['Authorization'] = `Bearer ${this.state.accessToken}`;
     }
 
-    const res = await fetch(url, {
-      method: method.toUpperCase(),
-      headers,
-      credentials: 'include',
-      body: data ? JSON.stringify(data) : undefined,
-      ...opts,
-    });
+    let res;
+    try {
+      res = await fetch(url, {
+        method: method.toUpperCase(),
+        headers,
+        credentials: 'include',
+        body: data ? JSON.stringify(data) : undefined,
+        ...opts,
+      });
+    } catch (netErr) {
+      console.warn('Network request failed:', netErr);
+      return null;
+    }
 
-    // Token expired — try refresh
+    // Rate Limited (429) — Do NOT logout, inform user gracefully
+    if (res.status === 429) {
+      this.toast('Terlalu banyak permintaan. Silakan tunggu beberapa saat.', 'warning');
+      return { success: false, message: 'Too many requests, please slow down.' };
+    }
+
+    // Token expired (401) — try refresh once
     if (res.status === 401 && !opts._retry) {
       const refreshed = await this.refreshToken();
       if (refreshed) {
         return this.api(method, endpoint, data, { ...opts, _retry: true });
       } else {
+        // Only logout if refresh token was rejected by server
         this.logout();
         return null;
       }
@@ -140,7 +154,20 @@ const LP = {
     throw new Error('Failed to fetch profile');
   },
 
+  startSessionKeepAlive() {
+    if (this._sessionKeepAliveTimer) clearInterval(this._sessionKeepAliveTimer);
+    // Refresh access token silently every 10 minutes while tab is open
+    this._sessionKeepAliveTimer = setInterval(async () => {
+      if (this.state.accessToken) {
+        try {
+          await this.refreshToken();
+        } catch (_) {}
+      }
+    }, 10 * 60 * 1000);
+  },
+
   logout() {
+    if (this._sessionKeepAliveTimer) clearInterval(this._sessionKeepAliveTimer);
     this.post('/auth/logout').catch(() => {});
     localStorage.removeItem('lp_token');
     this.state.accessToken = null;

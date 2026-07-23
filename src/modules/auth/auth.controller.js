@@ -19,10 +19,10 @@ class AuthController {
       // Set refresh token in HTTP-only cookie
       res.cookie('refresh_token', result.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        path: '/api/auth/refresh',
+        secure: process.env.NODE_ENV === 'production' && req.protocol === 'https',
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        path: '/',
       });
 
       return success(res, {
@@ -42,10 +42,10 @@ class AuthController {
 
       res.cookie('refresh_token', result.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        path: '/api/auth/refresh',
+        secure: process.env.NODE_ENV === 'production' && req.protocol === 'https',
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        path: '/',
       });
 
       return success(res, { accessToken: result.accessToken, user: result.user }, '2FA verified');
@@ -64,10 +64,10 @@ class AuthController {
       // [ROTATION] Set the new refresh token as HTTP-only cookie
       res.cookie('refresh_token', result.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-        path: '/api/auth/refresh',
+        secure: process.env.NODE_ENV === 'production' && req.protocol === 'https',
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        path: '/',
       });
 
       return success(res, { accessToken: result.accessToken }, 'Token refreshed');
@@ -80,7 +80,7 @@ class AuthController {
     try {
       const refreshToken = req.cookies?.refresh_token || req.body?.refreshToken;
       await authService.logout(refreshToken);
-      res.clearCookie('refresh_token', { path: '/api/auth/refresh' });
+      res.clearCookie('refresh_token', { path: '/' });
       return success(res, {}, 'Logged out successfully');
     } catch (err) {
       return error(res, err.message, 500);
