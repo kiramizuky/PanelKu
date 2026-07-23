@@ -21,9 +21,16 @@ function spawnPromise(cmd, args, opts = {}) {
   });
 }
 
+const EXTRA_PATH = '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/snap/bin';
+
 function execAsync(cmd, opts = {}) {
+  const env = {
+    ...process.env,
+    PATH: process.env.PATH ? `${process.env.PATH}:${EXTRA_PATH}` : EXTRA_PATH,
+    ...(opts.env || {}),
+  };
   return new Promise((resolve, reject) => {
-    const _child = exec(cmd, { ...opts, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    const _child = exec(cmd, { ...opts, env, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) reject(new Error(stderr || err.message));
       else resolve(stdout);
     });
@@ -54,13 +61,42 @@ function uid() {
 }
 
 // ── Rclone detection ────────────────────────────────────────────────
+async function getRcloneBin() {
+  const possiblePaths = [
+    'rclone',
+    '/usr/bin/rclone',
+    '/usr/local/bin/rclone',
+    '/usr/sbin/rclone',
+    '/bin/rclone',
+    '/snap/bin/rclone',
+  ];
+  for (const bin of possiblePaths) {
+    try {
+      const stdout = await execAsync(`${bin} --version 2>/dev/null`);
+      if (stdout && stdout.toLowerCase().includes('rclone')) {
+        return bin;
+      }
+    } catch (_) {}
+  }
+  try {
+    const stdout = await execAsync('which rclone 2>/dev/null');
+    const path = stdout.trim();
+    if (path) return path;
+  } catch (_) {}
+
+  return null;
+}
+
 async function detectRclone() {
   try {
-    const { stdout } = await execAsync('rclone --version 2>/dev/null || echo ""');
-    const version = stdout.split('\n')[0]?.trim() || null;
-    return { installed: !!version, version };
+    const bin = await getRcloneBin();
+    if (!bin) return { installed: false, version: null, bin: null };
+
+    const stdout = await execAsync(`${bin} --version 2>/dev/null`);
+    const version = stdout.split('\n')[0]?.trim() || 'rclone (installed)';
+    return { installed: true, version, bin };
   } catch {
-    return { installed: false, version: null };
+    return { installed: false, version: null, bin: null };
   }
 }
 
@@ -88,13 +124,14 @@ class BackupService {
     let configPath = null;
 
     if (info.installed) {
+      const bin = info.bin || 'rclone';
       try {
-        const out = await execAsync('rclone listremotes 2>/dev/null || echo ""');
+        const out = await execAsync(`${bin} listremotes 2>/dev/null || echo ""`);
         remotes = out.split('\n').map(r => r.replace(':', '').trim()).filter(Boolean);
       } catch { /* no remotes */ }
 
       try {
-        const out = await execAsync('rclone config file 2>/dev/null | head -1 || echo ""');
+        const out = await execAsync(`${bin} config file 2>/dev/null | head -1 || echo ""`);
         configPath = out.trim() || null;
       } catch { /* ignore */ }
     }
@@ -138,9 +175,10 @@ class BackupService {
 
     const rclone = await detectRclone();
     if (!rclone.installed) throw new Error('Rclone is not installed');
+    const bin = rclone.bin || 'rclone';
 
     try {
-      const stdout = await execAsync(`rclone lsd "${remoteName}:" 2>&1`, { timeout: 15000 });
+      const stdout = await execAsync(`${bin} lsd "${remoteName}:" 2>&1`, { timeout: 15000 });
       return { success: true, output: stdout.trim() };
     } catch (err) {
       throw new Error(`Failed to connect to remote "${remoteName}": ${err.message}`);
@@ -153,6 +191,7 @@ class BackupService {
 
     const rclone = await detectRclone();
     if (!rclone.installed) throw new Error('Rclone is not installed');
+    const bin = rclone.bin || 'rclone';
 
     try {
       const dest = remotePath ? `${remoteName}:${remotePath}` : `${remoteName}:`;
@@ -306,9 +345,10 @@ class BackupService {
     if (!rclone.installed) throw new Error('Rclone is not installed');
 
     // Build rclone command
+    const bin = rclone.bin || 'rclone';
     const cmd = job.type === 'copy' ? 'copy' : 'sync';
     const dest = `${job.remote}:${job.destPath}`;
-    let cmdStr = `rclone ${cmd} "${job.source}" "${dest}" --verbose`;
+    let cmdStr = `${bin} ${cmd} "${job.source}" "${dest}" --verbose`;
 
     if (job.includePatterns?.length > 0) {
       job.includePatterns.forEach(p => { cmdStr += ` --include "${p}"`; });
@@ -328,7 +368,7 @@ class BackupService {
       // Retention: if set, list remote and delete old backups
       if (job.retention > 0) {
         try {
-          await this._applyRetention(job);
+          await this._applyRetention(job, bin);
         } catch (e) {
           logger.warn(`Retention cleanup failed for job ${job.name}: ${e.message}`);
         }
@@ -345,11 +385,11 @@ class BackupService {
     }
   }
 
-  async _applyRetention(job) {
+  async _applyRetention(job, rcloneBin = 'rclone') {
     // List remote files in the backup path
     try {
       const stdout = await execAsync(
-        `rclone ls "${job.remote}:${job.destPath}" 2>/dev/null || echo ""`,
+        `${rcloneBin} ls "${job.remote}:${job.destPath}" 2>/dev/null || echo ""`,
         { timeout: 30000 }
       );
 
@@ -722,6 +762,7 @@ class BackupService {
 
     const rclone = await detectRclone();
     if (!rclone.installed) throw new Error('Rclone is not installed');
+    const bin = rclone.bin || 'rclone';
 
     // Ensure local target directory exists
     const fullTarget = path.resolve(localTarget);
@@ -729,7 +770,7 @@ class BackupService {
 
     try {
       const stdout = await execAsync(
-        `rclone copy "${remoteName}:${remotePath}" "${fullTarget}" --verbose 2>&1`,
+        `${bin} copy "${remoteName}:${remotePath}" "${fullTarget}" --verbose 2>&1`,
         { timeout: 3600000 }
       );
       return { message: `Restored from ${remoteName}:${remotePath} to ${fullTarget}`, output: stdout.slice(0, 1000) };
@@ -741,10 +782,11 @@ class BackupService {
   async listRemoteBackups(remoteName, remotePath = 'backups') {
     const rclone = await detectRclone();
     if (!rclone.installed) throw new Error('Rclone is not installed');
+    const bin = rclone.bin || 'rclone';
 
     try {
       const dest = `${remoteName}:${remotePath}`;
-      const stdout = await execAsync(`rclone ls "${dest}" 2>&1 || echo ""`, { timeout: 30000 });
+      const stdout = await execAsync(`${bin} ls "${dest}" 2>&1 || echo ""`, { timeout: 30000 });
       const files = stdout.split('\n')
         .filter(l => l.trim())
         .map(l => {
@@ -754,7 +796,7 @@ class BackupService {
         .filter(Boolean);
 
       // Also list directories
-      const dirsOut = await execAsync(`rclone lsd "${dest}" 2>&1 || echo ""`, { timeout: 15000 });
+      const dirsOut = await execAsync(`${bin} lsd "${dest}" 2>&1 || echo ""`, { timeout: 15000 });
       const dirs = dirsOut.split('\n')
         .filter(l => l.trim())
         .map(l => {
