@@ -11,38 +11,151 @@ class DatabaseService {
   constructor() {
     this.mysqlPool = null;
     this.pgClient = null;
+    this.queryHistory = [];
+  }
 
-    this.mysqlConfig = {
+  async loadMysqlConfig() {
+    try {
+      const { default: Setting } = await import('../../models/Setting.js');
+      const saved = await Setting.get('db_credentials_mysql');
+      if (saved && typeof saved === 'object') {
+        return {
+          host: saved.host || process.env.DB_MYSQL_HOST || 'localhost',
+          port: parseInt(saved.port || process.env.DB_MYSQL_PORT || 3306),
+          user: saved.user || process.env.DB_MYSQL_USER || 'root',
+          password: saved.password !== undefined ? String(saved.password) : (process.env.DB_MYSQL_PASSWORD || ''),
+        };
+      }
+    } catch (_) {}
+    return {
       host: process.env.DB_MYSQL_HOST || 'localhost',
+      port: parseInt(process.env.DB_MYSQL_PORT || 3306),
       user: process.env.DB_MYSQL_USER || 'root',
       password: process.env.DB_MYSQL_PASSWORD || '',
     };
-    this.pgConfig = {
+  }
+
+  async loadPgConfig() {
+    try {
+      const { default: Setting } = await import('../../models/Setting.js');
+      const saved = await Setting.get('db_credentials_pg');
+      if (saved && typeof saved === 'object') {
+        return {
+          host: saved.host || process.env.DB_PG_HOST || 'localhost',
+          port: parseInt(saved.port || process.env.DB_PG_PORT || 5432),
+          user: saved.user || process.env.DB_PG_USER || 'postgres',
+          password: saved.password !== undefined ? String(saved.password) : (process.env.DB_PG_PASSWORD !== undefined ? String(process.env.DB_PG_PASSWORD) : ''),
+          database: saved.database || 'postgres'
+        };
+      }
+    } catch (_) {}
+    return {
       host: process.env.DB_PG_HOST || 'localhost',
+      port: parseInt(process.env.DB_PG_PORT || 5432),
       user: process.env.DB_PG_USER || 'postgres',
-      password: process.env.DB_PG_PASSWORD || '',
+      password: process.env.DB_PG_PASSWORD !== undefined ? String(process.env.DB_PG_PASSWORD) : '',
+      database: 'postgres'
     };
-    this.queryHistory = [];
+  }
+
+  async resetConnections() {
+    if (this.mysqlPool) {
+      try { await this.mysqlPool.end(); } catch (_) {}
+      this.mysqlPool = null;
+    }
+    if (this.pgClient) {
+      try { await this.pgClient.end(); } catch (_) {}
+      this.pgClient = null;
+    }
   }
 
   async getMysqlConnection() {
     if (!this.mysqlPool) {
-      this.mysqlPool = mysql.createPool(this.mysqlConfig);
+      const config = await this.loadMysqlConfig();
+      this.mysqlPool = mysql.createPool(config);
     }
     return this.mysqlPool;
   }
 
   async getPgConnection() {
-    if (!this.pgClient) {
-      this.pgClient = new Client(this.pgConfig);
+    if (this.pgClient) {
       try {
-        await this.pgClient.connect();
-      } catch (err) {
+        await this.pgClient.query('SELECT 1');
+        return this.pgClient;
+      } catch (_) {
         this.pgClient = null;
-        throw new Error('Failed to connect to PostgreSQL: ' + err.message);
       }
     }
-    return this.pgClient;
+
+    const config = await this.loadPgConfig();
+    let lastErr = null;
+
+    // Primary Client
+    const clientOptions = {
+      host: config.host,
+      port: config.port,
+      user: config.user,
+      password: String(config.password ?? ''),
+      database: config.database || 'postgres',
+    };
+
+    try {
+      const client = new Client(clientOptions);
+      await client.connect();
+      this.pgClient = client;
+      return this.pgClient;
+    } catch (err) {
+      lastErr = err;
+    }
+
+    // Fallback on Linux: Try Unix Domain Socket if localhost/127.0.0.1 failed
+    if (process.platform === 'linux' && (config.host === 'localhost' || config.host === '127.0.0.1')) {
+      try {
+        const socketOptions = {
+          host: '/var/run/postgresql',
+          user: config.user || 'postgres',
+          database: 'postgres',
+        };
+        const socketClient = new Client(socketOptions);
+        await socketClient.connect();
+        this.pgClient = socketClient;
+        return this.pgClient;
+      } catch (_) {}
+    }
+
+    throw new Error('Failed to connect to PostgreSQL: ' + (lastErr?.message || 'Connection failed'));
+  }
+
+  async getCredentials() {
+    const mysqlCfg = await this.loadMysqlConfig();
+    const pgCfg = await this.loadPgConfig();
+    return {
+      mysql: { host: mysqlCfg.host, port: mysqlCfg.port, user: mysqlCfg.user, password: mysqlCfg.password },
+      postgres: { host: pgCfg.host, port: pgCfg.port, user: pgCfg.user, password: pgCfg.password }
+    };
+  }
+
+  async saveCredentials(type, data) {
+    const { default: Setting } = await import('../../models/Setting.js');
+    if (type === 'mysql') {
+      const payload = {
+        host: data.host || 'localhost',
+        port: parseInt(data.port || 3306),
+        user: data.user || 'root',
+        password: String(data.password ?? ''),
+      };
+      await Setting.set('db_credentials_mysql', JSON.stringify(payload), 'json');
+    } else if (type === 'postgres') {
+      const payload = {
+        host: data.host || 'localhost',
+        port: parseInt(data.port || 5432),
+        user: data.user || 'postgres',
+        password: String(data.password ?? ''),
+        database: 'postgres',
+      };
+      await Setting.set('db_credentials_pg', JSON.stringify(payload), 'json');
+    }
+    await this.resetConnections();
   }
 
   _sanitizeDbName(name) {

@@ -47,6 +47,67 @@ const DB = (() => {
 
   // ── DB CRUD ──────────────────────────────────────────
 
+  let credentialsModal;
+
+  async function showCredentialsModal() {
+    if (!credentialsModal) credentialsModal = new bootstrap.Modal(document.getElementById('dbCredentialsModal'));
+    try {
+      const res = await LP.get('/database/credentials');
+      if (res?.success && res.data) {
+        if (res.data.postgres) {
+          document.getElementById('credPgHost').value = res.data.postgres.host || 'localhost';
+          document.getElementById('credPgPort').value = res.data.postgres.port || 5432;
+          document.getElementById('credPgUser').value = res.data.postgres.user || 'postgres';
+          document.getElementById('credPgPass').value = res.data.postgres.password || '';
+        }
+        if (res.data.mysql) {
+          document.getElementById('credMysqlHost').value = res.data.mysql.host || 'localhost';
+          document.getElementById('credMysqlPort').value = res.data.mysql.port || 3306;
+          document.getElementById('credMysqlUser').value = res.data.mysql.user || 'root';
+          document.getElementById('credMysqlPass').value = res.data.mysql.password || '';
+        }
+      }
+    } catch (_) {}
+    credentialsModal.show();
+  }
+
+  async function saveCredentials(e, type) {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const oldHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Connecting...';
+    btn.disabled = true;
+
+    let payload = { type };
+    if (type === 'postgres') {
+      payload.host = document.getElementById('credPgHost').value;
+      payload.port = document.getElementById('credPgPort').value;
+      payload.user = document.getElementById('credPgUser').value;
+      payload.password = document.getElementById('credPgPass').value;
+    } else if (type === 'mysql') {
+      payload.host = document.getElementById('credMysqlHost').value;
+      payload.port = document.getElementById('credMysqlPort').value;
+      payload.user = document.getElementById('credMysqlUser').value;
+      payload.password = document.getElementById('credMysqlPass').value;
+    }
+
+    try {
+      const res = await LP.post('/database/credentials', payload);
+      if (res?.success) {
+        LP.toast(`${type.toUpperCase()} connected successfully!`, 'success');
+        if (credentialsModal) credentialsModal.hide();
+        loadData();
+      } else {
+        LP.toast(res?.message || 'Connection failed', 'error');
+      }
+    } catch (err) {
+      LP.toast('Failed to save connection credentials', 'error');
+    } finally {
+      btn.innerHTML = oldHtml;
+      btn.disabled = false;
+    }
+  }
+
   function showCreateModal() {
     if (!modal) modal = new bootstrap.Modal(document.getElementById('createDbModal'));
     document.getElementById('createDbForm').reset();
@@ -390,7 +451,7 @@ const DB = (() => {
   });
 
   return {
-    loadData, showCreateModal, createDatabase, deleteDb, installPackage,
+    loadData, showCredentialsModal, saveCredentials, showCreateModal, createDatabase, deleteDb, installPackage,
     openExplorer, refreshExplorerTables, selectTable, loadTableData, loadTableInfo,
     goToPage, sortColumn, switchExplorerTab,
     runQuery, loadHistory, clearHistory,

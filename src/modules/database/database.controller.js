@@ -146,6 +146,28 @@ class DatabaseController {
       return error(res, err.message, 500);
     }
   }
+
+  async getCredentials(req, res) {
+    try {
+      const creds = await databaseService.getCredentials();
+      return success(res, creds);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async updateCredentials(req, res) {
+    try {
+      const { type, host, port, user, password } = req.body;
+      if (!type || !['mysql', 'postgres'].includes(type)) {
+        return error(res, 'Invalid database type', 400);
+      }
+      await databaseService.saveCredentials(type, { host, port, user, password });
+      return success(res, null, `${type.toUpperCase()} credentials updated & reconnected`);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
 }
 
 export default new DatabaseController();

@@ -27,6 +27,8 @@ router.post('/query-history/clear', requirePermission('database:write'), databas
 // Export / Import
 router.post('/export', requirePermission('database:read'), databaseController.exportTable.bind(databaseController));
 router.post('/import/sql', requirePermission('database:write'), databaseController.importSql.bind(databaseController));
-router.post('/import/csv', requirePermission('database:write'), databaseController.importCsv.bind(databaseController));
+// Credentials Settings
+router.get('/credentials', requirePermission('database:read'), databaseController.getCredentials.bind(databaseController));
+router.post('/credentials', requirePermission('database:write'), databaseController.updateCredentials.bind(databaseController));
 
 export default router;
