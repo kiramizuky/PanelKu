@@ -171,11 +171,27 @@ async function getLvmData() {
     const rawDisks = allFlat.filter(d => d.type === 'disk');
     const disks = rawDisks.length > 0 ? rawDisks : allFlat.filter(d => d.type === 'disk' || d.type === 'part');
 
+    const getMountpoints = (device) => {
+      let mounts = [];
+      if (device.mountpoint) mounts.push(device.mountpoint);
+      if (device.children && Array.isArray(device.children)) {
+        for (const child of device.children) {
+          mounts = mounts.concat(getMountpoints(child));
+        }
+      }
+      return mounts;
+    };
+
     blockDevices = await Promise.all(disks.map(async d => {
       const used = pvNames.some(pv => {
         const pvClean = pv.replace('/dev/', '');
         return pvClean === d.name || pvClean.startsWith(d.name) || pv.includes(d.name);
       });
+
+      const mounts = getMountpoints(d);
+      const isSystem = mounts.some(m => m === '/' || m.startsWith('/boot') || m.startsWith('/etc'));
+      const isMounted = mounts.length > 0;
+
       let smart = 'N/A', temp = null, readMB = 0, writeMB = 0;
 
       // SMART health
@@ -207,6 +223,9 @@ async function getLvmData() {
         type: d.type,
         fstype: d.fstype || '',
         mountpoint: d.mountpoint || '',
+        mounts,
+        isSystem,
+        isMounted,
         model: (d.model || '').trim(),
         used,
         smart,
@@ -406,15 +425,18 @@ export default {
 
     <!-- LVM status -->
     <div style="display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-size:11px;color:var(--text-muted);">LVM Status</span>
-      <span class="lp-badge ${d.used ? 'lp-badge-info' : 'lp-badge-success'}" style="font-size:10px;">
-        <span class="lp-badge-dot"></span>${d.used ? 'In LVM' : 'Unallocated'}
+      <span style="font-size:11px;color:var(--text-muted);">Disk Usage</span>
+      <span class="lp-badge ${d.used ? 'lp-badge-info' : d.isSystem ? 'lp-badge-warning' : d.isMounted ? 'lp-badge-warning' : 'lp-badge-success'}" style="font-size:10px;">
+        <span class="lp-badge-dot"></span>${d.used ? 'In LVM' : d.isSystem ? 'System OS Disk' : d.isMounted ? `Mounted (${d.mounts.join(', ')})` : 'Unallocated'}
       </span>
     </div>
-    ${!d.used ? `
+    ${!d.used && !d.isSystem && !d.isMounted ? `
     <button class="btn-lp btn-lp-primary w-100 mt-3" onclick="LvmPage.showInitDiskModal('/dev/${d.name}')" style="font-size:11px;padding:6px 0;">
       <i class="bi bi-plus-circle me-1"></i>Initialize for LVM
-    </button>` : ''}
+    </button>` : d.isSystem ? `
+    <div class="mt-3 p-2 text-center" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;font-size:10px;color:#f59e0b;">
+      <i class="bi bi-shield-lock-fill me-1"></i>Protected System OS Disk
+    </div>` : ''}
   </div>`;
         }).join('');
 
@@ -655,7 +677,7 @@ ${statCards}
 
 <!-- ── Tab: Overview ── -->
 <div id="tab-overview" class="lvm-tab">
-  ${data.blockDevices.some(d => !d.used) ? `
+  ${data.blockDevices.some(d => !d.used && !d.isSystem && !d.isMounted) ? `
   <div class="lp-glass-card p-3 mb-4" style="border:1px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.05);">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
       <div style="display:flex;align-items:center;gap:12px;">
@@ -665,7 +687,7 @@ ${statCards}
         <div>
           <div style="font-weight:700;font-size:14px;color:#f59e0b;">Unallocated Storage Detected</div>
           <div style="font-size:12px;color:var(--text-muted);">
-            ${data.blockDevices.filter(d => !d.used).map(d => `<code>/dev/${d.name}</code> (${d.size})`).join(', ')} — Not initialized in LVM
+            ${data.blockDevices.filter(d => !d.used && !d.isSystem && !d.isMounted).map(d => `<code>/dev/${d.name}</code> (${d.size})`).join(', ')} — Not initialized in LVM
           </div>
         </div>
       </div>
