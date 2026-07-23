@@ -14,8 +14,16 @@ function errorResponse(res, message = 'Error', statusCode = 500) {
 const execAsync = promisify(exec);
 
 async function run(cmd) {
-  const { stdout } = await execAsync(cmd, { timeout: 30000 });
-  return stdout.trim();
+  try {
+    const { stdout } = await execAsync(cmd, { timeout: 30000 });
+    return stdout.trim();
+  } catch (err) {
+    const output = (err.stdout || err.stderr || err.message || '').toString().trim();
+    const error = new Error(output || `Command failed: ${cmd}`);
+    error.stdout = err.stdout;
+    error.stderr = err.stderr;
+    throw error;
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -1183,10 +1191,27 @@ const LvmPage = (() => {
       try {
         await ensureLvmInstalled();
         const { device, vg } = req.body;
-        if (!device || !/^\/dev\/[\w]+$/.test(device)) return errorResponse(res, 'Invalid device', 400);
-        let out = await run(`pvcreate -y ${device} 2>&1`);
+        if (!device || !/^\/dev\/[a-zA-Z0-9_\-\/]+$/.test(device)) return errorResponse(res, 'Invalid device path', 400);
+
+        let out = '';
+        try {
+          out = await run(`pvcreate -y ${device} 2>&1`);
+        } catch (e1) {
+          // If standard pvcreate fails (e.g. existing filesystem/partition signatures), try wiping signatures & force pvcreate
+          try {
+            await run(`wipefs -a ${device} 2>/dev/null || true`);
+            out = await run(`pvcreate -y -ff ${device} 2>&1`);
+          } catch (e2) {
+            throw new Error(`Inisialisasi ${device} gagal: ${e2.message}`);
+          }
+        }
+
         if (vg && /^[\w-]+$/.test(vg)) {
-          try { out += '\n' + await run(`vgextend ${vg} ${device} 2>&1 || vgcreate ${vg} ${device} 2>&1`); } catch(e) { out += '\n' + e.message; }
+          try {
+            out += '\n' + await run(`vgextend ${vg} ${device} 2>&1 || vgcreate ${vg} ${device} 2>&1`);
+          } catch (e) {
+            out += '\n' + e.message;
+          }
         }
         return successResponse(res, { output: out }, 'Disk initialized');
       } catch (e) { return errorResponse(res, e.message, 500); }
@@ -1241,8 +1266,16 @@ const LvmPage = (() => {
         await ensureLvmInstalled();
         const { vg, device } = req.body;
         if (!vg     || !/^[\w-]+$/.test(vg))       return errorResponse(res, 'Invalid VG name', 400);
-        if (!device || !/^\/dev\/[\w]+$/.test(device)) return errorResponse(res, 'Invalid device', 400);
-        let out = await run(`pvcreate -y ${device} 2>&1`);
+        if (!device || !/^\/dev\/[a-zA-Z0-9_\-\/]+$/.test(device)) return errorResponse(res, 'Invalid device path', 400);
+
+        let out = '';
+        try {
+          out = await run(`pvcreate -y ${device} 2>&1`);
+        } catch (_) {
+          await run(`wipefs -a ${device} 2>/dev/null || true`);
+          out = await run(`pvcreate -y -ff ${device} 2>&1`);
+        }
+
         out += '\n' + await run(`vgextend ${vg} ${device} 2>&1`);
         return successResponse(res, { output: out }, 'VG extended');
       } catch (e) { return errorResponse(res, e.message, 500); }
