@@ -168,6 +168,35 @@ class DatabaseController {
       return error(res, err.message, 500);
     }
   }
+
+  async getPgConfig(req, res) {
+    try {
+      const data = await databaseService.getPgConfigFiles();
+      return success(res, data);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async savePgConfig(req, res) {
+    try {
+      const { fileType, content } = req.body;
+      if (!fileType || content === undefined) return error(res, 'File type and content are required', 400);
+      await databaseService.savePgConfigFile(fileType, content);
+      return success(res, null, `${fileType} saved & PostgreSQL restarted`);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async enablePgRemoteAccess(req, res) {
+    try {
+      const result = await databaseService.enablePgRemoteAccess();
+      return success(res, result, 'PostgreSQL remote & Docker access configured successfully!');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
 }
 
 export default new DatabaseController();

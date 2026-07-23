@@ -441,6 +441,75 @@ const DB = (() => {
     } catch { LP.toast('Import error', 'error'); }
   }
 
+  async function enablePgRemoteAccess() {
+    const btn = document.getElementById('btnEnablePgRemote');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Configuring...';
+    }
+    try {
+      const res = await LP.post('/database/pg-config/enable-remote', {});
+      if (res?.success) {
+        LP.toast('PostgreSQL configured for Docker & Remote access!', 'success');
+        loadPgConfigFiles();
+      } else {
+        LP.toast(res?.message || 'Failed to enable remote access', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Failed to configure PostgreSQL', 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-lightning-charge-fill me-1"></i> Enable Docker & Remote Access';
+      }
+    }
+  }
+
+  async function loadPgConfigFiles() {
+    try {
+      const res = await LP.get('/database/pg-config');
+      if (res?.success && res.data) {
+        const { confPath, hbaPath, confContent, hbaContent } = res.data;
+        const areaConf = document.getElementById('pgConfContent');
+        const areaHba = document.getElementById('pgHbaContent');
+        const labelConf = document.getElementById('pgConfPathLabel');
+        const labelHba = document.getElementById('pgHbaPathLabel');
+
+        if (areaConf) areaConf.value = confContent || '';
+        if (areaHba) areaHba.value = hbaContent || '';
+        if (labelConf) labelConf.textContent = confPath || 'postgresql.conf';
+        if (labelHba) labelHba.textContent = hbaPath || 'pg_hba.conf';
+      }
+    } catch (e) {
+      LP.toast('Failed to load PostgreSQL config files', 'error');
+    }
+  }
+
+  async function savePgConfigFile(fileType) {
+    const isConf = fileType === 'conf' || fileType === 'postgresql.conf';
+    const content = isConf ? document.getElementById('pgConfContent').value : document.getElementById('pgHbaContent').value;
+    const btn = isConf ? document.getElementById('btnSavePgConf') : document.getElementById('btnSavePgHba');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving & Restarting...';
+    }
+    try {
+      const res = await LP.post('/database/pg-config/save', { fileType: isConf ? 'postgresql.conf' : 'pg_hba.conf', content });
+      if (res?.success) {
+        LP.toast(`${isConf ? 'postgresql.conf' : 'pg_hba.conf'} saved & PostgreSQL restarted!`, 'success');
+      } else {
+        LP.toast(res?.message || 'Failed to save config file', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Failed to save config file', 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-save me-1"></i> Save & Restart PostgreSQL';
+      }
+    }
+  }
+
   // ── Keyboard Shortcut ────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -456,6 +525,7 @@ const DB = (() => {
     goToPage, sortColumn, switchExplorerTab,
     runQuery, loadHistory, clearHistory,
     exportTable, toggleImportFields, importData,
+    enablePgRemoteAccess, loadPgConfigFiles, savePgConfigFile
   };
 })();
 

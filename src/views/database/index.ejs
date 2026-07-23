@@ -237,9 +237,11 @@
         <ul class="nav nav-pills mb-3" style="gap:8px;">
           <li class="nav-item">
             <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#credPostgresTab" style="font-size:12px;padding:6px 16px;"><i class="bi bi-database text-info me-1"></i> PostgreSQL</button>
-          </li>
           <li class="nav-item">
             <button class="nav-link" data-bs-toggle="pill" data-bs-target="#credMysqlTab" style="font-size:12px;padding:6px 16px;"><i class="bi bi-database text-warning me-1"></i> MySQL</button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#credPgConfigTab" onclick="DB.loadPgConfigFiles()" style="font-size:12px;padding:6px 16px;"><i class="bi bi-sliders text-success me-1"></i> PG Server Config</button>
           </li>
         </ul>
         <div class="tab-content">
@@ -267,10 +269,47 @@
                   <input type="password" id="credPgPass" class="lp-input" placeholder="Enter password (leave blank if peer auth)">
                 </div>
               </div>
-              <div style="display:flex;justify-content:flex-end;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="document.querySelector('[data-bs-target=\'#credPgConfigTab\']').click()"><i class="bi bi-sliders me-1"></i> Open PG Server Config</button>
                 <button type="submit" class="btn-lp btn-lp-primary"><i class="bi bi-check-lg me-1"></i> Save & Connect PostgreSQL</button>
               </div>
             </form>
+          </div>
+
+          <!-- PG Server Config & Remote Access Tab -->
+          <div class="tab-pane fade" id="credPgConfigTab">
+            <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:15px;margin-bottom:15px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                  <h6 style="margin:0;font-size:13px;font-weight:600;color:var(--accent-primary);"><i class="bi bi-lightning-charge-fill me-1"></i> 1-Click Auto Configure: Docker & Remote Access</h6>
+                  <p style="margin:4px 0 0 0;font-size:11px;color:var(--text-muted);">Automatically configures <code>listen_addresses = '*'</code> and <code>pg_hba.conf</code> rules so Docker apps (Nextcloud, etc.) & LAN IPs can connect.</p>
+                </div>
+                <button id="btnEnablePgRemote" class="btn-lp btn-lp-primary btn-lp-sm" onclick="DB.enablePgRemoteAccess()"><i class="bi bi-lightning-charge-fill me-1"></i> Enable Access</button>
+              </div>
+            </div>
+
+            <ul class="nav nav-tabs mb-3 db-tabs" id="pgConfigSubTabs">
+              <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#pgSubTabConf" style="font-size:11px;padding:6px 12px;">postgresql.conf</a></li>
+              <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#pgSubTabHba" style="font-size:11px;padding:6px 12px;">pg_hba.conf</a></li>
+            </ul>
+
+            <div class="tab-content">
+              <div class="tab-pane fade show active" id="pgSubTabConf">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <span style="font-size:11px;color:var(--text-muted);" id="pgConfPathLabel">/etc/postgresql/.../postgresql.conf</span>
+                  <button id="btnSavePgConf" class="btn-lp btn-lp-primary btn-lp-sm" onclick="DB.savePgConfigFile('postgresql.conf')"><i class="bi bi-save me-1"></i> Save & Restart PostgreSQL</button>
+                </div>
+                <textarea id="pgConfContent" class="lp-input query-textarea" style="height:220px;width:100%;font-size:11.5px;" placeholder="Loading postgresql.conf..."></textarea>
+              </div>
+
+              <div class="tab-pane fade" id="pgSubTabHba">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <span style="font-size:11px;color:var(--text-muted);" id="pgHbaPathLabel">/etc/postgresql/.../pg_hba.conf</span>
+                  <button id="btnSavePgHba" class="btn-lp btn-lp-primary btn-lp-sm" onclick="DB.savePgConfigFile('pg_hba.conf')"><i class="bi bi-save me-1"></i> Save & Restart PostgreSQL</button>
+                </div>
+                <textarea id="pgHbaContent" class="lp-input query-textarea" style="height:220px;width:100%;font-size:11.5px;" placeholder="Loading pg_hba.conf..."></textarea>
+              </div>
+            </div>
           </div>
 
           <!-- MySQL Tab -->

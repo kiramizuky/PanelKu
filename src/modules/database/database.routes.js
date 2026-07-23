@@ -31,4 +31,9 @@ router.post('/import/sql', requirePermission('database:write'), databaseControll
 router.get('/credentials', requirePermission('database:read'), databaseController.getCredentials.bind(databaseController));
 router.post('/credentials', requirePermission('database:write'), databaseController.updateCredentials.bind(databaseController));
 
+// PostgreSQL Server Config Management
+router.get('/pg-config', requirePermission('database:read'), databaseController.getPgConfig.bind(databaseController));
+router.post('/pg-config/save', requirePermission('database:write'), databaseController.savePgConfig.bind(databaseController));
+router.post('/pg-config/enable-remote', requirePermission('database:write'), databaseController.enablePgRemoteAccess.bind(databaseController));
+
 export default router;

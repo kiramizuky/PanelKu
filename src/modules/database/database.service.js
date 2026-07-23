@@ -197,6 +197,117 @@ class DatabaseService {
     }
   }
 
+  async _findPgConfigPaths() {
+    let confPath = '';
+    let hbaPath = '';
+
+    // Search Debian/Ubuntu versioned paths
+    try {
+      const versions = await fs.readdir('/etc/postgresql').catch(() => []);
+      for (const v of versions) {
+        const pConf = path.join('/etc/postgresql', v, 'main', 'postgresql.conf');
+        const pHba = path.join('/etc/postgresql', v, 'main', 'pg_hba.conf');
+        try { await fs.access(pConf); confPath = pConf; } catch (_) {}
+        try { await fs.access(pHba); hbaPath = pHba; } catch (_) {}
+        if (confPath && hbaPath) break;
+      }
+    } catch (_) {}
+
+    if (!confPath) {
+      const altConf = ['/etc/postgresql.conf', '/var/lib/pgsql/data/postgresql.conf', '/var/lib/postgres/data/postgresql.conf'];
+      for (const p of altConf) {
+        try { await fs.access(p); confPath = p; break; } catch (_) {}
+      }
+    }
+
+    if (!hbaPath) {
+      const altHba = ['/etc/pg_hba.conf', '/var/lib/pgsql/data/pg_hba.conf', '/var/lib/postgres/data/pg_hba.conf'];
+      for (const p of altHba) {
+        try { await fs.access(p); hbaPath = p; break; } catch (_) {}
+      }
+    }
+
+    return { confPath, hbaPath };
+  }
+
+  async getPgConfigFiles() {
+    const { confPath, hbaPath } = await this._findPgConfigPaths();
+    let confContent = '';
+    let hbaContent = '';
+
+    if (confPath) {
+      try { confContent = await fs.readFile(confPath, 'utf8'); } catch (_) {}
+    }
+    if (hbaPath) {
+      try { hbaContent = await fs.readFile(hbaPath, 'utf8'); } catch (_) {}
+    }
+
+    return { confPath, hbaPath, confContent, hbaContent };
+  }
+
+  async savePgConfigFile(fileType, content) {
+    const { confPath, hbaPath } = await this._findPgConfigPaths();
+    const target = (fileType === 'postgresql.conf' || fileType === 'conf') ? confPath : hbaPath;
+    if (!target) throw new Error(`Configuration file ${fileType} not found on server.`);
+
+    await fs.writeFile(target, content, 'utf8');
+
+    // Restart postgresql service
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    try {
+      await execAsync('systemctl restart postgresql || service postgresql restart 2>&1');
+    } catch (_) {}
+
+    return true;
+  }
+
+  async enablePgRemoteAccess() {
+    const { confPath, hbaPath } = await this._findPgConfigPaths();
+    if (!confPath || !hbaPath) {
+      throw new Error('PostgreSQL configuration files (postgresql.conf / pg_hba.conf) could not be located automatically.');
+    }
+
+    // 1. Update postgresql.conf: listen_addresses = '*'
+    let confContent = await fs.readFile(confPath, 'utf8');
+    if (/^\s*listen_addresses\s*=\s*/m.test(confContent)) {
+      confContent = confContent.replace(/^\s*listen_addresses\s*=\s*['"][^'"]*['"]/gm, "listen_addresses = '*'");
+    } else if (/#\s*listen_addresses\s*=\s*/.test(confContent)) {
+      confContent = confContent.replace(/#\s*listen_addresses\s*=\s*['"][^'"]*['"]/, "listen_addresses = '*'");
+    } else {
+      confContent += "\nlisten_addresses = '*'\n";
+    }
+    await fs.writeFile(confPath, confContent, 'utf8');
+
+    // 2. Update pg_hba.conf: add rules for Docker (172.16.0.0/12) & LAN (0.0.0.0/0)
+    let hbaContent = await fs.readFile(hbaPath, 'utf8');
+    const dockerRule = 'host    all             all             172.16.0.0/12           scram-sha-256';
+    const lanRule = 'host    all             all             0.0.0.0/0               scram-sha-256';
+
+    if (!hbaContent.includes('172.16.0.0/12')) {
+      hbaContent += `\n${dockerRule}\n`;
+    }
+    if (!hbaContent.includes('0.0.0.0/0') && !hbaContent.includes('192.168.')) {
+      hbaContent += `${lanRule}\n`;
+    }
+    await fs.writeFile(hbaPath, hbaContent, 'utf8');
+
+    // 3. Restart PostgreSQL service
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    try {
+      await execAsync('systemctl restart postgresql || service postgresql restart 2>&1');
+    } catch (_) {}
+
+    return {
+      confPath,
+      hbaPath,
+      message: 'PostgreSQL configured for Remote & Docker access successfully. Service restarted.'
+    };
+  }
+
   _normalizeType(type) {
     if (!type) return '';
     const t = String(type).toLowerCase().trim();
