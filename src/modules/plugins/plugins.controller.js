@@ -21,6 +21,61 @@ function validatePluginId(id) {
   return id;
 }
 
+async function checkAndInstallSystemDependencies(pluginPath) {
+  if (process.platform !== 'linux') return;
+  try {
+    const manifestPath = path.join(pluginPath, 'plugin.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+    const deps = manifest.systemDependencies || manifest.systemPackages || [];
+
+    if (Array.isArray(deps) && deps.length > 0) {
+      const pkgsToInstall = [];
+      for (const pkg of deps) {
+        try {
+          await execFileAsync('which', [pkg]);
+        } catch (_) {
+          pkgsToInstall.push(pkg);
+        }
+      }
+
+      if (pkgsToInstall.length > 0) {
+        let cmd = '';
+        let args = [];
+
+        try {
+          await execFileAsync('which', ['apt-get']);
+          cmd = 'apt-get';
+          args = ['install', '-y', ...pkgsToInstall];
+        } catch (_) {
+          try {
+            await execFileAsync('which', ['dnf']);
+            cmd = 'dnf';
+            args = ['install', '-y', ...pkgsToInstall];
+          } catch (_) {
+            try {
+              await execFileAsync('which', ['yum']);
+              cmd = 'yum';
+              args = ['install', '-y', ...pkgsToInstall];
+            } catch (_) {
+              try {
+                await execFileAsync('which', ['pacman']);
+                cmd = 'pacman';
+                args = ['-S', '--noconfirm', ...pkgsToInstall];
+              } catch (_) {}
+            }
+          }
+        }
+
+        if (cmd) {
+          await execFileAsync(cmd, args, { env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' } });
+        }
+      }
+    }
+  } catch (_) {
+    // Ignore dependency install errors to allow plugin registration
+  }
+}
+
 class PluginsController {
   async getPlugins(req, res) {
     try {
@@ -89,61 +144,6 @@ class PluginsController {
     }
   }
 
-  async checkAndInstallSystemDependencies(pluginPath) {
-    if (process.platform !== 'linux') return;
-    try {
-      const manifestPath = path.join(pluginPath, 'plugin.json');
-      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
-      const deps = manifest.systemDependencies || manifest.systemPackages || [];
-
-      if (Array.isArray(deps) && deps.length > 0) {
-        const pkgsToInstall = [];
-        for (const pkg of deps) {
-          try {
-            await execFileAsync('which', [pkg]);
-          } catch (_) {
-            pkgsToInstall.push(pkg);
-          }
-        }
-
-        if (pkgsToInstall.length > 0) {
-          let cmd = '';
-          let args = [];
-
-          try {
-            await execFileAsync('which', ['apt-get']);
-            cmd = 'apt-get';
-            args = ['install', '-y', ...pkgsToInstall];
-          } catch (_) {
-            try {
-              await execFileAsync('which', ['dnf']);
-              cmd = 'dnf';
-              args = ['install', '-y', ...pkgsToInstall];
-            } catch (_) {
-              try {
-                await execFileAsync('which', ['yum']);
-                cmd = 'yum';
-                args = ['install', '-y', ...pkgsToInstall];
-              } catch (_) {
-                try {
-                  await execFileAsync('which', ['pacman']);
-                  cmd = 'pacman';
-                  args = ['-S', '--noconfirm', ...pkgsToInstall];
-                } catch (_) {}
-              }
-            }
-          }
-
-          if (cmd) {
-            await execFileAsync(cmd, args, { env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' } });
-          }
-        }
-      }
-    } catch (_) {
-      // Ignore dependency install errors to allow plugin registration
-    }
-  }
-
   async installPlugin(req, res) {
     try {
       const { id, proxyUrl } = req.body;
@@ -160,7 +160,7 @@ class PluginsController {
       }
 
       // Auto check & install system CLI dependencies specified in plugin.json
-      await this.checkAndInstallSystemDependencies(pluginPath);
+      await checkAndInstallSystemDependencies(pluginPath);
 
       // Add to SQLite settings
       const installedStr = await Setting.get('installed_plugins') || '[]';
