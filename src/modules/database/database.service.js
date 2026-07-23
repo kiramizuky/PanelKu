@@ -197,6 +197,62 @@ class DatabaseService {
     }
   }
 
+  _normalizeType(type) {
+    if (!type) return '';
+    const t = String(type).toLowerCase().trim();
+    if (t === 'postgres' || t === 'postgresql' || t === 'pg') return 'postgres';
+    if (t === 'mysql' || t === 'mariadb') return 'mysql';
+    if (t === 'sqlite' || t === 'sqlite3') return 'sqlite';
+    return t;
+  }
+
+  async getPgClientForDb(database) {
+    const config = await this.loadPgConfig();
+    const pkgPg = (await import('pg')).default;
+
+    const hostsToTry = [];
+    if (config.host === 'localhost') {
+      hostsToTry.push('127.0.0.1', 'localhost');
+    } else {
+      hostsToTry.push(config.host);
+    }
+
+    let lastErr = null;
+    for (const h of hostsToTry) {
+      try {
+        const client = new pkgPg.Client({
+          host: h,
+          port: config.port || 5432,
+          user: config.user || 'postgres',
+          password: String(config.password ?? ''),
+          database: database || 'postgres',
+        });
+        await client.connect();
+        return client;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+
+    if (process.platform === 'linux') {
+      for (const sockDir of ['/var/run/postgresql', '/tmp']) {
+        try {
+          const socketClient = new pkgPg.Client({
+            host: sockDir,
+            port: config.port || 5432,
+            user: config.user || 'postgres',
+            password: String(config.password ?? ''),
+            database: database || 'postgres',
+          });
+          await socketClient.connect();
+          return socketClient;
+        } catch (_) {}
+      }
+    }
+
+    throw new Error(`Failed to connect to PostgreSQL database "${database}": ${lastErr?.message || 'Connection failed'}`);
+  }
+
   _sanitizeDbName(name) {
     if (!name || !/^[a-zA-Z_][a-zA-Z0-9_$]{0,63}$/.test(name)) {
       throw new Error(`Invalid database name: "${name}". Use only letters, numbers, and underscores.`);
@@ -217,8 +273,6 @@ class DatabaseService {
     }
     return name;
   }
-
-  // ── Database Listing ───────────────────────────────────────
 
   async listMysqlDatabases() {
     try {
@@ -244,8 +298,6 @@ class DatabaseService {
       return files.filter(f => f.endsWith('.sqlite') || f.endsWith('.db'));
     } catch (err) { return []; }
   }
-
-  // ── Database CRUD ──────────────────────────────────────────
 
   async createMysqlDatabase(name) {
     this._sanitizeDbName(name);
@@ -276,54 +328,59 @@ class DatabaseService {
   }
 
   async createSqliteDatabase(name) {
+    this._sanitizeDbName(name);
     const dbDir = path.resolve('storage', 'databases');
     await fs.mkdir(dbDir, { recursive: true });
-    const filename = name.endsWith('.sqlite') || name.endsWith('.db') ? name : `${name}.sqlite`;
-    const dbPath = path.join(dbDir, filename);
-    const handle = await fs.open(dbPath, 'w');
-    await handle.close();
+    const dbPath = path.join(dbDir, name.endsWith('.sqlite') ? name : `${name}.sqlite`);
+    const Database = (await import('better-sqlite3')).default;
+    const db = new Database(dbPath);
+    db.prepare('CREATE TABLE IF NOT EXISTS _schema_info (id INTEGER PRIMARY KEY, created_at TEXT)').run();
+    db.close();
     return true;
   }
 
   async deleteSqliteDatabase(name) {
+    this._sanitizeDbName(name);
     const dbDir = path.resolve('storage', 'databases');
     const dbPath = path.join(dbDir, name);
     await fs.unlink(dbPath);
     return true;
   }
 
-  // ── Tables ─────────────────────────────────────────────────
-
   async getTables(type, name) {
-    if (type === 'sqlite') {
+    const norm = this._normalizeType(type);
+    if (norm === 'sqlite') {
       const Database = (await import('better-sqlite3')).default;
       const dbPath = path.resolve('storage', 'databases', name);
       const db = new Database(dbPath);
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(r => r.name);
       db.close();
       return tables;
-    } else if (type === 'mysql') {
+    } else if (norm === 'mysql') {
       const pool = await this.getMysqlConnection();
       this._sanitizeDbName(name);
       await pool.query('USE `' + name + '`');
       const [rows] = await pool.query('SHOW TABLES');
       return rows.map(r => Object.values(r)[0]);
-    } else if (type === 'postgres') {
-      const pkgPg = (await import('pg')).default;
-      const client = new pkgPg.Client({ ...this.pgConfig, database: name });
-      await client.connect();
-      const res = await client.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name;");
-      await client.end();
-      return res.rows.map(r => r.table_name);
+    } else if (norm === 'postgres') {
+      this._sanitizeDbName(name);
+      const client = await this.getPgClientForDb(name);
+      try {
+        const res = await client.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name;");
+        await client.end();
+        return res.rows.map(r => r.table_name);
+      } catch (err) {
+        await client.end();
+        throw err;
+      }
     }
-    throw new Error('Unsupported database type');
+    throw new Error('Unsupported database type: ' + type);
   }
 
-  // ── Table Info (Structure, Indexes, Foreign Keys) ──────────
-
   async getTableInfo(type, dbName, tableName) {
+    const norm = this._normalizeType(type);
     this._sanitizeTableName(tableName);
-    if (type === 'mysql') {
+    if (norm === 'mysql') {
       this._sanitizeDbName(dbName);
       const pool = await this.getMysqlConnection();
       await pool.query('USE `' + dbName + '`');
@@ -351,44 +408,48 @@ class DatabaseService {
         createTable: createTable[0]?.['Create Table'] || '',
         rowCount: 0,
       };
-    } else if (type === 'postgres') {
-      const pkgPg = (await import('pg')).default;
-      const client = new pkgPg.Client({ ...this.pgConfig, database: dbName });
-      await client.connect();
-      const colRes = await client.query(
-        "SELECT column_name, data_type, is_nullable, column_default, character_maximum_length " +
-        "FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 ORDER BY ordinal_position",
-        [tableName]
-      );
-      const idxRes = await client.query(
-        "SELECT indexname, indexdef FROM pg_indexes WHERE tablename=$1 AND schemaname='public'",
-        [tableName]
-      );
-      const fkRes = await client.query(
-        "SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name " +
-        "FROM information_schema.table_constraints AS tc " +
-        "JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name " +
-        "JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name " +
-        "WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1",
-        [tableName]
-      );
-      const countRes = await client.query('SELECT COUNT(*) as cnt FROM "' + tableName + '"');
-      await client.end();
-      return {
-        columns: colRes.rows.map(c => ({
-          field: c.column_name,
-          type: c.data_type + (c.character_maximum_length ? '(' + c.character_maximum_length + ')' : ''),
-          nullable: c.is_nullable === 'YES',
-          key: '',
-          default: c.column_default,
-          extra: '',
-        })),
-        indexes: idxRes.rows.map(i => ({ name: i.indexname, definition: i.indexdef })),
-        foreignKeys: fkRes.rows,
-        createTable: '',
-        rowCount: parseInt(countRes.rows[0]?.cnt || 0),
-      };
-    } else if (type === 'sqlite') {
+    } else if (norm === 'postgres') {
+      this._sanitizeDbName(dbName);
+      const client = await this.getPgClientForDb(dbName);
+      try {
+        const colRes = await client.query(
+          "SELECT column_name, data_type, is_nullable, column_default, character_maximum_length " +
+          "FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 ORDER BY ordinal_position",
+          [tableName]
+        );
+        const idxRes = await client.query(
+          "SELECT indexname, indexdef FROM pg_indexes WHERE tablename=$1 AND schemaname='public'",
+          [tableName]
+        );
+        const fkRes = await client.query(
+          "SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name " +
+          "FROM information_schema.table_constraints AS tc " +
+          "JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name " +
+          "JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name " +
+          "WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1",
+          [tableName]
+        );
+        const countRes = await client.query('SELECT COUNT(*) as cnt FROM "' + tableName + '"');
+        await client.end();
+        return {
+          columns: colRes.rows.map(c => ({
+            field: c.column_name,
+            type: c.data_type + (c.character_maximum_length ? '(' + c.character_maximum_length + ')' : ''),
+            nullable: c.is_nullable === 'YES',
+            key: '',
+            default: c.column_default,
+            extra: '',
+          })),
+          indexes: idxRes.rows.map(i => ({ name: i.indexname, definition: i.indexdef })),
+          foreignKeys: fkRes.rows,
+          createTable: '',
+          rowCount: parseInt(countRes.rows[0]?.cnt || 0),
+        };
+      } catch (err) {
+        await client.end();
+        throw err;
+      }
+    } else if (norm === 'sqlite') {
       const Database = (await import('better-sqlite3')).default;
       const dbPath = path.resolve('storage', 'databases', dbName);
       const db = new Database(dbPath);
@@ -396,7 +457,6 @@ class DatabaseService {
       const idx = db.prepare('PRAGMA index_list(`' + tableName + '`)').all();
       const fk = db.prepare('PRAGMA foreign_key_list(`' + tableName + '`)').all();
       const countRow = db.prepare('SELECT COUNT(*) as cnt FROM `' + tableName + '`').get();
-      // Get CREATE TABLE statement
       const createRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(tableName);
       db.close();
       return {
@@ -414,7 +474,7 @@ class DatabaseService {
         rowCount: countRow?.cnt || 0,
       };
     }
-    throw new Error('Unsupported database type');
+    throw new Error('Unsupported database type: ' + type);
   }
 
   _formatMysqlIndexes(indexes) {
@@ -428,36 +488,39 @@ class DatabaseService {
     return Object.values(map);
   }
 
-  // ── Table Data with Pagination ─────────────────────────────
-
   async getTableData(type, dbName, tableName, page = 1, limit = 50, sortColumn = null, sortDir = 'ASC') {
+    const norm = this._normalizeType(type);
     this._sanitizeTableName(tableName);
     const offset = (page - 1) * limit;
     let orderClause = '';
     if (sortColumn) {
       this._sanitizeColumnName(sortColumn);
       const dir = sortDir === 'DESC' ? 'DESC' : 'ASC';
-      if (type === 'mysql') orderClause = ` ORDER BY \`${sortColumn}\` ${dir}`;
-      else if (type === 'postgres') orderClause = ` ORDER BY "${sortColumn}" ${dir}`;
+      if (norm === 'mysql') orderClause = ` ORDER BY \`${sortColumn}\` ${dir}`;
+      else if (norm === 'postgres') orderClause = ` ORDER BY "${sortColumn}" ${dir}`;
       else orderClause = ` ORDER BY "${sortColumn}" ${dir}`;
     }
 
-    if (type === 'mysql') {
+    if (norm === 'mysql') {
       this._sanitizeDbName(dbName);
       const pool = await this.getMysqlConnection();
       await pool.query('USE `' + dbName + '`');
       const [rows] = await pool.query('SELECT * FROM `' + tableName + '`' + orderClause + ' LIMIT ' + parseInt(limit) + ' OFFSET ' + parseInt(offset));
       const [countRows] = await pool.query('SELECT COUNT(*) as total FROM `' + tableName + '`');
       return { rows, total: countRows[0]?.total || 0 };
-    } else if (type === 'postgres') {
-      const pkgPg = (await import('pg')).default;
-      const client = new pkgPg.Client({ ...this.pgConfig, database: dbName });
-      await client.connect();
-      const dataRes = await client.query('SELECT * FROM "' + tableName + '"' + orderClause + ' LIMIT ' + parseInt(limit) + ' OFFSET ' + parseInt(offset));
-      const countRes = await client.query('SELECT COUNT(*) as total FROM "' + tableName + '"');
-      await client.end();
-      return { rows: dataRes.rows, total: parseInt(countRes.rows[0]?.total || 0) };
-    } else if (type === 'sqlite') {
+    } else if (norm === 'postgres') {
+      this._sanitizeDbName(dbName);
+      const client = await this.getPgClientForDb(dbName);
+      try {
+        const dataRes = await client.query('SELECT * FROM "' + tableName + '"' + orderClause + ' LIMIT ' + parseInt(limit) + ' OFFSET ' + parseInt(offset));
+        const countRes = await client.query('SELECT COUNT(*) as total FROM "' + tableName + '"');
+        await client.end();
+        return { rows: dataRes.rows, total: parseInt(countRes.rows[0]?.total || 0) };
+      } catch (err) {
+        await client.end();
+        throw err;
+      }
+    } else if (norm === 'sqlite') {
       const Database = (await import('better-sqlite3')).default;
       const dbPath = path.resolve('storage', 'databases', dbName);
       const db = new Database(dbPath);
@@ -466,22 +529,20 @@ class DatabaseService {
       db.close();
       return { rows, total: countRow?.total || 0 };
     }
-    throw new Error('Unsupported database type');
+    throw new Error('Unsupported database type: ' + type);
   }
 
-  // ── Query Console ──────────────────────────────────────────
-
   async runQuery(type, name, query) {
+    const norm = this._normalizeType(type);
     const upper = query.trim().toUpperCase();
     if (upper.startsWith('DROP') || upper.startsWith('TRUNCATE') || upper.startsWith('ALTER')) {
       throw new Error('DROP, TRUNCATE, and ALTER are restricted via UI.');
     }
 
-    // Save to history
     this.queryHistory.unshift({ type, database: name, query, timestamp: new Date().toISOString() });
     if (this.queryHistory.length > 100) this.queryHistory.pop();
 
-    if (type === 'sqlite') {
+    if (norm === 'sqlite') {
       const Database = (await import('better-sqlite3')).default;
       const dbPath = path.resolve('storage', 'databases', name);
       const db = new Database(dbPath);
@@ -494,7 +555,7 @@ class DatabaseService {
         db.close();
         throw err;
       }
-    } else if (type === 'mysql') {
+    } else if (norm === 'mysql') {
       const pool = await this.getMysqlConnection();
       await pool.query('USE `' + name + '`');
       if (upper.startsWith('SELECT') || upper.startsWith('SHOW') || upper.startsWith('DESCRIBE') || upper.startsWith('EXPLAIN')) {
@@ -504,10 +565,9 @@ class DatabaseService {
         const [result] = await pool.query(query);
         return { rows: [], columns: [], affected: result.affectedRows || 0, insertId: result.insertId };
       }
-    } else if (type === 'postgres') {
-      const pkgPg = (await import('pg')).default;
-      const client = new pkgPg.Client({ ...this.pgConfig, database: name });
-      await client.connect();
+    } else if (norm === 'postgres') {
+      this._sanitizeDbName(name);
+      const client = await this.getPgClientForDb(name);
       try {
         const res = await client.query(query);
         await client.end();
@@ -648,7 +708,8 @@ class DatabaseService {
   // ── Database Size & Stats ──────────────────────────────────
 
   async getDatabaseStats(type, dbName) {
-    if (type === 'mysql') {
+    const norm = this._normalizeType(type);
+    if (norm === 'mysql') {
       this._sanitizeDbName(dbName);
       const pool = await this.getMysqlConnection();
       const [rows] = await pool.query(
@@ -667,8 +728,30 @@ class DatabaseService {
         totalSize: rows.reduce((a, r) => a + (r.size || 0), 0),
         totalDataFree: rows.reduce((a, r) => a + (r.data_free || 0), 0),
       };
+    } else if (norm === 'postgres') {
+      try {
+        this._sanitizeDbName(dbName);
+        const client = await this.getPgClientForDb(dbName);
+        const res = await client.query(
+          "SELECT table_name, pg_total_relation_size(quote_ident(table_name)) as size " +
+          "FROM information_schema.tables WHERE table_schema = 'public' ORDER BY size DESC"
+        );
+        await client.end();
+        return {
+          tables: res.rows.map(r => ({
+            name: r.table_name,
+            engine: 'PostgreSQL',
+            rows: 0,
+            size: parseInt(r.size || 0),
+            dataFree: 0,
+          })),
+          totalSize: res.rows.reduce((a, r) => a + parseInt(r.size || 0), 0),
+          totalDataFree: 0,
+        };
+      } catch (err) {
+        return { tables: [], totalSize: 0, totalDataFree: 0 };
+      }
     }
-    // For others, return basic info
     return { tables: [], totalSize: 0, totalDataFree: 0 };
   }
 }
