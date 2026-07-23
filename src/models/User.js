@@ -76,10 +76,13 @@ function populateRole(user) {
 // ── Static API (mirrors Mongoose model statics) ───────────────────────────
 
 const User = {
-  // findById
   async findById(id) {
+    if (!id) return null;
     const db  = getDb();
-    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    let row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    if (!row && !isNaN(Number(id))) {
+      row = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(id));
+    }
     const user = rowToUser(row);
     return populateRole(user);
   },
@@ -113,16 +116,37 @@ const User = {
     const chain = {
       populate: async () => {
         _user = await self.findOne(filter);
-        return populateRole(_user);
+        return chain;
       },
-      then: (resolve) => chain.populate().then(resolve),
+      exec: async () => {
+        if (!_user) _user = await self.findOne(filter);
+        return _user;
+      },
+      then: (resolve, reject) => chain.exec().then(resolve, reject),
     };
     return chain;
   },
 
-  async find(_filter = {}, _select) {
+  async find(filter = {}, _select) {
     const db = getDb();
-    const rows = db.prepare('SELECT * FROM users ORDER BY created_at DESC').all();
+    let sql  = 'SELECT * FROM users WHERE 1=1';
+    const params = [];
+
+    if (filter.isActive !== undefined) {
+      sql += ' AND is_active = ?';
+      params.push(filter.isActive ? 1 : 0);
+    }
+    if (filter.isSuperAdmin !== undefined) {
+      sql += ' AND is_super_admin = ?';
+      params.push(filter.isSuperAdmin ? 1 : 0);
+    }
+    if (filter.role) {
+      sql += ' AND role_id = ?';
+      params.push(filter.role);
+    }
+
+    sql += ' ORDER BY created_at ASC';
+    const rows = db.prepare(sql).all(...params);
     return rows.map(r => populateRole(rowToUser(r)));
   },
 
@@ -134,44 +158,64 @@ const User = {
 
   async create(data) {
     const db = getDb();
-    const id = generateId();
+    const id = data._id || data.id || generateId('usr');
     const ts = now();
-    const hashedPw = await bcrypt.hash(data.password, 12);
+
+    let passwordHash = data.password;
+    if (passwordHash && !passwordHash.startsWith('$2')) {
+      passwordHash = await bcrypt.hash(passwordHash, 10);
+    }
 
     db.prepare(`
       INSERT INTO users (
         id, username, email, password, role_id, first_name, last_name, avatar,
         two_factor_enabled, two_factor_secret, api_key, api_key_enabled,
-        is_active, is_super_admin, is_ldap_user, sso_links, sessions, ai_settings, last_login, last_login_ip,
-        login_count, reset_token, reset_token_expiry, created_at, updated_at
+        is_active, is_super_admin, is_ldap_user, sso_links, sessions, ai_settings,
+        login_count, created_at, updated_at
       ) VALUES (
-        ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+        ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        0, ?, ?
       )
     `).run(
-      id, data.username.toLowerCase(), data.email.toLowerCase(), hashedPw,
-      data.role || data.role_id,
-      data.firstName || null, data.lastName || null, data.avatar || null,
-      data.twoFactorEnabled ? 1 : 0, data.twoFactorSecret || null,
-      data.apiKey || null, data.apiKeyEnabled ? 1 : 0,
-      data.isActive !== false ? 1 : 0,
+      id,
+      data.username?.toLowerCase(),
+      data.email?.toLowerCase() || null,
+      passwordHash || '',
+      data.role || null,
+      data.firstName || null,
+      data.lastName || null,
+      data.avatar || null,
+      data.twoFactorEnabled ? 1 : 0,
+      data.twoFactorSecret || null,
+      data.apiKey || null,
+      data.apiKeyEnabled ? 1 : 0,
+      data.isActive !== undefined ? (data.isActive ? 1 : 0) : 1,
       data.isSuperAdmin ? 1 : 0,
       data.isLdapUser ? 1 : 0,
       toJson(data.ssoLinks || {}),
-      '[]',
+      toJson(data.sessions || []),
       toJson(data.aiSettings || { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' }),
-      null, null, 0, null, null, ts, ts
+      ts, ts
     );
+
     return this.findById(id);
   },
 
   async findByIdAndUpdate(id, update, _options = {}) {
+    if (!id) return null;
     const db = getDb();
-    const ts = now();
-    const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    let existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    if (!existing && !isNaN(Number(id))) {
+      existing = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(id));
+    }
     if (!existing) return null;
 
+    const realId = existing.id;
     const sets = [];
     const vals = [];
+    const ts = now();
 
     const fieldMap = {
       username: 'username', email: 'email', password: 'password',
@@ -233,18 +277,22 @@ const User = {
 
     sets.push('updated_at = ?');
     vals.push(ts);
-    vals.push(id);
+    vals.push(realId);
 
     db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
-    const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(realId);
     return populateRole(rowToUser(updated));
   },
 
   async findByIdAndDelete(id) {
+    if (!id) return null;
     const db = getDb();
-    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    let row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    if (!row && !isNaN(Number(id))) {
+      row = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(id));
+    }
     if (!row) return null;
-    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    db.prepare('DELETE FROM users WHERE id = ?').run(row.id);
     return rowToUser(row);
   },
 };
