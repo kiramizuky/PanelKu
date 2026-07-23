@@ -17,7 +17,10 @@ class DatabaseService {
   async loadMysqlConfig() {
     try {
       const { default: Setting } = await import('../../models/Setting.js');
-      const saved = await Setting.get('db_credentials_mysql');
+      let saved = await Setting.get('db_credentials_mysql');
+      if (typeof saved === 'string') {
+        try { saved = JSON.parse(saved); } catch (_) {}
+      }
       if (saved && typeof saved === 'object') {
         return {
           host: saved.host || process.env.DB_MYSQL_HOST || 'localhost',
@@ -38,7 +41,10 @@ class DatabaseService {
   async loadPgConfig() {
     try {
       const { default: Setting } = await import('../../models/Setting.js');
-      const saved = await Setting.get('db_credentials_pg');
+      let saved = await Setting.get('db_credentials_pg');
+      if (typeof saved === 'string') {
+        try { saved = JSON.parse(saved); } catch (_) {}
+      }
       if (saved && typeof saved === 'object') {
         return {
           host: saved.host || process.env.DB_PG_HOST || 'localhost',
@@ -90,7 +96,21 @@ class DatabaseService {
     const config = await this.loadPgConfig();
     let lastErr = null;
 
-    // Primary Client
+    // 1. If Linux and no password provided, try Unix Domain Socket first (/var/run/postgresql) for peer auth
+    if (process.platform === 'linux' && (config.host === 'localhost' || config.host === '127.0.0.1') && !config.password) {
+      try {
+        const socketClient = new Client({
+          host: '/var/run/postgresql',
+          user: config.user || 'postgres',
+          database: config.database || 'postgres',
+        });
+        await socketClient.connect();
+        this.pgClient = socketClient;
+        return this.pgClient;
+      } catch (_) {}
+    }
+
+    // 2. TCP Client
     const clientOptions = {
       host: config.host,
       port: config.port,
@@ -108,19 +128,22 @@ class DatabaseService {
       lastErr = err;
     }
 
-    // Fallback on Linux: Try Unix Domain Socket if localhost/127.0.0.1 failed
+    // 3. Fallback on Linux: Try Unix Domain Socket if TCP connection failed
     if (process.platform === 'linux' && (config.host === 'localhost' || config.host === '127.0.0.1')) {
       try {
-        const socketOptions = {
+        const socketClient = new Client({
           host: '/var/run/postgresql',
           user: config.user || 'postgres',
-          database: 'postgres',
-        };
-        const socketClient = new Client(socketOptions);
+          database: config.database || 'postgres',
+        });
         await socketClient.connect();
         this.pgClient = socketClient;
         return this.pgClient;
       } catch (_) {}
+    }
+
+    if (lastErr?.message?.includes('SASL') || lastErr?.message?.includes('password')) {
+      throw new Error(`PostgreSQL authentication failed for user '${config.user}'. Please check DB Credentials in settings.`);
     }
 
     throw new Error('Failed to connect to PostgreSQL: ' + (lastErr?.message || 'Connection failed'));
@@ -144,7 +167,7 @@ class DatabaseService {
         user: data.user || 'root',
         password: String(data.password ?? ''),
       };
-      await Setting.set('db_credentials_mysql', JSON.stringify(payload), 'json');
+      await Setting.set('db_credentials_mysql', payload, 'json');
     } else if (type === 'postgres') {
       const payload = {
         host: data.host || 'localhost',
@@ -153,7 +176,7 @@ class DatabaseService {
         password: String(data.password ?? ''),
         database: 'postgres',
       };
-      await Setting.set('db_credentials_pg', JSON.stringify(payload), 'json');
+      await Setting.set('db_credentials_pg', payload, 'json');
     }
     await this.resetConnections();
   }
