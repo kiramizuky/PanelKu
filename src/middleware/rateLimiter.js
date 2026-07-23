@@ -27,6 +27,10 @@ export const apiLimiter = rateLimit({
     
     // Exempt system power/restart endpoints to avoid 'too many requests' during reboot
     if (url === '/api/system/reboot' || url === '/api/system/panel/restart') return true;
+    
+    // Exempt panel management endpoints (plugins, marketplace, settings, notifications) from rate limiting
+    if (url.startsWith('/api/plugins') || url.startsWith('/api/settings') || url.startsWith('/api/notifications')) return true;
+
     return false;
   },
 });
