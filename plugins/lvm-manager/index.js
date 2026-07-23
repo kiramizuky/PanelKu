@@ -912,7 +912,16 @@ ${statCards}
           <label class="lp-label" style="font-size:11px;">Logical Volume</label>
           <input type="text" id="extendLvDisplay" class="lp-input" readonly style="font-family:monospace;">
         </div>
-        <div class="mb-3">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(16,185,129,0.08);border-radius:8px;border:1px solid rgba(16,185,129,0.3);margin-bottom:12px;">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#10b981;">Gunakan Seluruh Sisa Space VG (100% FREE)</div>
+            <div style="font-size:10px;color:var(--text-muted);">Otomatis menggabungkan sisa storage (misal 1000GB) ke LV ini.</div>
+          </div>
+          <div class="form-check form-switch" style="margin:0;">
+            <input class="form-check-input" type="checkbox" id="extendLvAllFree" checked onchange="document.getElementById('extendLvSizeGroup').style.display = this.checked ? 'none' : 'block'">
+          </div>
+        </div>
+        <div class="mb-3" id="extendLvSizeGroup" style="display:none;">
           <label class="lp-label" style="font-size:11px;">Add Size (GB)</label>
           <input type="number" id="extendLvSize" class="lp-input" min="1" placeholder="e.g. 20">
         </div>
@@ -925,7 +934,7 @@ ${statCards}
       </div>
       <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
         <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn-lp btn-lp-primary" onclick="LvmPage.extendLv()">Extend</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="LvmPage.extendLv()">Extend LV</button>
       </div>
     </div>
   </div>
@@ -1091,11 +1100,12 @@ const LvmPage = (() => {
   async function extendLv() {
     const name = document.getElementById('extendLvName').value;
     const vg   = document.getElementById('extendLvVg').value;
+    const useAllFree = document.getElementById('extendLvAllFree').checked;
     const size = document.getElementById('extendLvSize').value;
     const resizeFs = document.getElementById('extendLvResizeFs').checked;
-    if (!size||+size<1) { LP.toast('Enter valid GB size.','error'); return; }
+    if (!useAllFree && (!size || +size < 1)) { LP.toast('Masukkan ukuran GB yang valid.','error'); return; }
     LP.toast('Extending LV…','info'); getModal('extendLvModal').hide();
-    const res = await apiPost('/api/plugins/lvm-manager/extend-lv', { name, vg, size:+size, resizeFs });
+    const res = await apiPost('/api/plugins/lvm-manager/extend-lv', { name, vg, size: +size, resizeFs, useAllFree });
     res?.success ? showLog('lvextend Output', res.data?.output||'Done.') : showLog('Error', res?.message||'Failed', true);
     LP.toast(res?.success ? 'Extended!' : res?.message||'Failed', res?.success?'success':'error');
   }
@@ -1245,21 +1255,29 @@ const LvmPage = (() => {
     app.post('/api/plugins/lvm-manager/extend-lv', async (req, res) => {
       try {
         await ensureLvmInstalled();
-        const { name, vg, size, resizeFs } = req.body;
+        const { name, vg, size, resizeFs, useAllFree } = req.body;
         if (!name || !/^[\w-]+$/.test(name)) return errorResponse(res, 'Invalid LV name', 400);
         if (!vg   || !/^[\w-]+$/.test(vg))   return errorResponse(res, 'Invalid VG name', 400);
-        if (!size || size < 1)                return errorResponse(res, 'Invalid size', 400);
+        
         const lvPath = `/dev/${vg}/${name}`;
-        let out = await run(`lvextend -L +${size}G ${lvPath} 2>&1`);
-        if (resizeFs) {
+        let cmd = '';
+        if (useAllFree) {
+          cmd = `lvextend -r -l +100%FREE ${lvPath} 2>&1`;
+        } else {
+          if (!size || size < 1) return errorResponse(res, 'Invalid size', 400);
+          cmd = `lvextend ${resizeFs ? '-r ' : ''}-L +${size}G ${lvPath} 2>&1`;
+        }
+
+        let out = await run(cmd);
+        if (resizeFs && !useAllFree) {
           try { out += '\n' + await run(`resize2fs ${lvPath} 2>&1`); } catch(_) {
             try {
-              const mp = (await run(`findmnt -n -o TARGET ${lvPath} 2>/dev/null`).catch(()=>'')).trim();
-              if (mp) out += '\n' + await run(`xfs_growfs ${mp} 2>&1`);
+              const mp = (await run(`findmnt -n -o TARGET ${lvPath} 2>/dev/null`).catch(()=>'')).trim() || '/';
+              out += '\n' + await run(`xfs_growfs ${mp} 2>&1`);
             } catch(_) {}
           }
         }
-        return successResponse(res, { output: out }, 'LV extended');
+        return successResponse(res, { output: out }, 'LV extended successfully');
       } catch (e) { return errorResponse(res, e.message, 500); }
     });
 
