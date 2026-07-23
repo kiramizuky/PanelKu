@@ -23,6 +23,18 @@ async function run(cmd) {
 // ─────────────────────────────────────────────
 function parseG(s) { return parseFloat((s || '0').replace(/,/g, '.').replace(/[^0-9.]/g, '')) || 0; }
 
+function parseSizeToG(s) {
+  if (!s) return 0;
+  const str = s.toString().trim().replace(/,/g, '.');
+  const num = parseFloat(str.replace(/[^0-9.]/g, '')) || 0;
+  if (/t/i.test(str)) return num * 1024;
+  if (/m/i.test(str)) return num / 1024;
+  if (/k/i.test(str)) return num / (1024 * 1024);
+  if (/b/i.test(str)) return num / (1024 * 1024 * 1024);
+  return num;
+}
+
+
 function findMountpoint(lvPath, vgName, lvName, mountMap) {
   if (!lvPath) return '';
   if (mountMap.has(lvPath)) return mountMap.get(lvPath);
@@ -154,10 +166,16 @@ async function getLvmData() {
 
     const lsblkData = JSON.parse(lsblkRaw);
     const pvNames = pvs.map(p => p.name);
-    const disks = flattenDevices(lsblkData.blockdevices || []).filter(d => d.type === 'disk' || d.type === 'part');
+    const allFlat = flattenDevices(lsblkData.blockdevices || []);
+    // Filter physical disks (type === 'disk'), exclude child partitions to prevent duplicate device counts
+    const rawDisks = allFlat.filter(d => d.type === 'disk');
+    const disks = rawDisks.length > 0 ? rawDisks : allFlat.filter(d => d.type === 'disk' || d.type === 'part');
 
     blockDevices = await Promise.all(disks.map(async d => {
-      const used = pvNames.some(pv => pv.includes(d.name));
+      const used = pvNames.some(pv => {
+        const pvClean = pv.replace('/dev/', '');
+        return pvClean === d.name || pvClean.startsWith(d.name) || pv.includes(d.name);
+      });
       let smart = 'N/A', temp = null, readMB = 0, writeMB = 0;
 
       // SMART health
@@ -255,10 +273,18 @@ export default {
         const parseG = s => parseFloat((s||'0').replace(/,/g, '.').replace(/[^0-9.]/g,''))||0;
 
         // ── Summary stats
-        const totalStorageG = data.pvs.reduce((a, p) => a + parseG(p.size), 0);
-        const freeStorageG  = data.pvs.reduce((a, p) => a + parseG(p.free), 0);
-        const usedStorageG  = totalStorageG - freeStorageG;
-        const overallPct    = totalStorageG > 0 ? Math.round((usedStorageG / totalStorageG) * 100) : 0;
+        const lvmTotalG     = data.pvs.reduce((a, p) => a + parseSizeToG(p.size), 0);
+        const lvmFreeG      = data.pvs.reduce((a, p) => a + parseSizeToG(p.free), 0);
+        const lvmUsedG      = lvmTotalG - lvmFreeG;
+
+        const physicalTotalG    = data.blockDevices.reduce((a, d) => a + parseSizeToG(d.size), 0);
+        const unallocatedDisksG = data.blockDevices.filter(d => !d.used).reduce((a, d) => a + parseSizeToG(d.size), 0);
+
+        const totalStorageG = physicalTotalG > 0 ? physicalTotalG : lvmTotalG;
+        const usedStorageG  = lvmUsedG;
+        const freeStorageG  = totalStorageG - usedStorageG;
+        const overallPct    = totalStorageG > 0 ? Math.min(100, Math.round((usedStorageG / totalStorageG) * 100)) : 0;
+
         const lvCount       = data.lvs.filter(l => !l.attr.includes('s')).length;
         const snapCount     = data.lvs.filter(l => l.attr.includes('s')).length;
         const healthStatus  = data.blockDevices.some(d => d.smart === 'FAILED') ? 'DEGRADED' :
@@ -290,7 +316,7 @@ export default {
     <div>
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Total Storage</div>
       <div style="font-size:18px;font-weight:800;">${totalStorageG >= 1024 ? (totalStorageG/1024).toFixed(1)+'T' : totalStorageG.toFixed(0)+'G'}</div>
-      <div style="font-size:11px;color:var(--text-muted);">${usedStorageG.toFixed(0)}G used · ${freeStorageG.toFixed(0)}G free</div>
+      <div style="font-size:11px;color:var(--text-muted);">${usedStorageG.toFixed(0)}G LVM used ${unallocatedDisksG > 0 ? `· <span style="color:#f59e0b;">${unallocatedDisksG.toFixed(0)}G unallocated</span>` : `· ${freeStorageG.toFixed(0)}G free`}</div>
     </div>
   </div>
 
@@ -326,7 +352,7 @@ export default {
     <div>
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Physical Disks</div>
       <div style="font-size:17px;font-weight:800;">${data.blockDevices.length}</div>
-      <div style="font-size:11px;color:var(--text-muted);">${data.blockDevices.filter(d=>d.used).length} in LVM · ${data.blockDevices.filter(d=>!d.used).length} free</div>
+      <div style="font-size:11px;color:var(--text-muted);">${data.blockDevices.filter(d=>d.used).length} in LVM · <span style="${data.blockDevices.some(d=>!d.used)?'color:#f59e0b;':''}">${data.blockDevices.filter(d=>!d.used).length} unallocated</span></div>
     </div>
   </div>
 
@@ -629,6 +655,26 @@ ${statCards}
 
 <!-- ── Tab: Overview ── -->
 <div id="tab-overview" class="lvm-tab">
+  ${data.blockDevices.some(d => !d.used) ? `
+  <div class="lp-glass-card p-3 mb-4" style="border:1px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.05);">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;border-radius:10px;background:rgba(245,158,11,0.15);display:flex;align-items:center;justify-content:center;font-size:20px;">
+          <i class="bi bi-hdd-network-fill text-warning"></i>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:14px;color:#f59e0b;">Unallocated Storage Detected</div>
+          <div style="font-size:12px;color:var(--text-muted);">
+            ${data.blockDevices.filter(d => !d.used).map(d => `<code>/dev/${d.name}</code> (${d.size})`).join(', ')} — Not initialized in LVM
+          </div>
+        </div>
+      </div>
+      <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LvmPage.switchTab('disks')" style="background:#f59e0b;color:#000;border:none;">
+        <i class="bi bi-lightning-fill me-1"></i>Manage Disks
+      </button>
+    </div>
+  </div>` : ''}
+
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
     ${vgCapacityCards || '<p style="color:var(--text-muted);">No volume groups found.</p>'}
   </div>
