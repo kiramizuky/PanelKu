@@ -30,7 +30,7 @@ export const registerTerminalSocket = (namespace) => {
     let remoteSockets = new Map(); // sessionId -> WebSocket client connecting to agent node
 
     // Create terminal session
-    socket.on('terminal:create', ({ shell = 'bash', cols = 80, rows = 24, osUser = 'root', nodeId }) => {
+    socket.on('terminal:create', ({ shell = 'bash', cols = 80, rows = 24, osUser = 'root', nodeId, cwd }) => {
       if (nodeId) {
         // REMOTE NODE MODE
         try {
@@ -113,7 +113,7 @@ export const registerTerminalSocket = (namespace) => {
       } else {
         // LOCAL PTY MODE
         try {
-          const { sessionId, pid } = terminalService.create(socket.user._id, shell, cols, rows, osUser);
+          const { sessionId, pid } = terminalService.create(socket.user._id, shell, cols, rows, osUser, cwd);
           activeSessions.add(sessionId);
 
           socket.emit('terminal:created', { sessionId, pid });

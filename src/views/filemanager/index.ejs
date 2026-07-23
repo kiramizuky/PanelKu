@@ -4,10 +4,12 @@
     <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">File Manager</h1>
     <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage host files securely</p>
   </div>
-  <div style="display:flex;gap:10px">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn-lp btn-lp-ghost" id="toggleViewBtn" onclick="FMPage.toggleView()" title="Toggle View"><i class="bi bi-grid"></i></button>
+    <button class="btn-lp btn-lp-primary" onclick="FMPage.createFile()"><i class="bi bi-file-earmark-plus"></i> New File</button>
     <button class="btn-lp btn-lp-primary" onclick="FMPage.createFolder()"><i class="bi bi-folder-plus"></i> New Folder</button>
     <button class="btn-lp btn-lp-primary" onclick="FMPage.showUploadModal()"><i class="bi bi-upload"></i> Upload</button>
+    <button class="btn-lp btn-lp-ghost text-info" onclick="FMPage.openTerminal()" title="Open Terminal at Current Path"><i class="bi bi-terminal-fill me-1"></i> Open Terminal</button>
   </div>
 </div>
 
@@ -17,6 +19,7 @@
     <button class="btn-lp btn-lp-ghost btn-lp-sm" id="upBtn" onclick="FMPage.goUp()" title="Go Up" disabled><i class="bi bi-arrow-up"></i></button>
     <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FMPage.refresh()" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
     <input type="text" id="currentPath" class="lp-input font-mono" style="flex:1; padding:6px 10px; margin:0;" onkeypress="if(event.key==='Enter') FMPage.navigate(this.value)" placeholder="/">
+    <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="FMPage.openTerminal()" title="Open Terminal Here"><i class="bi bi-terminal-fill me-1"></i> Terminal</button>
   </div>
 
   <!-- Bulk Actions Bar -->
@@ -45,6 +48,7 @@
   <div class="fm-ctx-item" onclick="FMPage.copySelected()"><i class="bi bi-clipboard"></i> Copy</div>
   <div class="fm-ctx-item" onclick="FMPage.pasteItem()"><i class="bi bi-clipboard-check"></i> Paste</div>
   <div class="fm-ctx-item" onclick="FMPage.downloadSelected()"><i class="bi bi-download"></i> Download</div>
+  <div class="fm-ctx-item text-info" onclick="FMPage.openTerminal()"><i class="bi bi-terminal"></i> Open Terminal Here</div>
   <hr style="margin:4px 0; border-color:var(--glass-border)">
   <div class="fm-ctx-item text-danger" onclick="FMPage.deleteSelected()"><i class="bi bi-trash"></i> Delete</div>
 </div>

@@ -14,7 +14,7 @@ class TerminalService {
   /**
    * Create a new PTY session.
    */
-  create(userId, shell = 'bash', cols = 80, rows = 24, osUser = 'root') {
+  create(userId, shell = 'bash', cols = 80, rows = 24, osUser = 'root', cwd = null) {
     if (this._sessions.size >= this._MAX_SESSIONS) {
       throw new Error('Maximum terminal sessions reached');
     }
@@ -29,11 +29,16 @@ class TerminalService {
       shellArgs = ['-', osUser];
     }
 
+    let workingDir = isWin ? process.env.USERPROFILE : (process.env.HOME || '/root');
+    if (cwd && typeof cwd === 'string' && cwd.trim()) {
+      workingDir = cwd.trim();
+    }
+
     const ptyProcess = pty.spawn(shellPath, shellArgs, {
       name: 'xterm-256color',
       cols,
       rows,
-      cwd: isWin ? process.env.USERPROFILE : (process.env.HOME || '/root'),
+      cwd: workingDir,
       env: {
         ...process.env,
         TERM: 'xterm-256color',

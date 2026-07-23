@@ -506,12 +506,40 @@ const FMPage = (() => {
     LP.toast(`${selectedItem.name} cut to clipboard`, 'info');
   }
 
+  async function createFile() {
+    const name = await LP.prompt('Enter new file name (e.g. index.html, script.js, .env):', 'text', 'Create New File');
+    if (!name || !name.trim()) return;
+    const fileName = name.trim();
+    const filePath = (currentPath === '/' ? '' : currentPath) + '/' + fileName;
+
+    const res = await LP.post('/filemanager/write', { path: filePath, content: '' });
+    if (res?.success) {
+      LP.toast(`File "${fileName}" created successfully`, 'success');
+      refresh();
+      // Auto open text editor for newly created file
+      openItem({ path: filePath, type: 'file', name: fileName });
+    } else {
+      LP.toast(res?.message || 'Failed to create file', 'error');
+    }
+  }
+
+  async function createFolder() {
+    const name = await LP.prompt('Enter new folder name:', 'text', 'Create New Folder');
+    if (!name || !name.trim()) return;
+    const folderName = name.trim();
+    const folderPath = (currentPath === '/' ? '' : currentPath) + '/' + folderName;
+    const res = await LP.post('/filemanager/mkdir', { path: folderPath });
+    if (res?.success) { LP.toast(`Folder "${folderName}" created`, 'success'); refresh(); }
+    else LP.toast(res?.message || 'Failed to create folder', 'error');
+  }
+
   async function mkdir() {
-    const name = prompt('New folder name:');
-    if (!name) return;
-    const res = await LP.post('/filemanager/mkdir', { path: currentPath + '/' + name });
-    if (res?.success) { LP.toast('Folder created', 'success'); refresh(); }
-    else LP.toast(res?.message || 'Failed', 'error');
+    return createFolder();
+  }
+
+  function openTerminal() {
+    const path = currentPath || '/';
+    window.location.href = `/terminal?path=${encodeURIComponent(path)}`;
   }
 
   async function upload(files) {
@@ -728,7 +756,10 @@ const FMPage = (() => {
     deleteSelected,
     copySelected,
     moveSelected,
+    createFile,
+    createFolder,
     mkdir,
+    openTerminal,
     upload,
     showUploadModal,
     handleSelectedUploads,
