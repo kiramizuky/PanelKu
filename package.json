@@ -84,5 +84,8 @@
     "node-pty": true,
     "protobufjs": true,
     "ssh2": true
+  },
+  "overrides": {
+    "brace-expansion": "5.0.8"
   }
 }
