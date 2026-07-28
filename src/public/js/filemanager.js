@@ -963,6 +963,7 @@ const FMPage = (() => {
 
       // Persist to localStorage
       localStorage.setItem('lp_fm_tree_width', treePanel.offsetWidth);
+      if (_cm) _cm.refresh();
 
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
@@ -972,6 +973,7 @@ const FMPage = (() => {
 
     // Cleanup on window resize (switch to mobile layout)
     window.addEventListener('resize', () => {
+      if (_cm) _cm.refresh();
       if (window.innerWidth <= 768) {
         treePanel.style.width = ''; // Reset to CSS default
       } else if (!treePanel.style.width) {
