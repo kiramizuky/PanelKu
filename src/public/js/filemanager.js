@@ -8,6 +8,11 @@ const FMPage = (() => {
   let selectedItem = null;
   let viewMode = localStorage.getItem('lp_fm_view') || 'grid';
   let _clipboard = null;
+  let _editingPath = null;
+  let _treeBasePath = null;
+  let _openTabs = [];
+  let _activeTab = null;
+  let _tabContents = {};
 
   const FILE_ICONS = {
     dir: '📁',
@@ -354,102 +359,589 @@ const FMPage = (() => {
     }
   }
 
-  async function openFileEditor(path) {
+  // ── Split View: File Tree + Editor ──────────────────────
+  async function openSplitView(path) {
     const res = await LP.get(`/filemanager/read?path=${encodeURIComponent(path)}`);
     if (!res?.success) { LP.toast('Cannot read file: ' + res?.message, 'error'); return; }
 
-    const content = res.data.content;
-    const modal = document.createElement('div');
-    const id = 'file_editor_' + Date.now();
-    modal.innerHTML = `
-      <div class="modal fade" id="${id}" tabindex="-1">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
-          <div class="modal-content" style="background:#0b0f19; border:1px solid var(--glass-border); color:#fff; border-radius:12px; overflow:hidden;">
-            <div class="modal-header" style="border-bottom:1px solid var(--glass-border); padding: 12px 20px;">
-              <h6 class="modal-title font-mono" style="font-size:12px; color:var(--text-secondary);"><i class="bi bi-file-code-fill me-2 text-primary"></i>${escHtml(path)}</h6>
-              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" style="padding:0; display:flex; position:relative; overflow:hidden; background:#070a13; height:550px;">
-              <!-- Gutter Line Numbers -->
-              <div id="${id}_gutter" style="width:54px; background:#04060c; border-right:1px solid rgba(255,255,255,0.06); color:rgba(255,255,255,0.2); font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:16px 12px 16px 0; text-align:right; select:none; user-select:none; overflow:hidden; line-height:1.6; box-sizing:border-box;">
-                <div>1</div>
-              </div>
-              <!-- Text Area -->
-              <textarea id="${id}_ta" style="flex:1; height:100%; background:transparent; color:#e2e8f0; border:none; padding:16px; font-family:'JetBrains Mono',monospace; font-size:12.5px; resize:none; outline:none; line-height:1.6; overflow-y:auto; overflow-x:auto; box-sizing:border-box; white-space:pre; word-wrap:normal;" wrap="off" spellcheck="false">${escHtml(content)}</textarea>
-            </div>
-            <div class="modal-footer" style="border-top:1px solid var(--glass-border); padding: 12px 20px;">
-              <div class="me-auto font-mono" id="${id}_stats" style="font-size:11px; color:var(--text-muted);">Lines: 1 | Length: 0</div>
-              <small class="text-muted me-3 d-none d-sm-inline" style="font-size:11px;"><kbd style="background:rgba(255,255,255,0.08); color:var(--text-muted); font-size:10px; padding:2px 5px; border-radius:3px;">Ctrl + S</kbd> to Quick Save</small>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" data-bs-dismiss="modal">Cancel</button>
-              <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LP.call('FMPage._saveFile', '${LP.encJsArg(path)}', '${LP.encJsArg(id)}', false)"><i class="bi bi-floppy me-1"></i> Save</button>
-            </div>
-          </div>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-    const bsModal = new bootstrap.Modal(document.getElementById(id));
-    bsModal.show();
+    // Show split view, hide grid
+    document.getElementById('fmFileArea').style.display = 'none';
+    document.getElementById('fmSplitView').style.display = 'flex';
 
-    // Hook up Gutter Sync & Line stats
-    setTimeout(() => {
-      const ta = document.getElementById(`${id}_ta`);
-      const gutter = document.getElementById(`${id}_gutter`);
-      const stats = document.getElementById(`${id}_stats`);
+    // Add tab
+    addTab(path);
+    _tabContents[path] = res.data.content;
 
-      function updateGutter() {
-        const value = ta.value;
-        const lineCount = value.split('\n').length;
-        let gutterHtml = '';
-        for (let i = 1; i <= lineCount; i++) {
-          gutterHtml += `<div>${i}</div>`;
-        }
-        gutter.innerHTML = gutterHtml;
-        stats.textContent = `Lines: ${lineCount} | Length: ${value.length}`;
-      }
+    // Load tree positioned at file's parent directory
+    await loadFileTree(path);
 
-      // Synchronize Scroll
-      ta.addEventListener('scroll', () => {
-        gutter.scrollTop = ta.scrollTop;
-      });
-
-      // Handle TAB key indentation
-      ta.addEventListener('keydown', (e) => {
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          const start = ta.selectionStart;
-          const end = ta.selectionEnd;
-          const val = ta.value;
-          ta.value = val.substring(0, start) + '  ' + val.substring(end);
-          ta.selectionStart = ta.selectionEnd = start + 2;
-          updateGutter();
-        }
-
-        // Handle Ctrl + S shortcut
-        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-          e.preventDefault();
-          FMPage._saveFile(path, id, true);
-        }
-      });
-
-      ta.addEventListener('input', updateGutter);
-      
-      // Initial Gutter generation
-      updateGutter();
-    }, 200);
-
-    document.getElementById(id).addEventListener('hidden.bs.modal', () => modal.remove());
+    // Render editor
+    renderSplitEditor(path, res.data.content);
   }
 
-  async function _saveFile(path, modalId, keepOpen = false) {
-    const content = document.getElementById(`${modalId}_ta`).value;
-    const res = await LP.post('/filemanager/write', { path, content });
-    if (res?.success) {
-      LP.toast('File saved successfully', 'success');
-      if (!keepOpen) {
-        bootstrap.Modal.getInstance(document.getElementById(modalId))?.hide();
+  // ── Tab Management ─────────────────────────────────
+  function addTab(path) {
+    const name = path.split('/').pop();
+    _openTabs = _openTabs.filter(t => t.path !== path);
+    _openTabs.push({ path, name });
+    _activeTab = path;
+    renderTabs();
+  }
+
+  function renderTabs() {
+    const container = document.getElementById('fmSplitTabs');
+    if (!container) return;
+    container.innerHTML = _openTabs.map(t => `
+      <div class="fm-split-tab${t.path === _activeTab ? ' active' : ''}"
+           onclick="FM.switchTab('${LP.encJsArg(t.path)}')">
+        <i class="bi bi-file-code-fill" style="font-size:11px;"></i>
+        ${escHtml(t.name)}
+        <span class="fm-split-tab-close" onclick="event.stopPropagation(); FM.closeTab('${LP.encJsArg(t.path)}')">
+          <i class="bi bi-x"></i>
+        </span>
+      </div>
+    `).join('');
+  }
+
+  async function switchTab(path) {
+    // Save current editor content before switching
+    if (_cm && _editingPath) {
+      _tabContents[_editingPath] = _cm.getValue();
+    }
+
+    _activeTab = path;
+    renderTabs();
+
+    // Fetch content if not cached
+    if (!_tabContents[path]) {
+      try {
+        const res = await LP.get(`/filemanager/read?path=${encodeURIComponent(path)}`);
+        if (res?.success) _tabContents[path] = res.data.content;
+      } catch (err) {
+        LP.toast('Failed to load file: ' + err.message, 'error');
+        return;
+      }
+    }
+
+    renderSplitEditor(path, _tabContents[path] || '');
+    highlightTreeItem(path);
+  }
+
+  function closeTab(path) {
+    _openTabs = _openTabs.filter(t => t.path !== path);
+    delete _tabContents[path];
+
+    if (_activeTab === path) {
+      if (_openTabs.length > 0) {
+        switchTab(_openTabs[_openTabs.length - 1].path);
+      } else {
+        closeSplitView();
+        return;
       }
     } else {
-      LP.toast('Failed to save: ' + res?.message, 'error');
+      renderTabs();
+    }
+  }
+
+  // ── File Tree ──────────────────────────────────────
+  async function loadFileTree(activeFilePath) {
+    const dir = activeFilePath.substring(0, activeFilePath.lastIndexOf('/')) || '/';
+    _treeBasePath = dir;
+
+    const titleEl = document.getElementById('fmTreeTitle');
+    if (titleEl) titleEl.textContent = dir === '/' ? '/' : dir.split('/').pop();
+
+    const res = await LP.get(`/filemanager/list?path=${encodeURIComponent(dir)}`);
+    if (!res?.success) {
+      const container = document.getElementById('fmTreeContainer');
+      if (container) container.innerHTML = '<div class="fm-tree-empty">Failed to load directory</div>';
+      return;
+    }
+
+    renderTree(res.data.items, dir, activeFilePath);
+  }
+
+  function renderTree(items, basePath, activeFilePath) {
+    const container = document.getElementById('fmTreeContainer');
+    if (!container) return;
+
+    let html = '';
+
+    // Parent directory entry (..)
+    if (basePath !== '/') {
+      html += `<div class="fm-tree-item fm-tree-dir" data-path="${escHtml(basePath)}" data-type="parent">
+        <span class="fm-tree-toggle"><i class="bi bi-arrow-up-short" style="font-size:12px;"></i></span>
+        <span class="fm-tree-icon">📂</span>
+        <span class="fm-tree-name" style="color:var(--text-muted);font-style:italic;">..</span>
+      </div>`;
+    }
+
+    // Sort: dirs first, then alphabetical
+    const sorted = [...items].sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    html += sorted.map(item => {
+      const isActive = item.path === activeFilePath;
+      const icon = item.type === 'dir' ? '📁' : getIcon(item);
+      const typeClass = item.type === 'dir' ? 'fm-tree-dir' : '';
+      const activeClass = isActive ? 'fm-tree-active' : '';
+
+      if (item.type === 'dir') {
+        return `<div class="fm-tree-item ${typeClass} ${activeClass}" data-path="${escHtml(item.path)}" data-type="dir">
+          <span class="fm-tree-toggle">▶</span>
+          <span class="fm-tree-icon">📁</span>
+          <span class="fm-tree-name">${escHtml(item.name)}</span>
+        </div>
+        <div class="fm-tree-children" data-parent="${escHtml(item.path)}"></div>`;
+      } else {
+        return `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file">
+          <span class="fm-tree-toggle" style="visibility:hidden;">▶</span>
+          <span class="fm-tree-icon">${icon}</span>
+          <span class="fm-tree-name">${escHtml(item.name)}</span>
+        </div>`;
+      }
+    }).join('');
+
+    container.innerHTML = html;
+
+    // Event delegation for tree clicks
+    container.onclick = (e) => {
+      const item = e.target.closest('.fm-tree-item');
+      if (!item) return;
+      const path = item.dataset.path;
+      const type = item.dataset.type;
+      if (type === 'dir') {
+        toggleTreeDir(item, path);
+      } else if (type === 'parent') {
+        goTreeUp();
+      } else {
+        openTreeFile(path);
+      }
+    };
+  }
+
+  async function toggleTreeDir(el, path) {
+    const childrenContainer = el.nextElementSibling;
+    if (!childrenContainer || !childrenContainer.classList.contains('fm-tree-children')) return;
+
+    const toggle = el.querySelector('.fm-tree-toggle');
+
+    if (childrenContainer.classList.contains('open')) {
+      childrenContainer.classList.remove('open');
+      if (toggle) toggle.classList.remove('expanded');
+      if (toggle) toggle.textContent = '▶';
+      return;
+    }
+
+    // Loading state
+    if (toggle) toggle.innerHTML = '<div class="spinner-border spinner-border-sm" style="width:10px;height:10px;border-width:1.5px;"></div>';
+
+    try {
+      const res = await LP.get(`/filemanager/list?path=${encodeURIComponent(path)}`);
+      if (!res?.success) {
+        if (toggle) toggle.textContent = '▶';
+        return;
+      }
+
+      const items = res.data.items;
+      const sorted = [...items].sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      let html = '';
+      sorted.forEach(item => {
+        const icon = item.type === 'dir' ? '📁' : getIcon(item);
+        const isActive = item.path === _activeTab;
+        const activeClass = isActive ? 'fm-tree-active' : '';
+
+        if (item.type === 'dir') {
+          html += `<div class="fm-tree-item fm-tree-dir ${activeClass}" data-path="${escHtml(item.path)}" data-type="dir">
+            <span class="fm-tree-toggle">▶</span>
+            <span class="fm-tree-icon">📁</span>
+            <span class="fm-tree-name">${escHtml(item.name)}</span>
+          </div>
+          <div class="fm-tree-children" data-parent="${escHtml(item.path)}"></div>`;
+        } else {
+          html += `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file">
+            <span class="fm-tree-toggle" style="visibility:hidden;">▶</span>
+            <span class="fm-tree-icon">${icon}</span>
+            <span class="fm-tree-name">${escHtml(item.name)}</span>
+          </div>`;
+        }
+      });
+
+      childrenContainer.innerHTML = html;
+      childrenContainer.classList.add('open');
+      if (toggle) {
+        toggle.classList.add('expanded');
+        toggle.textContent = '▼';
+      }
+    } catch (err) {
+      if (toggle) toggle.textContent = '▶';
+    }
+  }
+
+  async function openTreeFile(path) {
+    if (path === _editingPath) return;
+
+    // Save current content to cache
+    if (_cm && _editingPath) {
+      _tabContents[_editingPath] = _cm.getValue();
+    }
+
+    // Add tab
+    addTab(path);
+
+    // Fetch if not cached
+    if (!_tabContents[path]) {
+      try {
+        const res = await LP.get(`/filemanager/read?path=${encodeURIComponent(path)}`);
+        if (!res?.success) { LP.toast('Cannot read file: ' + res?.message, 'error'); return; }
+        _tabContents[path] = res.data.content;
+      } catch (err) {
+        LP.toast('Failed to load file: ' + err.message, 'error');
+        return;
+      }
+    }
+
+    renderSplitEditor(path, _tabContents[path]);
+    highlightTreeItem(path);
+  }
+
+  async function goTreeUp() {
+    if (!_treeBasePath || _treeBasePath === '/') return;
+    const parent = _treeBasePath.substring(0, _treeBasePath.lastIndexOf('/')) || '/';
+    _treeBasePath = parent;
+
+    const titleEl = document.getElementById('fmTreeTitle');
+    if (titleEl) titleEl.textContent = parent === '/' ? '/' : parent.split('/').pop();
+
+    const res = await LP.get(`/filemanager/list?path=${encodeURIComponent(parent)}`);
+    if (!res?.success) return;
+    renderTree(res.data.items, parent, _activeTab);
+  }
+
+  async function refreshTree() {
+    if (!_treeBasePath) return;
+    const res = await LP.get(`/filemanager/list?path=${encodeURIComponent(_treeBasePath)}`);
+    if (!res?.success) return;
+    renderTree(res.data.items, _treeBasePath, _activeTab);
+  }
+
+  function highlightTreeItem(path) {
+    // Use iteration instead of CSS selector to avoid escaping issues with paths containing " or special chars
+    document.querySelectorAll('.fm-tree-item.fm-tree-active').forEach(el => {
+      el.classList.remove('fm-tree-active');
+    });
+    document.querySelectorAll('.fm-tree-item').forEach(el => {
+      if (el.dataset.path === path) {
+        el.classList.add('fm-tree-active');
+      }
+    });
+  }
+
+  // ── Tree Search/Filter ───────────────────────────
+  function filterTree(query) {
+    const container = document.getElementById('fmTreeContainer');
+    const clearBtn = document.getElementById('fmTreeFilterClear');
+    if (!container) return;
+
+    const q = query.trim().toLowerCase();
+
+    // Show/hide clear button
+    if (clearBtn) clearBtn.style.display = q.length > 0 ? 'flex' : 'none';
+
+    // Toggle filtering class on container
+    container.classList.toggle('fm-tree-filtering', q.length > 0);
+
+    if (!q) {
+      // Reset: show all items
+      container.querySelectorAll('.fm-tree-item').forEach(el => el.classList.remove('fm-tree-hidden'));
+      return;
+    }
+
+    // Filter items: hide those whose name doesn't match
+    container.querySelectorAll('.fm-tree-item').forEach(el => {
+      const nameEl = el.querySelector('.fm-tree-name');
+      if (!nameEl) return;
+      const name = nameEl.textContent.toLowerCase();
+      el.classList.toggle('fm-tree-hidden', !name.includes(q));
+    });
+
+    // Show parent directories that have visible children
+    container.querySelectorAll('.fm-tree-children').forEach(ch => {
+      const hasVisible = Array.from(ch.querySelectorAll('.fm-tree-item')).some(item => !item.classList.contains('fm-tree-hidden'));
+      // If has visible children, also show the parent dir item
+      if (hasVisible) {
+        const prevItem = ch.previousElementSibling;
+        if (prevItem && prevItem.classList.contains('fm-tree-item')) {
+          prevItem.classList.remove('fm-tree-hidden');
+        }
+      }
+    });
+  }
+
+  function clearTreeFilter() {
+    const input = document.getElementById('fmTreeFilterInput');
+    if (input) {
+      input.value = '';
+      filterTree('');
+      input.focus();
+    }
+  }
+
+  // ── Draggable Split Divider ────────────────────────
+  let _splitDividerInitialized = false;
+
+  function initSplitDivider() {
+    if (_splitDividerInitialized) return;
+    _splitDividerInitialized = true;
+
+    const divider = document.getElementById('fmSplitDivider');
+    const treePanel = document.getElementById('fmTreePanel');
+    if (!divider || !treePanel) return;
+
+    // Restore saved width
+    const savedWidth = localStorage.getItem('lp_fm_tree_width');
+    if (savedWidth) {
+      const w = parseInt(savedWidth, 10);
+      if (w >= 180 && w <= 600) {
+        treePanel.style.width = w + 'px';
+      }
+    }
+
+    let isDragging = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    function onMouseDown(e) {
+      // Only left click
+      if (e.button !== 0) return;
+      // Disable on small screens
+      if (window.innerWidth <= 768) return;
+
+      isDragging = true;
+      startX = e.clientX;
+      startWidth = treePanel.offsetWidth;
+
+      divider.classList.add('dragging');
+      document.body.classList.add('fm-resizing');
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+
+      // Prevent text selection while dragging
+      e.preventDefault();
+    }
+
+    function onMouseMove(e) {
+      if (!isDragging) return;
+
+      const delta = e.clientX - startX;
+      let newWidth = startWidth + delta;
+
+      // Clamp between 180px and 50% of container
+      const container = divider.parentElement;
+      if (container) {
+        const maxWidth = container.offsetWidth * 0.5;
+        newWidth = Math.max(180, Math.min(newWidth, maxWidth));
+      } else {
+        newWidth = Math.max(180, Math.min(newWidth, 600));
+      }
+
+      treePanel.style.width = newWidth + 'px';
+    }
+
+    function onMouseUp() {
+      if (!isDragging) return;
+      isDragging = false;
+
+      divider.classList.remove('dragging');
+      document.body.classList.remove('fm-resizing');
+
+      // Persist to localStorage
+      localStorage.setItem('lp_fm_tree_width', treePanel.offsetWidth);
+
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    }
+
+    divider.addEventListener('mousedown', onMouseDown);
+
+    // Cleanup on window resize (switch to mobile layout)
+    window.addEventListener('resize', () => {
+      if (window.innerWidth <= 768) {
+        treePanel.style.width = ''; // Reset to CSS default
+      } else if (!treePanel.style.width) {
+        // Restore saved width when going back to desktop
+        const saved = localStorage.getItem('lp_fm_tree_width');
+        if (saved) treePanel.style.width = saved + 'px';
+      }
+    });
+  }
+
+  // ── Editor (CodeMirror) ───────────────────────────
+  let _cm = null;
+  let _cmInitialized = false;
+
+  /** Map file extensions to CodeMirror modes */
+  function getModeByExtension(path) {
+    const ext = path.split('.').pop()?.toLowerCase();
+    const map = {
+      js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
+      ts: 'javascript', tsx: 'javascript',
+      json: 'application/json',
+      html: 'htmlmixed', htm: 'htmlmixed',
+      css: 'css', scss: 'text/x-scss', less: 'text/x-less',
+      xml: 'xml', svg: 'xml', xhtml: 'xml',
+      py: 'python', pyw: 'python',
+      php: 'php', phtml: 'php',
+      sh: 'shell', bash: 'shell', zsh: 'shell', fish: 'shell',
+      sql: 'sql',
+      yaml: 'yaml', yml: 'yaml',
+      md: 'markdown', markdown: 'markdown',
+      java: 'text/x-java', c: 'text/x-csrc', cpp: 'text/x-c++src',
+      cs: 'text/x-csharp', go: 'text/x-go', rs: 'text/x-rustsrc',
+      rb: 'text/x-ruby', pl: 'text/x-perl',
+      swift: 'text/x-swift', kt: 'text/x-kotlin',
+      nginx: 'text/x-nginx-conf', conf: 'text', ini: 'text',
+      env: 'text', htaccess: 'text', log: 'text', txt: 'text',
+    };
+    return map[ext] || 'text';
+  }
+
+  function initCodeMirror() {
+    if (_cmInitialized) return;
+    const textarea = document.getElementById('fmEditorTextarea');
+    if (!textarea || typeof CodeMirror === 'undefined') return;
+    _cmInitialized = true;
+
+    _cm = CodeMirror.fromTextArea(textarea, {
+      theme: 'material-darker',
+      lineNumbers: true,
+      indentUnit: 2,
+      tabSize: 2,
+      indentWithTabs: false,
+      lineWrapping: false,
+      styleActiveLine: true,
+      matchBrackets: true,
+      autoCloseBrackets: true,
+      extraKeys: {
+        'Ctrl-S': () => saveSplitEditor(),
+        'Cmd-S': () => saveSplitEditor(),
+        Tab: (cm) => {
+          // Custom 2-space tab
+          cm.replaceSelection('  ');
+        },
+      },
+      // Default to plain text until a file is opened
+      mode: 'text',
+    });
+
+    // Track unsaved changes
+    _cm.on('change', () => {
+      const badge = document.getElementById('fmEditorUnsaved');
+      if (badge) badge.style.display = 'inline';
+      updateCodeMirrorStats();
+    });
+
+    // Cursor position tracking (attached once here, not per renderSplitEditor)
+    _cm.on('cursorActivity', updateCodeMirrorStats);
+
+    // Initial stats
+    updateCodeMirrorStats();
+  }
+
+  function updateCodeMirrorStats() {
+    if (!_cm) return;
+    const stats = document.getElementById('fmEditorStats');
+    if (!stats) return;
+    const value = _cm.getValue();
+    const lineCount = value.split('\n').length;
+    const ch = value.length;
+    const cursor = _cm.getCursor();
+    stats.textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1} | ${lineCount} lines | ${ch} chars`;
+  }
+
+  function renderSplitEditor(path, content) {
+    _editingPath = path;
+
+    // Update header
+    const headerPath = document.getElementById('fmEditorPath');
+    const unsavedBadge = document.getElementById('fmEditorUnsaved');
+    if (headerPath) headerPath.textContent = path;
+    if (_cm) {
+      // Suppress the unsaved badge during programmatic setValue
+      _cm.setValue(content);
+      _cm.clearHistory();
+
+      // Hide badge AFTER setValue (which fires 'change' event)
+      if (unsavedBadge) unsavedBadge.style.display = 'none';
+
+      // Set mode based on file extension
+      const mode = getModeByExtension(path);
+      _cm.setOption('mode', mode);
+
+      // Refresh to ensure proper sizing
+      setTimeout(() => _cm.refresh(), 50);
+
+      updateCodeMirrorStats();
+    }
+
+    // Highlight in tree
+    highlightTreeItem(path);
+    renderTabs();
+  }
+
+  async function saveSplitEditor() {
+    if (!_cm || !_editingPath) return;
+
+    const content = _cm.getValue();
+    try {
+      const res = await LP.post('/filemanager/write', { path: _editingPath, content });
+      if (res?.success) {
+        LP.toast('File saved successfully', 'success');
+        const badge = document.getElementById('fmEditorUnsaved');
+        if (badge) badge.style.display = 'none';
+        _tabContents[_editingPath] = content;
+      } else {
+        LP.toast('Failed to save: ' + res?.message, 'error');
+      }
+    } catch (err) {
+      LP.toast('Failed to save: ' + err.message, 'error');
+    }
+  }
+
+  function closeSplitView() {
+    document.getElementById('fmSplitView').style.display = 'none';
+    document.getElementById('fmFileArea').style.display = 'block';
+    _editingPath = null;
+    _openTabs = [];
+    _activeTab = null;
+    _tabContents = {};
+    // Reset CodeMirror
+    if (_cm) {
+      _cm.setValue('');
+      _cm.clearHistory();
+    }
+    refresh();
+  }
+
+  // Override openFileEditor to use split view
+  async function openFileEditor(path) {
+    await openSplitView(path);
+  }
+
+  // Backward compat alias — the old modal-based editor is removed,
+  // but this stays in the public API in case plugins reference it.
+  async function _saveFile(_path, _modalId, _keepOpen) {
+    if (_editingPath) {
+      await saveSplitEditor();
+    } else {
+      LP.toast('No file is currently open in the editor', 'error');
     }
   }
 
@@ -743,6 +1235,8 @@ const FMPage = (() => {
       await LP.init();
       if (!LP.state.accessToken) return;
       initDragDrop();
+      initCodeMirror();
+      initSplitDivider();
       navigate('/');
     },
 
@@ -776,6 +1270,18 @@ const FMPage = (() => {
     bulkDownload,
     bulkChmod,
     bulkDelete,
+
+    // Split view / editor
+    openSplitView,
+    switchTab,
+    closeTab,
+    openTreeFile,
+    goTreeUp,
+    refreshTree,
+    saveSplitEditor,
+    closeSplitView,
+    filterTree,
+    clearTreeFilter,
   };
 })();
 

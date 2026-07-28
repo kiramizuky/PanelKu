@@ -23,7 +23,7 @@
   </div>
 
   <!-- Bulk Actions Bar -->
-  <div id="fmBulkBar" style="display:none; background: rgba(59,130,246,0.1); border-bottom:1px solid rgba(59,130,246,0.2); padding:8px 20px; align-items:center; gap:12px;">
+  <div id="fmBulkBar" style="display:none; background: rgba(59,130,246,0.3); border-bottom:1px solid rgba(59,130,246,0.4); padding:8px 20px; align-items:center; gap:12px;">
     <span class="text-white font-mono" style="font-size:12px; font-weight:600;"><i class="bi bi-check2-all me-1"></i> <span id="bulkSelectedCount">0</span> selected</span>
     <div style="flex:1; display:flex; gap:8px; justify-content:flex-end;">
       <button class="btn-lp btn-lp-ghost btn-lp-sm text-white" onclick="FMPage.bulkCompress()"><i class="bi bi-file-zip-fill me-1"></i> Compress</button>
@@ -33,10 +33,86 @@
     </div>
   </div>
 
-  <!-- File Grid/List container -->
-  <div id="fmWrapper" class="lp-card-body" style="padding:10px; min-height:300px;">
-    <div id="fmGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:10px;">
-      <div style="grid-column:1/-1; padding:40px; text-align:center; color:var(--text-muted)">Loading...</div>
+  <!-- File area (grid view) -->
+  <div id="fmFileArea">
+    <div id="fmWrapper" class="lp-card-body" style="padding:10px; min-height:300px;">
+      <div id="fmGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:10px;">
+        <div style="grid-column:1/-1; padding:40px; text-align:center; color:var(--text-muted)">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Split View: File Tree + Editor ──────────────────────── -->
+<div id="fmSplitView" class="fm-split-container" style="display:none;">
+  <!-- Toolbar -->
+  <div class="fm-split-toolbar">
+    <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FM.closeSplitView()" title="Back to Grid View">
+      <i class="bi bi-arrow-left me-1"></i> Back
+    </button>
+    <div class="fm-split-tabs" id="fmSplitTabs"></div>
+  </div>
+  
+  <div class="fm-split-body">
+    <!-- Left: File Tree -->
+    <div class="fm-tree-panel" id="fmTreePanel">
+      <div class="fm-tree-header">
+        <i class="bi bi-diagram-2"></i>
+        <span id="fmTreeTitle" class="font-mono fw-semibold">Explorer</span>
+        <div class="ms-auto fm-tree-actions">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FM.refreshTree()" title="Refresh Tree" style="padding:2px 6px;">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FM.goTreeUp()" title="Go Up" style="padding:2px 6px;">
+            <i class="bi bi-arrow-up-short"></i>
+          </button>
+        </div>
+      </div>
+      <!-- Tree search filter -->
+      <div class="fm-tree-search" id="fmTreeSearch">
+        <i class="bi bi-search fm-tree-search-icon"></i>
+        <input type="text" class="lp-input" id="fmTreeFilterInput"
+          placeholder="Filter files..."
+          oninput="FM.filterTree(this.value)"
+          style="font-size:11px; padding:5px 8px 5px 28px; margin:0; border:none; background:rgba(0,0,0,0.35); border-radius:0; width:100%;">
+        <button class="fm-tree-search-clear" id="fmTreeFilterClear" onclick="FM.clearTreeFilter()" style="display:none;">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+      <div class="fm-tree-container" id="fmTreeContainer">
+        <div style="padding:20px; text-align:center; color:var(--text-muted);">
+          <div class="spinner-border spinner-border-sm me-2"></div>Loading...
+        </div>
+      </div>
+    </div>
+    
+    <!-- Divider (draggable resize handle) -->
+    <div class="fm-split-divider" id="fmSplitDivider">
+      <div class="fm-divider-grip"></div>
+    </div>
+    
+    <!-- Right: Editor -->
+    <div class="fm-editor-panel" id="fmEditorPanel">
+      <div class="fm-editor-header" id="fmEditorHeader">
+        <i class="bi bi-file-code-fill text-primary"></i>
+        <span id="fmEditorPath" class="font-mono">No file selected</span>
+        <span id="fmEditorUnsaved" class="fm-unsaved-badge" style="display:none;">● unsaved</span>
+      </div>
+      <div class="fm-editor-body">
+        <!-- CodeMirror replaces this textarea with its own editor widget -->
+        <textarea class="fm-editor-textarea" id="fmEditorTextarea" wrap="off" spellcheck="false"></textarea>
+      </div>
+      <div class="fm-editor-footer" id="fmEditorFooter">
+        <span class="fm-editor-stats" id="fmEditorStats"></span>
+        <div class="fm-editor-footer-right">
+          <small class="d-none d-sm-inline text-muted" style="font-size:11px;">
+            <kbd style="background:rgba(255,255,255,0.14); color:var(--text-secondary); font-size:10px; padding:2px 5px; border-radius:3px;">Ctrl+S</kbd> Save
+          </small>
+          <button class="btn-lp btn-lp-primary btn-lp-sm" id="fmEditorSaveBtn" onclick="FM.saveSplitEditor()">
+            <i class="bi bi-floppy me-1"></i> Save
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -54,31 +130,14 @@
 </div>
 
 <!-- Drop Overlay -->
-<div id="dropOverlay" style="display:none; position:fixed; inset:0; background:rgba(99,102,241,0.2); border:3px dashed var(--accent-primary); z-index:9000; align-items:center; justify-content:center; pointer-events:none;">
+<div id="dropOverlay" style="display:none; position:fixed; inset:0; background:rgba(99,102,241,0.35); border:3px dashed var(--accent-primary); z-index:9000; align-items:center; justify-content:center; pointer-events:none;">
   <div style="text-align:center; color:var(--accent-primary);">
     <i class="bi bi-cloud-upload" style="font-size:64px;"></i>
     <h3 style="margin-top:10px; color:#fff;">Drop files to upload</h3>
   </div>
 </div>
 
-<!-- Text Editor Modal -->
-<div class="modal fade" id="editModal" tabindex="-1">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable">
-    <div class="modal-content" style="background:var(--bg-primary); border:1px solid var(--glass-border);">
-      <div class="modal-header">
-        <h5 class="modal-title font-mono" style="font-size:13px;" id="editModalTitle">Edit File</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" style="padding:0;">
-        <textarea id="fileEditContent" style="width:100%; height:500px; background:#0d1117; color:#e6edf3; font-family:'JetBrains Mono',monospace; font-size:13px; border:none; padding:16px; resize:none; outline:none;"></textarea>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn-lp btn-lp-primary" onclick="FMPage.saveEdit()"><i class="bi bi-floppy"></i> Save</button>
-      </div>
-    </div>
-  </div>
-</div>
+
 
 <!-- File Upload Modal -->
 <div class="modal fade" id="uploadModal" tabindex="-1">
@@ -91,7 +150,7 @@
       <div class="modal-body" style="padding: 20px;">
         
         <!-- Drag & Drop Zone inside Modal -->
-        <div id="modalDragZone" style="border: 2px dashed rgba(255,255,255,0.15); border-radius: 10px; padding: 30px 20px; text-align: center; background: rgba(0,0,0,0.15); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-primary)'; this.style.background='rgba(59,130,246,0.05)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.15)'; this.style.background='rgba(0,0,0,0.15)';" onclick="document.getElementById('modalFileInput').click()">
+        <div id="modalDragZone" style="border: 2px dashed rgba(255,255,255,0.25); border-radius: 10px; padding: 30px 20px; text-align: center; background: rgba(0,0,0,0.3); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-primary)'; this.style.background='rgba(59,130,246,0.15)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.25)'; this.style.background='rgba(0,0,0,0.3)';" onclick="document.getElementById('modalFileInput').click()">
           <i class="bi bi-cloud-arrow-up-fill text-muted" style="font-size: 40px; display: block; margin-bottom: 12px; transition: color 0.2s;"></i>
           <span class="text-white" style="font-size: 13.5px; font-weight: 600; display: block;">Drag & Drop files here</span>
           <span style="font-size: 11.5px; color: var(--text-muted); display: block; margin-top: 4px;">or click to browse local files</span>
@@ -121,7 +180,7 @@
     position: relative;
   }
   .fm-item:hover { background:var(--glass-bg); }
-  .fm-item.selected { background:rgba(99,102,241,0.2); border-color:var(--accent-primary); }
+  .fm-item.selected { background:rgba(59,50,180,0.5); border-color:var(--accent-primary); }
   
   /* Checkbox styling */
   .fm-checkbox-wrapper {
@@ -159,6 +218,431 @@
   .fm-ctx-item { padding:8px 16px; cursor:pointer; font-size:13px; display:flex; align-items:center; gap:8px; color:var(--text-primary); }
   .fm-ctx-item:hover { background:var(--glass-bg); }
   .fm-ctx-item i { width:16px; }
+  
+  /* ── Split View Styles ───────────────────────────── */
+  .fm-split-container {
+    border-radius: 10px;
+    background: rgba(8,10,20,0.96);
+    border: 1px solid var(--glass-border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 500px;
+    max-height: calc(100vh - 180px);
+  }
+  
+  .fm-split-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: rgba(0,0,0,0.45);
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+  }
+  
+  .fm-split-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    overflow-x: auto;
+  }
+  
+  .fm-split-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.06);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .fm-split-tab:hover {
+    background: rgba(255,255,255,0.10);
+    color: var(--text-primary);
+  }
+  .fm-split-tab.active {
+    background: rgba(59,130,246,0.25);
+    border-color: rgba(59,130,246,0.4);
+    color: #e0e7ff;
+  }
+  .fm-split-tab-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    font-size: 10px;
+    margin-left: 2px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .fm-split-tab-close:hover {
+    background: rgba(239,68,68,0.2);
+    color: #ef4444;
+  }
+  
+  .fm-split-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  
+  .fm-tree-panel {
+    width: 260px;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    background: rgba(0,0,0,0.3);
+    border-right: 1px solid var(--glass-border);
+  }
+  
+  .fm-tree-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+  }
+  
+  .fm-tree-actions {
+    display: flex;
+    gap: 2px;
+  }
+  
+  .fm-tree-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+  }
+  .fm-tree-search-icon {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: var(--text-muted);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .fm-tree-search-clear {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 9px;
+    padding: 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s;
+    line-height: 1;
+  }
+  .fm-tree-search-clear:hover {
+    color: #ef4444;
+    background: rgba(239,68,68,0.1);
+  }
+  .fm-tree-search input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+  .fm-tree-search input:focus {
+    outline: none;
+    background: rgba(255,255,255,0.08) !important;
+  }
+  
+  /* Filtered state — dim non-matching items */
+  .fm-tree-filtering .fm-tree-item.fm-tree-hidden {
+    display: none;
+  }
+  .fm-tree-filtering .fm-tree-children {
+    display: block !important;
+  }
+  .fm-tree-filtering .fm-tree-children .fm-tree-item.fm-tree-hidden {
+    display: none;
+  }
+  .fm-tree-filtering .fm-tree-toggle {
+    visibility: hidden !important;
+  }
+  
+  .fm-tree-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 0;
+  }
+  
+  .fm-tree-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 14px;
+    font-size: 12.5px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.12s;
+    white-space: nowrap;
+    user-select: none;
+    border-left: 3px solid transparent;
+  }
+  .fm-tree-item:hover {
+    background: rgba(255,255,255,0.07);
+    color: var(--text-primary);
+  }
+  .fm-tree-item.fm-tree-active {
+    background: rgba(59,130,246,0.22);
+    color: #93c5fd;
+    border-left-color: var(--accent-primary);
+  }
+  .fm-tree-item.fm-tree-active:hover {
+    background: rgba(59,130,246,0.30);
+  }
+  .fm-tree-item.fm-tree-dir {
+    font-weight: 500;
+  }
+  
+  .fm-tree-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    font-size: 8px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: transform 0.15s;
+  }
+  .fm-tree-toggle.expanded {
+    transform: rotate(90deg);
+  }
+  
+  .fm-tree-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-right: 2px;
+  }
+  
+  .fm-tree-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .fm-tree-children {
+    display: none;
+  }
+  .fm-tree-children.open {
+    display: block;
+  }
+  
+  .fm-tree-loading {
+    padding: 8px 14px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  
+  .fm-tree-empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  
+  /* ── Editor Panel ─────────────────────────────────── */
+  .fm-editor-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: #070a13;
+  }
+  
+  .fm-editor-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.35);
+  }
+  
+  .fm-unsaved-badge {
+    font-size: 10px;
+    color: #fbbf24;
+    margin-left: auto;
+    animation: pulse-unsaved 1.5s ease-in-out infinite;
+  }
+  
+  @keyframes pulse-unsaved {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  
+  .fm-editor-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  .fm-editor-body .CodeMirror {
+    height: 100% !important;
+    font-size: 12.5px;
+    line-height: 1.6;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  .fm-editor-body .CodeMirror-gutters {
+    background: #080b18;
+    border-right: 1px solid rgba(255,255,255,0.08);
+  }
+  .fm-editor-body .CodeMirror-linenumber {
+    color: rgba(255,255,255,0.35);
+    padding: 0 12px 0 4px;
+    font-size: 11px;
+  }
+  .fm-editor-body .CodeMirror-cursor {
+    border-left: 2px solid #a5b4fc;
+  }
+  .fm-editor-body .CodeMirror-selected {
+    background: rgba(99,102,241,0.35) !important;
+  }
+  .fm-editor-body .CodeMirror-activeline-background {
+    background: rgba(255,255,255,0.05) !important;
+  }
+  .fm-editor-body .CodeMirror-matchingbracket {
+    color: inherit !important;
+    background: rgba(99,102,241,0.4);
+    border-bottom: 1px solid var(--accent-primary);
+  }
+  .fm-editor-body .CodeMirror-foldmarker {
+    color: var(--text-muted);
+    text-shadow: none;
+  }
+  
+  .fm-editor-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(0,0,0,0.35);
+    flex-shrink: 0;
+  }
+  
+  .fm-editor-stats {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  
+  .fm-editor-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .fm-split-divider {
+    width: 6px;
+    background: var(--glass-border);
+    flex-shrink: 0;
+    cursor: col-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: background 0.15s;
+    z-index: 10;
+  }
+  .fm-split-divider:hover {
+    background: rgba(99,102,241,0.3);
+  }
+  .fm-split-divider.dragging {
+    background: var(--accent-primary);
+  }
+  
+  .fm-divider-grip {
+    width: 2px;
+    height: 32px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.15);
+    transition: all 0.15s;
+    box-shadow: 0 0 6px rgba(99,102,241,0.2);
+  }
+  .fm-split-divider:hover .fm-divider-grip {
+    background: rgba(255,255,255,0.4);
+    height: 40px;
+  }
+  .fm-split-divider.dragging .fm-divider-grip {
+    background: #fff;
+    height: 48px;
+    box-shadow: 0 0 12px rgba(99,102,241,0.5);
+  }
+  
+  /* Body dragging state */
+  body.fm-resizing {
+    cursor: col-resize !important;
+    user-select: none !important;
+  }
+  
+  /* Responsive: stack tree on top on small screens */
+  @media (max-width: 768px) {
+    .fm-split-body {
+      flex-direction: column;
+    }
+    .fm-tree-panel {
+      width: 100% !important;
+      min-width: 100%;
+      max-height: 200px;
+      border-right: none;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    .fm-split-divider {
+      width: 100% !important;
+      height: 5px;
+      cursor: row-resize;
+    }
+  }
 </style>
 
+<!-- CodeMirror: Syntax Highlighting Editor -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/selection/active-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
+<!-- Language Modes -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/php/php.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/shell/shell.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/sql/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/yaml/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/markdown/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/clike/clike.min.js"></script>
 <script src="/js/filemanager.js"></script>

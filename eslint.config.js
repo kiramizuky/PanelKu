@@ -134,6 +134,7 @@ const browserGlobals = {
   Chart: 'readonly',
   Terminal: 'readonly',
   FitAddon: 'readonly',
+  CodeMirror: 'readonly',
   // Page-specific globals (defined in individual page JS files)
   ThemesPage: 'readonly',
   prompt: 'readonly',
