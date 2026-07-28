@@ -1048,7 +1048,7 @@ const FMPage = (() => {
 
     let dragCounter = 0;
 
-    editorPanel.addEventListener('dragenter', (e) => {
+    editorPanel.addEventListener('dragenter', (_e) => {
       if (!_cm || _previewTabs[_activeTab]) return; // only in text editor mode
       dragCounter++;
       editorPanel.classList.add('fm-drag-over');
@@ -1060,7 +1060,7 @@ const FMPage = (() => {
       e.dataTransfer.dropEffect = 'copy';
     });
 
-    editorPanel.addEventListener('dragleave', (e) => {
+    editorPanel.addEventListener('dragleave', (_e) => {
       if (!_cm || _previewTabs[_activeTab]) return;
       dragCounter--;
       if (dragCounter <= 0) {
