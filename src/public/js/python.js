@@ -211,7 +211,7 @@ const PythonPage = {
             <td style="font-family:monospace;font-size:12px;color:var(--text-muted);">${LP.escHtml(v.path)}</td>
             <td>${LP.escHtml(v.pythonVersion)}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="PythonPage.deleteVenv('${LP.encJsArg(v.name)}')" title="Delete"><i class="bi bi-trash3"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('PythonPage.deleteVenv', '${LP.encJsArg(v.name)}')" title="Delete"><i class="bi bi-trash3"></i></button>
             </td>
           </tr>
         `, 'No virtual environments.', 4);
@@ -271,7 +271,7 @@ const PythonPage = {
           <tr><td style="font-family:monospace;">${LP.escHtml(p.name)}</td>
           <td style="font-family:monospace;color:var(--text-muted);">${LP.escHtml(p.version)}</td>
           <td style="text-align:right;">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="PythonPage.uninstallPip('${LP.encJsArg(p.name)}')" title="Uninstall"><i class="bi bi-trash3"></i></button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('PythonPage.uninstallPip', '${LP.encJsArg(p.name)}')" title="Uninstall"><i class="bi bi-trash3"></i></button>
           </td></tr>
         `).join('');
       }
@@ -404,9 +404,9 @@ const PythonPage = {
             <td>${LP.escHtml(p.uptime)}</td>
             <td style="text-align:right;">
               <div class="d-flex gap-1 justify-content-end">
-                ${!statusOk ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="PythonPage.supervisorAction('${LP.encJsArg(p.name)}', 'start')" title="Start"><i class="bi bi-play-fill"></i></button>` : ''}
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="PythonPage.supervisorAction('${LP.encJsArg(p.name)}', 'restart')" title="Restart"><i class="bi bi-arrow-clockwise"></i></button>
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="PythonPage.supervisorAction('${LP.encJsArg(p.name)}', 'stop')" title="Stop"><i class="bi bi-stop-fill"></i></button>
+                ${!statusOk ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="LP.call('PythonPage.supervisorAction', '${LP.encJsArg(p.name)}', 'start')" title="Start"><i class="bi bi-play-fill"></i></button>` : ''}
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="LP.call('PythonPage.supervisorAction', '${LP.encJsArg(p.name)}', 'restart')" title="Restart"><i class="bi bi-arrow-clockwise"></i></button>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('PythonPage.supervisorAction', '${LP.encJsArg(p.name)}', 'stop')" title="Stop"><i class="bi bi-stop-fill"></i></button>
               </div>
             </td>
           </tr>`;
@@ -461,4 +461,5 @@ const PythonPage = {
   },
 };
 
+window.PythonPage = PythonPage;
 document.addEventListener('DOMContentLoaded', () => PythonPage.init());

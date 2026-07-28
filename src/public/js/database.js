@@ -283,7 +283,7 @@ const DB = (() => {
     }
 
     const columns = Object.keys(rows[0]);
-    head.innerHTML = `<tr>${columns.map(c => `<th class="sortable${currentSort.column === c ? ' ' + currentSort.dir.toLowerCase() : ''}" onclick="DB.sortColumn('${LP.encJsArg(c)}')">${LP.escHtml(c)}</th>`).join('')}</tr>`;
+    head.innerHTML = `<tr>${columns.map(c => `<th class="sortable${currentSort.column === c ? ' ' + currentSort.dir.toLowerCase() : ''}" onclick="LP.call('DB.sortColumn', '${LP.encJsArg(c)}')">${LP.escHtml(c)}</th>`).join('')}</tr>`;
 
     body.innerHTML = rows.map(row => `
       <tr>${columns.map(col => `<td>${formatCellValue(row[col])}</td>`).join('')}</tr>

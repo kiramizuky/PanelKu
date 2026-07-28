@@ -169,7 +169,7 @@ const NodeJSPage = {
             <span style="font-family:monospace;font-size:14px;color:var(--text-primary);">v${LP.escHtml(v.version)}</span>
             ${v.lts ? `<span class="lp-badge lp-badge-info" style="font-size:9px;margin-left:8px;">${LP.escHtml(v.lts)}</span>` : ''}
           </div>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="NodeJSPage.installSpecificVersion('${LP.encJsArg(v.version)}')" title="Install v${LP.escHtml(v.version)}">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="LP.call('NodeJSPage.installSpecificVersion', '${LP.encJsArg(v.version)}')" title="Install v${LP.escHtml(v.version)}">
             <i class="bi bi-download"></i> Install
           </button>
         </div>
@@ -294,7 +294,7 @@ const NodeJSPage = {
             <td style="font-family:monospace;">${LP.escHtml(p.name)}</td>
             <td style="font-family:monospace;color:var(--text-muted);">${LP.escHtml(p.version)}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="NodeJSPage.uninstallGlobalPackage('${LP.encJsArg(p.name)}')" title="Uninstall">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('NodeJSPage.uninstallGlobalPackage', '${LP.encJsArg(p.name)}')" title="Uninstall">
                 <i class="bi bi-trash3"></i>
               </button>
             </td>
@@ -394,10 +394,10 @@ const NodeJSPage = {
               <td style="color:var(--text-muted);font-size:12px;">${LP.escHtml(p.uptime)}</td>
               <td style="text-align:right;">
                 <div class="d-flex gap-1 justify-content-end">
-                  <button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="NodeJSPage.pm2Action('${LP.encJsArg(p.name)}', 'restart')" title="Restart"><i class="bi bi-arrow-clockwise"></i></button>
-                  <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="NodeJSPage.pm2Action('${LP.encJsArg(p.name)}', 'stop')" title="Stop"><i class="bi bi-stop-fill"></i></button>
-                  <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="NodeJSPage.pm2Action('${LP.encJsArg(p.name)}', 'delete')" title="Delete"><i class="bi bi-trash3"></i></button>
-                  <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="NodeJSPage.showPm2Logs('${LP.encJsArg(p.name)}')" title="Logs"><i class="bi bi-terminal"></i></button>
+                  <button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="LP.call('NodeJSPage.pm2Action', '${LP.encJsArg(p.name)}', 'restart')" title="Restart"><i class="bi bi-arrow-clockwise"></i></button>
+                  <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="LP.call('NodeJSPage.pm2Action', '${LP.encJsArg(p.name)}', 'stop')" title="Stop"><i class="bi bi-stop-fill"></i></button>
+                  <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('NodeJSPage.pm2Action', '${LP.encJsArg(p.name)}', 'delete')" title="Delete"><i class="bi bi-trash3"></i></button>
+                  <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('NodeJSPage.showPm2Logs', '${LP.encJsArg(p.name)}')" title="Logs"><i class="bi bi-terminal"></i></button>
                 </div>
               </td>
             </tr>
@@ -534,4 +534,5 @@ const NodeJSPage = {
   },
 };
 
+window.NodeJSPage = NodeJSPage;
 document.addEventListener('DOMContentLoaded', () => NodeJSPage.init());

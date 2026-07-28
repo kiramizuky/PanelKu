@@ -182,10 +182,10 @@ const BackupPage = {
                 <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="BackupPage.runJob('${j.id}')" title="Run Now">
                   <i class="bi bi-play-fill"></i>
                 </button>
-                <button class="btn-lp btn-lp-ghost btn-lp-sm ${j.lastOutput ? 'text-info' : 'text-muted'}" onclick="BackupPage.showJobLog('${LP.encJsArg(j.name)}', '${LP.encJsArg(j.lastOutput || 'No output')}')" title="View Log">
+                <button class="btn-lp btn-lp-ghost btn-lp-sm ${j.lastOutput ? 'text-info' : 'text-muted'}" onclick="LP.call('BackupPage.showJobLog', '${LP.encJsArg(j.name)}', '${LP.encJsArg(j.lastOutput || 'No output')}')" title="View Log">
                   <i class="bi bi-journal-text"></i>
                 </button>
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="BackupPage.deleteJob('${j.id}', '${LP.encJsArg(j.name)}')" title="Delete">
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('BackupPage.deleteJob', '${LP.encJsArg(j.id)}', '${LP.encJsArg(j.name)}')" title="Delete">
                   <i class="bi bi-trash"></i>
                 </button>
               </div>
@@ -431,10 +431,10 @@ const BackupPage = {
           <td>${LP.formatBytes(b.size)}</td>
           <td>${new Date(b.created).toLocaleString()}</td>
           <td style="text-align:right">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="BackupPage.showRestoreModal('${LP.encJsArg(b.name)}')" title="Restore">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="LP.call('BackupPage.showRestoreModal', '${LP.encJsArg(b.name)}')" title="Restore">
               <i class="bi bi-clock-history"></i>
             </button>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="BackupPage.deleteLocalBackup('${LP.encJsArg(b.name)}')" title="Delete">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('BackupPage.deleteLocalBackup', '${LP.encJsArg(b.name)}')" title="Delete">
               <i class="bi bi-trash"></i>
             </button>
           </td>
@@ -540,10 +540,10 @@ const BackupPage = {
           <div class="d-flex justify-content-between align-items-center py-2" style="border-bottom:1px solid rgba(255,255,255,0.04);">
             <span><i class="bi bi-cloud text-warning me-2"></i> <strong>${LP.escHtml(r)}</strong></span>
             <div style="display:flex;gap:4px;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="BackupPage.testRemote('${LP.encJsArg(r)}')" title="Test Connection" style="padding:2px 6px;font-size:10px;">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('BackupPage.testRemote', '${LP.encJsArg(r)}')" title="Test Connection" style="padding:2px 6px;font-size:10px;">
                 <i class="bi bi-lightning-fill"></i>
               </button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="BackupPage.browseRemote('${LP.encJsArg(r)}')" style="padding:2px 6px;font-size:10px;" title="Browse">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('BackupPage.browseRemote', '${LP.encJsArg(r)}')" style="padding:2px 6px;font-size:10px;" title="Browse">
                 <i class="bi bi-folder2-open"></i>
               </button>
             </div>
@@ -738,7 +738,7 @@ const BackupPage = {
             </span>
             <div style="display:flex;gap:4px;flex-shrink:0;">
               <span style="color:var(--text-muted);">${LP.formatBytes(f.size)}</span>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm p-0" style="font-size:9px;" onclick="BackupPage.downloadFromS3('${LP.encJsArg(f.key)}')" title="Download to local">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm p-0" style="font-size:9px;" onclick="LP.call('BackupPage.downloadFromS3', '${LP.encJsArg(f.key)}')" title="Download to local">
                 <i class="bi bi-download"></i>
               </button>
             </div>
@@ -799,7 +799,7 @@ const BackupPage = {
                 <span class="font-mono"><i class="bi bi-file-earmark me-1"></i>${LP.escHtml(f.name)}</span>
                 <div>
                   <span style="color:var(--text-muted);margin-right:6px;">${LP.formatBytes(f.size)}</span>
-                  <button class="btn-lp btn-lp-ghost btn-lp-sm p-0 text-info" style="font-size:9px;" onclick="BackupPage.restoreFromRemote('${LP.encJsArg(remote)}', '${LP.encJsArg(fullPath)}')" title="Restore this file">
+                  <button class="btn-lp btn-lp-ghost btn-lp-sm p-0 text-info" style="font-size:9px;" onclick="LP.call('BackupPage.restoreFromRemote', '${LP.encJsArg(remote)}', '${LP.encJsArg(fullPath)}')" title="Restore this file">
                     <i class="bi bi-cloud-download"></i>
                   </button>
                 </div>

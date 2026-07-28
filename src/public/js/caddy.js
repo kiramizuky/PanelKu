@@ -164,8 +164,8 @@ const CaddyPage = {
           <td style="font-size:12px;color:var(--text-secondary);font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${LP.escHtml(target)}">${LP.escHtml(target)}</td>
           <td><span class="lp-badge lp-badge-success"><i class="bi bi-lock-fill me-1"></i>${httpsLabel}</span></td>
           <td style="text-align:right;white-space:nowrap;">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="CaddyPage.viewSiteConfig('${LP.encJsArg(s.name)}')" title="View Config"><i class="bi bi-file-earmark-text"></i></button>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="CaddyPage.deleteSite('${LP.encJsArg(s.name)}')" title="Delete"><i class="bi bi-trash"></i></button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('CaddyPage.viewSiteConfig', '${LP.encJsArg(s.name)}')" title="View Config"><i class="bi bi-file-earmark-text"></i></button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('CaddyPage.deleteSite', '${LP.encJsArg(s.name)}')" title="Delete"><i class="bi bi-trash"></i></button>
           </td>
         </tr>`;
       }).join('');
@@ -405,6 +405,7 @@ const CaddyPage = {
   },
 };
 
+window.CaddyPage = CaddyPage;
 document.addEventListener('DOMContentLoaded', () => {
   CaddyPage.init();
 });

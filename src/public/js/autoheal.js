@@ -85,7 +85,7 @@ const AutoHealPage = {
                 <div style="font-size:12px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${LP.escHtml(s.name)}</div>
                 <div style="font-size:10px;color:var(--text-muted);">${LP.escHtml(s.message || s.status)}</div>
               </div>
-              ${isCritical ? `<button class="btn-lp btn-lp-ghost btn-lp-sm p-0 ms-auto" style="font-size:10px;color:#ef4444;flex-shrink:0;" onclick="AutoHealPage.healService('${LP.encJsArg(s.serviceName || s.name)}')" title="Restart Service"><i class="bi bi-arrow-clockwise"></i></button>` : ''}
+              ${isCritical ? `<button class="btn-lp btn-lp-ghost btn-lp-sm p-0 ms-auto" style="font-size:10px;color:#ef4444;flex-shrink:0;" onclick="LP.call('AutoHealPage.healService', '${LP.encJsArg(s.serviceName || s.name)}')" title="Restart Service"><i class="bi bi-arrow-clockwise"></i></button>` : ''}
             </div>
           </div>
         `;
@@ -183,10 +183,10 @@ const AutoHealPage = {
             </div>
           </div>
           <div style="display:flex;gap:5px;">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="AutoHealPage.healService('${LP.encJsArg(svc.name)}')" title="Restart ${LP.escHtml(svc.name)}" style="font-size:11px;">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('AutoHealPage.healService', '${LP.encJsArg(svc.name)}')" title="Restart ${LP.escHtml(svc.name)}" style="font-size:11px;">
               <i class="bi bi-arrow-clockwise"></i> Restart
             </button>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="AutoHealPage.checkService('${LP.encJsArg(svc.name)}')" title="Check ${LP.escHtml(svc.name)} status" style="font-size:11px;">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('AutoHealPage.checkService', '${LP.encJsArg(svc.name)}')" title="Check ${LP.escHtml(svc.name)} status" style="font-size:11px;">
               <i class="bi bi-search"></i>
             </button>
           </div>
@@ -303,4 +303,5 @@ const AutoHealPage = {
   },
 };
 
+window.AutoHealPage = AutoHealPage;
 document.addEventListener('DOMContentLoaded', () => AutoHealPage.init());

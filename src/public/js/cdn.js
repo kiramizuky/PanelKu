@@ -23,7 +23,7 @@ const CDN = (() => {
               <span class="text-muted" style="font-size:11px;margin-left:10px;">${LP.escHtml(z.status)} | ${LP.escHtml(z.plan || 'Free')}</span>
             </div>
             <div style="display:flex;gap:6px;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="CDN.purgeZone('${z.id}','${LP.encJsArg(z.name)}')"><i class="bi bi-trash"></i> Purge</button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('CDN.purgeZone', '${LP.encJsArg(z.id)}', '${LP.encJsArg(z.name)}')"><i class="bi bi-trash"></i> Purge</button>
             </div>
           </div>
         `).join('');

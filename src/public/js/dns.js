@@ -151,8 +151,8 @@ const DNSPage = {
         <td style="font-family:monospace;font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${LP.escHtml(r.content)}">${LP.escHtml(r.content)}</td>
         <td style="font-size:12px;color:var(--text-muted);font-family:monospace;">${r.ttl === 1 ? 'Auto' : r.ttl + 's'}</td>
         <td style="text-align:right;white-space:nowrap;">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="DNSPage.editRecord('${LP.encJsArg(r.id)}')" title="Edit"><i class="bi bi-pencil"></i></button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DNSPage.deleteRecord('${LP.encJsArg(r.id)}')" title="Delete"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('DNSPage.editRecord', '${LP.encJsArg(r.id)}')" title="Edit"><i class="bi bi-pencil"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DNSPage.deleteRecord', '${LP.encJsArg(r.id)}')" title="Delete"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No records found', 10);
@@ -171,8 +171,8 @@ const DNSPage = {
         <td style="font-family:monospace;font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;">${LP.escHtml(r.content)}</td>
         <td style="font-size:12px;color:var(--text-muted);font-family:monospace;">${r.ttl === 1 ? 'Auto' : r.ttl + 's'}</td>
         <td style="text-align:right;white-space:nowrap;">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="DNSPage.editRecord('${LP.encJsArg(r.id)}')"><i class="bi bi-pencil"></i></button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DNSPage.deleteRecord('${LP.encJsArg(r.id)}')"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('DNSPage.editRecord', '${LP.encJsArg(r.id)}')"><i class="bi bi-pencil"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DNSPage.deleteRecord', '${LP.encJsArg(r.id)}')"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No matching records', 10);
@@ -472,4 +472,5 @@ const DNSPage = {
   },
 };
 
+window.DNSPage = DNSPage;
 document.addEventListener('DOMContentLoaded', () => DNSPage.init());
