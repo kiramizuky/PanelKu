@@ -21,6 +21,7 @@ import { readFileSync, readdirSync } from 'fs';
 import { resolve, dirname, extname, join } from 'path';
 import { fileURLToPath } from 'url';
 import request from 'supertest';
+import bcrypt from 'bcryptjs';
 import createApp from '../src/app.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -285,6 +286,171 @@ describe('CSP Static Analysis — View CDN URLs vs Whitelist', () => {
 
       const whitelisted = isWhitelisted(domain, directive);
       expect(whitelisted).toBe(true);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+// SUITE 3: CSP Header — Authenticated Pages
+// ═══════════════════════════════════════════════════════════
+
+describe('CSP Header — Authenticated Pages', () => {
+
+  /** Parse a CSP header string into a {directive: [values]} map */
+  function parseCsp(header) {
+    const map = {};
+    header.split(';').forEach(pair => {
+      const parts = pair.trim().split(/\s+/);
+      if (parts.length < 2) return;
+      const directive = parts[0];
+      const values = parts.slice(1);
+      map[directive] = values;
+    });
+    return map;
+  }
+
+  let authToken;
+
+  // ── Database setup + login ──
+  // We use a temp directory + seeded user (same pattern as mustChangePassword test)
+  beforeAll(async () => {
+    // Set up temp directory for test DB
+    const { mkdirSync } = await import('fs');
+    const { resolve } = await import('path');
+    const { tmpdir } = await import('os');
+    const { randomUUID } = await import('crypto');
+
+    const TEST_DIR = resolve(tmpdir(), `panelku-csp-auth-${randomUUID()}`);
+    const STORAGE_DIR = resolve(TEST_DIR, 'storage');
+    mkdirSync(STORAGE_DIR, { recursive: true });
+    const originalCwd = process.cwd();
+    process.chdir(TEST_DIR);
+
+    // Seed DB with a normal user
+    const { getDb, now, toJson } = await import('../src/core/db/sqlite.js');
+    const db = getDb();
+    db.exec('DELETE FROM audit_logs');
+    db.exec('DELETE FROM sessions');
+    db.exec('DELETE FROM users');
+    db.exec('DELETE FROM roles');
+
+    const roleId = 'role-super_admin';
+    db.prepare(`
+      INSERT INTO roles (id, name, slug, description, permissions, is_system, is_active, color, created_at, updated_at)
+      VALUES (?, 'Super Admin', 'super_admin', 'Full access', ?, 1, 1, '#dc3545', ?, ?)
+    `).run(roleId, toJson([{ resource: '*', actions: ['read', 'create', 'update', 'delete', 'execute'] }]), now(), now());
+
+    const ts = now();
+    const hash = bcrypt.hashSync('CspAuthPass1!', 10);
+    db.prepare(`
+      INSERT INTO users (id, username, email, password, role_id, first_name, last_name,
+        is_active, is_super_admin, must_change_password, created_at, updated_at)
+      VALUES (?, 'csptestuser', 'csptest@test.local', ?, ?, 'CSP', 'Tester', 1, 1, 0, ?, ?)
+    `).run('user-csp', hash, roleId, ts, ts);
+
+    // Create app after DB is seeded
+    app = createApp();
+
+    // Login to get auth token
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'csptestuser', password: 'CspAuthPass1!' })
+      .set('Accept', 'application/json');
+
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.success).toBe(true);
+    expect(loginRes.body.data.accessToken).toBeTruthy();
+    authToken = loginRes.body.data.accessToken;
+
+    // Store cleanup for afterAll
+    if (!global.__cspCleanup) {
+      global.__cspCleanup = [];
+    }
+    global.__cspCleanup.push({ dir: TEST_DIR, cwd: originalCwd });
+  });
+
+  afterAll(async () => {
+    // Cleanup temp directories
+    if (global.__cspCleanup) {
+      const { rmSync } = await import('fs');
+      for (const { dir, cwd } of global.__cspCleanup) {
+        process.chdir(cwd);
+        try { rmSync(dir, { recursive: true, force: true }); } catch { }
+      }
+      delete global.__cspCleanup;
+    }
+  });
+
+  // ── Authenticated pages to test ──
+  const AUTH_PAGES = [
+    ['/dashboard', 'Dashboard'],
+    ['/filemanager', 'File Manager'],
+    ['/monitor', 'Monitoring'],
+    ['/terminal', 'Terminal'],
+    ['/settings/profile', 'Profile'],
+    ['/settings/users', 'Users'],
+    ['/settings/audit', 'Audit Log'],
+    ['/api-docs', 'API Docs'],
+  ];
+
+  test.each(AUTH_PAGES)('CSP on %s (%s) matches login page structure', async (page, name) => {
+    const res = await request(app)
+      .get(page)
+      .set('Authorization', `Bearer ${authToken}`)
+      .set('Accept', 'text/html');
+
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(400);
+
+    expect(res.headers['content-security-policy']).toBeDefined();
+    const csp = parseCsp(res.headers['content-security-policy']);
+
+    assertCspStructure(csp, name);
+  });
+
+  // ── Nonce uniqueness test ──
+  test('Each authenticated request gets a unique nonce', async () => {
+    const res1 = await request(app)
+      .get('/dashboard')
+      .set('Authorization', `Bearer ${authToken}`);
+
+    const res2 = await request(app)
+      .get('/dashboard')
+      .set('Authorization', `Bearer ${authToken}`);
+
+    const csp1 = parseCsp(res1.headers['content-security-policy']);
+    const csp2 = parseCsp(res2.headers['content-security-policy']);
+
+    const nonce1 = csp1['script-src'].find(v => v.startsWith("'nonce-"));
+    const nonce2 = csp2['script-src'].find(v => v.startsWith("'nonce-"));
+
+    expect(nonce1).toBeDefined();
+    expect(nonce2).toBeDefined();
+    expect(nonce1).not.toEqual(nonce2);
+  });
+
+  // ── Unauthenticated request to protected page ──
+  test('Protected page without token still has CSP header (even on redirect/401)', async () => {
+    const res = await request(app)
+      .get('/dashboard');
+
+    // Should be 401 unauthorized
+    expect([401, 302]).toContain(res.status);
+    // CSP header should STILL be present
+    expect(res.headers['content-security-policy']).toBeDefined();
+  });
+
+  // ── CSP on settings pages (different layouts) ──
+  test('Settings pages have consistent CSP structure', async () => {
+    const settingsPages = ['/settings/profile', '/settings/users', '/settings/roles', '/settings/audit', '/settings/themes'];
+    for (const page of settingsPages) {
+      const res = await request(app)
+        .get(page)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.headers['content-security-policy']).toBeDefined();
+      const csp = parseCsp(res.headers['content-security-policy']);
+      assertCspStructure(csp, `settings: ${page}`);
     }
   });
 });
