@@ -13,7 +13,7 @@ const FMPage = (() => {
   let _openTabs = [];
   let _activeTab = null;
   let _tabContents = {};
-  let _previewTabs = {}; // { path: 'image' | 'pdf' }
+  let _previewTabs = {}; // { path: 'image' | 'audio' | 'video' | 'pdf' }
   let _previewZoom = { level: 100, mode: 'fit' }; // zoom state: 'fit' | 'width' | 'custom'
   let _zoomWheelInited = false;
   const ZOOM_LEVELS = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
@@ -299,13 +299,25 @@ const FMPage = (() => {
         return;
       }
 
-      // 2. PDF preview — open in split view
+      // 2. Audio preview — open in split view
+      if (['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'].includes(ext)) {
+        await openSplitView(item.path, 'audio');
+        return;
+      }
+
+      // 3. Video preview — open in split view
+      if (['mp4', 'avi', 'mkv', 'mov', 'webm', 'wmv', 'flv'].includes(ext)) {
+        await openSplitView(item.path, 'video');
+        return;
+      }
+
+      // 4. PDF preview — open in split view
       if (ext === 'pdf') {
         await openSplitView(item.path, 'pdf');
         return;
       }
 
-      // 3. Binary file blocker (zip, tar, exe, db, mp4, etc.)
+      // 5. Binary file blocker (zip, tar, exe, db, etc.)
       const isText = ['txt', 'md', 'js', 'ts', 'json', 'html', 'css', 'py', 'php', 'sh', 'bash', 'zsh', 'env', 'yml', 'yaml', 'xml', 'log', 'htaccess', 'conf', 'ini'].includes(ext);
       if (!isText && ext) {
         await LP.alert(`File <strong>${escHtml(item.name)}</strong> merupakan file biner (.${ext}) dan tidak dapat dibuka langsung menggunakan Text Editor. Silakan download file untuk membukanya.`, 'Buka File Gagal');
@@ -370,13 +382,22 @@ const FMPage = (() => {
     renderTabs();
   }
 
+  function getTabIcon(path) {
+    const previewType = _previewTabs[path];
+    if (previewType === 'image') return 'bi bi-file-image-fill';
+    if (previewType === 'audio') return 'bi bi-file-music-fill';
+    if (previewType === 'video') return 'bi bi-file-play-fill';
+    if (previewType === 'pdf') return 'bi bi-file-pdf-fill';
+    return 'bi bi-file-code-fill';
+  }
+
   function renderTabs() {
     const container = document.getElementById('fmSplitTabs');
     if (!container) return;
     container.innerHTML = _openTabs.map(t => `
       <div class="fm-split-tab${t.path === _activeTab ? ' active' : ''}"
            onclick="FM.switchTab('${LP.encJsArg(t.path)}')">
-        <i class="bi bi-file-code-fill" style="font-size:11px;"></i>
+        <i class="${getTabIcon(t.path)}" style="font-size:11px;"></i>
         ${escHtml(t.name)}
         <span class="fm-split-tab-close" onclick="event.stopPropagation(); FM.closeTab('${LP.encJsArg(t.path)}')">
           <i class="bi bi-x"></i>
@@ -573,6 +594,28 @@ const FMPage = (() => {
             initZoomWheel();
           };
         }
+      } else      if (type === 'audio') {
+        const fileName = path.split('/').pop() || path;
+        const audioType = _getMediaMime(path, 'audio');
+        container.innerHTML = `<div class="fm-media-player fm-audio-player">
+          <div class="fm-media-info">
+            <i class="bi bi-file-music-fill fm-media-icon"></i>
+            <span class="fm-media-name">${escHtml(fileName)}</span>
+            <span class="fm-media-path">${escHtml(path)}</span>
+          </div>
+          <audio controls autoplay>
+            <source src="${url}" type="${audioType}">
+            Your browser does not support the audio element.
+          </audio>
+        </div>`;
+      } else if (type === 'video') {
+        const videoType = _getMediaMime(path, 'video');
+        container.innerHTML = `<div class="fm-media-player fm-video-player">
+          <video controls autoplay>
+            <source src="${url}" type="${videoType}">
+            Your browser does not support the video element.
+          </video>
+        </div>`;
       } else if (type === 'pdf') {
         container.innerHTML = `<iframe src="${url}#toolbar=1" sandbox="allow-scripts allow-same-origin"></iframe>`;
       }
@@ -1475,6 +1518,27 @@ const FMPage = (() => {
       if (overlay) overlay.classList.remove('visible');
       if (e.dataTransfer.files.length) upload(e.dataTransfer.files);
     });
+  }
+
+  // ── Media MIME Type Helper ───────────────────────
+  function _getMediaMime(path, type) {
+    const ext = path.split('.').pop()?.toLowerCase();
+    if (type === 'audio') {
+      const map = {
+        mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg',
+        aac: 'audio/aac', flac: 'audio/flac', m4a: 'audio/mp4',
+      };
+      return map[ext] || 'audio/mpeg';
+    }
+    if (type === 'video') {
+      const map = {
+        mp4: 'video/mp4', avi: 'video/x-msvideo', mkv: 'video/x-matroska',
+        mov: 'video/quicktime', webm: 'video/webm', wmv: 'video/x-ms-wmv',
+        flv: 'video/x-flv',
+      };
+      return map[ext] || 'video/mp4';
+    }
+    return '';
   }
 
   // ── Download Token Cache ─────────────────────────
