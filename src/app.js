@@ -12,6 +12,7 @@ import { apiLimiter } from './middleware/rateLimiter.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { wafMiddleware } from './middleware/waf.middleware.js';
+import { nonceMiddleware, nonceInjector } from './middleware/nonce.js';
 
 import expressEjsLayouts from 'express-ejs-layouts';
 import pluginLoader from './core/plugin-loader/PluginLoader.js';
@@ -34,6 +35,9 @@ const createApp = () => {
   app.set('layout extractScripts', true);
   app.set('layout extractStyles', true);
 
+  // [CSP HARDEN] Generate nonce BEFORE helmet so it's ready for CSP header
+  app.use(nonceMiddleware);
+
   // Security
   app.use(helmet({
     crossOriginOpenerPolicy: false,
@@ -42,23 +46,36 @@ const createApp = () => {
       useDefaults: true,
       directives: {
         defaultSrc: ["'self'"],
-        // [HARDEN] Removed 'unsafe-eval' — no eval/new Function used in codebase
-        scriptSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'cdn.socket.io', 'static.cloudflareinsights.com'],
-        // script-src-attr must include 'unsafe-inline' because LP.call() pattern
-        // renders inline onclick="LP.call(...)" attributes via innerHTML.
-        // helmet's default is 'none', which would block all inline event handlers,
-        // so we must explicitly set it here despite the CSP weakness.
+        // [CSP HARDEN] 'unsafe-inline' removed — replaced with per-request nonce.
+        // The nonceMiddleware runs before helmet, so res.locals.nonce is available.
+        // All inline <script> blocks are auto-injected with the nonce via nonceInjector.
+        scriptSrc: [
+          "'self'",
+          (req, res) => `'nonce-${res.locals.nonce}'`,
+          'cdn.jsdelivr.net',
+          'cdnjs.cloudflare.com',
+          'cdn.socket.io',
+          'static.cloudflareinsights.com',
+        ],
+        // script-src-attr must remain 'unsafe-inline' because:
+        // 1) LP.call() pattern renders inline onclick handlers via innerHTML
+        // 2) 126+ inline event handlers across views (onclick, onchange, etc.)
+        // 3) CSP nonces do NOT work for HTML attribute event handlers
         scriptSrcAttr: ["'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'fonts.googleapis.com'],
-        fontSrc: ["'self'", 'fonts.gstatic.com', 'cdn.jsdelivr.net'],
+        // [CSP HARDEN] 'unsafe-inline' removed — nonce-based now.
+        // All inline <style> blocks auto-injected with nonce.
+        styleSrc: [
+          "'self'",
+          (req, res) => `'nonce-${res.locals.nonce}'`,
+          'cdn.jsdelivr.net',
+        ],
+        fontSrc: ["'self'", 'cdn.jsdelivr.net'],
         imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'", 'ws:', 'wss:', 'cdn.jsdelivr.net', 'cdn.socket.io', 'static.cloudflareinsights.com'],
         // [HARDEN] Restrict form submissions to same origin
         formAction: ["'self'"],
         // [HARDEN] Restrict base URI to prevent base tag injection
         baseUri: ["'self'"],
-        // Allow same-origin framing (needed for API docs iframe)
-        // Cross-origin framing (clickjacking) is still prevented
         frameAncestors: ["'self'"],
         upgradeInsecureRequests: null,
       },
@@ -175,6 +192,9 @@ const createApp = () => {
   app.use((req, res, next) => pluginLoader.handleProxy(req, res, next));
   app.use(pluginLoader.router);
   app.use('/api', pluginLoader.router);
+
+  // [CSP HARDEN] Auto-inject nonces into inline <script>/<style> after rendering
+  app.use(nonceInjector);
 
   // Error handlers (must be last)
   app.use(notFoundHandler);
