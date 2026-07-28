@@ -12,16 +12,17 @@ export const apiLimiter = rateLimit({
   message: { success: false, message: 'Too many requests, please slow down.' },
   skip: (req) => {
     // 1. Exempt all authenticated requests (logged in panel users should never be rate limited)
-    if (req.user || req.cookies?.token || req.cookies?.refresh_token || req.headers?.authorization) return true;
+    // [MED-3 FIX] Only check Authorization header — cookies are not checked to prevent
+    // CSRF-based bypass of rate limiting via cookie injection.
+    if (req.user || req.headers?.authorization) return true;
 
-    // 2. Skip loopback & private LAN networks (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+    // 2. [LOW-3 FIX] Only skip loopback addresses — DO NOT skip private LAN networks
+    // because an attacker on the same LAN (e.g., compromised IoT device) could bypass
+    // rate limiting entirely by using a local IP. Also DO NOT skip all /api/* endpoints
+    // — unauthenticated API endpoints (login, SSO) need rate limiting.
+    // Exempt only local server requests (127.0.0.1, ::1).
     const ip = req.ip || req.socket?.remoteAddress || '';
     if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return true;
-    if (/^(::ffff:)?(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(ip)) return true;
-
-    // 3. Exempt internal API endpoints
-    const url = (req.originalUrl || req.url || '').split('?')[0];
-    if (url.startsWith('/api/')) return true;
 
     return false;
   },
@@ -33,7 +34,14 @@ export const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts. Try again in 15 minutes.' },
-  keyGenerator: (req) => req.body?.username || req.ip,
+  // [LOW-3 FIX] Key by IP first (prevent IP spoofing), append username for per-user tracking.
+  // Using IP as primary key prevents an attacker from consuming another user's rate limit
+  // by guessing usernames across many requests. The username suffix enables forensics.
+  keyGenerator: (req) => {
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    const username = req.body?.username || '';
+    return `${ip}:${username}`;
+  },
 });
 
 /**
@@ -69,4 +77,43 @@ export const downloadTokenLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => req.user?.id || req.ip,
   message: { success: false, message: 'Too many download token requests. Please slow down.' },
+});
+
+/**
+ * [MED-4 FIX] 2FA verification rate limiter — prevent OTP brute-force.
+ * Keyed by tempToken (unique per login attempt) and IP address.
+ * 5 attempts per 15 minutes should be plenty for legitimate users.
+ */
+export const twoFactorLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    // Key by tempToken (unique per login attempt) + IP
+    const token = req.body?.tempToken || '';
+    return `${token}:${req.ip}`;
+  },
+  message: { success: false, message: 'Too many 2FA attempts. Please try again in 15 minutes.' },
+  skipFailedRequests: false,
+});
+
+/**
+ * [HIGH-2 FIX] Webhook rate limiter — prevent brute-force and DDoS against public webhook endpoints.
+ * Keyed by webhook ID (from URL params) + IP address.
+ * 10 requests per minute allows CI/CD platforms to trigger multiple pushes during a deploy.
+ * StandardHeaders enabled so CI platforms can read Retry-After headers.
+ */
+export const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 min
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    // Key by webhook secret (unique per webhook) + IP
+    const secret = req.params?.secret || 'unknown';
+    return `wh:${secret}:${req.ip}`;
+  },
+  message: { success: false, message: 'Too many webhook requests. Please slow down.' },
+  skipFailedRequests: false,
 });

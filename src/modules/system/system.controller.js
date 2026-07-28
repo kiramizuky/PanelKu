@@ -3,6 +3,7 @@ import sshService from './ssh.service.js';
 import phpService from './php.service.js';
 import { success, errorResponse } from '../../helpers/response.js';
 import { runSecurityScan, fixSecurityIssue } from '../../helpers/security-advisor.js';
+import passwordPolicyService, { SCHEMA_VERSION } from './password-policy.service.js';
 
 class SystemController {
   async getServicesStatus(req, res) {
@@ -330,6 +331,182 @@ class SystemController {
       return success(res, null, 'Tailscale down command executed successfully');
     } catch (error) {
       return errorResponse(res, error.message, 500);
+    }
+  }
+
+  // ── Password Policy ───────────────────────────────────
+
+  async getPasswordPolicy(req, res) {
+    try {
+      const policy = await passwordPolicyService.getPolicy();
+      return success(res, policy);
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to get password policy', 500);
+    }
+  }
+
+  async updatePasswordPolicy(req, res) {
+    try {
+      const auditInfo = {
+        userId:    req.user?._id || req.user?.id,
+        username:  req.user?.username,
+        ip:        req.ip || req.connection?.remoteAddress,
+        userAgent: req.headers?.['user-agent'] || '',
+      };
+      const policy = await passwordPolicyService.savePolicy(req.body, auditInfo);
+      return success(res, policy, 'Password policy updated');
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to update password policy', error.statusCode || 500);
+    }
+  }
+
+  async resetPasswordPolicy(req, res) {
+    try {
+      const auditInfo = {
+        userId:    req.user?._id || req.user?.id,
+        username:  req.user?.username,
+        ip:        req.ip || req.connection?.remoteAddress,
+        userAgent: req.headers?.['user-agent'] || '',
+      };
+      const policy = await passwordPolicyService.resetPolicy(auditInfo);
+      return success(res, policy, 'Password policy reset to defaults');
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to reset password policy', 500);
+    }
+  }
+
+  async validatePassword(req, res) {
+    try {
+      const { password } = req.body;
+      if (!password) return errorResponse(res, 'Password is required', 400);
+      const result = await passwordPolicyService.validatePassword(password);
+      return success(res, result);
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to validate password', 500);
+    }
+  }
+
+  async exportPasswordPolicy(req, res) {
+    try {
+      // Wrap policy with schema version for forward compatibility
+      const policy = await passwordPolicyService.getPolicy();
+      const exportData = {
+        _schema: { version: SCHEMA_VERSION },
+        ...policy,
+      };
+      return success(res, exportData);
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to export password policy', 500);
+    }
+  }
+
+  async importPasswordPolicy(req, res) {
+    try {
+      const auditInfo = {
+        userId:    req.user?._id || req.user?.id,
+        username:  req.user?.username,
+        ip:        req.ip || req.connection?.remoteAddress,
+        userAgent: req.headers?.['user-agent'] || '',
+      };
+      const policy = await passwordPolicyService.importPolicy(req.body, auditInfo);
+      return success(res, policy, 'Password policy imported successfully');
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to import password policy', error.statusCode || 500);
+    }
+  }
+
+  async previewUrlPasswordPolicy(req, res) {
+    try {
+      const { url } = req.query;
+      if (!url) return errorResponse(res, 'URL query parameter is required', 400);
+
+      const result = await passwordPolicyService.fetchPolicyFromUrl(url);
+      // Return the fetched policy for preview (no changes made yet)
+      return success(res, {
+        source: result.source,
+        schema: result.schema,
+        data: result.data,
+      });
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to fetch policy from URL', error.statusCode || 502);
+    }
+  }
+
+  async getPasswordPolicyHistory(req, res) {
+    try {
+      const limit = parseInt(req.query.limit) || 50;
+      const db = (await import('../../core/db/sqlite.js')).getDb();
+
+      const rows = db.prepare(`
+        SELECT * FROM audit_logs
+        WHERE action IN ('PASSWORD_POLICY_UPDATED', 'PASSWORD_POLICY_RESET', 'PASSWORD_POLICY_IMPORTED')
+        ORDER BY created_at DESC
+        LIMIT ?
+      `).all(limit);
+
+      // Parse JSON details and build diff-friendly entries
+      const history = rows.map((r) => {
+        let details = {};
+        try { details = JSON.parse(r.details || '{}'); } catch { details = { raw: r.details }; }
+
+        // Build a human-readable summary
+        let summary = '';
+        if (r.action === 'PASSWORD_POLICY_UPDATED') {
+          summary = 'Policy settings updated';
+          // Compute field-level changes
+          const changes = [];
+          const prev = details.previous || {};
+          const curr = details.updated || {};
+          for (const key of Object.keys(curr)) {
+            if (key === 'action') continue;
+            if (JSON.stringify(prev[key]) !== JSON.stringify(curr[key])) {
+              changes.push({
+                field: key,
+                from: prev[key],
+                to: curr[key],
+              });
+            }
+          }
+          details.changes = changes;
+        } else if (r.action === 'PASSWORD_POLICY_RESET') {
+          summary = 'Policy reset to defaults';
+          const prev = details.previous || {};
+          const defs = details.defaults || {};
+          const changes = [];
+          for (const key of Object.keys(defs)) {
+            if (JSON.stringify(prev[key]) !== JSON.stringify(defs[key])) {
+              changes.push({
+                field: key,
+                from: prev[key],
+                to: defs[key],
+              });
+            }
+          }
+          details.changes = changes;
+        } else if (r.action === 'PASSWORD_POLICY_IMPORTED') {
+          summary = 'Policy imported from JSON';
+          const imported = details.imported || {};
+          const changes = Object.entries(imported).map(([key, val]) => ({
+            field: key,
+            from: undefined,
+            to: val,
+          })).filter(c => c.field !== 'action' && c.field !== 'schemaVersion');
+          details.changes = changes;
+        }
+
+        return {
+          id: r.id,
+          timestamp: r.created_at,
+          username: r.username || 'system',
+          action: r.action,
+          summary,
+          details,
+        };
+      });
+
+      return success(res, history);
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to get password policy history', 500);
     }
   }
 }

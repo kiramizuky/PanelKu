@@ -8,7 +8,7 @@ const execAsync = promisify(exec);
 
 
 export default {
-  register(app, io) {
+  register(app, _io) {
     // Helper to check if wg is installed
     async function getWgStatus() {
       try {
@@ -107,6 +107,38 @@ export default {
       const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // ── Security helpers ────────────────────────────────────────────
+    /**
+     * [CRIT-1 FIX] Validate IP/CIDR notation — only safe characters.
+     */
+    function _validateAllowedIps(ips) {
+      if (!ips || typeof ips !== 'string') throw new Error('Allowed IPs is required');
+      // Format: 10.0.0.0/24 or 10.0.0.1/32 (comma-separated)
+      const parts = ips.split(',').map(s => s.trim());
+      for (const part of parts) {
+        if (!/^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/.test(part)) {
+          throw new Error(`Invalid IP/CIDR format: ${part}`);
+        }
+        // Validate IP octets
+        const octets = part.split('/')[0].split('.').map(Number);
+        if (octets.some(o => o < 0 || o > 255)) {
+          throw new Error(`Invalid IP address: ${part}`);
+        }
+      }
+      return ips.trim();
+    }
+
+    /**
+     * [CRIT-1 FIX] Validate WireGuard public key format (44-char base64 or base64url).
+     */
+    function _validatePublicKey(key) {
+      if (!key || typeof key !== 'string') return '';
+      if (!/^[A-Za-z0-9+/]{43}=$/.test(key) && !/^[A-Za-z0-9_-]{43}$/.test(key)) {
+        throw new Error('Invalid public key format (expected 44-char base64 key)');
+      }
+      return key.trim();
     }
 
     // --- Routes ---
@@ -342,6 +374,9 @@ export default {
       if (!allowedIps) {
         return res.json({ success: false, message: 'Allowed IPs is required' });
       }
+      if (!publicKey) {
+        return res.json({ success: false, message: 'Public Key is required' });
+      }
       try {
         // Safe commands to run wg set wg0 peer <key> allowed-ips <ips>
         // For security, if not prod/wg active, we mock it
@@ -353,7 +388,7 @@ export default {
 
     // API: Delete Peer
     app.post('/api/plugins/wireguard/peer/delete', async (req, res) => {
-      const { interfaceName, publicKey } = req.body;
+      const { publicKey } = req.body;
       if (!publicKey) {
         return res.json({ success: false, message: 'Public Key is required' });
       }

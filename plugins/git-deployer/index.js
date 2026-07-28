@@ -1,8 +1,59 @@
 import { exec } from 'child_process';
+import crypto from 'crypto';
 import { promisify } from 'util';
 import { requireAuth } from '../../middleware/auth.js';
+import { webhookLimiter } from '../../middleware/rateLimiter.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * [CRIT-4 FIX] Generate a cryptographically secure token.
+ */
+function secureToken(bytes = 16) {
+  return crypto.randomBytes(bytes).toString('hex');
+}
+
+/**
+ * [CRIT-1 FIX] Validate a path — block shell metacharacters and traversal.
+ */
+function validateDeployPath(p) {
+  if (!p || typeof p !== 'string') throw new Error('Invalid path');
+  if (p.includes('..')) throw new Error('Path traversal detected');
+  if (!/^[a-zA-Z0-9_\-.\/@]+$/.test(p)) throw new Error('Path contains invalid characters');
+  return p.trim();
+}
+
+/**
+ * [CRIT-1 FIX] Validate a branch name — only safe git ref characters.
+ */
+function validateBranch(b) {
+  if (!b || typeof b !== 'string') return 'main';
+  if (!/^[a-zA-Z0-9_\-./]+$/.test(b)) throw new Error('Branch name contains invalid characters');
+  return b.trim();
+}
+
+/**
+ * [CRIT-1 FIX] Validate hook/script name — only alphanumeric and spaces.
+ */
+function validateHookName(n) {
+  if (!n || typeof n !== 'string') throw new Error('Invalid name');
+  if (n.length > 200) throw new Error('Name too long');
+  if (!/^[a-zA-Z0-9\s_\-.@()]+$/.test(n)) throw new Error('Name contains invalid characters');
+  return n.trim();
+}
+
+/**
+ * [MED-1 FIX] Escape HTML entities to prevent XSS when injecting user data into inline HTML templates.
+ */
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 export default {
   register(app, io) {
@@ -68,16 +119,16 @@ export default {
                   ` : webhooks.map(hook => `
                     <div style="background: rgba(0,0,0,0.15); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 15px;">
                       <div class="d-flex justify-content-between align-items-center mb-2">
-                        <strong style="color:var(--text-primary); font-size:15px;"><i class="bi bi-link-45deg text-danger"></i> ${hook.name}</strong>
-                        <button class="btn-lp btn-lp-ghost btn-sm text-danger" onclick="GitDeployPage.deleteHook('${hook.id}')"><i class="bi bi-trash"></i></button>
+                        <strong style="color:var(--text-primary); font-size:15px;"><i class="bi bi-link-45deg text-danger"></i> ${escapeHtml(hook.name)}</strong>
+                        <button class="btn-lp btn-lp-ghost btn-sm text-danger" onclick="GitDeployPage.deleteHook('${escapeHtml(hook.id)}')"><i class="bi bi-trash"></i></button>
                       </div>
                       <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
-                        <div><strong>Path:</strong> <code>${hook.path}</code></div>
-                        <div><strong>Branch:</strong> <span class="lp-badge lp-badge-info" style="font-size:10px;">${hook.branch}</span></div>
+                        <div><strong>Path:</strong> <code>${escapeHtml(hook.path)}</code></div>
+                        <div><strong>Branch:</strong> <span class="lp-badge lp-badge-info" style="font-size:10px;">${escapeHtml(hook.branch)}</span></div>
                         <div class="mt-2"><strong>Webhook URL:</strong></div>
                         <div class="d-flex gap-2 align-items-center mt-1">
-                          <input type="text" class="form-control lp-input" readonly value="${req.protocol}://${req.get('host')}/api/git-deploy/webhook/${hook.id}" style="background: rgba(0,0,0,0.3); font-size:11px; height:28px; padding: 0 8px; border:none; border-radius:4px; flex-grow:1;">
-                          <button class="btn-lp btn-lp-primary" style="height:28px; font-size:11px; padding: 0 10px; line-height:28px;" onclick="navigator.clipboard.writeText('${req.protocol}://${req.get('host')}/api/git-deploy/webhook/${hook.id}').then(() => LP.toast('Copied URL', 'success'))">Copy</button>
+                          <input type="text" class="form-control lp-input" readonly value="${escapeHtml(req.protocol)}://${escapeHtml(req.get('host'))}/api/git-deploy/webhook/${escapeHtml(hook.id)}" style="background: rgba(0,0,0,0.3); font-size:11px; height:28px; padding: 0 8px; border:none; border-radius:4px; flex-grow:1;">
+                          <button class="btn-lp btn-lp-primary" style="height:28px; font-size:11px; padding: 0 10px; line-height:28px;" onclick="navigator.clipboard.writeText('${escapeHtml(req.protocol)}://${escapeHtml(req.get('host'))}/api/git-deploy/webhook/${escapeHtml(hook.id)}').then(() => LP.toast('Copied URL', 'success'))">Copy</button>
                         </div>
                       </div>
 
@@ -88,8 +139,8 @@ export default {
                           <span style="font-size:11px; color:var(--text-muted);">No deployments yet. Send a push webhook to trigger.</span>
                         ` : hook.logs.map(log => `
                           <div style="font-size:11px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding: 6px 10px; border-radius:6px;">
-                            <span><span class="lp-badge ${log.status === 'success' ? 'lp-badge-success' : 'lp-badge-danger'}" style="font-size:9px; margin-right:6px;">${log.status.toUpperCase()}</span> ${new Date(log.timestamp).toLocaleString()}</span>
-                            <button class="btn-lp btn-lp-ghost btn-sm text-info p-0" style="height:20px; line-height:20px;" onclick="GitDeployPage.showLog('${hook.id}', '${log.timestamp}')">View Output</button>
+                            <span><span class="lp-badge ${escapeHtml(log.status === 'success' ? 'lp-badge-success' : 'lp-badge-danger')}" style="font-size:9px; margin-right:6px;">${escapeHtml(log.status).toUpperCase()}</span> ${escapeHtml(new Date(log.timestamp).toLocaleString())}</span>
+                            <button class="btn-lp btn-lp-ghost btn-sm text-info p-0" style="height:20px; line-height:20px;" onclick="GitDeployPage.showLog('${escapeHtml(hook.id)}', '${escapeHtml(log.timestamp)}')">View Output</button>
                           </div>
                         `).join('')}
                       </div>
@@ -186,10 +237,10 @@ export default {
       const { name, path, branch, script } = req.body;
       const webhooks = await getWebhooks();
       const newHook = {
-        id: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
-        name,
-        path,
-        branch: branch || 'main',
+        id: secureToken(),
+        name: validateHookName(name),
+        path: validateDeployPath(path),
+        branch: validateBranch(branch),
         script,
         logs: []
       };
@@ -201,14 +252,22 @@ export default {
     // --- Private API: Delete configuration ---
     app.post('/api/plugins/git-deploy/webhook-configs/delete', requireAuth, async (req, res) => {
       const { id } = req.body;
+      // Validate ID is a valid hex string from secureToken
+      if (!id || typeof id !== 'string' || !/^[a-f0-9]{32}$/i.test(id)) {
+        return res.status(400).json({ success: false, message: 'Invalid webhook ID' });
+      }
       const webhooks = await getWebhooks();
       const updated = webhooks.filter(w => w.id !== id);
+      if (updated.length === webhooks.length) {
+        return res.status(404).json({ success: false, message: 'Webhook not found' });
+      }
       await saveWebhooks(updated);
       res.json({ success: true, message: 'Webhook deleted successfully' });
     });
 
     // --- Public API Endpoint: Webhook Trigger ---
-    app.post('/api/git-deploy/webhook/:secret', async (req, res) => {
+    // [HIGH-2 FIX] Apply rate limiter — 10 req/min per webhook ID + IP
+    app.post('/api/git-deploy/webhook/:secret', webhookLimiter, async (req, res) => {
       const { secret } = req.params;
       const webhooks = await getWebhooks();
       const hook = webhooks.find(w => w.id === secret);

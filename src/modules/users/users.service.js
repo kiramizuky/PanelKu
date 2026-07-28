@@ -1,6 +1,9 @@
 import userRepository from '../../repositories/user.repository.js';
 import roleRepository from '../../repositories/role.repository.js';
 import { generateApiKey } from '../../helpers/crypto.js';
+import { isStrongPassword, passwordRequirements } from '../../helpers/validate.js';
+import passwordPolicyService from '../../modules/system/password-policy.service.js';
+import auditRepository from '../../repositories/audit.repository.js';
 import eventBus, { EVENTS } from '../../core/events/EventBus.js';
 import bcrypt from 'bcryptjs';
 import { getDb } from '../../core/db/sqlite.js';
@@ -8,6 +11,24 @@ import sessionRepository from '../../repositories/session.repository.js';
 import logger from '../../config/logger.js';
 
 class UsersService {
+  /**
+   * Helper: enforce password policy using DB config with static fallback.
+   * Throws 400 error if password doesn't meet requirements.
+   */
+  async _enforcePasswordPolicy(password) {
+    if (!password) {
+      throw Object.assign(new Error('Password is required'), { statusCode: 400 });
+    }
+    const policyResult = await passwordPolicyService.validatePassword(password).catch(() => null);
+    if (policyResult && !policyResult.valid) {
+      throw Object.assign(new Error(policyResult.errors.join('. ')), { statusCode: 400 });
+    }
+    // Fallback: static validation if DB policy load fails
+    if (!policyResult && !isStrongPassword(password)) {
+      throw Object.assign(new Error(passwordRequirements()), { statusCode: 400 });
+    }
+  }
+
   async list(page = 1, limit = 20, search = '') {
     // SQLite doesn't support $or, do filtering manually
     const all = await userRepository.findWithRole({});
@@ -36,6 +57,11 @@ class UsersService {
   }
 
   async create(data) {
+    // [LOW-1 FIX] Enforce strong password policy on user creation
+    if (data.password) {
+      await this._enforcePasswordPolicy(data.password);
+    }
+
     const db = getDb();
     const existingUsername = db.prepare('SELECT id FROM users WHERE username = ?').get(data.username?.toLowerCase());
     const existingEmail    = db.prepare('SELECT id FROM users WHERE email = ?').get(data.email?.toLowerCase());
@@ -46,7 +72,8 @@ class UsersService {
     const role = await roleRepository.findBySlug(data.role || 'read_only');
     if (!role) throw Object.assign(new Error('Role not found'), { statusCode: 400 });
 
-    const user = await userRepository.create({ ...data, role: role._id });
+    // [PASSWORD EXPIRY] Start the expiry clock from creation time
+    const user = await userRepository.create({ ...data, role: role._id, passwordChangedAt: new Date().toISOString() });
     eventBus.publish(EVENTS.USER_CREATED, { userId: user._id, username: user.username });
     return userRepository._populateRole(user);
   }
@@ -76,8 +103,28 @@ class UsersService {
       rest.email = lowerEmail;
     }
 
+    // [LOW-1 FIX] Enforce strong password policy on password update
     if (password && String(password).trim()) {
+      await this._enforcePasswordPolicy(String(password).trim());
       rest.password = await bcrypt.hash(String(password).trim(), 10);
+      // [LOW-2 FIX] Clear mustChangePassword flag when user voluntarily changes their password
+      // [PASSWORD EXPIRY] Reset password_changed_at so the 90-day expiry clock starts fresh
+      rest.mustChangePassword = false;
+      rest.passwordChangedAt = new Date().toISOString();
+
+      // [AUDIT] Log admin-initiated password reset
+      // This runs async — non-blocking so it doesn't slow down the response
+      auditRepository.log({
+        userId:     id,
+        username:   user.username,
+        action:     'PASSWORD_RESET_BY_ADMIN',
+        resource:   'users',
+        resourceId: id,
+        details:    `Password was reset by another user (admin/manager)`,
+        ip:         '',
+        userAgent:  '',
+        status:     'success',
+      }).catch((e) => logger.error('Failed to write audit log: ' + e.message));
     }
 
     if (roleName) {
@@ -120,16 +167,34 @@ class UsersService {
   }
 
   async changePassword(id, currentPassword, newPassword) {
+    // [LOW-1 FIX] Enforce strong password policy using dynamic config
+    await this._enforcePasswordPolicy(newPassword);
+
     const db = getDb();
     const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     if (!row) throw Object.assign(new Error('User not found'), { statusCode: 404 });
 
+    // [AUDIT] Log failed password change attempt (wrong current password)
     const valid = await bcrypt.compare(currentPassword, row.password);
-    if (!valid) throw Object.assign(new Error('Current password is incorrect'), { statusCode: 400 });
+    if (!valid) {
+      auditRepository.log({
+        userId:     id,
+        username:   row.username,
+        action:     'PASSWORD_CHANGE_FAILED',
+        resource:   'users',
+        resourceId: id,
+        details:    'Failed password change attempt — incorrect current password',
+        ip:         '',
+        userAgent:  '',
+        status:     'failure',
+      }).catch((e) => logger.error('Failed to write audit log: ' + e.message));
+      throw Object.assign(new Error('Current password is incorrect'), { statusCode: 400 });
+    }
 
     const hashed = await bcrypt.hash(newPassword, 12);
-    db.prepare('UPDATE users SET password = ?, updated_at = ? WHERE id = ?').run(
-      hashed, new Date().toISOString(), id
+    // [LOW-2 FIX] Clear mustChangePassword flag and record password change timestamp
+    db.prepare('UPDATE users SET password = ?, must_change_password = 0, password_changed_at = ?, updated_at = ? WHERE id = ?').run(
+      hashed, new Date().toISOString(), new Date().toISOString(), id
     );
 
     // [SECURITY] Invalidate all sessions so attacker can't use stolen refresh tokens

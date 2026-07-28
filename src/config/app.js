@@ -62,6 +62,11 @@ export default {
     authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX) || 30,
   },
 
+  passwordExpiry: {
+    enabled: process.env.PASSWORD_EXPIRY_ENABLED !== 'false',
+    days: parseInt(process.env.PASSWORD_EXPIRY_DAYS) || 90,
+  },
+
   isDev: (process.env.NODE_ENV || 'development') === 'development',
   isProd: process.env.NODE_ENV === 'production',
 };

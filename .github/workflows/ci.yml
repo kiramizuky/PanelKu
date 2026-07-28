@@ -1,0 +1,174 @@
+# ─────────────────────────────────────────────────────────────────────
+# Panelku — Continuous Integration Pipeline
+# Runs on every push and pull request to main/master.
+# Stages: Lint → Test (Jest) → Security Audit (npm) → CodeQL SAST
+# ─────────────────────────────────────────────────────────────────────
+
+name: CI — Lint, Test & Security Scan
+
+on:
+  push:
+    branches: [main, master, 'v*']
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+  # workflow_call allows this workflow to be used as a reusable workflow by CD
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  NODE_OPTIONS: '--experimental-vm-modules'
+
+jobs:
+  # ── Stage 1: Lint (ESLint) ──────────────────────────────────────
+  lint:
+    name: 🔍 Lint (ESLint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: linux-panel/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./linux-panel
+        run: npm ci --ignore-scripts
+
+      - name: Run ESLint
+        working-directory: ./linux-panel
+        run: npm run lint:check
+        # lint:check exits with error if there are any warnings (--max-warnings 0)
+
+  # ── Stage 2: Unit Tests (Jest) ──────────────────────────────────
+  test:
+    name: 🧪 Tests (Jest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lint]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: linux-panel/package-lock.json
+
+      - name: Install dependencies (with build scripts)
+        working-directory: ./linux-panel
+        run: npm ci
+
+      - name: Create storage directories
+        working-directory: ./linux-panel
+        run: mkdir -p storage/logs storage/uploads storage/backups storage/temp
+
+      - name: Copy .env.example to .env (if exists)
+        working-directory: ./linux-panel
+        run: cp -n .env.example .env 2>/dev/null || true
+
+      - name: Run Jest tests
+        working-directory: ./linux-panel
+        run: npm test -- --ci --coverage
+        env:
+          NODE_ENV: test
+          JWT_SECRET: test-jwt-secret-for-ci-pipeline-only
+          JWT_REFRESH_SECRET: test-refresh-secret-for-ci-pipeline-only
+          APP_SECRET: test-app-secret-for-ci-pipeline-only
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: linux-panel/coverage/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # ── Stage 3: Dependency Audit (npm audit) ───────────────────────
+  audit:
+    name: 🛡️ Dependency Audit (npm audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lint]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: linux-panel/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./linux-panel
+        run: npm ci --ignore-scripts
+
+      - name: Run npm audit
+        working-directory: ./linux-panel
+        run: npm audit --audit-level=high
+        # Exits with code 1 if any high/critical vulnerability is found
+        continue-on-error: true  # Don't block pipeline but flag in logs
+
+  # ── Stage 4: CodeQL SAST Analysis ───────────────────────────────
+  codeql:
+    name: 🔬 CodeQL SAST (JavaScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    needs: [lint]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          queries: +security-and-quality
+
+      - name: Build project (none required for Node.js)
+        run: echo "No build step required for JavaScript/Node.js"
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript"
+
+  # ── Stage 5: Build Check (docker build) ─────────────────────────
+  build-check:
+    name: 🐳 Docker Build Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lint]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./linux-panel
+          push: false
+          tags: panelku:ci-build
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

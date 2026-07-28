@@ -27,6 +27,9 @@
         <a href="/settings/roles" class="settings-nav-item">
           <i class="bi bi-shield-lock"></i> Roles &amp; Permissions
         </a>
+        <a href="/settings/password-policy" class="settings-nav-item">
+          <i class="bi bi-lock-fill"></i> Password Policy
+        </a>
         <a href="/settings/themes" class="settings-nav-item">
           <i class="bi bi-palette"></i> Themes
         </a>
@@ -172,6 +175,12 @@
           <div style="border-bottom:1px solid var(--glass-border); padding-bottom:12px; margin-bottom:20px;">
             <h5 style="font-weight:700; margin:0; color:var(--text-primary);"><i class="bi bi-key me-2 text-warning"></i>Security Settings</h5>
           </div>
+          <!-- [LOW-2 FIX] Must-change-password banner (hidden by default) -->
+          <div id="mustChangePwBanner" class="alert alert-warning" style="display:none; background:rgba(255, 193, 7, 0.15); color:#fbbf24; border:1px solid rgba(255, 193, 7, 0.3); font-size:13px; padding:10px; border-radius:10px;">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Default Password Detected!</strong> You must change your password before continuing.
+          </div>
+
           <form onsubmit="ProfilePage.changePassword(event)" class="row g-3">
             <div class="col-12">
               <div class="lp-form-group mb-0">
@@ -182,13 +191,18 @@
             <div class="col-12 col-md-6">
               <div class="lp-form-group mb-0">
                 <label class="lp-label" style="font-size:11px; font-weight:600;">New Password</label>
-                <input type="password" id="newPassword" class="lp-input" placeholder="Min. 8 characters" required minlength="8">
+                <input type="password" id="newPassword" class="lp-input" placeholder="Min. 12 characters with uppercase, lowercase, number &amp; special" oninput="ProfilePage.checkPasswordStrength()">
+                <!-- [LOW-1 FIX] Password strength indicator -->
+                <div id="pwStrengthBar" class="progress mt-1" style="height:4px; background:rgba(255,255,255,0.1); border-radius:2px;">
+                  <div id="pwStrengthFill" class="progress-bar" role="progressbar" style="width:0%; transition: width 0.3s ease;"></div>
+                </div>
+                <small id="pwStrengthText" class="text-muted mt-1" style="font-size:10px;">Minimum 12 characters: uppercase, lowercase, number &amp; special character</small>
               </div>
             </div>
             <div class="col-12 col-md-6">
               <div class="lp-form-group mb-0">
                 <label class="lp-label" style="font-size:11px; font-weight:600;">Confirm New Password</label>
-                <input type="password" id="confirmPassword" class="lp-input" placeholder="Verify password" required minlength="8">
+                <input type="password" id="confirmPassword" class="lp-input" placeholder="Verify password">
               </div>
             </div>
             <div class="col-12 mt-4">
@@ -201,4 +215,28 @@
   </div>
 </div>
 
+<script>
+  // [LOW-2 FIX] If redirected from login with forceChange=1, scroll to password section
+  // [PASSWORD EXPIRY] Show reason-specific message: 'default' or 'expired'
+  document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('forceChange') === '1') {
+      const banner = document.getElementById('mustChangePwBanner');
+      const reason = params.get('reason') || 'default';
+      if (banner) {
+        if (reason === 'expired') {
+          banner.innerHTML = '<i class="bi bi-clock-history me-2"></i><strong>Password Expired!</strong> Your password is more than 90 days old. Please set a new password to continue.';
+          banner.style.cssText = 'display:block; background:rgba(255, 193, 7, 0.15); color:#fbbf24; border:1px solid rgba(255, 193, 7, 0.3); font-size:13px; padding:10px; border-radius:10px;';
+        } else {
+          banner.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i><strong>Default Password Detected!</strong> You must change your password before continuing.';
+          banner.style.cssText = 'display:block; background:rgba(255, 193, 7, 0.15); color:#fbbf24; border:1px solid rgba(255, 193, 7, 0.3); font-size:13px; padding:10px; border-radius:10px;';
+        }
+        banner.style.display = 'block';
+        setTimeout(function() {
+          banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 500);
+      }
+    }
+  });
+</script>
 <script src="/js/settings/profile.js?v=<%= Date.now() %>"></script>

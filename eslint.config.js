@@ -137,6 +137,8 @@ const browserGlobals = {
   // Page-specific globals (defined in individual page JS files)
   ThemesPage: 'readonly',
   prompt: 'readonly',
+  confirm: 'readonly',
+  alert: 'readonly',
   event: 'readonly',
 };
 

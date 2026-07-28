@@ -418,6 +418,11 @@
         if(res && res.success) {
            if(res.requiresTwoFactor) {
               window.location.href = '/login/2fa?token=' + res.tempToken;
+           } else if(res.mustChangePassword) {
+              // [PASSWORD EXPIRY] Force user to change password before accessing panel
+              // Append reason so profile page can show specific message
+              const reason = res.passwordExpired ? 'expired' : 'default';
+              window.location.href = '/settings/profile?forceChange=1&reason=' + reason;
            } else {
               window.location.href = '/dashboard';
            }

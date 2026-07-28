@@ -19,10 +19,25 @@ export const validate = (req, res, next) => {
 export const isEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 /**
- * Validate password strength.
+ * [LOW-1 FIX] Validate password strength.
+ * Requires: min 12 chars, uppercase, lowercase, number, and special character.
+ * OWASP 2023 recommends at least 12 characters with complexity.
  */
 export const isStrongPassword = (password) => {
-  return password && password.length >= 8;
+  if (!password || typeof password !== 'string') return false;
+  if (password.length < 12) return false;
+  if (!/[A-Z]/.test(password)) return false;
+  if (!/[a-z]/.test(password)) return false;
+  if (!/[0-9]/.test(password)) return false;
+  if (!/[^A-Za-z0-9]/.test(password)) return false;
+  return true;
+};
+
+/**
+ * [LOW-1 FIX] Get human-readable password requirements message.
+ */
+export const passwordRequirements = () => {
+  return 'Password must be at least 12 characters with uppercase, lowercase, number, and special character.';
 };
 
 /**

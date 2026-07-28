@@ -42,6 +42,16 @@ const AuditPage = (() => {
       if (res?.success && res.data?.logs) {
         allLogs = res.data.logs;
         renderLogsTable(allLogs);
+
+        // Auto-filter if ?filter=password_policy is present in URL
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('filter') === 'password_policy') {
+          const searchInput = document.getElementById('logSearch');
+          if (searchInput) {
+            searchInput.value = 'PASSWORD_POLICY';
+            filterLogs();
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to load audit logs:', err);

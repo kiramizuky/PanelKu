@@ -285,12 +285,12 @@ class LDAPService {
 
         // Try searching top level
         client.search(config.baseDn || '', '(objectClass=*)', { scope: 'base', timeLimit: 5, attributes: ['defaultNamingContext'] }, (searchErr, res) => {
-          let info = {};
+          let _info = {};
           let entries = [];
 
           res.on('searchEntry', (entry) => {
             entries.push(entry);
-            info = entry.object || {};
+            _info = entry.object || {};
           });
 
           res.on('end', () => {
@@ -298,7 +298,6 @@ class LDAPService {
             resolve({
               success: true,
               message: 'LDAP connection successful',
-              server: info,
               entriesFound: entries.length,
               baseDn: config.baseDn,
             });

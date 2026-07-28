@@ -139,10 +139,13 @@ const adminRoleId = roles[0].id;
 const salt = bcrypt.genSaltSync(10);
 const passwordHash = bcrypt.hashSync('Admin@123456', salt);
 
+// [LOW-2 FIX] Force password change on first login for default admin
+const ts2 = new Date().toISOString();
 db.prepare(`
-  INSERT INTO users (id, username, email, password, role_id, first_name, last_name, is_active, is_super_admin, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
-`).run(uuidv4(), 'admin', 'admin@panelku.fun', passwordHash, adminRoleId, 'Super', 'Admin', ts, ts);
+  INSERT INTO users (id, username, email, password, role_id, first_name, last_name,
+    is_active, is_super_admin, must_change_password, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?, ?)
+`).run(uuidv4(), 'admin', 'admin@panelku.fun', passwordHash, adminRoleId, 'Super', 'Admin', ts2, ts2);
 
 db.close();
 

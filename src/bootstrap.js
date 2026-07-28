@@ -11,6 +11,8 @@ import { startMonitorJob } from './jobs/monitor.job.js';
 import { startHealthJob } from './jobs/health.job.js';
 import { startBackupJob } from './jobs/backup.job.js';
 import pluginLoader from './core/plugin-loader/PluginLoader.js';
+import auditRepository from './repositories/audit.repository.js';
+import { startPasswordExpiryReminder } from './jobs/password-expiry-reminder.job.js';
 import { mkdirSync } from 'fs';
 
 // Ensure storage directories exist
@@ -67,6 +69,7 @@ export const bootstrap = async (app, httpServer) => {
   startMonitorJob();
   startHealthJob();
   startBackupJob();
+  startPasswordExpiryReminder();
 
   // 5.5 Load WAF cache
   const { refreshWafCache } = await import('./middleware/waf.middleware.js');
@@ -179,7 +182,22 @@ async function seedInitialData() {
       lastName: 'Admin',
       isSuperAdmin: true,
       isActive: true,
+      // [LOW-2 FIX] Force password change on first login — even admin must set a strong password
+      mustChangePassword: true,
     });
     logger.warn('⚠️  Default admin created: username=admin password=Admin@123456 — CHANGE THIS IMMEDIATELY!');
+
+    // [AUDIT] Log the creation of default admin account for security tracking
+    auditRepository.log({
+      userId:    null,
+      username:  'system',
+      action:    'DEFAULT_ADMIN_CREATED',
+      resource:  'users',
+      resourceId: null,
+      details:   'Default super admin account created during initial setup (forced password change on first login)',
+      ip:        '',
+      userAgent: '',
+      status:    'warning',
+    }).catch((e) => logger.error('Failed to write audit log: ' + e.message));
   }
 }

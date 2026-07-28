@@ -3,13 +3,14 @@ import authController from './auth.controller.js';
 import ssoController from './sso.controller.js';
 import ldapController from './ldap.controller.js';
 import { authenticate } from '../../middleware/auth.js';
-import { authLimiter } from '../../middleware/rateLimiter.js';
+import { authLimiter, twoFactorLimiter } from '../../middleware/rateLimiter.js';
 
 const router = Router();
 
 // ── Existing auth routes ──
 router.post('/login', authLimiter, authController.login.bind(authController));
-router.post('/2fa/verify', authLimiter, authController.verifyTwoFactor.bind(authController));
+// [MED-4 FIX] Use dedicated 2FA rate limiter (5 attempts per 15 min) keyed by tempToken + IP
+router.post('/2fa/verify', twoFactorLimiter, authController.verifyTwoFactor.bind(authController));
 router.post('/refresh', authController.refresh.bind(authController));
 
 // ── Public SSO & LDAP status endpoints ──

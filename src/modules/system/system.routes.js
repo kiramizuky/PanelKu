@@ -69,5 +69,15 @@ router.post('/tailscale/install', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), syste
 router.post('/tailscale/up', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.tailscaleUp.bind(systemController));
 router.post('/tailscale/down', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.tailscaleDown.bind(systemController));
 
+// Password Policy endpoints
+router.get('/password-policy', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getPasswordPolicy.bind(systemController));
+router.put('/password-policy', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.updatePasswordPolicy.bind(systemController));
+router.post('/password-policy/reset', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.resetPasswordPolicy.bind(systemController));
+router.post('/password-policy/validate', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.validatePassword.bind(systemController));
+router.get('/password-policy/export', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.exportPasswordPolicy.bind(systemController));
+router.post('/password-policy/import', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.importPasswordPolicy.bind(systemController));
+router.get('/password-policy/preview-url', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.previewUrlPasswordPolicy.bind(systemController));
+router.get('/password-policy/history', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getPasswordPolicyHistory.bind(systemController));
+
 export default router;
 

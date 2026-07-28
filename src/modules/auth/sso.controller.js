@@ -1,5 +1,6 @@
 import ssoService from './sso.service.js';
 import authService from './auth.service.js';
+import appConfig from '../../config/app.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
 
 class SSOController {
@@ -73,9 +74,10 @@ class SSOController {
       const loginResult = await authService.completeLogin(user, req);
 
       // Set refresh token in HTTP-only cookie
+      // [LOW-4 FIX] Use appConfig.isProd for secure flag
       res.cookie('refresh_token', loginResult.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: appConfig.isProd,
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: '/api/auth/refresh',

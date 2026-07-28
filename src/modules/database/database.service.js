@@ -1,6 +1,6 @@
 import mysql from 'mysql2/promise';
 import pkg from 'pg';
-const { Client, Pool } = pkg;
+const { Pool } = pkg;
 import path from 'path';
 import fs from 'fs/promises';
 

@@ -226,7 +226,13 @@
       try {
         const res = await LP.login2FA(tempToken, otp);
         if (res && res.success) {
-          window.location.href = '/dashboard';
+          // [PASSWORD EXPIRY] If user must change password (default or expired), redirect to settings
+          if (res.mustChangePassword) {
+            const reason = res.passwordExpired ? 'expired' : 'default';
+            window.location.href = '/settings/profile?forceChange=1&reason=' + reason;
+          } else {
+            window.location.href = '/dashboard';
+          }
         } else {
           err.textContent = (res && res.message) ? res.message : 'Invalid code, please try again.';
           err.style.display = 'block';

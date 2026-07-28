@@ -151,6 +151,8 @@ const createApp = () => {
   app.get('/settings/changelog', (req, res) => res.render('settings/changelog', { title: 'Changelog' }));
   app.get('/settings/auth', (req, res) => res.render('settings/auth', { title: 'SSO / LDAP' }));
   app.get('/settings/themes', (req, res) => res.render('settings/themes', { title: 'Themes' }));
+  app.get('/settings/password-policy', (req, res) => res.render('settings/password-policy', { title: 'Password Policy' }));
+  app.get('/settings/password-policy-history', (req, res) => res.render('settings/password-policy-history', { title: 'Policy History' }));
   app.get('/whatsapp', (req, res) => res.render('whatsapp/index', { title: 'WhatsApp API' }));
   app.get('/api-docs', (req, res) => res.render('api-docs/index', { title: 'API Documentation' }));
   app.get('/nodejs', (req, res) => res.render('nodejs/index', { title: 'Node.js Manager' }));

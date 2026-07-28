@@ -145,6 +145,12 @@ const LP = {
       this.state.accessToken = res.data.accessToken;
       this.state.user = res.data.user;
       localStorage.setItem('lp_token', res.data.accessToken);
+
+      // [PASSWORD EXPIRY] If user must change their password (default or expired), redirect to settings
+      if (res.data.mustChangePassword || res.data.passwordExpired) {
+        return { success: true, mustChangePassword: true, passwordExpired: res.data.passwordExpired };
+      }
+
       return { success: true };
     }
     return { success: false, message: res?.message || 'Login failed' };
@@ -156,6 +162,12 @@ const LP = {
       this.state.accessToken = res.data.accessToken;
       this.state.user = res.data.user;
       localStorage.setItem('lp_token', res.data.accessToken);
+
+      // [PASSWORD EXPIRY] If user must change their password (default or expired), redirect to settings
+      if (res.data.mustChangePassword || res.data.passwordExpired) {
+        return { success: true, mustChangePassword: true, passwordExpired: res.data.passwordExpired };
+      }
+
       return { success: true };
     }
     return { success: false, message: res?.message || 'Verification failed' };

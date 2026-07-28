@@ -36,13 +36,19 @@ class LDAPController {
   /**
    * POST /api/auth/ldap/test
    * Test LDAP connection and search.
+   * [MED-2 FIX] Sanitize error message to avoid leaking LDAP server internals.
    */
   async testConnection(req, res) {
     try {
       const result = await ldapService.testConnection();
-      return successResponse(res, result, result.message);
+      // [MED-2 FIX] Don't return server details in response — only success/failure
+      if (result.success) {
+        return successResponse(res, { success: true }, 'LDAP connection successful');
+      }
+      return errorResponse(res, 'LDAP connection failed', 500);
     } catch (error) {
-      return errorResponse(res, error.message, 500);
+      // [MED-2 FIX] Return generic error, log the details server-side
+      return errorResponse(res, 'LDAP connection test failed', 500);
     }
   }
 

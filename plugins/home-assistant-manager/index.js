@@ -5,7 +5,7 @@ import { ensureDockerCompose, withDeployTimeout } from '../shared/dep-installer.
 
 
 export default {
-  register(app, io) {
+  register(app, _io) {
     // 1. Dashboard View
     app.get('/plugins/home-assistant-manager', async (req, res) => {
       try {
@@ -285,11 +285,48 @@ export default {
       }
     });
 
+    // ── Security helpers ────────────────────────────────────────────
+    /**
+     * [CRIT-3 FIX] Validate port number — must be between 1 and 65535.
+     */
+    function _validateHaPort(p) {
+      const num = parseInt(p);
+      if (isNaN(num) || num < 1 || num > 65535) {
+        throw new Error('Invalid port number (must be 1-65535)');
+      }
+      return num;
+    }
+
+    /**
+     * [CRIT-3 FIX] Validate package name — only alphanumeric, underscores, hyphens.
+     */
+    function _validateHaPkg(name) {
+      if (!name || typeof name !== 'string') throw new Error('Invalid package name');
+      if (!/^[a-zA-Z0-9_-]+$/.test(name)) throw new Error('Package name contains invalid characters');
+      return name.trim();
+    }
+
+    /**
+     * [CRIT-3 FIX] Validate USB device path — only safe path characters.
+     */
+    function _validateUsbPath(path) {
+      if (!path || typeof path !== 'string') return '/dev/ttyACM0';
+      if (!/^\/[a-zA-Z0-9_\/.\-]+$/.test(path)) {
+        throw new Error('USB device path contains invalid characters');
+      }
+      return path.trim();
+    }
+
     // 2. Deploy API
     app.post('/plugins/home-assistant-manager/deploy', withDeployTimeout(600000), async (req, res) => {
       try {
-        const { package: pkg, port, usb } = req.body;
+        let { package: pkg, port, usb } = req.body;
         await ensureDockerCompose();
+        
+        // [CRIT-3 FIX] Validate all inputs before building YAML
+        _validateHaPkg(pkg);
+        port = _validateHaPort(port);
+        usb = _validateUsbPath(usb);
 
         let composeYaml = '';
         if (pkg === 'homeassistant') {

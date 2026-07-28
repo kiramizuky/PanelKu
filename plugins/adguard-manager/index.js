@@ -5,7 +5,7 @@ import { ensureDockerCompose, withDeployTimeout } from '../shared/dep-installer.
 
 
 export default {
-  register(app, io) {
+  register(app, _io) {
     // 1. AdGuard Home Manager Dashboard View
     app.get('/plugins/adguard-manager', async (req, res) => {
       try {
@@ -208,10 +208,24 @@ export default {
       }
     });
 
+    // ── Security helper ────────────────────────────────────────────
+    /**
+     * [CRIT-3 FIX] Validate port number — must be between 1 and 65535.
+     */
+    function _validateAdguardPort(p, label = 'Port') {
+      const num = parseInt(p);
+      if (isNaN(num) || num < 1 || num > 65535) {
+        throw new Error(`Invalid ${label} (must be 1-65535)`);
+      }
+      return num;
+    }
+
     // 2. Deploy API
     app.post('/plugins/adguard-manager/deploy', withDeployTimeout(600000), async (req, res) => {
       try {
-        const { port = 3000, dnsPort = 53 } = req.body;
+        // [CRIT-3 FIX] Validate port numbers server-side to prevent YAML injection
+        const port = _validateAdguardPort(req.body.port || 3000, 'Web Admin Port');
+        const dnsPort = _validateAdguardPort(req.body.dnsPort || 53, 'DNS Port');
         // Ensure docker-compose is installed before deploying
         await ensureDockerCompose();
         // Define docker-compose yml

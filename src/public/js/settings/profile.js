@@ -18,6 +18,13 @@ const ProfilePage = (() => {
         document.getElementById('profEmail').value = user.email || '';
         document.getElementById('profRole').value = (user.role?.name || '').toUpperCase();
 
+        // [LOW-2 FIX] Show must-change-password banner if user hasn't changed default password
+        const banner = document.getElementById('mustChangePwBanner');
+        if (banner && user.mustChangePassword) {
+          banner.style.display = 'block';
+          banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
         // Update live avatar card elements
         document.getElementById('profileCardName').textContent = user.username || 'User';
         document.getElementById('profileCardEmail').textContent = user.email || 'No email set';
@@ -47,6 +54,37 @@ const ProfilePage = (() => {
     }
   }
 
+  // [LOW-1 FIX] Password strength checker with visual progress bar
+  function checkPasswordStrength() {
+    const pw = document.getElementById('newPassword').value;
+    const bar = document.getElementById('pwStrengthFill');
+    const text = document.getElementById('pwStrengthText');
+    if (!bar || !text) return;
+
+    let score = 0;
+    if (pw.length >= 12) score += 25;
+    else if (pw.length >= 8) score += 10;
+    if (/[A-Z]/.test(pw)) score += 25;
+    if (/[a-z]/.test(pw)) score += 20;
+    if (/[0-9]/.test(pw)) score += 15;
+    if (/[^A-Za-z0-9]/.test(pw)) score += 15;
+
+    bar.style.width = Math.min(score, 100) + '%';
+    if (score < 40) {
+      bar.className = 'progress-bar bg-danger';
+      text.textContent = 'Weak — need uppercase, lowercase, number & special character (12+ chars)';
+      text.style.color = '#f87171';
+    } else if (score < 70) {
+      bar.className = 'progress-bar bg-warning';
+      text.textContent = 'Moderate — add more character variety or length';
+      text.style.color = '#fbbf24';
+    } else {
+      bar.className = 'progress-bar bg-success';
+      text.textContent = 'Strong password!';
+      text.style.color = '#34d399';
+    }
+  }
+
   async function changePassword(e) {
     e.preventDefault();
     const currentPassword = document.getElementById('currentPassword').value;
@@ -55,6 +93,11 @@ const ProfilePage = (() => {
 
     if (newPassword !== confirmPassword) {
       LP.toast('New passwords do not match.', 'error');
+      return;
+    }
+
+    if (newPassword.length < 12) {
+      LP.toast('Password must be at least 12 characters long.', 'error');
       return;
     }
 
@@ -288,7 +331,7 @@ const ProfilePage = (() => {
     }
   }
 
-  return { init, updateProfile, changePassword, regenerateApiKey, toggleApiKeyVisibility, copyApiKey, toggle2FA, confirmEnable2FA, toggleAiFields, saveAiSettings, loadAiSettings };
+  return { init, updateProfile, changePassword, checkPasswordStrength, regenerateApiKey, toggleApiKeyVisibility, copyApiKey, toggle2FA, confirmEnable2FA, toggleAiFields, saveAiSettings, loadAiSettings };
 })();
 
 window.ProfilePage = ProfilePage;

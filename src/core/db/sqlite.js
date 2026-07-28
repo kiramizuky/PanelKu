@@ -14,21 +14,40 @@ import { v4 as uuidv4 } from 'uuid';
 import logger from '../../config/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = resolve(process.cwd(), 'storage', 'panelku.db');
 
-// Ensure storage directory exists
-mkdirSync(resolve(process.cwd(), 'storage'), { recursive: true });
+// [TEST FIX] Compute DB_PATH lazily inside getDb() so tests can change CWD before first call.
+// ESM hoists all imports to the top of the module, so process.chdir() in test setup
+// happens AFTER this module is evaluated. Making DB_PATH lazy ensures the correct
+// working directory is used even when tests call chdir() before their first getDb() call.
+function getDbPath() {
+  // Allow override via env var for testing
+  if (process.env.PANELKU_DB_PATH) {
+    return resolve(process.env.PANELKU_DB_PATH);
+  }
+  return resolve(process.cwd(), 'storage', 'panelku.db');
+}
 
 let _db = null;
+let _storageEnsured = false;
+
+function ensureStorageDir() {
+  if (_storageEnsured) return;
+  _storageEnsured = true;
+  try {
+    mkdirSync(resolve(process.cwd(), 'storage'), { recursive: true });
+  } catch {}
+}
 
 export function getDb() {
   if (!_db) {
-    _db = new Database(DB_PATH);
+    const dbPath = getDbPath();
+    ensureStorageDir();
+    _db = new Database(dbPath);
     _db.pragma('journal_mode = WAL');
     _db.pragma('foreign_keys = ON');
     _db.pragma('synchronous = NORMAL');
     initSchema(_db);
-    logger.info(`SQLite database initialized at ${DB_PATH}`);
+    logger.info(`SQLite database initialized at ${dbPath}`);
   }
   return _db;
 }
@@ -75,6 +94,8 @@ function initSchema(db) {
       login_count         INTEGER NOT NULL DEFAULT 0,
       reset_token         TEXT,
       reset_token_expiry  TEXT,
+      must_change_password INTEGER NOT NULL DEFAULT 0,
+      password_changed_at  TEXT,
       created_at          TEXT NOT NULL,
       updated_at          TEXT NOT NULL
     );
@@ -249,6 +270,21 @@ function initSchema(db) {
   } catch (e) {
     if (!e.message.includes('duplicate column')) {
       logger.warn(`Migration users.sso_links failed: ${e.message}`);
+    }
+  }
+  // [LOW-2 FIX] Add must_change_password and password_changed_at columns for default password enforcement
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0");
+  } catch (e) {
+    if (!e.message.includes('duplicate column')) {
+      logger.warn(`Migration users.must_change_password failed: ${e.message}`);
+    }
+  }
+  try {
+    db.exec("ALTER TABLE users ADD COLUMN password_changed_at TEXT");
+  } catch (e) {
+    if (!e.message.includes('duplicate column')) {
+      logger.warn(`Migration users.password_changed_at failed: ${e.message}`);
     }
   }
 }

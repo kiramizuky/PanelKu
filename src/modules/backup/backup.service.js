@@ -195,7 +195,7 @@ class BackupService {
 
     try {
       const dest = remotePath ? `${remoteName}:${remotePath}` : `${remoteName}:`;
-      const stdout = await execAsync(`rclone ls "${dest}" 2>&1`, { timeout: 30000 });
+      const stdout = await execAsync(`"${bin}" ls "${dest}" 2>&1`, { timeout: 30000 });
       const files = stdout.split('\n')
         .filter(l => l.trim())
         .map(l => {

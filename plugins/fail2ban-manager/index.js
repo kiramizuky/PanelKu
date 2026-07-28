@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import fs from 'fs/promises';
+import net from 'net';
 import { requireAuth } from '../../src/middleware/auth.js';
 import { ensureCommand } from '../shared/dep-installer.js';
 
@@ -8,7 +8,7 @@ const execAsync = promisify(exec);
 
 
 export default {
-  register(app, io) {
+  register(app, _io) {
     // Helper to get Fail2ban status
     async function getFail2banStatus() {
       try {
@@ -244,15 +244,33 @@ export default {
       });
     });
 
+    // ── Security helpers ────────────────────────────────────────────
+    /**
+     * [CRIT-1 FIX] Validate jail name — only alphanumeric, underscores, hyphens.
+     */
+    function _validateJail(name) {
+      if (!name || typeof name !== 'string') throw new Error('Invalid jail name');
+      if (!/^[a-zA-Z0-9_-]+$/.test(name)) throw new Error('Jail name contains invalid characters');
+      return name.trim();
+    }
+
+    /**
+     * [CRIT-1 FIX] Validate IP address format strictly using Node's built-in net.isIP/net.isIPv6.
+     */
+    function _validateIp(ip) {
+      if (!ip || typeof ip !== 'string') throw new Error('IP address is required');
+      if (net.isIPv4(ip)) return ip;
+      if (net.isIPv6(ip)) return ip;
+      throw new Error('Invalid IP address format');
+    }
+
     // API: Ban IP
     app.post('/api/plugins/fail2ban/ban', async (req, res) => {
       const { jail, ip } = req.body;
-      if (!jail || !ip) {
-        return res.json({ success: false, message: 'Jail and IP address are required' });
-      }
       try {
-        // Runs: fail2ban-client set <jail> banip <ip>
-        // Simulate for security/fallback
+        // [CRIT-1 FIX] Validate jail and IP before using in any command
+        _validateJail(jail);
+        _validateIp(ip);
         res.json({ success: true, message: `IP ${ip} banned successfully on ${jail} (simulation)` });
       } catch (err) {
         res.json({ success: false, message: err.message });
@@ -262,11 +280,10 @@ export default {
     // API: Unban IP
     app.post('/api/plugins/fail2ban/unban', async (req, res) => {
       const { jail, ip } = req.body;
-      if (!jail || !ip) {
-        return res.json({ success: false, message: 'Jail and IP address are required' });
-      }
       try {
-        // Runs: fail2ban-client set <jail> unbanip <ip>
+        // [CRIT-1 FIX] Validate jail and IP before using in any command
+        _validateJail(jail);
+        _validateIp(ip);
         res.json({ success: true, message: `IP ${ip} unbanned successfully on ${jail} (simulation)` });
       } catch (err) {
         res.json({ success: false, message: err.message });

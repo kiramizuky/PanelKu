@@ -64,6 +64,39 @@ export const registerNotificationSocket = (namespace) => {
       logger.warn('Failed to create system alert notification:', err.message);
     }
   }, 'notifications-ws');
+
+  // Listen to password policy changes and broadcast to all online admins
+  eventBus.subscribe(EVENTS.PASSWORD_POLICY_CHANGED, async (data) => {
+    try {
+      const actionLabels = {
+        updated: 'updated',
+        reset: 'reset to defaults',
+        imported: 'imported from file/server',
+      };
+      const label = actionLabels[data.action] || data.action;
+      const msg = `Password policy was ${label} by ${data.username}`;
+
+      const notification = await Notification.create({
+        title: 'Password Policy Changed',
+        message: msg,
+        type: 'info',
+        icon: 'bi bi-shield-lock-fill',
+        link: '/settings/password-policy-history',
+        isGlobal: true,
+        metadata: {
+          event: 'password_policy_changed',
+          action: data.action,
+          username: data.username,
+        },
+      });
+
+      // Broadcast to ALL connected users (admin panel users)
+      namespace.emit('notification:new', notification);
+      logger.info(`WS broadcast: Password policy ${label} by ${data.username}`);
+    } catch (err) {
+      logger.warn('Failed to broadcast password policy change:', err.message);
+    }
+  }, 'notifications-ws');
 };
 
 /**

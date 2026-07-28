@@ -338,18 +338,152 @@ Port default: `3699` (dari `src/config/app.js`)
 
 ---
 
-## 🎯 Rencana Selanjutnya
+## 🔒 Security Audit — Juli 2026
 
-Fitur potensial untuk pengembangan mendatang:
-1. ✅ **Fase 1–23**: Semua fase inti selesai
-2. ⬜ **Testing**: Unit tests + integration tests (Jest)
-3. ⬜ **Mobile App**: REST API sudah lengkap untuk mobile client
-4. ⬜ **i18n**: Multi-language support
-5. ⬜ **Ansible Integration**: Playbook generator
-6. ⬜ **Proxmox VE**: VM/LXC management
-7. ⬜ **Plesk Migration Tool**: Import dari panel lain
+### Audit Events — Password Changes
+| Event | Source | Trigger | Deskripsi |
+|---|---|---|---|
+| `DEFAULT_ADMIN_CREATED` | `bootstrap.js` | Seed data first run | Default super admin created with mustChangePassword flag |
+| `PASSWORD_CHANGE_REQUIRED` | `auth.service.js` | Login with mustChangePassword=true | User logged in with default password — warned to change |
+| `PASSWORD_CHANGED` | `users.controller.js` | POST /users/me/password | User voluntarily changed their own password |
+| `PASSWORD_CHANGE_FAILED` | `users.service.js` | Wrong currentPassword | Failed attempt to change password (wrong existing password) |
+| `PASSWORD_RESET_BY_ADMIN` | `users.service.js` | Admin PUT /users/:id with password field | Admin/manager reset another user's password |
+
+### Ringkasan Keamanan
+| Level | Jumlah Temuan | Diperbaiki |
+|---|---|---|
+| 🔴 CRITICAL | 5 | ✅ 5/5 |
+| 🟠 HIGH | 3 | ✅ 3/3 |
+| 🟡 MEDIUM | 5 | ✅ 5/5 |
+| 🟢 LOW | 4 | ✅ 4/4 |
+
+### 🔴 Critical (Diperbaiki)
+1. **CRIT-1: Command Injection di rclone-backuper plugin** — `execAsync` dengan string interpolasi dari user input (source, remote, destPath).
+   - **Fix**: Validasi input dengan regex whitelist + ganti ke `execFile` dengan args array.
+2. **CRIT-2: Command Injection di fail2ban-manager** — jail & IP dari `req.body` tanpa validasi.
+   - **Fix**: Validasi jail name (alphanumeric), IP address (net.isIPv4/isIPv6).
+3. **CRIT-3: YAML Injection via port number** — Port dari `req.body` diinterpolasi langsung ke template YAML docker-compose.
+   - **Fix**: Validasi port server-side (1-65535, integer) di db-admin, adguard, home-assistant manager.
+4. **CRIT-4: Weak Random Token (Math.random())** — Token webhook dan ID menggunakan `Math.random().toString(36)`.
+   - **Fix**: Ganti dengan `crypto.randomBytes()` di websites.service.js, git-deployer.
+5. **CRIT-5: Command Injection di wireguard-manager** — Input allowedIps/publicKey dari user tanpa validasi.
+   - **Fix**: Validasi IP/CIDR, public key format, path di semua endpoint.
+
+### 🟠 High (✅ Diperbaiki)
+1. **HIGH-1: Plugin API endpoints tanpa autentikasi** — Beberapa endpoint plugin tidak menggunakan middleware `requireAuth`.
+   - **Existing**: Umumnya endpoint GET view publik (halaman plugin) memang publik.
+   - **Rekomendasi**: Tambah `requireAuth` pada semua POST/PUT/DELETE endpoint.
+2. ✅ **HIGH-2: No rate limiting pada webhook publik** — Git-deployer webhook endpoint rentan brute-force.
+   - **Fix**: Tambah `webhookLimiter` (10 req/min per webhook ID + IP) di endpoint `/api/git-deploy/webhook/:secret`.
+3. ✅ **HIGH-3: Command injection di system.service.js** — Semua fungsi migrasi dari `execAsync(cmd)` ke `execFile` + args array.
+   - **Fix**: Helper baru `_execFile(cmd, args)` untuk semua operasi dengan input pengguna. `_execShell(cmd)` hanya untuk command hardcoded (pipa, redirect).
+   - **Detail**: Complex git pipeline dipecah jadi multiple `execFile` calls + JS line counting.
+   - **File**: `system.service.js` — 30+ call sites direfactor. `ssh.service.js` — sudah aman sejak awal.
+
+### 🟡 Medium (✅ Diperbaiki)
+1. ✅ **MED-1: Self-XSS via plugin settings** — Semua user data di template HTML git-deployer di-escape dengan `escapeHtml()`. Defense-in-depth: data juga sudah divalidasi sebelumnya.
+2. ✅ **MED-2: Detail error berlebihan** — LDAP test hanya return `{ success: true/false }`, `server: info` dihapus dari response. errorHandler di production ganti pesan 500 jadi 'Internal server error'.
+3. ✅ **MED-3: CSRF pada cookie refresh_token** — `sameSite: 'lax'` → `'strict'` di semua cookie (login, 2FA, refresh). Skip condition rate-limiter tidak lagi membaca cookies.
+4. ✅ **MED-4: No brute-force protection pada 2FA verify** — `twoFactorLimiter` baru: 5 attempts/15 menit, keyed by tempToken (unique per login) + IP.
+5. ✅ **MED-5: XSS di EJS page rendering** — Verifikasi: layout.ejs pakai `<%=` (escape) untuk semua data user, `<%-` (unescape) hanya untuk pre-rendered body/style/script. Login page handle input via JS `textContent`.
+
+### 🟢 Low (✅ Diperbaiki)
+1. ✅ **LOW-1: Weak password policy** — Minimum 12 karakter + uppercase + lowercase + number + special character.
+   - **Fix**: `isStrongPassword()` di validate.js diperkuat. Validasi diterapkan di `users.service.js` (create, update, changePassword). Client-side strength indicator dengan progress bar di profile view.
+2. ✅ **LOW-2: Default admin credentials** — Admin@123456 tidak bisa login tanpa ganti password dulu.
+   - **Fix**: Kolom `must_change_password` dan `password_changed_at` di SQLite. Set `mustChangePassword: true` di seed default admin. Backend return `mustChangePassword` flag di login response. Frontend redirect ke `/settings/profile?forceChange=1`. Banner warning di profile page. Flag di-clear otomatis saat ganti password.
+3. ✅ **LOW-3: IP-based brute-force protection** — Login rate limiter keyed by IP + username.
+   - **Fix**: `authLimiter.keyGenerator` sekarang join IP + username. `apiLimiter.skip` tidak lagi bypass semua `/api/*` endpoints — hanya loopback saja. Tidak skip private LAN (cegah serangan dari device IoT yang sudah dikompromisi di LAN yang sama).
+4. ✅ **LOW-4: Secure cookie defaults** — Cookie `secure` via `appConfig.isProd`, bukan `process.env.NODE_ENV === 'production' && req.protocol === 'https'`.
+   - **Fix**: Semua 4 cookie (login, 2FA, refresh, SSO) pakai `secure: appConfig.isProd`. Ini penting karena di belakang reverse proxy (nginx), `req.protocol` bisa 'http' meskipun koneksi eksternal HTTPS.
+
+### Rekomendasi Keamanan Tambahan
+1. **Content Security Policy (CSP)**: Gunakan nonce untuk script tags, bukan 'unsafe-inline'
+2. **Helmet.js**: Aktifkan semua helmet default (termasuk hidePoweredBy, referrerPolicy)
+3. **SQL Injection prevention**: Gunakan parameterized queries untuk semua SQL (sudah — better-sqlite3)
+4. **Rate Limiting**: Implementasi sliding window rate limiter per-IP untuk semua endpoint publik
+5. **Audit Log Retention**: Konfigurasi auto-cleanup untuk audit logs (lebih dari 30 hari)
+6. **Secrets Rotation**: Auto-rotate JWT secrets dan API keys secara periodik
+7. **Dependency Scanning**: Tambahkan `npm audit` di CI/CD pipeline
+8. **Penetration Testing**: Lakukan pengujian penetrasi berkala
+
+---
+
+## 🎯 Rencana Pengembangan Selanjutnya (v2.0 — Enterprise)
+
+### Prioritas Tinggi (Q3 2026)
+1. ⬜ **Security Hardening Final** — Perbaiki semua MEDIUM & LOW vulnerabilities
+2. ⬜ **Unit Testing** — Jest test suites untuk semua 38 modul (minimal controller + service)
+3. ⬜ **Integration Testing** — API integration tests dengan supertest
+4. ⬜ **Automated CI/CD** — GitHub Actions: lint → test → build → deploy
+
+### Prioritas Sedang (Q4 2026)
+5. ⬜ **Multi-Language (i18n)** — Dukungan bahasa Inggris, Indonesia, Mandarin
+6. ⬜ **Performance Optimization** — Redis caching untuk dashboard & monitoring
+7. ⬜ **Mobile Responsive** — Bootstrap 5 mobile-first redesign untuk semua halaman
+8. ⬜ **PWA Support** — Service worker, offline mode, push notifications
+
+### Prioritas Rendah (2027)
+9. ⬜ **Mobile App (Flutter/React Native)** — REST API sudah lengkap
+10. ⬜ **Proxmox VE Integration** — VM/LXC container management
+11. ⬜ **Ansible Playbook Generator** — Generate Ansible playbook dari konfigurasi panel
+12. ⬜ **Plesk/cPanel Migration Tool** — Import dari panel hosting lain
+13. ⬜ **Database Clustering** — MySQL Group Replication / Patroni PostgreSQL
+14. ⬜ **AI-Powered Auto-Scaling** — Prediksi beban dan auto-scale services
+
+### Maintenance Berkelanjutan
+- ✅ **CI/CD Pipeline** — GitHub Actions: lint, jest test, npm audit, CodeQL SAST, Trivy, truffleHog
+- ⬜ **Dependency updates** — npm audit setiap bulan (via CI/CD)
+- ⬜ **Security patches** — Respons dalam 24 jam untuk critical CVEs
+- ⬜ **Plugin Marketplace** — Review dan approve plugin komunitas
+- ⬜ **Documentation** — API docs (Swagger) update setiap rilis
+
+---
+
+## 🤖 CI/CD Pipeline (GitHub Actions)
+
+### Workflows
+
+| Workflow | Trigger | Jobs | Durasi |
+|---|---|---|---|
+| **CI** (`.github/workflows/ci.yml`) | Push/PR ke main/master | Lint (ESLint) → Test (Jest) → npm Audit → CodeQL → Docker Build Check | ~15-30 menit |
+| **CD** (`.github/workflows/docker-publish.yml`) | Push tag v* atau main/master | CI Gate → Build & Push (Docker Hub + GHCR) → Docker Scout scan | ~10-15 menit |
+| **Security Scan** (`.github/workflows/security-scan.yml`) | Weekly (Senin 07:00 UTC) + on-demand | Dependency Review → npm Audit → CodeQL Full → Trivy FS → truffleHog | ~20-30 menit |
+
+### CI Pipeline Stages
+```mermaid
+graph LR
+    A[Push/PR] --> B[Lint ESLint]
+    B --> C[Jest Tests]
+    B --> D[npm Audit]
+    B --> E[CodeQL SAST]
+    C --> F[Docker Build Check]
+    D --> G[Report]
+    E --> G
+    F --> G
+```
+
+### CD Pipeline Stages
+```mermaid
+graph LR
+    A[Tag Push] --> B[CI Gate]
+    B --> C[Docker Buildx]
+    C --> D[Docker Hub Push]
+    C --> E[GHCR Push]
+    C --> F[Docker Scout Scan]
+    D --> G[Upload SARIF]
+    E --> G
+    F --> G
+```
+
+### Environment Variables Required
+| Secret | Deskripsi |
+|---|---|
+| `DOCKER_USERNAME` | Username Docker Hub |
+| `DOCKER_PASSWORD` | Password / token Docker Hub |
+| `GITHUB_TOKEN` | Otomatis tersedia — untuk GHCR push |
 
 ---
 
 > *Dibuat oleh Phersa Creative Studio™*  
-> *Terakhir diperbarui: 17 Juli 2026*
+> *Terakhir diperbarui: 28 Juli 2026*

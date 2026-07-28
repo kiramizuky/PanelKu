@@ -1,4 +1,6 @@
 import usersService from './users.service.js';
+import auditRepository from '../../repositories/audit.repository.js';
+import logger from '../../config/logger.js';
 import { success, created, error, paginated } from '../../helpers/response.js';
 
 function cleanId(id) {
@@ -61,7 +63,22 @@ class UsersController {
     try {
       const { currentPassword, newPassword } = req.body;
       const userId = cleanId(req.user._id || req.user.id);
+      const username = req.user?.username || 'unknown';
       await usersService.changePassword(userId, currentPassword, newPassword);
+
+      // [AUDIT] Log voluntary password change by the user
+      auditRepository.log({
+        userId,
+        username,
+        action:   'PASSWORD_CHANGED',
+        resource: 'users',
+        resourceId: userId,
+        details:  'User voluntarily changed their password',
+        ip:       req.ip || req.socket?.remoteAddress || '',
+        userAgent: req.headers?.['user-agent'] || '',
+        status:   'success',
+      }).catch((e) => logger.error('Failed to write audit log: ' + e.message));
+
       return success(res, {}, 'Password changed successfully');
     } catch (err) {
       return error(res, err.message, err.statusCode || 500);

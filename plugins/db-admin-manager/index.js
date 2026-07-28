@@ -5,7 +5,7 @@ import { ensureDockerCompose, withDeployTimeout } from '../shared/dep-installer.
 
 
 export default {
-  register(app, io) {
+  register(app, _io) {
     // 1. Dashboard View
     app.get('/plugins/db-admin-manager', async (req, res) => {
       try {
@@ -301,11 +301,40 @@ export default {
       }
     });
 
+    // ── Security helpers ────────────────────────────────────────────
+    /**
+     * [CRIT-3 FIX] Validate port number — must be between 1 and 65535.
+     */
+    function _validatePort(port) {
+      const num = parseInt(port);
+      if (isNaN(num) || num < 1 || num > 65535) {
+        throw new Error('Invalid port number (must be 1-65535)');
+      }
+      return num;
+    }
+
+    /**
+     * [CRIT-3 FIX] Validate container name — only safe alphanumeric chars.
+     */
+    function _validatePkg(name) {
+      if (!name || typeof name !== 'string') throw new Error('Invalid package name');
+      if (!/^[a-zA-Z0-9_-]+$/.test(name)) throw new Error('Package name contains invalid characters');
+      return name.trim();
+    }
+
     // 2. Deploy API
     app.post('/plugins/db-admin-manager/deploy', withDeployTimeout(600000), async (req, res) => {
       try {
-        const { package: pkg, port, pmaHost = '172.17.0.1', pgadminEmail, pgadminPassword } = req.body;
+        let { package: pkg, port, pmaHost = '172.17.0.1', pgadminEmail, pgadminPassword } = req.body;
         await ensureDockerCompose();
+
+        // [CRIT-3 FIX] Validate all inputs before building YAML
+        _validatePkg(pkg);
+        port = _validatePort(port);
+
+        if (pmaHost && !/^[\d.]+$/.test(pmaHost)) {
+          throw new Error('Invalid MySQL host format');
+        }
 
         let composeYaml = '';
         if (pkg === 'phpmyadmin') {

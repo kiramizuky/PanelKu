@@ -53,9 +53,17 @@ export const errorHandler = (err, req, res, _next) => {
 
   // Custom app error
   const statusCode = err.statusCode || HTTP.SERVER_ERROR;
+  
+  // [MED-2 FIX] In production, don't expose internal error messages for 500 errors.
+  // Lower-status errors (4xx) are intentional and safe to show.
+  let message = err.message || 'Internal server error';
+  if (statusCode >= 500 && process.env.NODE_ENV === 'production') {
+    message = 'Internal server error';
+  }
+  
   res.status(statusCode).json({
     success: false,
-    message: err.message || 'Internal server error',
+    message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };

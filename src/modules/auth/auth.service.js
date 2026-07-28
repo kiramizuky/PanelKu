@@ -8,6 +8,7 @@ import { getDeviceInfo } from '../../helpers/system.js';
 import eventBus, { EVENTS } from '../../core/events/EventBus.js';
 import logger from '../../config/logger.js';
 import auditRepository from '../../repositories/audit.repository.js';
+import passwordPolicyService from '../system/password-policy.service.js';
 
 class AuthService {
   /**
@@ -112,7 +113,58 @@ class AuthService {
     await userRepository.updateLoginStats(user._id, deviceInfo.ip);
     eventBus.publish(EVENTS.USER_LOGGED_IN, { userId: user._id, username: user.username, ip: deviceInfo.ip });
 
-    return { accessToken, refreshToken, user: this._sanitizeUser(user) };
+    // [LOW-2 FIX] Notify frontend if user must change their default password
+    // The frontend will redirect to settings page to enforce new password.
+    const sanitizedUser = this._sanitizeUser(user);
+
+    // [PASSWORD EXPIRY] Check if password has expired based on password_changed_at + configurable days.
+    // If expired, force user to change password (same flow as mustChangePassword).
+    // Loads policy from DB settings, falls back to appConfig defaults.
+    let passwordExpired = false;
+    let forceChangeReason = null;
+
+    const policy = await passwordPolicyService.getPolicy().catch(() => null);
+    const expiryEnabled = policy ? policy.expiryEnabled : appConfig.passwordExpiry.enabled;
+    const expiryDays = policy ? policy.expiryDays : appConfig.passwordExpiry.days;
+
+    if (expiryEnabled && user.passwordChangedAt) {
+      const maxAge = expiryDays * 24 * 60 * 60 * 1000;
+      const age = Date.now() - new Date(user.passwordChangedAt).getTime();
+      if (age > maxAge) {
+        passwordExpired = true;
+        forceChangeReason = `Password is older than ${expiryDays} days — please change it.`;
+      }
+    }
+
+    // Combine both flags: mustChangePassword from DB (default admin) OR password expiry
+    const needsPasswordChange = user.mustChangePassword || passwordExpired;
+
+    // [AUDIT] Log login event when password change is required
+    if (needsPasswordChange) {
+      const auditDetails = passwordExpired
+        ? `Password expired (${expiryDays} day policy) — must change before continuing`
+        : 'User logged in with default password — must change before accessing the panel';
+
+      auditRepository.log({
+        userId:    user._id,
+        username:  user.username,
+        action:    'PASSWORD_CHANGE_REQUIRED',
+        resource:  'auth',
+        details:   auditDetails,
+        ip:        deviceInfo.ip,
+        userAgent: deviceInfo.userAgent,
+        status:    'warning',
+      }).catch((e) => logger.error('Failed to write audit log: ' + e.message));
+    }
+
+    return {
+      accessToken,
+      refreshToken,
+      user: sanitizedUser,
+      mustChangePassword: user.mustChangePassword || false,
+      passwordExpired,
+      forceChangeReason,
+    };
   }
 
   /**
@@ -329,8 +381,11 @@ class AuthService {
       expiresIn: appConfig.jwt.expiresIn,
     });
 
+    // [TEST FIX] Add `nonce` with millisecond precision to prevent refresh token collisions.
+    // JWT `iat` has second resolution — two calls within the same second produce identical
+    // tokens for the same user. The `nonce` claim ensures each token is unique.
     const refreshToken = jwt.sign(
-      { sub: user._id },
+      { sub: user._id, nonce: Date.now() },
       appConfig.jwt.refreshSecret,
       { expiresIn: appConfig.jwt.refreshExpiresIn }
     );

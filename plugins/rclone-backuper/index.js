@@ -1,13 +1,38 @@
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { requireAuth } from '../../src/middleware/auth.js';
 import { ensureCommand } from '../shared/dep-installer.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+// ── Security helpers ────────────────────────────────────────────
+
+/**
+ * [SECURITY] Validate a remote name — only alphanumeric, underscores, hyphens.
+ */
+function _validateRemote(name) {
+  if (!name || typeof name !== 'string') throw new Error('Invalid remote name');
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) throw new Error('Remote name contains invalid characters');
+  return name.trim();
+}
+
+/**
+ * [SECURITY] Validate a source/destination path — block shell metacharacters.
+ */
+function _validatePath(p, allowSlash = true) {
+  if (!p || typeof p !== 'string') throw new Error('Invalid path');
+  const pattern = allowSlash ? /^[a-zA-Z0-9_\-.\/@]+$/ : /^[a-zA-Z0-9_\-.]+$/;
+  if (!pattern.test(p)) throw new Error('Path contains invalid characters');
+  if (p.includes('..')) throw new Error('Path traversal detected');
+  return p.trim();
+}
+
+
 
 
 export default {
-  register(app, io) {
+  register(app, _io) {
     // Helper to list rclone remotes
     async function getRcloneRemotes() {
       try {
@@ -223,12 +248,21 @@ export default {
     app.post('/api/plugins/rclone/jobs', requireAuth, async (req, res) => {
       const { name, source, remote, destPath, schedule } = req.body;
       const jobs = await getBackupJobs();
+      
+      // [CRIT-1 FIX] Validate all user inputs to prevent command injection
+      const crypto = await import('crypto');
+      const safeId = crypto.randomBytes(12).toString('hex');
+      _validatePath(name, false);
+      _validatePath(source);
+      _validateRemote(remote);
+      if (destPath) _validatePath(destPath);
+      
       const newJob = {
-        id: Math.random().toString(36).substring(2, 15),
-        name,
-        source,
-        remote,
-        destPath,
+        id: safeId,
+        name: name.trim(),
+        source: source.trim(),
+        remote: remote.trim(),
+        destPath: (destPath || 'backups').trim(),
         schedule,
         lastRun: null,
         lastStatus: null
@@ -261,8 +295,14 @@ export default {
       let lastStatus = 'success';
 
       try {
-        // Runs: rclone sync <source> <remote>:<destPath>
-        await execAsync(`rclone sync ${job.source} ${job.remote}:${job.destPath}`);
+        // [CRIT-1 FIX] Use execFile with args array instead of shell string interpolation.
+        // This completely prevents command injection via source/remote/destPath.
+        // All inputs were validated on create/update, but we re-validate at runtime for defense-in-depth.
+        _validateRemote(job.remote);
+        _validatePath(job.source);
+        _validatePath(job.destPath);
+        const dest = `${job.remote}:${job.destPath}`;
+        await execFileAsync('rclone', ['sync', job.source, dest], { timeout: 3600000 });
       } catch (err) {
         // Simulated execution success if rclone is not present
         lastStatus = 'success'; // Treat as success for demo purposes

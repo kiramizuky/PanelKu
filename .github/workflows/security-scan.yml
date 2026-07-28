@@ -1,0 +1,173 @@
+# ─────────────────────────────────────────────────────────────────────
+# Panelku — Weekly Security Scan
+# Runs every Monday at 07:00 UTC and on-demand via workflow_dispatch.
+# Stages: Dependency Review → npm Audit → CodeQL Full Analysis → Trivy FS Scan
+# ─────────────────────────────────────────────────────────────────────
+
+name: 🔒 Weekly Security Scan
+
+on:
+  schedule:
+    # Every Monday 07:00 UTC
+    - cron: '0 7 * * 1'
+  push:
+    branches: [main, master]
+    paths:
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/*.js'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+  pull-requests: write
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── Dependency Review (for PRs touching dependencies) ───────────
+  dependency-review:
+    name: 📦 Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          deny-licenses: AGPL-1.0, AGPL-3.0, BUSL-1.1
+          comment-summary-in-pr: always
+
+  # ── npm Audit ────────────────────────────────────────────────────
+  npm-audit:
+    name: 🛡️ npm Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: linux-panel/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./linux-panel
+        run: npm ci --ignore-scripts
+
+      - name: Run npm audit (all severity levels)
+        working-directory: ./linux-panel
+        run: npm audit --audit-level=moderate
+        continue-on-error: true  # Report findings but don't block
+
+      - name: Check for known advisories
+        working-directory: ./linux-panel
+        run: |
+          echo "🔍 Audit Summary"
+          npm audit --json 2>/dev/null | node -e "
+            const d = require('fs').readFileSync('/dev/stdin','utf8');
+            const r = JSON.parse(d);
+            const v = r.vulnerabilities || {};
+            const counts = { critical: 0, high: 0, moderate: 0, low: 0 };
+            for (const [pkg, info] of Object.entries(v)) {
+              counts[info.severity] = (counts[info.severity] || 0) + 1;
+            }
+            console.log('╔════════════════════════════════╗');
+            console.log('║   npm Audit Summary            ║');
+            console.log('╠════════════════════════════════╣');
+            console.log('║  Critical: ' + String(counts.critical).padEnd(17) + '║');
+            console.log('║  High:     ' + String(counts.high).padEnd(17) + '║');
+            console.log('║  Moderate: ' + String(counts.moderate).padEnd(17) + '║');
+            console.log('║  Low:      ' + String(counts.low).padEnd(17) + '║');
+            console.log('╚════════════════════════════════╝');
+            if (counts.critical > 0 || counts.high > 0) process.exit(1);
+          " || echo "⚠️  High/Critical vulnerabilities found — review required"
+        continue-on-error: true
+
+  # ── CodeQL Full Analysis ─────────────────────────────────────────
+  codeql:
+    name: 🔬 CodeQL Full JavaScript Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          queries: +security-extended,security-and-quality
+          config: |
+            name: "Panelku Security Queries"
+            paths:
+              - linux-panel/src
+              - linux-panel/plugins
+            paths-ignore:
+              - linux-panel/node_modules
+              - linux-panel/src/public
+              - linux-panel/src/config/swagger.js
+              - linux-panel/src/config/swagger.fixed.js
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript"
+          output: codeql-results
+          upload: true
+
+  # ── Trivy Filesystem Security Scan ──────────────────────────────
+  trivy-scan:
+    name: 🔎 Trivy FS Vulnerability Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner (filesystem)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: ./linux-panel
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 0  # Don't fail the pipeline — report only
+          hide-progress: true
+          scanners: vuln,secret,misconfig
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+  # ── Secret Scanner (truffleHog) ──────────────────────────────────
+  secrets-scan:
+    name: 🕵️ Secrets Scan (truffleHog)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git-based scanning
+
+      - name: truffleHog Secrets Scan
+        uses: trufflesecurity/trufflehog@v3
+        with:
+          extra_args: --results=verified,unknown --no-verification

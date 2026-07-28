@@ -1,10 +1,18 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { exec } from 'child_process';
+import crypto from 'crypto';
 import util from 'util';
 import Website from '../../models/Website.js';
 
 const execAsync = util.promisify(exec);
+
+/**
+ * [CRIT-4 FIX] Generate a cryptographically secure random token instead of Math.random().
+ */
+function secureToken(bytes = 24) {
+  return crypto.randomBytes(bytes).toString('hex');
+}
 
 // Vhost templates
 const NGINX_TEMPLATE_STATIC = `
@@ -146,7 +154,8 @@ class WebsiteService {
     // [SECURITY] Validate rootDirectory to prevent path traversal and shell injection
     const rootDirectory = data.rootDirectory ? this._validateRootDirectory(data.rootDirectory) : `/var/www/${data.domain}`;
 
-    const webhookToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    // [CRIT-4 FIX] Use cryptographically secure token instead of Math.random()
+    const webhookToken = secureToken();
 
     const website = await Website.create({
       domain:        data.domain,
@@ -195,7 +204,7 @@ class WebsiteService {
       gitRepo:       data.gitRepo       !== undefined ? data.gitRepo       : website.gitRepo,
       autoDeploy:    data.autoDeploy    !== undefined ? data.autoDeploy    : website.autoDeploy,
       phpVersion:    data.phpVersion    ?? website.phpVersion,
-      webhookToken:  website.webhookToken || (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)),
+      webhookToken:  website.webhookToken || secureToken(),
     });
 
     if (updated.status === 'active') {

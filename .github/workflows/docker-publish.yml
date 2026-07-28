@@ -1,4 +1,11 @@
-name: Publish Docker Image
+# ─────────────────────────────────────────────────────────────────────
+# Panelku — Continuous Deployment (Docker Image)
+# Triggered on tag pushes (v*) or manual dispatch.
+# Includes inline CI gate, multi-registry push (Docker Hub + GHCR),
+# and Docker Scout vulnerability scanning.
+# ─────────────────────────────────────────────────────────────────────
+
+name: CD — Publish Docker Image
 
 on:
   push:
@@ -8,10 +15,75 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Override tag for the image (e.g. v2.0.0)'
+        required: false
+        type: string
+
+env:
+  NODE_VERSION: '20'
+  REGISTRY_GHCR: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  # ── Stage 1: CI Gate (lint + audit before building) ─────────────
+  ci-lint:
+    name: 🔍 Lint Check (ESLint)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: linux-panel/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./linux-panel
+        run: npm ci --ignore-scripts
+
+      - name: Run ESLint
+        working-directory: ./linux-panel
+        run: npm run lint:check
+
+  ci-audit:
+    name: 🛡️ npm Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: linux-panel/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./linux-panel
+        run: npm ci --ignore-scripts
+
+      - name: Run npm audit
+        working-directory: ./linux-panel
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  # ── Stage 2: Build & Push ───────────────────────────────────────
+  build-and-push:
+    name: 🐳 Build & Push
+    runs-on: ubuntu-latest
+    needs: [ci-lint]
+    permissions:
+      contents: read
+      packages: write  # Required for GHCR push
+      security-events: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,29 +94,67 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # ── Docker Hub login (optional — only if secrets are set) ──
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
+        if: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # ── GitHub Container Registry login ──
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Extract metadata ──
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/panelku
+          images: |
+            ${{ secrets.DOCKER_USERNAME }}/panelku
+            ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=ref,event=branch
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+            type=sha,format=short
 
+      # ── Build and push ──
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./linux-panel
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+
+      # ── Docker Scout image analysis (security) ──
+      - name: Run Docker Scout (image vulnerability scan)
+        uses: docker/scout-action@v1
+        if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+        with:
+          # Use a known tag from the metadata output for the Scout scan
+          image: ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:latest
+          only-severities: critical,high
+          dockerhub-user: ${{ secrets.DOCKER_USERNAME || '' }}
+          dockerhub-password: ${{ secrets.DOCKER_PASSWORD || '' }}
+          command: quickview,cves
+          sarif-file: scout-report.sarif
+
+      # ── Upload vulnerability report ──
+      - name: Upload Scout SARIF report
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: scout-report.sarif
+          category: docker-scout

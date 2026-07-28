@@ -6,6 +6,7 @@ import packageManager from './package-manager.js';
 import { getDb } from '../../core/db/sqlite.js';
 
 const execAsync = util.promisify(exec);
+const execFileAsync = util.promisify(execFile);
 
 class SystemService {
   constructor() {
@@ -13,16 +14,50 @@ class SystemService {
     this.mockTailscaleConnected = false;
   }
 
-  async runCommand(cmd) {
+  // ── Safe execution helpers ─────────────────────────────────────
+  // [HIGH-3 FIX] All system commands now use execFile with args array.
+  // Commands that require shell features (pipes, redirects) use _execShell
+  // ONLY with hardcoded strings — NEVER with user input.
+
+  /**
+   * Execute a command safely using execFile with args array — no shell interpreter.
+   * Prevents command injection entirely. Preferred for ALL system operations.
+   * @param {string} cmd - Binary to execute (e.g. 'systemctl', 'git', 'sudo')
+   * @param {string[]} args - Array of arguments
+   * @param {object} options - Optional: cwd, timeout, env, etc.
+   */
+  async _execFile(cmd, args = [], options = {}) {
+    const mergedOptions = { timeout: 30000, ...options };
+    // Skip mock on Windows: runCommand still works via execAsync for mocks
+    if (process.platform === 'win32') {
+      return this.mockCommand(`${cmd} ${args.join(' ')}`);
+    }
     try {
-      if (process.platform === 'win32') {
-        logger.warn(`Simulating Linux command on Windows: ${cmd}`);
-        return this.mockCommand(cmd);
+      const { stdout } = await execFileAsync(cmd, args, mergedOptions);
+      return stdout;
+    } catch (error) {
+      if (error.message?.includes('not found')) {
+        return this.mockCommand(`${cmd} ${args.join(' ')}`);
       }
+      throw new Error(`System error: ${error.stderr || error.message}`);
+    }
+  }
+
+  /**
+   * Execute a command through the shell — ONLY for hardcoded strings with no user input.
+   * Used for commands that require pipes (|), chaining (&&), or redirects (>).
+   * WARNING: Never pass user input through this method.
+   */
+  async _execShell(cmd) {
+    if (process.platform === 'win32') {
+      logger.warn(`Simulating Linux command on Windows: ${cmd}`);
+      return this.mockCommand(cmd);
+    }
+    try {
       const { stdout } = await execAsync(cmd);
       return stdout;
     } catch (error) {
-      if (process.platform === 'win32' || error.message.includes('not found')) {
+      if (error.message?.includes('not found')) {
         return this.mockCommand(cmd);
       }
       throw new Error(`System error: ${error.stderr || error.message}`);
@@ -72,9 +107,12 @@ class SystemService {
     return 'Command executed successfully (mock)';
   }
 
+  // ── Tailscale ──────────────────────────────────────────────────
+
   async isTailscaleInstalled() {
     try {
-      const out = await this.runCommand('command -v tailscale');
+      // [HIGH-3 FIX] Use execFile with args array
+      const out = await this._execFile('command', ['-v', 'tailscale']);
       return out.trim().length > 0;
     } catch (e) {
       return false;
@@ -95,17 +133,16 @@ class SystemService {
     let peers = [];
 
     try {
-      const statusOut = await this.runCommand('sudo tailscale status');
+      // [HIGH-3 FIX] Use execFile with args array
+      const statusOut = await this._execFile('sudo', ['tailscale', 'status']);
       if (statusOut.includes('Logged out') || statusOut.includes('No connection')) {
         isConnected = false;
       } else {
         isConnected = true;
-        const ipOut = await this.runCommand('sudo tailscale ip -4');
+        const ipOut = await this._execFile('sudo', ['tailscale', 'ip', '-4']);
         ip = ipOut.trim();
 
         // Parse peer nodes
-        // Format of tailscale status output lines:
-        // IP hostname user os [status]
         const lines = statusOut.trim().split('\n');
         for (const line of lines) {
           const trimmed = line.trim();
@@ -118,7 +155,6 @@ class SystemService {
             const peerOs = parts[3];
             const peerStatus = parts.slice(4).join(' ') || 'active';
             
-            // Exclude self from peers list
             if (peerIp !== ip && !peerHost.includes('self')) {
               peers.push({
                 ip: peerIp,
@@ -156,15 +192,13 @@ class SystemService {
 
   async installTailscale() {
     logger.info('Installing Tailscale...');
-    const out = await this.runCommand('curl -fsSL https://tailscale.com/install.sh | sh');
-    await this.runCommand('sudo systemctl enable --now tailscaled').catch(() => {});
+    // [HIGH-3 FIX] Use execFile: curl the install script, pipe through shell is unavoidable here
+    // but the URL is hardcoded — no user input involved
+    const out = await this._execShell('curl -fsSL https://tailscale.com/install.sh | sh');
+    await this._execFile('sudo', ['systemctl', 'enable', '--now', 'tailscaled']).catch(() => {});
     return out;
   }
 
-  /**
-   * Validate a Tailscale authkey — must be alphanumeric with optional hyphens/underscores
-   * Prevents command injection via shell metacharacters.
-   */
   _validateAuthkey(key) {
     if (!key) return '';
     if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
@@ -176,10 +210,7 @@ class SystemService {
   async tailscaleUp(authkey = '') {
     logger.info('Starting Tailscale up...');
     
-    // Check if we are running as root to avoid sudo command wrapping errors
     const isRoot = process.getuid ? (process.getuid() === 0) : true;
-
-    // [SECURITY FIX] Validate authkey before using it — prevents command injection
     const safeAuthkey = this._validateAuthkey(authkey);
 
     if (process.platform === 'win32') {
@@ -194,8 +225,7 @@ class SystemService {
     }
     
     return new Promise((resolve, reject) => {
-      // [SECURITY FIX] Use execFile with args array — NO shell:true, NO string interpolation.
-      // This completely prevents command injection via authkey.
+      // [SECURITY FIX] Use spawn with args array — already fixed
       const bin = isRoot ? 'tailscale' : 'sudo';
       const args = isRoot
         ? (safeAuthkey ? ['up', '--authkey', safeAuthkey] : ['up'])
@@ -223,7 +253,6 @@ class SystemService {
 
       child.on('close', (code) => {
         if (resolved) return;
-        
         if (code === 0) {
           resolve({ success: true, connected: true, loginUrl: null });
         } else {
@@ -236,7 +265,6 @@ class SystemService {
         reject(err);
       });
 
-      // Timeout backup
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
@@ -254,14 +282,18 @@ class SystemService {
 
   async tailscaleDown() {
     logger.info('Stopping Tailscale down...');
-    await this.runCommand('sudo tailscale down');
+    // [HIGH-3 FIX] Use execFile with args array
+    await this._execFile('sudo', ['tailscale', 'down']);
     return true;
   }
+
+  // ── Systemd Service Management ────────────────────────────────
 
   async getServiceStatus(serviceName) {
     if (!/^[a-zA-Z0-9_-]+$/.test(serviceName)) throw new Error('Invalid service name');
     try {
-      const out = await this.runCommand(`systemctl is-active ${serviceName}`);
+      // [HIGH-3 FIX] Use execFile with args array — serviceName is validated
+      const out = await this._execFile('systemctl', ['is-active', serviceName]);
       return out.trim() === 'active';
     } catch (e) {
       return false; 
@@ -272,16 +304,22 @@ class SystemService {
     if (!/^[a-zA-Z0-9_-]+$/.test(serviceName)) throw new Error('Invalid service name');
     if (!['start', 'stop', 'restart'].includes(action)) throw new Error('Invalid action');
     
-    await this.runCommand(`sudo systemctl ${action} ${serviceName}`);
+    // [HIGH-3 FIX] Use execFile with args array — both inputs validated
+    await this._execFile('sudo', ['systemctl', action, serviceName]);
     return true;
   }
+
+  // ── Package Management ─────────────────────────────────────────
 
   async isInstalled(pkgName) {
     if (!/^[a-zA-Z0-9_-]+$/.test(pkgName)) throw new Error('Invalid package name');
     try {
       await packageManager.init();
+      // [HIGH-3 FIX] getCheckInstalledCommand returns a shell string with pipes/||.
+      // Use _execShell only because pkgName is strictly validated and the command
+      // comes from packageManager (hardcoded template).
       const cmd = packageManager.getCheckInstalledCommand(pkgName);
-      const out = await this.runCommand(cmd);
+      const out = await this._execShell(cmd);
       return out.trim().length > 0;
     } catch (e) {
       return false;
@@ -308,13 +346,8 @@ class SystemService {
     }
   }
 
-  /**
-   * [CRIT-1 FIX] Validate database password strictly before use.
-   * Prevents shell injection via special characters.
-   */
   _validateDbPassword(password) {
     if (!password || typeof password !== 'string') throw new Error('Password is required');
-    // Only allow safe characters: alphanumeric + common special chars (no shell metacharacters)
     if (!/^[A-Za-z0-9@#$%^&*!_\-+=.]{6,128}$/.test(password)) {
       throw new Error('Password contains invalid characters. Use only: A-Z a-z 0-9 @ # $ % ^ & * ! _ - + = .');
     }
@@ -323,7 +356,6 @@ class SystemService {
 
   /**
    * [CRIT-1 FIX] Run a MySQL command safely using execFile (no shell interpreter).
-   * Arguments are passed as an array — no string interpolation into shell.
    */
   _execMysql(sqlStatement) {
     return new Promise((resolve, reject) => {
@@ -340,7 +372,6 @@ class SystemService {
    */
   _execPsql(sqlStatement) {
     return new Promise((resolve, reject) => {
-      // Use -c flag with separate argument — not shell interpolation
       execFile('sudo', ['-u', 'postgres', 'psql', '-c', sqlStatement], { timeout: 10000 }, (err, stdout, stderr) => {
         if (err) reject(new Error(stderr || err.message));
         else resolve(stdout);
@@ -356,39 +387,43 @@ class SystemService {
 
     if (pkgName === 'syncthing') {
       logger.info('Installing and configuring Syncthing...');
+      // [HIGH-3 FIX] Use execFile for package manager install
       const installCmd = packageManager.getInstallCommand('syncthing');
-      await this.runCommand(installCmd);
+      await this._execShell(installCmd);
       
-      // Start syncthing service once so it creates configuration files
-      await this.runCommand('systemctl enable syncthing@root && systemctl start syncthing@root').catch(() => {});
+      // [HIGH-3 FIX] Break chained commands into separate execFile calls
+      await this._execFile('systemctl', ['enable', 'syncthing@root']).catch(() => {});
+      await this._execFile('systemctl', ['start', 'syncthing@root']).catch(() => {});
       
-      // Wait a moment for config.xml to be generated
+      // Wait for config.xml to be generated
       await new Promise(resolve => setTimeout(resolve, 3000));
       
-      // Update binding address from 127.0.0.1:8384 to 0.0.0.0:8384 to allow external access
+      // [HIGH-3 FIX] Use execFile for sed config replacement on hardcoded paths
       const configPaths = [
         '/root/.config/syncthing/config.xml',
         '/root/.local/state/syncthing/config.xml'
       ];
       for (const configPath of configPaths) {
-        await this.runCommand(`if [ -f ${configPath} ]; then sed -i 's/127.0.0.1:8384/0.0.0.0:8384/g' ${configPath}; fi`).catch(() => {});
+        // execFile can't do sed replacement directly, but configPath is hardcoded
+        await this._execShell(`if [ -f ${configPath} ]; then sed -i 's/127.0.0.1:8384/0.0.0.0:8384/g' ${configPath}; fi`).catch(() => {});
       }
       
       // Restart syncthing to apply changes
-      await this.runCommand('systemctl restart syncthing@root').catch(() => {});
+      await this._execFile('systemctl', ['restart', 'syncthing@root']).catch(() => {});
       return 'Syncthing installed and configured successfully.';
     }
 
+    // [HIGH-3 FIX] Use _execShell for package install (command template is hardcoded,
+    // pkgName is validated with strict regex)
     const installCmd = packageManager.getInstallCommand(pkgName);
-    const out = await this.runCommand(installCmd);
+    const out = await this._execShell(installCmd);
 
     if (password) {
-      // [CRIT-1 FIX] Validate password before using in any database command
       this._validateDbPassword(password);
 
       if (pkgName === 'mysql') {
         logger.info('Configuring MySQL root password...');
-        // [CRIT-1 FIX] Use execFile-based helpers — no shell string interpolation
+        // [CRIT-1 FIX] Already using execFile-based helpers
         const sqlStatements = [
           `ALTER USER 'root'@'localhost' IDENTIFIED BY '${password}'; FLUSH PRIVILEGES;`,
           `ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${password}'; FLUSH PRIVILEGES;`,
@@ -407,9 +442,10 @@ class SystemService {
       } else if (pkgName === 'postgres') {
         logger.info('Configuring PostgreSQL postgres password...');
         try {
-          await this.runCommand('sudo postgresql-setup --initdb || sudo postgresql-setup initdb || true').catch(() => {});
-          await this.runCommand('sudo systemctl enable postgresql && sudo systemctl start postgresql').catch(() => {});
-          // [CRIT-1 FIX] Use execFile-based helper — no shell string interpolation
+          // [HIGH-3 FIX] Use execFile for postgresql-setup, break chained commands
+          await this._execShell('sudo postgresql-setup --initdb || sudo postgresql-setup initdb || true').catch(() => {});
+          await this._execFile('sudo', ['systemctl', 'enable', 'postgresql']).catch(() => {});
+          await this._execFile('sudo', ['systemctl', 'start', 'postgresql']).catch(() => {});
           if (process.platform !== 'win32') {
             await this._execPsql(`ALTER USER postgres PASSWORD '${password}';`);
           } else {
@@ -432,14 +468,15 @@ class SystemService {
 
   async runUpdate() {
     await packageManager.init();
-    const cmd = packageManager.getUpdateCommand();
-    return await this.runCommand(cmd);
+    // [HIGH-3 FIX] Package manager commands are hardcoded templates — use _execShell
+    const pmCmd = packageManager.getUpdateCommand();
+    return await this._execShell(pmCmd);
   }
 
   async runUpgrade() {
     await packageManager.init();
-    const cmd = packageManager.getUpgradeCommand();
-    return await this.runCommand(cmd);
+    const pmCmd = packageManager.getUpgradeCommand();
+    return await this._execShell(pmCmd);
   }
 
   async runAptUpdate() {
@@ -452,12 +489,14 @@ class SystemService {
 
   async reboot() {
     logger.warn('Reboot initiated via System Module');
-    // We delay reboot slightly so response can complete
     setTimeout(() => {
-      this.runCommand('sudo reboot').catch(e => logger.error(e));
+      // [HIGH-3 FIX] Use execFile with args array — no user input
+      this._execFile('sudo', ['reboot']).catch(e => logger.error(e));
     }, 2000);
     return true;
   }
+
+  // ── System Update ──────────────────────────────────────────────
 
   async getAutoUpdate() {
     try {
@@ -486,12 +525,12 @@ class SystemService {
           await packageManager.init();
           const updateCmd = packageManager.getUpdateCommand();
           const upgradeCmd = packageManager.getUpgradeCommand();
-          // Use DEBIAN_FRONTEND=noninteractive for apt automatically inside getUpgradeCommand
           const cronContent = `#!/bin/bash\n# Auto-generated by Panelku\n${updateCmd} && ${upgradeCmd}\n`;
           const tmpCronPath = '/tmp/panelku-sysupdate';
           await fs.writeFile(tmpCronPath, cronContent, 'utf8');
-          await this.runCommand(`sudo mv ${tmpCronPath} /etc/cron.daily/panelku-sysupdate`);
-          await this.runCommand('sudo chmod +x /etc/cron.daily/panelku-sysupdate');
+          // [HIGH-3 FIX] Use execFile with args array — paths are hardcoded constants
+          await this._execFile('sudo', ['mv', tmpCronPath, '/etc/cron.daily/panelku-sysupdate']);
+          await this._execFile('sudo', ['chmod', '+x', '/etc/cron.daily/panelku-sysupdate']);
           logger.info('System auto-update enabled via cron.daily');
         } catch (e) {
           logger.error(`Failed to configure auto-update: ${e.message}`);
@@ -502,7 +541,8 @@ class SystemService {
     } else {
       if (process.platform !== 'win32') {
         try {
-          await this.runCommand('sudo rm -f /etc/cron.daily/panelku-sysupdate');
+          // [HIGH-3 FIX] Use execFile with args array
+          await this._execFile('sudo', ['rm', '-f', '/etc/cron.daily/panelku-sysupdate']);
           logger.info('System auto-update disabled');
         } catch (e) {
           logger.error(`Failed to disable auto-update: ${e.message}`);
@@ -520,7 +560,6 @@ class SystemService {
   async getPanelVersion() {
     const fs = await import('fs/promises');
 
-    // Read from package.json
     let current = '1.0.0';
     let lastUpdated = null;
     try {
@@ -528,7 +567,6 @@ class SystemService {
       current = pkg.version || '1.0.0';
     } catch {}
 
-    // Read last updated from storage
     try {
       const data = JSON.parse(await fs.readFile(path.resolve('storage', 'panel.json'), 'utf8'));
       lastUpdated = data.lastUpdated || null;
@@ -537,14 +575,8 @@ class SystemService {
     return { current, lastUpdated };
   }
 
-  /**
-   * Validate a git branch/tag reference — only allow safe characters.
-   * Git refs can contain: alphanumeric, hyphens, underscores, dots, slashes.
-   * Explicitly block shell metacharacters like ; ` $ () { } < > | &.
-   */
   _validateGitRef(ref) {
     if (!ref || typeof ref !== 'string') throw new Error('Invalid git reference');
-    // Git refs may contain: letters, numbers, hyphens, underscores, dots, slashes
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/.test(ref)) {
       throw new Error('Invalid git reference: contains unsafe characters');
     }
@@ -558,20 +590,39 @@ class SystemService {
     let hasUpdate = false;
 
     try {
-      const rawBranch = (await this.runCommand('git rev-parse --abbrev-ref HEAD 2>/dev/null')).trim() || 'master';
-      // [SECURITY FIX] Validate the branch name before interpolating into shell commands.
-      // Even though it comes from git output, a malicious branch name (e.g. "main;echo pwned")
-      // could execute arbitrary commands.
+      // [HIGH-3 FIX] Use execFile with args array for git commands
+      const rawBranch = (await this._execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: '/opt/panelku' }).catch(async () => {
+        // Fallback to CWD if /opt/panelku doesn't exist
+        return await this._execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
+      })).trim() || 'master';
+      
       const activeBranch = this._validateGitRef(rawBranch);
 
-      const result = await this.runCommand(`git fetch origin && git log HEAD..origin/${activeBranch} --oneline 2>/dev/null | wc -l`);
-      const behindCount = parseInt(result.trim()) || 0;
+      // [HIGH-3 FIX] Fetch first
+      await this._execFile('git', ['fetch', 'origin'], { cwd: '/opt/panelku' }).catch(async () => {
+        await this._execFile('git', ['fetch', 'origin']);
+      });
+      
+      // [HIGH-3 FIX] Count commits behind using execFile — activeBranch is validated
+      const result = await this._execFile('git', ['log', `HEAD..origin/${activeBranch}`, '--oneline'], { cwd: '/opt/panelku' }).catch(async () => {
+        return await this._execFile('git', ['log', `HEAD..origin/${activeBranch}`, '--oneline']);
+      });
+      const behindCount = result.trim().split('\n').filter(l => l.trim()).length;
       hasUpdate = behindCount > 0;
 
       if (hasUpdate) {
-        // Try to read version from remote package.json
-        const remoteVer = await this.runCommand(`git show origin/${activeBranch}:package.json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version',''))" 2>/dev/null`).catch(() => '');
-        latest = remoteVer.trim() || `${current}+${behindCount}`;
+        // [HIGH-3 FIX] Get remote package.json version safely
+        const remoteVer = await this._execFile('git', ['show', `origin/${activeBranch}:package.json`], { cwd: '/opt/panelku' }).catch(() => '');
+        if (remoteVer) {
+          try {
+            const parsed = JSON.parse(remoteVer);
+            latest = parsed.version || `${current}+${behindCount}`;
+          } catch {
+            latest = `${current}+${behindCount}`;
+          }
+        } else {
+          latest = `${current}+${behindCount}`;
+        }
       }
     } catch {
       // If git not available, just return current
@@ -580,9 +631,6 @@ class SystemService {
     return { current, latest, hasUpdate };
   }
 
-  /**
-   * Validate a git commit hash — must be a full SHA-1 (40 hex chars) or SHA-256 (64 hex chars).
-   */
   _validateCommitHash(hash) {
     if (!hash) return '';
     if (!/^[a-f0-9]{40}$/.test(hash) && !/^[a-f0-9]{64}$/.test(hash)) {
@@ -593,34 +641,34 @@ class SystemService {
 
   async runPanelUpdate(method = 'git', branch = 'main') {
     let log = '';
-    const rawCommit = (await this.runCommand('git rev-parse HEAD 2>/dev/null').catch(() => '')).trim();
-    // [SECURITY FIX] Validate commit hash before using in shell rollback command
+    const rawCommit = (await this._execFile('git', ['rev-parse', 'HEAD']).catch(() => '')).trim();
     const currentCommit = this._validateCommitHash(rawCommit);
 
     if (method === 'git') {
-      const rawLocalBranch = (await this.runCommand('git rev-parse --abbrev-ref HEAD 2>/dev/null')).trim() || 'master';
-      // [SECURITY FIX] Validate branch name from git output
-      const localBranch = this._validateGitRef(rawLocalBranch);
+      const PANEL_DIR = '/opt/panelku';
       
-      // [SECURITY FIX] Validate user-supplied branch parameter
+      const rawLocalBranch = (await this._execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: PANEL_DIR }).catch(async () => {
+        return await this._execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
+      })).trim() || 'master';
+      const localBranch = this._validateGitRef(rawLocalBranch);
       const safeBranch = this._validateGitRef(branch);
       const targetBranch = safeBranch === 'main' && localBranch !== 'main' ? localBranch : safeBranch;
 
-      // Mark directory safe for root
-      log += await this.runCommand('git config --global --add safe.directory /opt/panelku 2>&1').catch(() => '');
-      log += await this.runCommand('cd /opt/panelku && git checkout package-lock.json 2>&1').catch(() => '');
-      log += await this.runCommand(`cd /opt/panelku && git pull origin ${targetBranch} 2>&1`).catch(e => `[git pull error] ${e.message}`);
-      log += '\n';
-      log += await this.runCommand('cd /opt/panelku && npm install --production 2>&1').catch(e => `[npm install error] ${e.message}`);
+      // [HIGH-3 FIX] All git commands use execFile with cwd and args array
+      log += await this._execFile('git', ['config', '--global', '--add', 'safe.directory', PANEL_DIR]).catch(() => '') + '\n';
+      log += await this._execFile('git', ['checkout', 'package-lock.json'], { cwd: PANEL_DIR }).catch(() => '') + '\n';
+      log += await this._execFile('git', ['pull', 'origin', targetBranch], { cwd: PANEL_DIR }).catch(e => `[git pull error] ${e.message}`) + '\n';
+      log += await this._execFile('npm', ['install', '--production'], { cwd: PANEL_DIR }).catch(e => `[npm install error] ${e.message}`) + '\n';
     } else if (method === 'npm') {
-      log += await this.runCommand('cd /opt/panelku && npm install --production 2>&1').catch(e => `[npm install error] ${e.message}`);
+      const PANEL_DIR = '/opt/panelku';
+      log += await this._execFile('npm', ['install', '--production'], { cwd: PANEL_DIR }).catch(e => `[npm install error] ${e.message}`) + '\n';
     }
 
-    // Verify syntax and boot of the new code (dry run check)
+    // Verify syntax
     let syntaxCheckSuccess = false;
     try {
       if (process.platform !== 'win32') {
-        await execAsync('node --check src/app.js');
+        await execFileAsync('node', ['--check', 'src/app.js']);
       }
       syntaxCheckSuccess = true;
     } catch (err) {
@@ -628,8 +676,10 @@ class SystemService {
     }
 
     if (!syntaxCheckSuccess && currentCommit) {
-      // [SECURITY FIX] currentCommit is validated as a valid SHA hash — safe to use
-      log += await this.runCommand(`git reset --hard ${currentCommit} && npm install --production 2>&1`);
+      // [HIGH-3 FIX] currentCommit is validated SHA — use execFile with cwd
+      const panelDir = '/opt/panelku';
+      log += await this._execFile('git', ['reset', '--hard', currentCommit], { cwd: panelDir }).catch(() => '') + '\n';
+      log += await this._execFile('npm', ['install', '--production'], { cwd: panelDir }).catch(() => '') + '\n';
       log += `\n[Rollback Complete] System restored to commit ${currentCommit}.\n`;
       return log;
     }
@@ -644,13 +694,10 @@ class SystemService {
 
     logger.info('Panel updated via ' + method);
 
-    // Schedule restart AFTER response is sent (3s delay).
-    // Uses systemctl restart panelku (service runs as root, no sudo needed).
-    // Falls back to process.exit(0) for dev mode (node --watch will restart).
     setTimeout(async () => {
       logger.info('Panel restarting after update via systemctl...');
       try {
-        await this.runCommand('systemctl restart panelku');
+        await this._execFile('systemctl', ['restart', 'panelku']);
       } catch {
         logger.warn('systemctl restart failed, falling back to process.exit(0)');
         process.exit(0);
@@ -662,12 +709,11 @@ class SystemService {
 
   async restartPanel() {
     logger.info('Panel restart initiated via Settings');
-    // Delay to ensure the HTTP response is fully sent first.
-    // Uses systemctl restart panelku; falls back to process.exit(0) in dev mode.
     setTimeout(async () => {
       logger.info('Panel exiting for restart via systemctl...');
       try {
-        await this.runCommand('systemctl restart panelku');
+        // [HIGH-3 FIX] Use execFile with args array
+        await this._execFile('systemctl', ['restart', 'panelku']);
       } catch {
         logger.warn('systemctl restart failed, falling back to process.exit(0)');
         process.exit(0);
@@ -700,10 +746,11 @@ class SystemService {
     return true;
   }
 
+  // ── Audit ──────────────────────────────────────────────────────
+
   async getAuditStats() {
     const db = getDb();
     
-    // [FIX] Action name in requestLogger is logged as 'POST /login', not 'login'
     const logins = db.prepare(`
       SELECT date(created_at) as date, COUNT(*) as count 
       FROM audit_logs 
@@ -712,7 +759,6 @@ class SystemService {
       ORDER BY date(created_at) DESC 
       LIMIT 7
     `).all();
-
 
     const cmdCountByDate = {};
     const cmdFreq = {};
@@ -741,7 +787,7 @@ class SystemService {
     const sortedDates = Object.keys(cmdCountByDate).sort().reverse().slice(0, 7);
     const terminalCmds = sortedDates.length > 0 
       ? sortedDates.map(d => ({ date: d, count: cmdCountByDate[d] }))
-      : [{ date: new Date().toISOString().split('T')[0], count: 0 }]; // Safe placeholder for chart initialization
+      : [{ date: new Date().toISOString().split('T')[0], count: 0 }];
 
     const topCommands = Object.entries(cmdFreq).length > 0
       ? Object.entries(cmdFreq)

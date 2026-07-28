@@ -35,6 +35,8 @@ function rowToUser(row) {
     loginCount:        row.login_count,
     resetToken:        row.reset_token,
     resetTokenExpiry:  row.reset_token_expiry ? new Date(row.reset_token_expiry) : null,
+    mustChangePassword: Boolean(row.must_change_password),
+    passwordChangedAt:  row.password_changed_at ? new Date(row.password_changed_at) : null,
     createdAt:         new Date(row.created_at),
     updatedAt:         new Date(row.updated_at),
   };
@@ -171,12 +173,12 @@ const User = {
         id, username, email, password, role_id, first_name, last_name, avatar,
         two_factor_enabled, two_factor_secret, api_key, api_key_enabled,
         is_active, is_super_admin, is_ldap_user, sso_links, sessions, ai_settings,
-        login_count, created_at, updated_at
+        login_count, must_change_password, password_changed_at, created_at, updated_at
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
-        0, ?, ?
+        0, ?, ?, ?, ?
       )
     `).run(
       id,
@@ -197,6 +199,8 @@ const User = {
       toJson(data.ssoLinks || {}),
       toJson(data.sessions || []),
       toJson(data.aiSettings || { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' }),
+      data.mustChangePassword ? 1 : 0,
+      data.passwordChangedAt || null,
       ts, ts
     );
 
@@ -226,7 +230,8 @@ const User = {
       isLdapUser: 'is_ldap_user', ssoLinks: 'sso_links',
       sessions: 'sessions', lastLogin: 'last_login', lastLoginIp: 'last_login_ip',
       loginCount: 'login_count', resetToken: 'reset_token',
-      resetTokenExpiry: 'reset_token_expiry', role: 'role_id',
+      resetTokenExpiry: 'reset_token_expiry', mustChangePassword: 'must_change_password',
+      passwordChangedAt: 'password_changed_at', role: 'role_id',
       aiSettings: 'ai_settings',
     };
 
