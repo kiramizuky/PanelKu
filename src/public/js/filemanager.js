@@ -13,6 +13,7 @@ const FMPage = (() => {
   let _openTabs = [];
   let _activeTab = null;
   let _tabContents = {};
+  let _previewTabs = {}; // { path: 'image' | 'pdf' }
 
   const FILE_ICONS = {
     dir: '📁',
@@ -289,61 +290,15 @@ const FMPage = (() => {
     } else {
       const ext = item.name.split('.').pop()?.toLowerCase();
       
-      // 1. Image preview modal
+      // 1. Image preview — open in split view
       if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico'].includes(ext)) {
-        const id = 'img_view_' + Date.now();
-        const modal = document.createElement('div');
-        modal.innerHTML = `
-          <div class="modal fade" id="${id}" tabindex="-1">
-            <div class="modal-dialog modal-lg modal-dialog-centered">
-              <div class="modal-content lp-glass-card" style="border:1px solid var(--glass-border); background:rgba(10,12,20,0.95); border-radius:12px; overflow:hidden;">
-                <div class="modal-header" style="border-bottom:1px solid var(--glass-border); padding: 12px 20px;">
-                  <h6 class="modal-title font-mono text-white" style="font-size:12px;"><i class="bi bi-image me-2 text-primary"></i>Preview: ${escHtml(item.name)}</h6>
-                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body text-center" style="padding:20px; background:#04060b;">
-                  <img id="${id}_img" style="max-width:100%; max-height:70vh; object-fit:contain; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
-                </div>
-              </div>
-            </div>
-          </div>`;
-        document.body.appendChild(modal);
-        const bsModal = new bootstrap.Modal(document.getElementById(id));
-        bsModal.show();
-        // Set image src after modal opens to avoid blocking
-        _getDownloadUrl(item.path).then(url => {
-          document.getElementById(`${id}_img`).src = url;
-        });
-        document.getElementById(id).addEventListener('hidden.bs.modal', () => modal.remove());
+        await openSplitView(item.path, 'image');
         return;
       }
 
-      // 2. PDF preview modal
+      // 2. PDF preview — open in split view
       if (ext === 'pdf') {
-        const id = 'pdf_view_' + Date.now();
-        const modal = document.createElement('div');
-        modal.innerHTML = `
-          <div class="modal fade" id="${id}" tabindex="-1">
-            <div class="modal-dialog modal-xl modal-dialog-scrollable">
-              <div class="modal-content" style="border:1px solid var(--glass-border); background:rgba(10,12,20,0.95); border-radius:12px; overflow:hidden; height:90vh;">
-                <div class="modal-header" style="border-bottom:1px solid var(--glass-border); padding: 12px 20px;">
-                  <h6 class="modal-title font-mono text-white" style="font-size:12px;"><i class="bi bi-file-pdf me-2 text-danger"></i>PDF Reader: ${escHtml(item.name)}</h6>
-                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" style="padding:0; height:calc(100% - 50px);">
-                  <iframe id="${id}_iframe" style="width:100%; height:100%; border:none;"></iframe>
-                </div>
-              </div>
-            </div>
-          </div>`;
-        document.body.appendChild(modal);
-        const bsModal = new bootstrap.Modal(document.getElementById(id));
-        bsModal.show();
-        // Set iframe src after modal opens
-        _getDownloadUrl(item.path).then(url => {
-          document.getElementById(`${id}_iframe`).src = url;
-        });
-        document.getElementById(id).addEventListener('hidden.bs.modal', () => modal.remove());
+        await openSplitView(item.path, 'pdf');
         return;
       }
 
@@ -360,7 +315,31 @@ const FMPage = (() => {
   }
 
   // ── Split View: File Tree + Editor ──────────────────────
-  async function openSplitView(path) {
+  async function openSplitView(path, previewType = null) {
+    if (previewType) {
+      // Preview mode (image/pdf) — no need to read file content
+      document.getElementById('fmFileArea').style.display = 'none';
+      document.getElementById('fmSplitView').style.display = 'flex';
+
+      // Hide editor elements, show preview container
+      const editorBody = document.querySelector('.fm-editor-body');
+      if (editorBody) editorBody.classList.add('fm-showing-preview');
+      const footer = document.getElementById('fmEditorFooter');
+      const toggle = document.getElementById('fmThemeToggle');
+      if (footer) footer.style.display = 'none';
+      if (toggle) toggle.style.display = 'none';
+
+      // Add tab
+      addTab(path);
+      _previewTabs[path] = previewType;
+
+      // Load tree positioned at file's parent directory
+      await loadFileTree(path);
+
+      // Render preview
+      renderPreview(path, previewType);
+      return;
+    }
     const res = await LP.get(`/filemanager/read?path=${encodeURIComponent(path)}`);
     if (!res?.success) { LP.toast('Cannot read file: ' + res?.message, 'error'); return; }
 
@@ -405,31 +384,82 @@ const FMPage = (() => {
 
   async function switchTab(path) {
     // Save current editor content before switching
-    if (_cm && _editingPath) {
+    if (_cm && _editingPath && !_previewTabs[_editingPath]) {
       _tabContents[_editingPath] = _cm.getValue();
     }
 
     _activeTab = path;
     renderTabs();
 
-    // Fetch content if not cached
-    if (!_tabContents[path]) {
-      try {
-        const res = await LP.get(`/filemanager/read?path=${encodeURIComponent(path)}`);
-        if (res?.success) _tabContents[path] = res.data.content;
-      } catch (err) {
-        LP.toast('Failed to load file: ' + err.message, 'error');
-        return;
+    // Show/hide editor vs preview based on tab type
+    const editorBody = document.querySelector('.fm-editor-body');
+    const editorFooter = document.getElementById('fmEditorFooter');
+    const themeToggle = document.getElementById('fmThemeToggle');
+
+    if (_previewTabs[path]) {
+      // Preview tab — hide editor (CodeMirror), show preview container
+      if (editorBody) editorBody.classList.add('fm-showing-preview');
+      if (editorFooter) editorFooter.style.display = 'none';
+      if (themeToggle) themeToggle.style.display = 'none';
+      // Load preview if not yet rendered
+      renderPreview(path, _previewTabs[path]);
+    } else {
+      // Editor tab — show editor, hide preview
+      if (editorBody) editorBody.classList.remove('fm-showing-preview');
+      if (editorFooter) editorFooter.style.display = 'flex';
+      if (themeToggle) themeToggle.style.display = '';
+
+      // Fetch content if not cached
+      if (!_tabContents[path]) {
+        try {
+          const res = await LP.get(`/filemanager/read?path=${encodeURIComponent(path)}`);
+          if (res?.success) _tabContents[path] = res.data.content;
+        } catch (err) {
+          LP.toast('Failed to load file: ' + err.message, 'error');
+          return;
+        }
       }
+
+      renderSplitEditor(path, _tabContents[path] || '');
     }
 
-    renderSplitEditor(path, _tabContents[path] || '');
     highlightTreeItem(path);
+  }
+
+  function renderPreview(path, type) {
+    const container = document.getElementById('fmPreviewContent');
+    const loading = document.getElementById('fmPreviewLoading');
+    const headerPath = document.getElementById('fmEditorPath');
+    const unsavedBadge = document.getElementById('fmEditorUnsaved');
+
+    if (!container) return;
+
+    // Update header
+    if (headerPath) headerPath.textContent = path;
+    if (unsavedBadge) unsavedBadge.style.display = 'none';
+
+    // Show loading
+    if (loading) loading.style.display = '';
+    container.innerHTML = '';
+
+    _getDownloadUrl(path).then(url => {
+      if (loading) loading.style.display = 'none';
+
+      if (type === 'image') {
+        container.innerHTML = `<img src="${url}" alt="${escHtml(path)}" onerror="this.parentElement.innerHTML='<div class=\"fm-preview-error\"><i class=\"bi bi-exclamation-triangle-fill\"></i>Failed to load image: ${escHtml(path)}</div>'">`;
+      } else if (type === 'pdf') {
+        container.innerHTML = `<iframe src="${url}#toolbar=1" sandbox="allow-scripts allow-same-origin"></iframe>`;
+      }
+    }).catch(err => {
+      if (loading) loading.style.display = 'none';
+      container.innerHTML = `<div class="fm-preview-error"><i class="bi bi-exclamation-triangle-fill"></i>Failed to load preview: ${err.message}</div>`;
+    });
   }
 
   function closeTab(path) {
     _openTabs = _openTabs.filter(t => t.path !== path);
     delete _tabContents[path];
+    delete _previewTabs[path];
 
     if (_activeTab === path) {
       if (_openTabs.length > 0) {
@@ -783,6 +813,44 @@ const FMPage = (() => {
     });
   }
 
+  // ── Editor: Theme Toggle ───────────────────────────
+  let _editorTheme = localStorage.getItem('lp_fm_editor_theme') || 'dark';
+
+  function toggleEditorTheme() {
+    _editorTheme = _editorTheme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('lp_fm_editor_theme', _editorTheme);
+    applyEditorTheme();
+  }
+
+  function applyEditorTheme() {
+    const splitContainer = document.getElementById('fmSplitView');
+    if (!splitContainer) return;
+
+    if (_editorTheme === 'light') {
+      splitContainer.classList.add('fm-editor-light');
+    } else {
+      splitContainer.classList.remove('fm-editor-light');
+    }
+
+    // Update CodeMirror theme
+    if (_cm) {
+      _cm.setOption('theme', _editorTheme === 'light' ? 'material' : 'material-darker');
+      _cm.refresh();
+    }
+
+    // Update toggle icon
+    const icon = document.getElementById('fmThemeIcon');
+    if (icon) {
+      icon.className = _editorTheme === 'light' ? 'bi bi-moon-fill' : 'bi bi-sun-fill';
+    }
+
+    // Update toggle button title
+    const btn = document.getElementById('fmThemeToggle');
+    if (btn) {
+      btn.title = _editorTheme === 'light' ? 'Switch to Dark Theme' : 'Switch to Light Theme';
+    }
+  }
+
   // ── Editor (CodeMirror) ───────────────────────────
   let _cm = null;
   let _cmInitialized = false;
@@ -820,12 +888,12 @@ const FMPage = (() => {
     _cmInitialized = true;
 
     _cm = CodeMirror.fromTextArea(textarea, {
-      theme: 'material-darker',
       lineNumbers: true,
       indentUnit: 2,
       tabSize: 2,
       indentWithTabs: false,
       lineWrapping: false,
+      theme: _editorTheme === 'light' ? 'material' : 'material-darker',
       styleActiveLine: true,
       matchBrackets: true,
       autoCloseBrackets: true,
@@ -922,11 +990,19 @@ const FMPage = (() => {
     _openTabs = [];
     _activeTab = null;
     _tabContents = {};
+    _previewTabs = {};
     // Reset CodeMirror
     if (_cm) {
       _cm.setValue('');
       _cm.clearHistory();
     }
+    // Reset preview
+    const editorBody = document.querySelector('.fm-editor-body');
+    if (editorBody) editorBody.classList.remove('fm-showing-preview');
+    const editorFooter = document.getElementById('fmEditorFooter');
+    if (editorFooter) editorFooter.style.display = 'flex';
+    const themeToggle = document.getElementById('fmThemeToggle');
+    if (themeToggle) themeToggle.style.display = '';
     refresh();
   }
 
@@ -1237,6 +1313,7 @@ const FMPage = (() => {
       initDragDrop();
       initCodeMirror();
       initSplitDivider();
+      applyEditorTheme();
       navigate('/');
     },
 
@@ -1282,6 +1359,7 @@ const FMPage = (() => {
     closeSplitView,
     filterTree,
     clearTreeFilter,
+    toggleEditorTheme,
   };
 })();
 

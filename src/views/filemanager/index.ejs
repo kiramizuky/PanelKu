@@ -97,10 +97,20 @@
         <i class="bi bi-file-code-fill text-primary"></i>
         <span id="fmEditorPath" class="font-mono">No file selected</span>
         <span id="fmEditorUnsaved" class="fm-unsaved-badge" style="display:none;">● unsaved</span>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" id="fmThemeToggle" onclick="FM.toggleEditorTheme()" title="Toggle Editor Theme" style="padding:2px 8px; font-size:13px; margin-left:auto;">
+          <i class="bi bi-sun-fill" id="fmThemeIcon"></i>
+        </button>
       </div>
       <div class="fm-editor-body">
         <!-- CodeMirror replaces this textarea with its own editor widget -->
         <textarea class="fm-editor-textarea" id="fmEditorTextarea" wrap="off" spellcheck="false"></textarea>
+        <!-- Preview container for images & PDFs -->
+        <div class="fm-preview-container" id="fmPreviewContainer">
+          <div class="fm-preview-loading" id="fmPreviewLoading">
+            <div class="spinner-border spinner-border-sm me-2"></div>Loading preview...
+          </div>
+          <div class="fm-preview-content" id="fmPreviewContent"></div>
+        </div>
       </div>
       <div class="fm-editor-footer" id="fmEditorFooter">
         <span class="fm-editor-stats" id="fmEditorStats"></span>
@@ -487,6 +497,17 @@
     flex-shrink: 0;
     background: rgba(0,0,0,0.35);
   }
+  /* Theme toggle button hover states */
+  #fmThemeToggle {
+    transition: all 0.2s;
+  }
+  #fmThemeToggle:hover {
+    background: rgba(255,255,255,0.1);
+    transform: scale(1.1);
+  }
+  #fmThemeToggle:active {
+    transform: scale(0.95);
+  }
   
   .fm-unsaved-badge {
     font-size: 10px;
@@ -539,6 +560,122 @@
   .fm-editor-body .CodeMirror-foldmarker {
     color: var(--text-muted);
     text-shadow: none;
+  }
+
+  /* ── Preview Container (Images & PDFs) ────────────── */
+  .fm-preview-container {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #0c0e18;
+    position: relative;
+    overflow: auto;
+  }
+  /* When showing preview — hide CodeMirror editor widget, show preview */
+  .fm-editor-body.fm-showing-preview .CodeMirror,
+  .fm-editor-body.fm-showing-preview .CodeMirror-gutters {
+    display: none !important;
+  }
+  .fm-editor-body.fm-showing-preview .fm-preview-container {
+    display: flex !important;
+  }
+  .fm-preview-loading {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 40px;
+  }
+  .fm-preview-content {
+    display: flex;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+  }
+  .fm-preview-content img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 4px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+  .fm-preview-content iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #fff;
+  }
+  .fm-preview-error {
+    text-align: center;
+    color: #f87171;
+    font-size: 13px;
+    padding: 40px;
+  }
+  .fm-preview-error i {
+    font-size: 40px;
+    display: block;
+    margin-bottom: 12px;
+  }
+  /* Light theme overrides */
+  .fm-editor-light .fm-preview-container {
+    background: #f0f2f5;
+  }
+  .fm-editor-light .fm-preview-content img {
+    box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+  }
+
+  /* ── Editor Light Theme ─────────────────────────────── */
+  .fm-editor-light .fm-editor-panel {
+    background: #f8f9fc;
+  }
+  .fm-editor-light .fm-editor-header {
+    background: rgba(255,255,255,0.85);
+    border-bottom-color: #e2e4e8;
+    color: #334155;
+  }
+  .fm-editor-light .fm-editor-header #fmEditorPath {
+    color: #334155;
+  }
+  .fm-editor-light .fm-editor-footer {
+    background: rgba(255,255,255,0.85);
+    border-top-color: #e2e4e8;
+  }
+  .fm-editor-light .fm-editor-stats {
+    color: #64748b;
+  }
+  .fm-editor-light .fm-editor-footer-right small {
+    color: #64748b !important;
+  }
+  .fm-editor-light .fm-editor-footer-right kbd {
+    background: #e2e4e8 !important;
+    color: #475569 !important;
+  }
+  .fm-editor-light .fm-editor-body .CodeMirror-gutters {
+    background: #f1f3f5;
+    border-right-color: #e2e4e8;
+  }
+  .fm-editor-light .fm-editor-body .CodeMirror-linenumber {
+    color: rgba(0,0,0,0.35);
+  }
+  .fm-editor-light .fm-editor-body .CodeMirror-cursor {
+    border-left-color: #6366f1;
+  }
+  .fm-editor-light .fm-editor-body .CodeMirror-selected {
+    background: rgba(99,102,241,0.20) !important;
+  }
+  .fm-editor-light .fm-editor-body .CodeMirror-activeline-background {
+    background: rgba(0,0,0,0.04) !important;
+  }
+  .fm-editor-light .fm-editor-body .CodeMirror-matchingbracket {
+    background: rgba(99,102,241,0.15);
+    border-bottom-color: #6366f1;
+  }
+  .fm-editor-light .fm-unsaved-badge {
+    color: #d97706;
   }
   
   .fm-editor-footer {
@@ -629,6 +766,7 @@
 <!-- CodeMirror: Syntax Highlighting Editor -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/selection/active-line.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
