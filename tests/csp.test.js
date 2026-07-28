@@ -51,6 +51,64 @@ describe('CSP Header — Integration Test', () => {
     return map;
   }
 
+  /**
+   * List of required CSP directives that MUST be present on every response.
+   * Used across all pages (public + authenticated) to verify consistency.
+   */
+  const REQUIRED_DIRECTIVES = [
+    'default-src',
+    'script-src',
+    'style-src',
+    'font-src',
+    'img-src',
+    'connect-src',
+    'form-action',
+    'base-uri',
+    'frame-ancestors',
+  ];
+
+  /**
+   * Shared assertions — verify a parsed CSP object has the expected structure.
+   * These are reused for both public and authenticated pages.
+   */
+  function assertCspStructure(csp, pageName) {
+    // Required directives
+    for (const dir of REQUIRED_DIRECTIVES) {
+      expect(csp[dir]).toBeDefined();
+    }
+
+    // 'unsafe-inline' restrictions
+    expect(csp['script-src'].some(v => v === "'unsafe-inline'")).toBe(false);
+    expect(csp['style-src'].some(v => v === "'unsafe-inline'")).toBe(false);
+
+    // Attr exceptions (must use unsafe-inline since nonces don't work for attributes)
+    expect(csp['script-src-attr']).toContain("'unsafe-inline'");
+    expect(csp['style-src-attr']).toContain("'unsafe-inline'");
+
+    // Nonce-based protection
+    expect(csp['script-src'].some(v => v.startsWith("'nonce-"))).toBe(true);
+    expect(csp['style-src'].some(v => v.startsWith("'nonce-"))).toBe(true);
+
+    // Restrictive directives locked to self
+    expect(csp['form-action']).toEqual(["'self'"]);
+    expect(csp['base-uri']).toEqual(["'self'"]);
+    expect(csp['frame-ancestors']).toEqual(["'self'"]);
+
+    // No Google Fonts domains (self-hosted)
+    expect(csp['style-src']).not.toContain('fonts.googleapis.com');
+    expect(csp['font-src']).not.toContain('fonts.gstatic.com');
+
+    // Required CDN whitelist
+    expect(csp['script-src']).toContain('cdn.jsdelivr.net');
+    expect(csp['style-src']).toContain('cdn.jsdelivr.net');
+
+    // Non-whitelisted domains NOT present
+    const forbidden = ['googleapis.com', 'github.com', 'facebook.com', 'twitter.com'];
+    for (const domain of forbidden) {
+      expect(csp['script-src'].some(v => v.includes(domain))).toBe(false);
+    }
+  }
+
   let cspHeader;
   let csp;
 
@@ -61,98 +119,8 @@ describe('CSP Header — Integration Test', () => {
     csp = parseCsp(cspHeader);
   });
 
-  // ── Required Directives ──
-
-  test('Has required restrictive directives', () => {
-    expect(csp['default-src']).toBeDefined();
-    expect(csp['script-src']).toBeDefined();
-    expect(csp['style-src']).toBeDefined();
-    expect(csp['font-src']).toBeDefined();
-    expect(csp['img-src']).toBeDefined();
-    expect(csp['connect-src']).toBeDefined();
-    expect(csp['form-action']).toBeDefined();
-    expect(csp['base-uri']).toBeDefined();
-    expect(csp['frame-ancestors']).toBeDefined();
-  });
-
-  // ── Restrict form-action to self ──
-
-  test('form-action is restricted to self', () => {
-    expect(csp['form-action']).toEqual(["'self'"]);
-  });
-
-  // ── Restrict base-uri to self ──
-
-  test('base-uri is restricted to self', () => {
-    expect(csp['base-uri']).toEqual(["'self'"]);
-  });
-
-  // ── Restrict frame-ancestors to self ──
-
-  test('frame-ancestors is restricted to self', () => {
-    expect(csp['frame-ancestors']).toEqual(["'self'"]);
-  });
-
-  // ── unsafe-inline checks ──
-
-  test('script-src does NOT contain unsafe-inline', () => {
-    const hasUnsafeInline = csp['script-src'].some(v => v === "'unsafe-inline'");
-    expect(hasUnsafeInline).toBe(false);
-  });
-
-  test('style-src does NOT contain unsafe-inline', () => {
-    const hasUnsafeInline = csp['style-src'].some(v => v === "'unsafe-inline'");
-    expect(hasUnsafeInline).toBe(false);
-  });
-
-  test('script-src-attr contains unsafe-inline (for inline event handlers)', () => {
-    expect(csp['script-src-attr']).toBeDefined();
-    expect(csp['script-src-attr']).toContain("'unsafe-inline'");
-  });
-
-  test('style-src-attr contains unsafe-inline (for inline style attributes)', () => {
-    expect(csp['style-src-attr']).toBeDefined();
-    expect(csp['style-src-attr']).toContain("'unsafe-inline'");
-  });
-
-  // ── Nonce presence ──
-
-  test('script-src contains nonce- directive (dynamic per request)', () => {
-    const hasNonce = csp['script-src'].some(v => v.startsWith("'nonce-"));
-    expect(hasNonce).toBe(true);
-  });
-
-  test('style-src contains nonce- directive (dynamic per request)', () => {
-    const hasNonce = csp['style-src'].some(v => v.startsWith("'nonce-"));
-    expect(hasNonce).toBe(true);
-  });
-
-  // ── No Google Fonts domains (self-hosted) ──
-
-  test('fonts.googleapis.com is NOT in style-src (self-hosted)', () => {
-    expect(csp['style-src']).not.toContain('fonts.googleapis.com');
-  });
-
-  test('fonts.gstatic.com is NOT in font-src (self-hosted)', () => {
-    expect(csp['font-src']).not.toContain('fonts.gstatic.com');
-  });
-
-  // ── Required CDN whitelist ──
-
-  test('cdn.jsdelivr.net in script-src (Bootstrap, Xterm)', () => {
-    expect(csp['script-src']).toContain('cdn.jsdelivr.net');
-  });
-
-  test('cdn.jsdelivr.net in style-src (Bootstrap, CodeMirror)', () => {
-    expect(csp['style-src']).toContain('cdn.jsdelivr.net');
-  });
-
-  test('Non-whitelisted external domains are NOT in script-src', () => {
-    const forbidden = ['googleapis.com', 'github.com', 'facebook.com', 'twitter.com'];
-    for (const domain of forbidden) {
-      const found = csp['script-src'].some(v => v.includes(domain));
-      expect(found).toBe(false);
-    }
+  test('Login page CSP has complete and correct structure', () => {
+    assertCspStructure(csp, 'login');
   });
 });
 
@@ -285,6 +253,11 @@ describe('CSP Static Analysis — View CDN URLs vs Whitelist', () => {
   // Gather all view files
   const viewsDir = resolve(PROJECT_ROOT, 'src/views');
   const viewFiles = findViewFiles(viewsDir);
+
+  // Check that at least some view files were discovered
+  test('At least one view file was scanned', () => {
+    expect(viewFiles.length).toBeGreaterThan(0);
+  });
 
   test.each(viewFiles)('All external URLs in %s are CSP-whitelisted', (viewFile) => {
     const fullPath = resolve(PROJECT_ROOT, viewFile);
