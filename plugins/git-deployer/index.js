@@ -139,7 +139,7 @@ export default {
                           <span style="font-size:11px; color:var(--text-muted);">No deployments yet. Send a push webhook to trigger.</span>
                         ` : hook.logs.map(log => `
                           <div style="font-size:11px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding: 6px 10px; border-radius:6px;">
-                            <span><span class="lp-badge ${escapeHtml(log.status === 'success' ? 'lp-badge-success' : 'lp-badge-danger')}" style="font-size:9px; margin-right:6px;">${escapeHtml(log.status).toUpperCase()}</span> ${escapeHtml(new Date(log.timestamp).toLocaleString())}</span>
+                            <span><span class="lp-badge ${escapeHtml(log.stashConflict ? 'lp-badge-warning' : (log.status === 'success' ? 'lp-badge-success' : 'lp-badge-danger'))}" style="font-size:9px; margin-right:6px;">${escapeHtml(log.stashConflict ? 'CONFLICT' : log.status).toUpperCase()}</span> ${escapeHtml(new Date(log.timestamp).toLocaleString())}</span>
                             <button class="btn-lp btn-lp-ghost btn-sm text-info p-0" style="height:20px; line-height:20px;" onclick="GitDeployPage.showLog('${escapeHtml(hook.id)}', '${escapeHtml(log.timestamp)}')">View Output</button>
                           </div>
                         `).join('')}
@@ -162,6 +162,17 @@ export default {
                 <div class="modal-body">
                   <pre id="logOutputArea" style="background:#000; color:#00ff00; padding:15px; border-radius:8px; font-size:12px; font-family:monospace; max-height:400px; overflow-y:auto; margin:0; white-space: pre-wrap; word-break: break-all;"></pre>
                 </div>
+                <div class="modal-footer" id="logModalFooter" style="border-top: 1px solid rgba(255,255,255,0.1); padding:12px 20px; display:none;">
+                  <span style="font-size:11px; color:#fbbf24; margin-right:auto;">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i> Stash conflict — perlu resolusi manual
+                  </span>
+                  <button class="btn-lp btn-lp-ghost btn-sm" id="discardStashBtn" onclick="GitDeployPage.discardStash()" style="font-size:11px; color:#f87171;">
+                    <i class="bi bi-trash me-1"></i> Discard Stash
+                  </button>
+                  <button class="btn-lp btn-lp-ghost btn-sm" data-bs-dismiss="modal" style="font-size:11px;">
+                    Keep Stash (manual via SSH)
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -170,6 +181,8 @@ export default {
             const GitDeployPage = (() => {
               let logModal = null;
               const webhooksData = ${JSON.stringify(webhooks)};
+              let _currentLogHookId = null;
+              let _currentLogTimestamp = null;
 
               async function createHook() {
                 const name = document.getElementById('hookName').value;
@@ -211,11 +224,24 @@ export default {
               }
 
               function showLog(hookId, timestamp) {
+                _currentLogHookId = hookId;
+                _currentLogTimestamp = timestamp;
+
                 const hook = webhooksData.find(h => h.id === hookId);
                 if (hook && hook.logs) {
                   const log = hook.logs.find(l => l.timestamp === timestamp);
                   if (log) {
                     document.getElementById('logOutputArea').textContent = log.output || 'No output.';
+
+                    // Show stash conflict footer if needed
+                    const footer = document.getElementById('logModalFooter');
+                    const btn = document.getElementById('discardStashBtn');
+                    if (log.stashConflict) {
+                      footer.style.display = 'flex';
+                    } else {
+                      footer.style.display = 'none';
+                    }
+
                     if (!logModal) logModal = new bootstrap.Modal(document.getElementById('logModal'));
                     logModal.show();
                     return;
@@ -224,7 +250,42 @@ export default {
                 LP.toast('Log not found', 'error');
               }
 
-              return { createHook, deleteHook, showLog };
+              async function discardStash() {
+                const hookId = _currentLogHookId;
+                const timestamp = _currentLogTimestamp;
+                if (!hookId || !timestamp) return;
+
+                const btn = document.getElementById('discardStashBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Discarding...';
+
+                try {
+                  const res = await LP.post('/api/plugins/git-deploy/stash/discard', { hookId, timestamp });
+                  if (res?.success) {
+                    LP.toast('Stash discarded successfully', 'success');
+                    btn.innerHTML = '<i class="bi bi-check2 me-1"></i> Discarded';
+                    btn.style.color = '#4ade80';
+                    btn.disabled = true;
+                    // Update the output area
+                    const area = document.getElementById('logOutputArea');
+                    area.textContent += '\n[RESOLVED] Stash discarded by admin. ' + (res.output || '');
+                    // Hide footer after a moment
+                    setTimeout(() => {
+                      document.getElementById('logModalFooter').style.display = 'none';
+                    }, 2000);
+                  } else {
+                    LP.toast(res?.message || 'Failed to discard stash', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-trash me-1"></i> Discard Stash';
+                  }
+                } catch (err) {
+                  LP.toast('Error: ' + err.message, 'error');
+                  btn.disabled = false;
+                  btn.innerHTML = '<i class="bi bi-trash me-1"></i> Discard Stash';
+                }
+              }
+
+              return { createHook, deleteHook, showLog, discardStash };
             })();
           </script>
         `,
@@ -265,6 +326,49 @@ export default {
       res.json({ success: true, message: 'Webhook deleted successfully' });
     });
 
+    // --- Private API: Resolve Stash Conflict — Discard Stash ---
+    app.post('/api/plugins/git-deploy/stash/discard', requireAuth, async (req, res) => {
+      const { hookId, timestamp } = req.body;
+      if (!hookId || typeof hookId !== 'string' || !/^[a-f0-9]{32}$/i.test(hookId)) {
+        return res.status(400).json({ success: false, message: 'Invalid webhook ID' });
+      }
+      if (!timestamp || typeof timestamp !== 'string') {
+        return res.status(400).json({ success: false, message: 'Invalid timestamp' });
+      }
+
+      const webhooks = await getWebhooks();
+      const hook = webhooks.find(w => w.id === hookId);
+      if (!hook) {
+        return res.status(404).json({ success: false, message: 'Webhook not found' });
+      }
+
+      const logEntry = hook.logs?.find(l => l.timestamp === timestamp);
+      if (!logEntry || !logEntry.stashConflict) {
+        return res.status(404).json({ success: false, message: 'No active stash conflict for this deployment' });
+      }
+
+      try {
+        const { stdout, stderr } = await execAsync('git stash drop', { cwd: hook.path });
+        // Mark conflict as resolved in the log entry
+        logEntry.stashConflict = false;
+        logEntry.stashResolved = true;
+        logEntry.output += '\n[RESOLVED] Stash discarded by admin.';
+        await saveWebhooks(webhooks);
+
+        res.json({
+          success: true,
+          message: 'Stash discarded successfully. Your local changes remain in the working tree (may contain conflict markers).',
+          output: stdout + (stderr ? '\n' + stderr : ''),
+        });
+      } catch (err) {
+        res.json({
+          success: false,
+          message: 'Failed to discard stash: ' + err.message,
+          output: (err.stdout || '') + '\n' + (err.stderr || ''),
+        });
+      }
+    });
+
     // --- Public API Endpoint: Webhook Trigger ---
     // [HIGH-2 FIX] Apply rate limiter — 10 req/min per webhook ID + IP
     app.post('/api/git-deploy/webhook/:secret', webhookLimiter, async (req, res) => {
@@ -284,12 +388,46 @@ export default {
       let status = 'success';
       let output = '';
 
+      // 🚩 [FIX] Stash uncommitted changes before deploy so git pull doesn't fail
+      let stashed = false;
+      let stashRef = '';
+      let stashConflict = false;
+      try {
+        const { stdout: statusOut } = await execAsync('git status --porcelain', { cwd: hook.path });
+        if (statusOut.trim()) {
+          await execAsync('git stash push -m "auto-stash-before-deploy"', { cwd: hook.path });
+          stashed = true;
+          // Capture the stash commit hash for later reference
+          const { stdout: hashOut } = await execAsync('git stash list --format="%H" -1', { cwd: hook.path });
+          stashRef = hashOut.trim();
+          output += '[INFO] Local changes stashed before deploy. Stash ref: ' + stashRef + '\n';
+        }
+      } catch (_) {
+        // Not a git repo or git not available — continue anyway
+      }
+
       try {
         const { stdout, stderr } = await execAsync(hook.script, { cwd: hook.path });
-        output = stdout + '\n' + stderr;
+        output += stdout + '\n' + stderr;
       } catch (err) {
         status = 'error';
-        output = err.message + '\n' + (err.stdout || '') + '\n' + (err.stderr || '');
+        output += err.message + '\n' + (err.stdout || '') + '\n' + (err.stderr || '');
+      }
+
+      // 🚩 [FIX] Restore stashed changes after deploy completes
+      if (stashed) {
+        try {
+          const { stdout: popOut, stderr: popErr } = await execAsync('git stash pop', { cwd: hook.path });
+          output += '\n[INFO] Stashed changes restored after deploy.\n' + popOut;
+          if (popErr) output += '\n' + popErr;
+        } catch (popErr) {
+          stashConflict = true;
+          status = 'warning';
+          output += '\n[CONFLICT] Stash pop failed — merge conflict detected!';
+          output += '\n[CONFLICT] Stash ref: ' + stashRef;
+          output += '\n[CONFLICT] Error: ' + popErr.message;
+          output += '\n[CONFLICT] You can resolve this manually via SSH, or use the "Discard Stash" button below to throw away the stashed changes (your local changes will remain in the working tree with conflict markers).';
+        }
       }
 
       // Append log (keep last 5 logs)
@@ -297,12 +435,18 @@ export default {
       const hookToUpdate = freshWebhooks.find(w => w.id === secret);
       if (hookToUpdate) {
         if (!hookToUpdate.logs) hookToUpdate.logs = [];
-        hookToUpdate.logs.unshift({ timestamp, status, output });
+        const logEntry = { timestamp, status, output };
+        if (stashConflict) {
+          logEntry.stashConflict = true;
+          logEntry.stashRef = stashRef;
+          logEntry.hookPath = hook.path;
+        }
+        hookToUpdate.logs.unshift(logEntry);
         hookToUpdate.logs = hookToUpdate.logs.slice(0, 5);
         await saveWebhooks(freshWebhooks);
 
         // Notify front-end dashboard in real-time
-        io.emit('git-deploy:triggered', { hookId: secret, status, timestamp });
+        io.emit('git-deploy:triggered', { hookId: secret, status, timestamp, stashConflict });
       }
     });
   }

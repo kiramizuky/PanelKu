@@ -396,10 +396,10 @@ const FMPage = (() => {
     if (!container) return;
     container.innerHTML = _openTabs.map(t => `
       <div class="fm-split-tab${t.path === _activeTab ? ' active' : ''}"
-           onclick="FM.switchTab('${LP.encJsArg(t.path)}')">
+           onclick="LP.call('FM.switchTab', '${LP.encJsArg(t.path)}')">
         <i class="${getTabIcon(t.path)}" style="font-size:11px;"></i>
         ${escHtml(t.name)}
-        <span class="fm-split-tab-close" onclick="event.stopPropagation(); FM.closeTab('${LP.encJsArg(t.path)}')">
+        <span class="fm-split-tab-close" onclick="event.stopPropagation(); LP.call('FM.closeTab', '${LP.encJsArg(t.path)}')">
           <i class="bi bi-x"></i>
         </span>
       </div>
