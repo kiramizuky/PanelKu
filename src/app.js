@@ -69,6 +69,11 @@ const createApp = () => {
           (req, res) => `'nonce-${res.locals.nonce}'`,
           'cdn.jsdelivr.net',
         ],
+        // style-src-attr must remain 'unsafe-inline' because:
+        // 1) style="..." HTML attributes are used extensively across views
+        // 2) CSP nonces do NOT apply to style HTML attributes — only <style> tags
+        // 3) Migrating all 126+ inline style attributes to CSS classes is impractical
+        styleSrcAttr: ["'unsafe-inline'"],
         fontSrc: ["'self'", 'cdn.jsdelivr.net'],
         imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'", 'ws:', 'wss:', 'cdn.jsdelivr.net', 'cdn.socket.io', 'static.cloudflareinsights.com'],
