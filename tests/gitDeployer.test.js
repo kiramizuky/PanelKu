@@ -153,8 +153,7 @@ describe('git-deployer stash/pop logic', () => {
     repo = createGitRepo();
 
     // Script that creates a new file (like a deploy would)
-    // Use touch which produces no stdout, making assertion simpler
-    const script = 'touch deploy-output.txt';
+    const script = `node -e "require('fs').writeFileSync('deploy-output.txt', '')"`;
 
     const result = await simulateDeploy(repo.root, script);
 
