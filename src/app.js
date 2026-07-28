@@ -139,6 +139,10 @@ const createApp = () => {
     next();
   });
 
+  // [CSP HARDEN] Auto-inject nonces into inline <script>/<style> after rendering
+  // MUST be before page routes so res.render() is already overridden when routes call it
+  app.use(nonceInjector);
+
   // SPA / Page routes
   app.get('/', (req, res) => res.render('login/index', { layout: false }));
   app.get('/login/2fa', (req, res) => res.render('login/2fa', { layout: false }));
@@ -192,9 +196,6 @@ const createApp = () => {
   app.use((req, res, next) => pluginLoader.handleProxy(req, res, next));
   app.use(pluginLoader.router);
   app.use('/api', pluginLoader.router);
-
-  // [CSP HARDEN] Auto-inject nonces into inline <script>/<style> after rendering
-  app.use(nonceInjector);
 
   // Error handlers (must be last)
   app.use(notFoundHandler);
