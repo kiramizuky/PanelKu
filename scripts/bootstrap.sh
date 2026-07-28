@@ -10,6 +10,7 @@
 #   bash scripts/bootstrap.sh --quick      # skip npm install + tests
 #   bash scripts/bootstrap.sh --ci         # CI mode (exit on first fail)
 #   bash scripts/bootstrap.sh --report     # security report only, no setup
+#   bash scripts/bootstrap.sh --deploy     # git pull + install + restart + CSP verify
 # ============================================================
 
 set -o pipefail
@@ -32,11 +33,13 @@ SKIP_NPM=false
 SKIP_TESTS=false
 EXIT_ON_FAIL=false
 REPORT_ONLY=false
+DEPLOY_MODE=false
 
 case "$MODE" in
   --quick)    SKIP_NPM=true; SKIP_TESTS=true ;;
   --ci)       EXIT_ON_FAIL=true ;;
   --report)   REPORT_ONLY=true ;;
+  --deploy)   DEPLOY_MODE=true; EXIT_ON_FAIL=true ;;
 esac
 
 # Determine project root (where package.json lives)
@@ -486,6 +489,190 @@ if [ "$REPORT_ONLY" = false ]; then
 fi # end REPORT_ONLY
 
 # ─────────────────────────────────────────────────────────
+#  4b. DEPLOY / RESTART (--deploy mode)
+# ─────────────────────────────────────────────────────────
+if [ "$DEPLOY_MODE" = true ]; then
+
+  header "DEPLOY"
+
+  # 1. Check we're in a git repo
+  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    fail "Not a git repository — deploy mode requires git"
+  else
+    BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+    info "Current branch: $BRANCH"
+  fi
+
+  # 2. Stash local changes if any, then pull
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    warn "Local changes detected — stashing before pull"
+    git stash push -m "bootstrap-deploy-auto-stash-$(date +%s)" 2>&1 | head -3
+  fi
+
+  info "Pulling latest code..."
+  GIT_OUTPUT=$(git pull origin "$BRANCH" 2>&1)
+  GIT_EXIT=$?
+  echo "$GIT_OUTPUT" | while IFS= read -r line; do echo "    $line"; done
+  
+  if [ "$GIT_EXIT" -ne 0 ]; then
+    fail "Git pull failed — resolve conflicts and retry"
+  else
+    pass "Git pull completed"
+    
+    # Check if app.js changed (CSP changes are critical)
+    if echo "$GIT_OUTPUT" | grep -q "src/app.js"; then
+      info "src/app.js changed — CSP update detected"
+    fi
+    if echo "$GIT_OUTPUT" | grep -q "src/views/"; then
+      info "View files changed — templates updated"
+    fi
+  fi
+
+  # 3. Install dependencies
+  header "DEPENDENCIES"
+  info "Installing npm dependencies..."
+  npm install 2>&1 | tail -5
+  if [ $? -eq 0 ]; then
+    pass "npm install completed"
+  else
+    fail "npm install failed"
+    if [ "$EXIT_ON_FAIL" = true ]; then exit 1; fi
+  fi
+
+  # 4. Run CSP tests first (fast security gate)
+  header "CSP GATE"
+  if [ -f node_modules/.bin/jest ] && [ -f tests/csp.test.js ]; then
+    info "Running CSP verification tests..."
+    CSP_OUTPUT=$(npx jest --no-cache tests/csp.test.js --testTimeout=30000 2>&1)
+    CSP_EXIT=$?
+    echo "$CSP_OUTPUT" | tail -8 | while IFS= read -r line; do
+      echo "    $line"
+    done
+    if [ $CSP_EXIT -eq 0 ]; then
+      pass "CSP tests passed"
+    else
+      fail "CSP tests failed — deployment blocked!"
+      if [ "$EXIT_ON_FAIL" = true ]; then exit 1; fi
+    fi
+  else
+    warn "CSP tests not available — skipping security gate"
+  fi
+
+  # 5. Stop existing panel process
+  header "RESTART"
+  info "Stopping current panel process..."
+  
+  # Try PM2 first
+  if command -v pm2 &>/dev/null; then
+    if pm2 list 2>/dev/null | grep -q "panelku"; then
+      pm2 stop panelku 2>&1 | tail -2
+      pm2 delete panelku 2>&1 | tail -2
+      pass "Stopped PM2 process: panelku"
+    else
+      info "No PM2 process named 'panelku' running"
+    fi
+  fi
+  
+  # Fallback: kill any process on our port
+  PORT=${PORT:-23456}
+  KILLED=false
+  if command -v fuser &>/dev/null; then
+    if fuser "${PORT}/tcp" 2>/dev/null; then
+      fuser -k "${PORT}/tcp" 2>/dev/null
+      sleep 2
+      pass "Freed port ${PORT} (fuser)"
+      KILLED=true
+    fi
+  elif command -v ss &>/dev/null; then
+    OLD_PID=$(ss -tlnp "sport = :$PORT" 2>/dev/null | grep -oP 'pid=\K\d+' | head -1)
+    if [ -n "$OLD_PID" ]; then
+      kill "$OLD_PID" 2>/dev/null
+      sleep 2
+      pass "Killed process (PID $OLD_PID) via ss"
+      KILLED=true
+    fi
+  elif command -v lsof &>/dev/null; then
+    OLD_PID=$(lsof -ti:"$PORT" 2>/dev/null)
+    if [ -n "$OLD_PID" ]; then
+      kill "$OLD_PID" 2>/dev/null
+      sleep 2
+      if kill -0 "$OLD_PID" 2>/dev/null; then
+        kill -9 "$OLD_PID" 2>/dev/null
+        sleep 1
+      fi
+      pass "Killed old process (PID $OLD_PID)"
+      KILLED=true
+    fi
+  fi
+  if [ "$KILLED" = false ]; then
+    warn "Could not find process on port ${PORT} — no fuser/lsof/ss available"
+  fi
+
+  # 6. Start panel
+  info "Starting panel on port $PORT..."
+  if command -v pm2 &>/dev/null; then
+    pm2 start ecosystem.config.cjs --env production 2>&1 | tail -5
+    START_EXIT=$?
+  else
+    nohup node --experimental-vm-modules src/server.js > /dev/null 2>&1 &
+    START_EXIT=$?
+    info "Started with PID $!"
+  fi
+  
+  sleep 4
+
+  if [ $START_EXIT -eq 0 ]; then
+    pass "Panel started"
+  else
+    fail "Panel failed to start — check logs"
+    if [ "$EXIT_ON_FAIL" = true ]; then exit 1; fi
+  fi
+
+  # 7. Verify CSP header
+  header "CSP VERIFICATION"
+  sleep 3
+  CSP_HEADER=$(curl -s -I "http://localhost:$PORT/" 2>/dev/null | grep -i content-security-policy)
+  
+  if [ -z "$CSP_HEADER" ]; then
+    fail "No CSP header received — panel may not be running"
+  else
+    pass "CSP header present"
+    
+    # Check critical CSP features
+    if echo "$CSP_HEADER" | grep -q "style-src-attr.*unsafe-inline"; then
+      pass "style-src-attr 'unsafe-inline' — inline styles allowed"
+    else
+      fail "style-src-attr missing — inline style="..." will be blocked!"
+    fi
+    
+    if echo "$CSP_HEADER" | grep -q "script-src-attr.*unsafe-inline"; then
+      pass "script-src-attr 'unsafe-inline' — inline event handlers allowed"
+    else
+      fail "script-src-attr missing — inline onclick="..." will be blocked!"
+    fi
+    
+    if echo "$CSP_HEADER" | grep -q "cdn\.jsdelivr"; then
+      warn "cdn.jsdelivr.net still in CSP — consider migrating to local hosting"
+    else
+      pass "No CDN domains in CSP — all resources self-hosted"
+    fi
+    
+    if echo "$CSP_HEADER" | grep -q "fonts\.googleapis\|fonts\.gstatic"; then
+      warn "Google Fonts domains still in CSP — consider self-hosting"
+    else
+      pass "No Google Fonts domains in CSP"
+    fi
+  fi
+
+  # 8. Show status
+  header "DEPLOY COMPLETE"
+  echo ""
+  echo -e "  ${BOLD}Panel URL:${NC}  http://localhost:$PORT"
+  echo -e "  ${BOLD}CSP Status:${NC} $(echo "$CSP_HEADER" | head -c 120)..."
+  echo ""
+fi
+
+# ─────────────────────────────────────────────────────────
 #  5. SUMMARY
 # ─────────────────────────────────────────────────────────
 header "SUMMARY"
@@ -512,6 +699,7 @@ echo -e "  ${BLUE}→${NC} Run tests:               ${GREEN}npm test${NC}"
 echo -e "  ${BLUE}→${NC} Lint & fix:              ${GREEN}npm run lint:fix${NC}"
 echo -e "  ${BLUE}→${NC} Default login:           ${YELLOW}admin / Admin@123456${NC}"
 echo -e "  ${BLUE}→${NC} Reset DB:                ${GREEN}npm run reset-db${NC}"
+echo -e "  ${BLUE}→${NC} Deploy update:           ${GREEN}bash scripts/bootstrap.sh --deploy${NC}"
 echo ""
 
 # Exit code
