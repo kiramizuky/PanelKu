@@ -15,7 +15,9 @@
     "format": "eslint src/ --fix",
     "lint:fix": "eslint src/ --fix",
     "lint:check": "eslint src/ --max-warnings 0",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:csp": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/csp.test.js --no-cache --testTimeout=30000",
+    "test:ci": "npm run test:csp && npm test -- --no-cache --testTimeout=30000"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1085.0",

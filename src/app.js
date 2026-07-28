@@ -47,15 +47,11 @@ const createApp = () => {
       directives: {
         defaultSrc: ["'self'"],
         // [CSP HARDEN] 'unsafe-inline' removed — replaced with per-request nonce.
-        // The nonceMiddleware runs before helmet, so res.locals.nonce is available.
-        // All inline <script> blocks are auto-injected with the nonce via nonceInjector.
+        // All external resources (Bootstrap, Chart.js, CodeMirror, Xterm, fonts)
+        // are now self-hosted — no CDN whitelist needed for loading resources.
         scriptSrc: [
           "'self'",
           (req, res) => `'nonce-${res.locals.nonce}'`,
-          'cdn.jsdelivr.net',
-          'cdnjs.cloudflare.com',
-          'cdn.socket.io',
-          'static.cloudflareinsights.com',
         ],
         // script-src-attr must remain 'unsafe-inline' because:
         // 1) LP.call() pattern renders inline onclick handlers via innerHTML
@@ -67,16 +63,15 @@ const createApp = () => {
         styleSrc: [
           "'self'",
           (req, res) => `'nonce-${res.locals.nonce}'`,
-          'cdn.jsdelivr.net',
         ],
         // style-src-attr must remain 'unsafe-inline' because:
         // 1) style="..." HTML attributes are used extensively across views
         // 2) CSP nonces do NOT apply to style HTML attributes — only <style> tags
         // 3) Migrating all 126+ inline style attributes to CSS classes is impractical
         styleSrcAttr: ["'unsafe-inline'"],
-        fontSrc: ["'self'", 'cdn.jsdelivr.net'],
+        fontSrc: ["'self'"],
         imgSrc: ["'self'", 'data:', 'blob:'],
-        connectSrc: ["'self'", 'ws:', 'wss:', 'cdn.jsdelivr.net', 'cdn.socket.io', 'static.cloudflareinsights.com'],
+        connectSrc: ["'self'", 'ws:', 'wss:'],
         // [HARDEN] Restrict form submissions to same origin
         formAction: ["'self'"],
         // [HARDEN] Restrict base URI to prevent base tag injection
