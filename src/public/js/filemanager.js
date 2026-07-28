@@ -652,7 +652,7 @@ const FMPage = (() => {
         </div>
         <div class="fm-tree-children" data-parent="${escHtml(item.path)}"></div>`;
       } else {
-        return `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file">
+        return `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file" draggable="true" ondragstart="FM.onTreeDragStart(event)">
           <span class="fm-tree-toggle" style="visibility:hidden;">▶</span>
           <span class="fm-tree-icon">${icon}</span>
           <span class="fm-tree-name">${escHtml(item.name)}</span>
@@ -714,14 +714,14 @@ const FMPage = (() => {
         const activeClass = isActive ? 'fm-tree-active' : '';
 
         if (item.type === 'dir') {
-          html += `<div class="fm-tree-item fm-tree-dir ${activeClass}" data-path="${escHtml(item.path)}" data-type="dir">
+          html += `<div class="fm-tree-item fm-tree-dir ${activeClass}" data-path="${escHtml(item.path)}" data-type="dir" draggable="true" ondragstart="FM.onTreeDragStart(event)">
             <span class="fm-tree-toggle">▶</span>
             <span class="fm-tree-icon">📁</span>
             <span class="fm-tree-name">${escHtml(item.name)}</span>
           </div>
           <div class="fm-tree-children" data-parent="${escHtml(item.path)}"></div>`;
         } else {
-          html += `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file">
+          html += `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file" draggable="true" ondragstart="FM.onTreeDragStart(event)">
             <span class="fm-tree-toggle" style="visibility:hidden;">▶</span>
             <span class="fm-tree-icon">${icon}</span>
             <span class="fm-tree-name">${escHtml(item.name)}</span>
@@ -977,6 +977,74 @@ const FMPage = (() => {
     }
   }
 
+  // ── Drag & Drop from Tree to Editor ──────────────
+  function onTreeDragStart(e) {
+    const item = e.target.closest('.fm-tree-item');
+    if (!item) return;
+    const path = item.dataset.path;
+    const name = item.querySelector('.fm-tree-name')?.textContent || path;
+    e.dataTransfer.setData('text/plain', path);
+    e.dataTransfer.effectAllowed = 'copy';
+    // Set a custom drag image
+    const dragImg = document.createElement('div');
+    dragImg.textContent = '📄 ' + name;
+    dragImg.style.cssText = 'padding:4px 10px;background:#1e293b;color:#e2e8f0;border:1px solid rgba(99,102,241,0.5);border-radius:6px;font-size:12px;font-family:monospace;white-space:nowrap;position:absolute;top:-1000px;left:-1000px;';
+    document.body.appendChild(dragImg);
+    e.dataTransfer.setDragImage(dragImg, 10, 10);
+    // Clean up after drag ends — not on a timeout, to avoid race with setDragImage clone
+    document.addEventListener('dragend', () => dragImg.remove(), { once: true });
+  }
+
+  let _editorDropInited = false;
+
+  function initEditorDropTarget() {
+    if (_editorDropInited) return;
+    const editorPanel = document.getElementById('fmEditorPanel');
+    if (!editorPanel) return;
+    _editorDropInited = true;
+
+    let dragCounter = 0;
+
+    editorPanel.addEventListener('dragenter', (e) => {
+      if (!_cm || _previewTabs[_activeTab]) return; // only in text editor mode
+      dragCounter++;
+      editorPanel.classList.add('fm-drag-over');
+    });
+
+    editorPanel.addEventListener('dragover', (e) => {
+      if (!_cm || _previewTabs[_activeTab]) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+
+    editorPanel.addEventListener('dragleave', (e) => {
+      if (!_cm || _previewTabs[_activeTab]) return;
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        editorPanel.classList.remove('fm-drag-over');
+      }
+    });
+
+    editorPanel.addEventListener('drop', (e) => {
+      if (!_cm || _previewTabs[_activeTab]) return;
+      e.preventDefault();
+      dragCounter = 0;
+      editorPanel.classList.remove('fm-drag-over');
+
+      const path = e.dataTransfer.getData('text/plain');
+      if (!path) return;
+
+      // Insert path at cursor position
+      const cursor = _cm.getCursor();
+      _cm.replaceRange(path, cursor);
+      _cm.focus();
+      // Move cursor to end of inserted path
+      const newPos = { line: cursor.line, ch: cursor.ch + path.length };
+      _cm.setCursor(newPos);
+    });
+  }
+
   // ── Editor (CodeMirror) ───────────────────────────
   let _cm = null;
   let _cmInitialized = false;
@@ -1044,6 +1112,9 @@ const FMPage = (() => {
 
     // Cursor position tracking (attached once here, not per renderSplitEditor)
     _cm.on('cursorActivity', updateCodeMirrorStats);
+
+    // Init drop target for tree-to-editor drag & drop
+    initEditorDropTarget();
 
     // Initial stats
     updateCodeMirrorStats();
@@ -1118,7 +1189,6 @@ const FMPage = (() => {
     _tabContents = {};
     _previewTabs = {};
     _previewZoom = { level: 100, mode: 'fit' };
-    _zoomWheelInited = false;
     // Reset CodeMirror
     if (_cm) {
       _cm.setValue('');
@@ -1488,6 +1558,7 @@ const FMPage = (() => {
     filterTree,
     clearTreeFilter,
     toggleEditorTheme,
+    onTreeDragStart,
     zoomIn,
     zoomOut,
     zoomReset,

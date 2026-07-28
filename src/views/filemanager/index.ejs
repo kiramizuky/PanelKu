@@ -502,6 +502,19 @@
     min-width: 0;
     background: #070a13;
   }
+  /* Drag & Drop from tree — visual feedback */
+  .fm-editor-panel.fm-drag-over {
+    outline: 2px dashed rgba(99,102,241,0.5);
+    outline-offset: -4px;
+    background: rgba(99,102,241,0.04);
+  }
+  .fm-editor-panel.fm-drag-over .CodeMirror {
+    opacity: 0.85;
+  }
+  .fm-editor-light .fm-editor-panel.fm-drag-over {
+    outline-color: rgba(99,102,241,0.6);
+    background: rgba(99,102,241,0.06);
+  }
   
   .fm-editor-header {
     display: flex;
