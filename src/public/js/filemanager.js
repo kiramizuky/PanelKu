@@ -14,6 +14,9 @@ const FMPage = (() => {
   let _activeTab = null;
   let _tabContents = {};
   let _previewTabs = {}; // { path: 'image' | 'pdf' }
+  let _previewZoom = { level: 100, mode: 'fit' }; // zoom state: 'fit' | 'width' | 'custom'
+  let _zoomWheelInited = false;
+  const ZOOM_LEVELS = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 
   const FILE_ICONS = {
     dir: '📁',
@@ -426,11 +429,114 @@ const FMPage = (() => {
     highlightTreeItem(path);
   }
 
+  // ── Zoom Controls ─────────────────────────────────
+  function zoomIn() {
+    const current = _previewZoom.level;
+    const next = ZOOM_LEVELS.find(l => l > current) || ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+    _previewZoom.mode = 'custom';
+    _previewZoom.level = next;
+    applyZoom();
+  }
+
+  function zoomOut() {
+    const current = _previewZoom.level;
+    const prev = [...ZOOM_LEVELS].reverse().find(l => l < current) || ZOOM_LEVELS[0];
+    _previewZoom.mode = 'custom';
+    _previewZoom.level = prev;
+    applyZoom();
+  }
+
+  function zoomReset() {
+    _previewZoom.mode = 'fit';
+    _previewZoom.level = 100;
+    applyZoom();
+  }
+
+  function zoomFitWidth() {
+    _previewZoom.mode = 'width';
+    _previewZoom.level = 100;
+    applyZoom();
+  }
+
+  function zoomFitPage() {
+    _previewZoom.mode = 'fit';
+    _previewZoom.level = 100;
+    applyZoom();
+  }
+
+  function applyZoom() {
+    const wrapper = document.getElementById('fmZoomWrapper');
+    const display = document.getElementById('fmZoomLevel');
+    if (!wrapper) return;
+
+    // Remove all mode classes
+    wrapper.classList.remove('fm-zoom-mode-fit', 'fm-zoom-mode-width', 'fm-zoom-mode-custom');
+
+    const img = wrapper.querySelector('img');
+    if (!img) return;
+
+    // Reset inline styles
+    img.style.width = '';
+    img.style.height = '';
+
+    if (_previewZoom.mode === 'fit') {
+      wrapper.classList.add('fm-zoom-mode-fit');
+      if (display) display.textContent = 'Fit';
+    } else if (_previewZoom.mode === 'width') {
+      wrapper.classList.add('fm-zoom-mode-width');
+      const content = document.getElementById('fmPreviewContent');
+      if (content && img.naturalWidth > 0) {
+        // Account for scrollbar (~16px) and some padding
+        const containerWidth = content.clientWidth - 24;
+        img.style.width = containerWidth + 'px';
+        img.style.height = 'auto';
+        if (display) display.textContent = `W: ${Math.round((containerWidth / img.naturalWidth) * 100)}%`;
+      } else {
+        img.style.width = '100%';
+        img.style.height = 'auto';
+        if (display) display.textContent = 'Fit W';
+      }
+    } else {
+      // Custom zoom mode
+      wrapper.classList.add('fm-zoom-mode-custom');
+      const scale = _previewZoom.level / 100;
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        img.style.width = Math.round(img.naturalWidth * scale) + 'px';
+        img.style.height = Math.round(img.naturalHeight * scale) + 'px';
+      } else {
+        // Fallback for SVGs or images without natural dimensions yet
+        img.style.width = (100 * scale) + '%';
+        img.style.height = 'auto';
+      }
+      if (display) display.textContent = `${_previewZoom.level}%`;
+    }
+  }
+
+  function updateZoomDisplay(text) {
+    const display = document.getElementById('fmZoomLevel');
+    if (display) display.textContent = text;
+  }
+
+  function initZoomWheel() {
+    if (_zoomWheelInited) return;
+    const content = document.getElementById('fmPreviewContent');
+    if (!content) return;
+    _zoomWheelInited = true;
+    content.addEventListener('wheel', (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) zoomIn();
+        else zoomOut();
+      }
+    }, { passive: false });
+  }
+
   function renderPreview(path, type) {
     const container = document.getElementById('fmPreviewContent');
     const loading = document.getElementById('fmPreviewLoading');
     const headerPath = document.getElementById('fmEditorPath');
     const unsavedBadge = document.getElementById('fmEditorUnsaved');
+    const zoomToolbar = document.getElementById('fmZoomToolbar');
 
     if (!container) return;
 
@@ -442,11 +548,31 @@ const FMPage = (() => {
     if (loading) loading.style.display = '';
     container.innerHTML = '';
 
+    // Show/hide zoom toolbar based on type
+    if (zoomToolbar) {
+      zoomToolbar.style.display = type === 'image' ? 'flex' : 'none';
+    }
+
+    // Reset zoom state for new image
+    if (type === 'image') {
+      _previewZoom = { level: 100, mode: 'fit' };
+    }
+
     _getDownloadUrl(path).then(url => {
       if (loading) loading.style.display = 'none';
 
       if (type === 'image') {
-        container.innerHTML = `<img src="${url}" alt="${escHtml(path)}" onerror="this.parentElement.innerHTML='<div class=\"fm-preview-error\"><i class=\"bi bi-exclamation-triangle-fill\"></i>Failed to load image: ${escHtml(path)}</div>'">`;
+        container.innerHTML = `<div class="fm-zoom-wrapper fm-zoom-mode-fit" id="fmZoomWrapper">
+          <img src="${url}" alt="${escHtml(path)}" onerror="this.closest('.fm-preview-content').innerHTML='<div class=\"fm-preview-error\"><i class=\"bi bi-exclamation-triangle-fill\"></i>Failed to load image: ${escHtml(path)}</div>'">
+        </div>`;
+        // Set up zoom controls when image loads
+        const img = container.querySelector('img');
+        if (img) {
+          img.onload = () => {
+            updateZoomDisplay('Fit');
+            initZoomWheel();
+          };
+        }
       } else if (type === 'pdf') {
         container.innerHTML = `<iframe src="${url}#toolbar=1" sandbox="allow-scripts allow-same-origin"></iframe>`;
       }
@@ -991,6 +1117,8 @@ const FMPage = (() => {
     _activeTab = null;
     _tabContents = {};
     _previewTabs = {};
+    _previewZoom = { level: 100, mode: 'fit' };
+    _zoomWheelInited = false;
     // Reset CodeMirror
     if (_cm) {
       _cm.setValue('');
@@ -1360,6 +1488,11 @@ const FMPage = (() => {
     filterTree,
     clearTreeFilter,
     toggleEditorTheme,
+    zoomIn,
+    zoomOut,
+    zoomReset,
+    zoomFitWidth,
+    zoomFitPage,
   };
 })();
 
