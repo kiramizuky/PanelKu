@@ -68,9 +68,8 @@ const createApp = () => {
           "'self'",
           (req, res) => `'nonce-${res.locals.nonce}'`,
           'cdn.jsdelivr.net',
-          'fonts.googleapis.com',
         ],
-        fontSrc: ["'self'", 'cdn.jsdelivr.net', 'fonts.gstatic.com'],
+        fontSrc: ["'self'", 'cdn.jsdelivr.net'],
         imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'", 'ws:', 'wss:', 'cdn.jsdelivr.net', 'cdn.socket.io', 'static.cloudflareinsights.com'],
         // [HARDEN] Restrict form submissions to same origin

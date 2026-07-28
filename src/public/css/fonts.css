@@ -1,0 +1,25 @@
+/**
+ * fonts.css — Self-hosted Google Fonts
+ *
+ * Inter (variable, weight 400-700) and JetBrains Mono (weight 400).
+ * Downloaded from fonts.gstatic.com; served locally to eliminate
+ * external CSP whitelist entries and improve privacy/performance.
+ */
+
+/* Inter — variable font, covers 400–700 weight range */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* JetBrains Mono — regular weight 400 */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  font-display: swap;
+}
