@@ -48,14 +48,34 @@
         <h5 class="settings-section-title">
           <i class="bi bi-file-earmark-text text-primary"></i> Version Changelog
         </h5>
-        <span class="lp-badge lp-badge-success" style="font-size: 10px;">v1.9.0 Active</span>
+        <span class="lp-badge lp-badge-success" style="font-size: 10px;">v2.0.0 Active</span>
       </div>
       <div class="settings-section-body" style="display: flex; flex-direction: column; gap: 20px;">
         
-        <!-- Release Version 1.9.0 -->
+        <!-- Release Version 2.0.0 -->
         <div style="position: relative; padding-left: 20px; border-left: 2px solid var(--accent-primary);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
-            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v1.9.0 <span class="lp-badge lp-badge-success" style="font-size: 9px; padding: 2px 6px;">Latest Release</span></h6>
+            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v2.0.0 <span class="lp-badge lp-badge-success" style="font-size: 9px; padding: 2px 6px;">Latest Release</span></h6>
+            <span style="font-size: 11px; color: var(--text-muted);">July 28, 2026</span>
+          </div>
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px;">
+            Major Architecture &amp; Security Release — Password Policy Engine, Split-View File Manager with CodeMirror &amp; Media Previews, CSP Security Hardening, and 0-Vulnerability Dependency Audit.
+          </p>
+          <ul style="font-size: 12px; color: var(--text-secondary); padding-left: 16px; margin: 0; display: flex; flex-direction: column; gap: 4px;">
+            <li><strong>Password Policy Engine:</strong> Enforce password complexity rules (length, uppercase, lowercase, numbers, symbols), automated expiration reminder background job, forced change on login (<code>mustChangePassword</code>), audit trail &amp; JSON import/export.</li>
+            <li><strong>Split-View File Manager:</strong> Dual-pane interface with side-by-side file tree &amp; editor, smooth draggable divider handle, and full-width responsive flex container.</li>
+            <li><strong>Self-Hosted CodeMirror:</strong> Integrated CodeMirror editor with syntax modes, bracket matching, active line highlighting, line numbers, and instant light/dark theme switcher.</li>
+            <li><strong>Media &amp; Document Previewer:</strong> Inline previewer for images (with zoom controls &amp; wheel zoom), audio, video, and PDF reader iframe inside split view.</li>
+            <li><strong>Tree-to-Editor Drag &amp; Drop:</strong> Drag items from file tree to editor to automatically insert path strings at cursor.</li>
+            <li><strong>CSP Nonce Security Hardening:</strong> Automated Content Security Policy nonce injection for all inline scripts &amp; style blocks.</li>
+            <li><strong>Rate Limiting &amp; 0 Vulnerabilities:</strong> Refined API &amp; Download Token rate limiters, plus 100% resolution of high-severity npm audit vulnerabilities.</li>
+          </ul>
+        </div>
+
+        <!-- Release Version 1.9.0 -->
+        <div style="position: relative; padding-left: 20px; border-left: 2px solid var(--accent-success);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v1.9.0</h6>
             <span style="font-size: 11px; color: var(--text-muted);">July 17, 2026</span>
           </div>
           <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px;">

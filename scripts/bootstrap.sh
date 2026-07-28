@@ -64,7 +64,7 @@ summary_line() {
 echo ""
 echo -e "${CYAN}  ╔══════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}  ║        Panelku — Bootstrap & Security Audit     ║${NC}"
-echo -e "${CYAN}  ║        v1.9.0                                   ║${NC}"
+echo -e "${CYAN}  ║        v2.0.0                                   ║${NC}"
 echo -e "${CYAN}  ╚══════════════════════════════════════════════════╝${NC}"
 echo ""
 

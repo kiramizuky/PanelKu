@@ -3,7 +3,7 @@
 > Lightweight, modern, realtime Linux server control panel — a blend of aaPanel, Portainer, CasaOS, and Cockpit, but far lighter.
 
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green)](https://nodejs.org)
-[![Version](https://img.shields.io/badge/version-1.9.0-blue)](CHANGELOG)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue)](CHANGELOG)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
 ## Core Features
@@ -138,8 +138,24 @@ src/
 | Phase 20 (v1.9.0) | ✅ Done | **Mail Server Manager** — Postfix/Dovecot/SpamAssassin, email accounts, mail queue, spam config, SSL certs |
 | Phase 21 (v1.9.0) | ✅ Done | **CDN & Cache Manager** — Cloudflare API, Varnish cache, Redis cache, Full Page Cache (Nginx FPC) |
 | Phase 22 (v1.9.0) | ✅ Done | **IoT & Edge Device Manager** — Mosquitto MQTT, Home Assistant, Node-RED, device discovery, MQTT metrics |
+| Phase 23 (v2.0.0) | ✅ Done | **Password Policy Engine & History** — Password complexity rules, expiration job, force change prompt on login, policy history & JSON import/export |
+| Phase 24 (v2.0.0) | ✅ Done | **Split-View File Manager & CodeMirror** — Tree + CodeMirror editor split view, light/dark themes, media previewer (image zoom/audio/video/PDF), tree-to-editor drag & drop, CSP nonces, rate limiters, 0-vulnerability audit |
 
 ## Changelog
+
+### v2.0.0 — July 28, 2026 (Major Architecture & Security Release)
+
+> Password Policy Engine, Split-View File Manager with CodeMirror & Media Previews, CSP Security Hardening, and 0-Vulnerability Dependency Audit.
+
+**🚀 New Features & Enhancements**
+- **Password Policy Engine & Expiry Reminder**: Configurable password complexity rules, automated password expiration reminder background job, forced password change on login (`mustChangePassword`), policy history audit trail, and JSON import/export.
+- **Split-View File Manager**: Dual-pane file manager with side-by-side file tree and editor, smooth draggable divider, and full-width responsive flex container.
+- **Self-Hosted CodeMirror Integration**: CodeMirror text editor with syntax highlighting, active line highlighting, match brackets, auto-close brackets, line numbers, and instant light/dark theme switcher.
+- **Media & Document Previewer**: Inline file previewer for images (with zoom in/out, fit-to-width, fit-to-page controls & mouse wheel zoom), audio player, video player, and PDF reader iframe inside the split view.
+- **Tree-to-Editor Drag & Drop**: Drag files or folders from the file explorer tree directly into the editor to insert relative/absolute paths at cursor position.
+- **CSP Nonce Security Hardening**: Automated Content Security Policy nonce injection for all inline scripts & style blocks across EJS views.
+- **Optimized Rate Limiting**: Smart API & Download Token rate limiters with loopback/auth exemptions to prevent false-positive `429 Too Many Requests` during active session management.
+- **0-Vulnerability NPM Audit**: Resolved 100% of high-severity npm vulnerabilities via package overrides (`brace-expansion 5.0.8`).
 
 ### v1.9.0 — July 17, 2026 (Major Feature Release)
 

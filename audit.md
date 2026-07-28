@@ -1,7 +1,7 @@
 # 📋 Panelku — Audit Pengembangan (Fase 1–23)
 
 > **Proyek**: Panelku — Lightweight Linux Server Control Panel  
-> **Versi**: 1.9.0  
+> **Versi**: 2.0.0  
 > **Stack**: Node.js 24 LTS + Express + SQLite + Socket.IO + EJS + Bootstrap 5  
 > **Status**: 🟢 Production Ready (23 dari 23 fase selesai)  
 > **Target Server**: Armbian / Debian / Ubuntu / Arch / Fedora / Gentoo (RAM minimal 512MB)

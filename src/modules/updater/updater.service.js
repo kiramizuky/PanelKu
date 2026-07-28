@@ -74,8 +74,8 @@ class UpdaterService {
     if (cmd.includes('git config --global --add safe.directory')) return '';
     if (cmd.includes('git checkout')) return '';
     if (cmd.includes('git pull')) return 'Already up to date.\n';
-    if (cmd.includes('git show origin')) return '{"version":"1.9.0"}\n';
-    if (cmd.includes('git diff')) return 'diff --git a/package.json b/package.json\nindex abc..def 100644\n--- a/package.json\n+++ b/package.json\n@@ -1,5 +1,5 @@\n {\n   "name": "panelku",\n-  "version": "1.8.0",\n+  "version": "1.9.0",\n';
+    if (cmd.includes('git show origin')) return '{"version":"2.0.0"}\n';
+    if (cmd.includes('git diff')) return 'diff --git a/package.json b/package.json\nindex abc..def 100644\n--- a/package.json\n+++ b/package.json\n@@ -1,5 +1,5 @@\n {\n   "name": "panelku",\n-  "version": "1.9.0",\n+  "version": "2.0.0",\n';
     if (cmd.includes('npm install')) return 'added 0 packages, removed 0 packages, changed 0 packages\n';
     if (cmd.includes('node --check')) return '';
     if (cmd.includes('systemctl restart panelku')) return '';
