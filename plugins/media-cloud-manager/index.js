@@ -231,6 +231,8 @@ export default {
 
                 return { showDeployModal, deploy, start, stop, uninstall };
               })();
+            // [FIX] Expose to window for LP.call() resolution
+            window.MediaCloud = MediaCloud;
             </script>
           `,
           layout: false

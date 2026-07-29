@@ -145,6 +145,8 @@ export default {
 
                 return { install, testRemote };
               })();
+            // [FIX] Expose to window for LP.call() resolution
+            window.RclonePage = RclonePage;
             </script>
           `,
           layout: false

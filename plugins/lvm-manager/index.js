@@ -1170,6 +1170,8 @@ const LvmPage = (() => {
            showExtendLvModal, extendLv, showExtendVgModal, extendVg,
            showSnapshotModal, createSnapshot, restoreSnapshot, installLvm, refresh };
 })();
+// [FIX] Expose to window for LP.call() resolution
+window.LvmPage = LvmPage;
 </script>
 
 <style>

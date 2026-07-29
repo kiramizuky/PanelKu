@@ -238,6 +238,8 @@ export default {
 
               return { createJob, deleteJob, runJob, installHost };
             })();
+          // [FIX] Expose to window for LP.call() resolution
+          window.RclonePage = RclonePage;
           </script>
         `,
         layout: false

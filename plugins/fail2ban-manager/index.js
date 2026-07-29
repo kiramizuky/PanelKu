@@ -238,6 +238,8 @@ export default {
 
               return { banIp, unbanIp, installHost };
             })();
+          // [FIX] Expose to window for LP.call() resolution
+          window.Fail2banPage = Fail2banPage;
           </script>
         `,
         layout: false

@@ -113,6 +113,8 @@ export default {
 
               return { loadLogs };
             })();
+          // [FIX] Expose to window for LP.call() resolution
+          window.LogAnalyzer = LogAnalyzer;
           </script>
         `,
         layout: false

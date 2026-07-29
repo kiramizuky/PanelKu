@@ -287,6 +287,8 @@ export default {
 
               return { createHook, deleteHook, showLog, discardStash };
             })();
+          // [FIX] Expose to window for LP.call() resolution
+          window.GitDeployPage = GitDeployPage;
           </script>
         `,
         layout: false

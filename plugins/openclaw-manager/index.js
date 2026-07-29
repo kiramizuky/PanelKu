@@ -190,6 +190,8 @@ export default {
 
                 return { showDeployModal, deploy, start, stop, destroy };
               })();
+            // [FIX] Expose to window for LP.call() resolution
+            window.OpenClawPage = OpenClawPage;
             </script>
           `,
           layout: false

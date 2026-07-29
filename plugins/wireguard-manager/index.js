@@ -362,6 +362,8 @@ export default {
 
               return { showAddPeerModal, addPeer, showQr, deletePeer, installHost };
             })();
+          // [FIX] Expose to window for LP.call() resolution
+          window.WgPage = WgPage;
           </script>
         `,
         layout: false

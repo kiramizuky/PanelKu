@@ -234,6 +234,8 @@ export default {
 
               return { triggerAction, showLogs, installHost };
             })();
+          // [FIX] Expose to window for LP.call() resolution
+          window.Pm2Page = Pm2Page;
           </script>
         `,
         layout: false

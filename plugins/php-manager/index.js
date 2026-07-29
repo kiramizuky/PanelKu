@@ -326,6 +326,8 @@ export default {
 
                 return { manageService, installPhp, editConfig, saveConfig };
               })();
+            // [FIX] Expose to window for LP.call() resolution
+            window.PhpPage = PhpPage;
             </script>
           `,
           layout: false
