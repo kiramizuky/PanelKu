@@ -83,9 +83,14 @@ function assertCspStructure(csp) {
   expect(csp['script-src-attr']).toContain("'unsafe-inline'");
   expect(csp['style-src-attr']).toContain("'unsafe-inline'");
 
-  // Nonce-based protection for <script> and <style> tags
+  // Nonce-based protection for <script> tags (XSS defense)
   expect(csp['script-src'].some(v => v.startsWith("'nonce-"))).toBe(true);
-  expect(csp['style-src'].some(v => v.startsWith("'nonce-"))).toBe(true);
+
+  // style-src uses 'unsafe-inline' (not nonce) because:
+  // 1) CSP spec: nonce overrides 'unsafe-inline' causing it to be ignored
+  // 2) xterm.js, CodeMirror dynamically inject <style> elements at runtime
+  //    that cannot carry server-generated nonces
+  // So we DO NOT assert nonce in style-src
 
   // Restrictive directives locked to self
   expect(csp['form-action']).toEqual(["'self'"]);

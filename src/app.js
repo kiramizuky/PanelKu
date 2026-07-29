@@ -58,13 +58,14 @@ const createApp = () => {
         // 2) 126+ inline event handlers across views (onclick, onchange, etc.)
         // 3) CSP nonces do NOT work for HTML attribute event handlers
         scriptSrcAttr: ["'unsafe-inline'"],
-        // style-src includes 'unsafe-inline' because client-side UI libraries
-        // (xterm.js, CodeMirror) inject dynamic <style> elements at runtime
-        // for font measuring, cursor sizing, and dimension updates.
+        // style-src uses 'unsafe-inline' instead of nonce because:
+        // 1) CSP spec: if nonce is present, 'unsafe-inline' is IGNORED
+        // 2) xterm.js, CodeMirror, and other client libs dynamically inject
+        //    <style> elements at runtime that cannot carry a nonce
+        // 3) Inline style attributes (style="...") are covered by style-src-attr
         styleSrc: [
           "'self'",
           "'unsafe-inline'",
-          (req, res) => `'nonce-${res.locals.nonce}'`,
         ],
         // style-src-attr must remain 'unsafe-inline' because:
         // 1) style="..." HTML attributes are used extensively across views
