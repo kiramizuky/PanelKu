@@ -192,6 +192,8 @@ const PanelPage = (() => {
 
   return { init, checkUpdate, runUpdate, restartPanel, toggleAutoUpdate, saveAutoUpdateConfig };
 })();
+// [FIX] Expose to window for LP.call() resolution
+window.PanelPage = PanelPage;
 
 document.addEventListener('DOMContentLoaded', () => {
   PanelPage.init();

@@ -194,6 +194,8 @@ const RolesPage = (() => {
 
   return { init, showCreateModal, editRole, saveRole, deleteRole };
 })();
+// [FIX] Expose to window for LP.call() resolution
+window.RolesPage = RolesPage;
 
 document.addEventListener('DOMContentLoaded', () => {
   RolesPage.init();

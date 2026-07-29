@@ -118,25 +118,102 @@ class BackupService {
   //  SECTION 1 — Rclone Management
   // ═══════════════════════════════════════════════════════════════════
 
+  /** List common rclone config file locations to search when default is empty */
+  _getCommonRcloneConfigPaths() {
+    const home = process.env.HOME || '/root';
+    const sudoHome = process.env.SUDO_USER
+      ? process.env.HOME?.replace(/\/[^/]+$/, '') + '/' + process.env.SUDO_USER
+      : null;
+    return [
+      path.join(home, '.config', 'rclone', 'rclone.conf'),
+      '/root/.config/rclone/rclone.conf',
+      '/home/*/.config/rclone/rclone.conf',
+    ].filter(Boolean);
+  }
+
+  /**
+   * Get rclone status including remotes list.
+   * Falls back to scanning common config locations if default returns empty.
+   */
   async getRcloneStatus() {
     const info = await detectRclone();
     let remotes = [];
     let configPath = null;
+    let configHint = null; // if using non-default config, explains why
 
     if (info.installed) {
       const bin = info.bin || 'rclone';
+
+      // Step 1: Try default rclone config (current process user's config)
       try {
         const out = await execAsync(`${bin} listremotes 2>/dev/null || echo ""`);
         remotes = out.split('\n').map(r => r.replace(':', '').trim()).filter(Boolean);
       } catch { /* no remotes */ }
 
+      // Step 2: Get the detected config path from rclone itself
       try {
-        const out = await execAsync(`${bin} config file 2>/dev/null | head -1 || echo ""`);
-        configPath = out.trim() || null;
+        const out = await execAsync(`${bin} config file 2>/dev/null || echo ""`);
+        const lines = out.split('\n').filter(Boolean);
+        configPath = lines[0]?.trim() || null;
       } catch { /* ignore */ }
+
+      // Step 3: If remotes empty, try searching for configs in common locations
+      // (The user may have configured remotes as a different system user.)
+      if (remotes.length === 0) {
+        const commonPaths = [
+          // By SUDO_USER (user who invoked sudo)
+          process.env.SUDO_USER
+            ? `/home/${process.env.SUDO_USER}/.config/rclone/rclone.conf`
+            : null,
+          // Common locations
+          '/root/.config/rclone/rclone.conf',
+          '/home/*/.config/rclone/rclone.conf',
+        ];
+
+        // Expand wildcard paths
+        const expanded = [];
+        for (const p of commonPaths.filter(Boolean)) {
+          if (p.includes('*')) {
+            try {
+              const { readdirSync } = await import('fs');
+              const baseDir = p.substring(0, p.indexOf('*'));
+              const suffix = p.substring(p.indexOf('*') + 1);
+              if (await fs.stat(baseDir).catch(() => null)) {
+                const dirs = await fs.readdir(baseDir);
+                for (const d of dirs) {
+                  const candidate = path.join(baseDir, d, suffix);
+                  if (await fs.stat(candidate).then(() => true).catch(() => false)) {
+                    expanded.push(candidate);
+                  }
+                }
+              }
+            } catch { /* skip */ }
+          } else {
+            if (await fs.stat(p).then(() => true).catch(() => false)) {
+              if (!expanded.includes(p)) expanded.push(p);
+            }
+          }
+        }
+
+        // Try each config file with --config flag
+        for (const cfgPath of expanded) {
+          try {
+            const out = await execAsync(
+              `${bin} listremotes --config "${cfgPath}" 2>/dev/null || echo ""`
+            );
+            const found = out.split('\n').map(r => r.replace(':', '').trim()).filter(Boolean);
+            if (found.length > 0) {
+              remotes = found;
+              configPath = cfgPath;
+              configHint = `Using config from: ${cfgPath} (configured as user other than panel process)`;
+              break;
+            }
+          } catch { /* try next */ }
+        }
+      }
     }
 
-    return { ...info, remotes, configPath };
+    return { ...info, remotes, configPath, configHint };
   }
 
   async installRclone() {

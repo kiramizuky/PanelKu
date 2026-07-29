@@ -96,9 +96,37 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
-  # ── Stage 3: Dependency Audit (npm audit) ───────────────────────
+  # ── Stage 3: Window Assignment Check ───────────────────────────
+  # Scans all JS files to ensure every `const ModuleName = ...` has a
+  # matching `window.ModuleName = ModuleName;` assignment. Prevents
+  # "xxx.yyy not a function" errors caused by const not being on window.
+  window-check:
+    name: Window Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lint]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: linux-panel/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./linux-panel
+        run: npm ci --ignore-scripts
+
+      - name: Run window assignment check
+        working-directory: ./linux-panel
+        run: node scripts/check-window-assignment.js
+
+  # ── Stage 4: Dependency Audit (npm audit) ───────────────────────
   audit:
-    name: 🛡️ Dependency Audit (npm audit)
+    name: Dependency Audit (npm audit)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [lint]
@@ -151,12 +179,14 @@ jobs:
         with:
           category: "/language:javascript"
 
-  # ── Stage 5: Build Check (docker build) ─────────────────────────
+  # ── Stage 5: Build Gate (ESLint + Custom Rules) ─────────────────
+  # The ESLint custom rule `require-window-export` runs as part of
+  # `npm run lint:check` in the `lint` job (via eslint.config.js).
   build-check:
     name: 🐳 Docker Build Check
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [lint]
+    needs: [lint, window-check]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

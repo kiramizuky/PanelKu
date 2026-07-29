@@ -4,7 +4,10 @@
  * Run: npx eslint src/
  */
 
-const rules = {
+import requireWindowExport from './eslint-rules/require-window-export.js';
+
+// Shared base rules (applied to all JS)
+const baseRules = {
   'no-undef': 'error',
   'no-unused-vars': ['warn', {
     argsIgnorePattern: '^_',
@@ -12,6 +15,12 @@ const rules = {
     destructuredArrayIgnorePattern: '^_',
     caughtErrors: 'none',
   }],
+};
+
+// Client-side rules (applied to public JS only)
+const clientRules = {
+  ...baseRules,
+  'local/require-window-export': 'error',
 };
 
 const nodeGlobals = {
@@ -168,18 +177,25 @@ export default [
       sourceType: 'module',
       globals: nodeGlobals,
     },
-    rules: { ...rules },
+    rules: { ...baseRules },
   },
 
   // Client-side code (src/public/js/)
   {
     files: ['src/public/**/*.js'],
+    plugins: {
+      local: {
+        rules: {
+          'require-window-export': requireWindowExport,
+        },
+      },
+    },
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'script',
       globals: browserGlobals,
     },
-    rules: { ...rules },
+    rules: { ...clientRules },
   },
 
   // Scripts directory
@@ -190,7 +206,7 @@ export default [
       sourceType: 'module',
       globals: nodeGlobals,
     },
-    rules: { ...rules },
+    rules: { ...baseRules },
   },
 
   // Plugin directory
@@ -206,6 +222,6 @@ export default [
         pluginDb: 'readonly',
       },
     },
-    rules: { ...rules },
+    rules: { ...baseRules },
   },
 ];

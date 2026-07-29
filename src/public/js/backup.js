@@ -529,6 +529,15 @@ const BackupPage = {
       notInstalled.style.display = 'none';
       content.style.display = 'block';
 
+      // Config hint (e.g., using config from another user)
+      const configHintEl = document.getElementById('rcloneConfigHint');
+      if (status.configHint) {
+        configHintEl.style.display = 'block';
+        configHintEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i> ${LP.escHtml(status.configHint)}`;
+      } else {
+        configHintEl.style.display = 'none';
+      }
+
       // Remotes list
       const remotes = status.remotes || [];
       const remotesEl = document.getElementById('rcloneRemotesList');

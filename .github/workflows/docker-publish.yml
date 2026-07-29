@@ -75,12 +75,38 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true
 
+  # ── Window Assignment Gate (fast — runs before build) ─────────
+  # Ensures every `const ModuleName` has a matching `window.ModuleName`
+  # assignment. Prevents "not a function" errors in onclick handlers.
+  ci-window-check:
+    name: Window Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: linux-panel/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./linux-panel
+        run: npm ci --ignore-scripts
+
+      - name: Run window assignment check
+        working-directory: ./linux-panel
+        run: node scripts/check-window-assignment.js
+
   # ── CSP Security Gate (fast — runs before build) ──────────────
   # Quick CSP header + static analysis. Blocks deployment if CSP
   # whitelist is accidentally widened or a view references an
   # unapproved external resource.
   ci-csp:
-    name: 🛡️ CSP Gate
+    name: 0️⃣ CSP Gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -106,7 +132,7 @@ jobs:
   build-and-push:
     name: 🐳 Build & Push
     runs-on: ubuntu-latest
-    needs: [ci-lint, ci-csp]
+    needs: [ci-lint, ci-window-check, ci-csp]
     permissions:
       contents: read
       packages: write  # Required for GHCR push

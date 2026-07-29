@@ -126,5 +126,7 @@ const ThemesPage = {
     input.value = '';
   },
 };
+// [FIX] Expose to window for LP.call() resolution
+window.ThemesPage = ThemesPage;
 
 document.addEventListener('DOMContentLoaded', () => ThemesPage.init());
