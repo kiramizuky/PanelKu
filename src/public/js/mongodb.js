@@ -382,4 +382,7 @@ const MongoDBPage = {
   },
 };
 
+// [FIX] Expose to window for LP.call() resolution
+window.MongoDBPage = MongoDBPage;
+
 document.addEventListener('DOMContentLoaded', () => MongoDBPage.init());

@@ -556,4 +556,7 @@ const AnalyticsPage = {
   },
 };
 
+// [FIX] Expose to window for LP.call() resolution
+window.AnalyticsPage = AnalyticsPage;
+
 document.addEventListener('DOMContentLoaded', () => AnalyticsPage.init());

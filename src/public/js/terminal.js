@@ -189,6 +189,9 @@ const TerminalPage = (() => {
   return { init, connect, askAIFix };
 })();
 
+// [FIX] Expose to window for LP.call() resolution
+window.TerminalPage = TerminalPage;
+
 document.addEventListener('DOMContentLoaded', () => {
   TerminalPage.init();
 });

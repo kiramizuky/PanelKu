@@ -218,7 +218,7 @@ const ClusterPage = (() => {
             <i class="bi bi-diagram-3" style="font-size:52px; display:block; margin-bottom:16px; color:rgba(255,255,255,0.08);"></i>
             <h5 class="text-white" style="font-weight:600; margin-bottom:6px;">Belum Ada Agent Node</h5>
             <p style="font-size:13px; max-width:400px; margin:0 auto 20px;">Tambahkan server sekunder sebagai Agent Node untuk memantau resource-nya dari dashboard ini.</p>
-            <button class="btn-lp btn-lp-primary" onclick="ClusterPage.showAddModal()"><i class="bi bi-plus-lg me-1"></i>Tambah Node Pertama</button>
+            <button class="btn-lp btn-lp-primary" onclick="LP.call('ClusterPage.showAddModal')"><i class="bi bi-plus-lg me-1"></i>Tambah Node Pertama</button>
           </div>`;
         return;
       }
@@ -511,6 +511,9 @@ const ClusterPage = (() => {
 
   return { init, showAddModal, toggleApiKeyVis, addNode, deleteNode, pingNode, copyHost, refreshMetrics, showDetails };
 })();
+
+// [FIX] Expose to window so LP.call() and direct onclick can resolve ClusterPage
+window.ClusterPage = ClusterPage;
 
 document.addEventListener('DOMContentLoaded', () => {
   ClusterPage.init();

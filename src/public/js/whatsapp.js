@@ -171,6 +171,9 @@ const WhatsappPage = (() => {
   };
 })();
 
+// [FIX] Expose to window for LP.call() resolution
+window.WhatsappPage = WhatsappPage;
+
 document.addEventListener('DOMContentLoaded', () => {
   WhatsappPage.loadData();
 });

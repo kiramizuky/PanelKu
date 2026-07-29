@@ -322,4 +322,7 @@ const RedisPage = {
   },
 };
 
+// [FIX] Expose to window for LP.call() resolution
+window.RedisPage = RedisPage;
+
 document.addEventListener('DOMContentLoaded', () => RedisPage.init());

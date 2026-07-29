@@ -127,6 +127,9 @@ const FirewallPage = {
   }
 };
 
+// [FIX] Expose to window for LP.call() resolution
+window.FirewallPage = FirewallPage;
+
 document.addEventListener('DOMContentLoaded', () => {
   FirewallPage.init();
 });

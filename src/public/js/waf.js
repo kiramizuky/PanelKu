@@ -162,6 +162,9 @@ const WAFPage = {
   }
 };
 
+// [FIX] Expose to window for LP.call() resolution
+window.WAFPage = WAFPage;
+
 document.addEventListener('DOMContentLoaded', () => {
   WAFPage.init();
 });

@@ -662,6 +662,9 @@ const UpdaterPage = (() => {
   };
 })();
 
+// [FIX] Expose to window for LP.call() resolution
+window.UpdaterPage = UpdaterPage;
+
 document.addEventListener('DOMContentLoaded', () => {
   UpdaterPage.init();
 });

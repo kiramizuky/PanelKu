@@ -114,6 +114,9 @@ const AlertsPage = {
   }
 };
 
+// [FIX] Expose to window for LP.call() resolution
+window.AlertsPage = AlertsPage;
+
 document.addEventListener('DOMContentLoaded', () => {
   AlertsPage.init();
 });

@@ -211,3 +211,6 @@ const CronPage = (() => {
     parseCronToText
   };
 })();
+
+// [FIX] Expose to window for LP.call() resolution
+window.CronPage = CronPage;

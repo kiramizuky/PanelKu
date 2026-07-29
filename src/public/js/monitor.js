@@ -240,6 +240,9 @@ const MonitorPage = (() => {
   return { init, openProcessesModal, sortProcesses };
 })();
 
+// [FIX] Expose to window for LP.call() resolution
+window.MonitorPage = MonitorPage;
+
 document.addEventListener('DOMContentLoaded', () => {
   MonitorPage.init();
 });
