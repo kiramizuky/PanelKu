@@ -73,12 +73,13 @@ function assertCspStructure(csp) {
     expect(csp[dir]).toBeDefined();
   }
 
-  // 'unsafe-inline' must NOT be in script-src or style-src (nonce-based now)
+  // 'unsafe-inline' must NOT be in script-src (nonce-based protection against XSS)
   expect(csp['script-src'].some(v => v === "'unsafe-inline'")).toBe(false);
-  expect(csp['style-src'].some(v => v === "'unsafe-inline'")).toBe(false);
 
-  // script-src-attr and style-src-attr NEED 'unsafe-inline' because nonces
+  // style-src, script-src-attr and style-src-attr NEED 'unsafe-inline' because
+  // runtime UI widgets (xterm.js, CodeMirror) inject dynamic <style> tags, and nonces
   // don't work for HTML attribute event handlers or style="..." attributes
+  expect(csp['style-src']).toContain("'unsafe-inline'");
   expect(csp['script-src-attr']).toContain("'unsafe-inline'");
   expect(csp['style-src-attr']).toContain("'unsafe-inline'");
 
@@ -146,6 +147,7 @@ describe('CSP Static Analysis — View CDN URLs vs Whitelist', () => {
     ],
     styleSrc: [
       "'self'",          // local CSS only
+      "'unsafe-inline'", // required for xterm.js and CodeMirror dynamic style injection
     ],
     fontSrc: [
       "'self'",          // local fonts only
