@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { successResponse, errorResponse } from '../../src/helpers/response.js';
 import packageManager from '../../src/modules/system/package-manager.js';
+import backupService from '../../src/modules/backup/backup.service.js';
 
 const execPromise = promisify(exec);
 
@@ -10,21 +11,13 @@ export default {
     // 1. Rclone View
     app.get('/plugins/rclone-manager', async (req, res) => {
       try {
-        let isInstalled = false;
-        let rcloneVersionStr = '';
-        let remotes = [];
-
-        try {
-          const { stdout } = await execPromise('rclone --version');
-          isInstalled = true;
-          rcloneVersionStr = stdout.split('\n')[0] || 'rclone detected';
-          
-          // Fetch remotes
-          const { stdout: remotesOut } = await execPromise('rclone listremotes');
-          remotes = remotesOut.split('\n').map(r => r.trim()).filter(Boolean);
-        } catch (e) {
-          isInstalled = false;
-        }
+        // Use centralized rclone status detection with custom config path support
+        const status = await backupService.getRcloneStatus();
+        const isInstalled = status.installed;
+        const rcloneVersionStr = status.version || '';
+        const remotes = (status.remotes || []).map(r => r + ':') || [];
+        const configPath = status.configPath;
+        const configHint = status.configHint;
 
         res.render('layout', {
           title: 'Rclone Manager',
@@ -53,6 +46,8 @@ export default {
                   <p class="text-muted" style="font-size:12px; margin-bottom:20px;">
                     ${isInstalled ? rcloneVersionStr : 'Rclone CLI utility is not installed on the host system.'}
                   </p>
+                  ${configPath ? `<p style="font-size:10px;color:var(--text-muted);margin-bottom:20px;"><i class="bi bi-file-earmark-text me-1"></i> Config: <code style="font-size:9px;">${configPath}</code></p>` : ''}
+                  ${configHint ? `<p style="font-size:10px;color:#f59e0b;margin-bottom:20px;"><i class="bi bi-exclamation-triangle-fill me-1"></i> ${configHint}</p>` : ''}
 
                   <div>
                     ${!isInstalled 

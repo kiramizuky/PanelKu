@@ -538,6 +538,27 @@ const BackupPage = {
         configHintEl.style.display = 'none';
       }
 
+      // Config path display + copy button
+      const configPathRow = document.getElementById('rcloneConfigPathRow');
+      const configPathValue = document.getElementById('rcloneConfigPathValue');
+      if (status.configPath) {
+        configPathRow.style.display = 'block';
+        configPathValue.textContent = status.configPath;
+      } else {
+        configPathRow.style.display = 'none';
+      }
+
+      // Custom config path row — show only when rclone is installed
+      const customConfigRow = document.getElementById('rcloneCustomConfigRow');
+      customConfigRow.style.display = 'block';
+
+      // If API returned customConfigPath, populate the input
+      if (status.customConfigPath) {
+        document.getElementById('rcloneCustomConfigInput').value = status.customConfigPath;
+        const statusEl = document.getElementById('rcloneCustomConfigStatus');
+        statusEl.innerHTML = '<span style="color:#10b981;"><i class="bi bi-check-circle-fill me-1"></i>Using custom config path</span>';
+      }
+
       // Remotes list
       const remotes = status.remotes || [];
       const remotesEl = document.getElementById('rcloneRemotesList');
@@ -642,6 +663,116 @@ const BackupPage = {
     } catch (err) {
       resultsEl.innerHTML = `<div style="padding:10px;text-align:center;color:var(--accent-danger);">Error: ${LP.escHtml(err.message)}</div>`;
     }
+  },
+
+  async saveCustomConfigPath() {
+    const input = document.getElementById('rcloneCustomConfigInput');
+    const statusEl = document.getElementById('rcloneCustomConfigStatus');
+    const path = input.value.trim();
+
+    if (!path) {
+      await this.clearCustomConfigPath();
+      return;
+    }
+
+    statusEl.innerHTML = '<span style="color:#f59e0b;"><i class="bi bi-hourglass me-1"></i>Saving...</span>';
+    try {
+      const res =      await LP.post('/backup/rclone/config-path', { path });
+      if (res?.success) {
+        statusEl.innerHTML = '<span style="color:#10b981;"><i class="bi bi-check-circle-fill me-1"></i>Saved! Refreshing...</span>';
+        LP.toast('Custom config path saved!', 'success');
+        await this.loadRcloneStatus();
+      } else {
+        statusEl.innerHTML = `<span style="color:#ef4444;"><i class="bi bi-x-circle-fill me-1"></i>${LP.escHtml(res?.message || 'Failed')}</span>`;
+        LP.toast(res?.message || 'Failed to save', 'error');
+      }
+    } catch (err) {
+      statusEl.innerHTML = `<span style="color:#ef4444;"><i class="bi bi-x-circle-fill me-1"></i>${LP.escHtml(err.message)}</span>`;
+      LP.toast('Error: ' + err.message, 'error');
+    }
+  },
+
+  async testCustomConfigPath() {
+    const input = document.getElementById('rcloneCustomConfigInput');
+    const statusEl = document.getElementById('rcloneCustomConfigStatus');
+    const path = input.value.trim();
+
+    if (!path) {
+      statusEl.innerHTML = '<span style="color:#f59e0b;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Enter a path first</span>';
+      return;
+    }
+
+    statusEl.innerHTML = '<span style="color:#f59e0b;"><i class="bi bi-hourglass me-1"></i>Testing...</span>';
+    try {
+      const res = await LP.post('/backup/rclone/config-path/test', { path });
+      if (res?.success) {
+        const data = res.data;
+        statusEl.innerHTML = `<span style="color:#10b981;"><i class="bi bi-check-circle-fill me-1"></i>Valid: ${data.count} remote(s) found (${LP.escHtml(data.remotes.join(', '))})</span>`;
+        LP.toast(`Found ${data.count} remote(s)!`, 'success');
+      } else {
+        statusEl.innerHTML = `<span style="color:#ef4444;"><i class="bi bi-x-circle-fill me-1"></i>${LP.escHtml(res?.message || 'Test failed')}</span>`;
+        LP.toast(res?.message || 'Test failed', 'error');
+      }
+    } catch (err) {
+      statusEl.innerHTML = `<span style="color:#ef4444;"><i class="bi bi-x-circle-fill me-1"></i>${LP.escHtml(err.message)}</span>`;
+      LP.toast('Error: ' + err.message, 'error');
+    }
+  },
+
+  async clearCustomConfigPath() {
+    const input = document.getElementById('rcloneCustomConfigInput');
+    const statusEl = document.getElementById('rcloneCustomConfigStatus');
+
+    statusEl.innerHTML = '<span style="color:#f59e0b;"><i class="bi bi-hourglass me-1"></i>Clearing...</span>';
+    try {
+      const res =      await LP.post('/backup/rclone/config-path', { path: null });
+      if (res?.success) {
+        input.value = '';
+        statusEl.innerHTML = '<span style="color:var(--text-muted);">Custom config path cleared. Using default.</span>';
+        LP.toast('Custom config path cleared', 'success');
+        await this.loadRcloneStatus();
+      } else {
+        statusEl.innerHTML = `<span style="color:#ef4444;"><i class="bi bi-x-circle-fill me-1"></i>${LP.escHtml(res?.message || 'Failed')}</span>`;
+      }
+    } catch (err) {
+      statusEl.innerHTML = `<span style="color:#ef4444;"><i class="bi bi-x-circle-fill me-1"></i>${LP.escHtml(err.message)}</span>`;
+      LP.toast('Error: ' + err.message, 'error');
+    }
+  },
+
+  copyConfigPath() {
+    const pathEl = document.getElementById('rcloneConfigPathValue');
+    const path = pathEl?.textContent?.trim();
+    if (!path || path === '—') {
+      LP.toast('No config path available', 'warning');
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(path).then(() => {
+        LP.toast('Config path copied!', 'success');
+      }).catch(() => {
+        this._fallbackCopy(path);
+      });
+    } else {
+      this._fallbackCopy(path);
+    }
+  },
+
+  _fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      LP.toast('Config path copied!', 'success');
+    } catch {
+      LP.toast('Failed to copy. Path: ' + text, 'info');
+    }
+    document.body.removeChild(ta);
   },
 
   // ══════════════════════════════════════════════════════

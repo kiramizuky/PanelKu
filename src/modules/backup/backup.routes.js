@@ -13,6 +13,11 @@ router.post('/rclone/install', requirePermission('backup', 'execute'), backupCon
 router.post('/rclone/test',   requirePermission('backup', 'execute'), backupController.testRemote.bind(backupController));
 router.get('/rclone/files',   requirePermission('backup', 'read'),    backupController.listRemoteFiles.bind(backupController));
 
+// ── Rclone Custom Config Path ──
+router.get('/rclone/config-path',  requirePermission('backup', 'read'),    backupController.getRcloneConfigPath.bind(backupController));
+router.post('/rclone/config-path',  requirePermission('backup', 'update'),  backupController.setRcloneConfigPath.bind(backupController));
+router.post('/rclone/config-path/test', requirePermission('backup', 'execute'), backupController.testRcloneConfigPath.bind(backupController));
+
 // ── Backup Jobs ──
 router.get('/jobs',           requirePermission('backup', 'read'),    backupController.getBackupJobs.bind(backupController));
 router.post('/jobs',          requirePermission('backup', 'create'),  backupController.createBackupJob.bind(backupController));

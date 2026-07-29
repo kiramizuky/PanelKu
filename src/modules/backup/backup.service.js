@@ -118,64 +118,129 @@ class BackupService {
   //  SECTION 1 — Rclone Management
   // ═══════════════════════════════════════════════════════════════════
 
-  /** List common rclone config file locations to search when default is empty */
-  _getCommonRcloneConfigPaths() {
-    const home = process.env.HOME || '/root';
-    const sudoHome = process.env.SUDO_USER
-      ? process.env.HOME?.replace(/\/[^/]+$/, '') + '/' + process.env.SUDO_USER
-      : null;
-    return [
-      path.join(home, '.config', 'rclone', 'rclone.conf'),
-      '/root/.config/rclone/rclone.conf',
-      '/home/*/.config/rclone/rclone.conf',
-    ].filter(Boolean);
+  /** 
+   * Get / Set custom rclone config path.
+   * Stored in Setting DB as 'rclone_custom_config_path'.
+   */
+  async getRcloneConfigPathSetting() {
+    const raw = await Setting.get('rclone_custom_config_path', null);
+    return raw || null;
+  }
+
+  async setRcloneConfigPathSetting(customPath) {
+    if (!customPath || typeof customPath !== 'string') {
+      await Setting.set('rclone_custom_config_path', null);
+      return { path: null };
+    }
+
+    // Security: validate path — no directory traversal, only absolute paths
+    const resolved = path.resolve(customPath);
+    if (!path.isAbsolute(customPath)) {
+      throw Object.assign(new Error('Config path must be an absolute path'), { statusCode: 400 });
+    }
+    if (customPath.includes('..') || customPath.includes('\\')) {
+      throw Object.assign(new Error('Invalid config path'), { statusCode: 400 });
+    }
+
+    // Check file exists
+    try {
+      await fs.access(resolved);
+    } catch {
+      throw Object.assign(new Error(`Config file not found: ${resolved}`), { statusCode: 400 });
+    }
+
+    await Setting.set('rclone_custom_config_path', resolved);
+    return { path: resolved };
+  }
+
+  /** Test that a given config path is valid by listing remotes */
+  async testRcloneConfigPath(customPath) {
+    const info = await detectRclone();
+    if (!info.installed) {
+      throw new Error('Rclone is not installed');
+    }
+    const bin = info.bin || 'rclone';
+
+    const resolved = path.resolve(customPath);
+    try {
+      await fs.access(resolved);
+    } catch {
+      throw new Error(`Config file not found: ${resolved}`);
+    }
+
+    const out = await execAsync(
+      `${bin} listremotes --config "${resolved}" 2>/dev/null || echo ""`
+    );
+    const remotes = out.split('\n').map(r => r.replace(':', '').trim()).filter(Boolean);
+    return {
+      valid: true,
+      remotes,
+      count: remotes.length,
+      path: resolved,
+    };
   }
 
   /**
    * Get rclone status including remotes list.
-   * Falls back to scanning common config locations if default returns empty.
+   * - If custom config path is set in Settings, use that as primary.
+   * - Falls back to scanning common config locations if default returns empty.
    */
   async getRcloneStatus() {
     const info = await detectRclone();
     let remotes = [];
     let configPath = null;
-    let configHint = null; // if using non-default config, explains why
+    let configHint = null;
+    let customConfigPath = null;
 
     if (info.installed) {
       const bin = info.bin || 'rclone';
 
-      // Step 1: Try default rclone config (current process user's config)
-      try {
-        const out = await execAsync(`${bin} listremotes 2>/dev/null || echo ""`);
-        remotes = out.split('\n').map(r => r.replace(':', '').trim()).filter(Boolean);
-      } catch { /* no remotes */ }
+      // Step 0: Try custom config path from settings (if set)
+      customConfigPath = await this.getRcloneConfigPathSetting();
+      if (customConfigPath) {
+        try {
+          const out = await execAsync(
+            `${bin} listremotes --config "${customConfigPath}" 2>/dev/null || echo ""`
+          );
+          remotes = out.split('\n').map(r => r.replace(':', '').trim()).filter(Boolean);
+          if (remotes.length > 0) {
+            configPath = customConfigPath;
+            configHint = `Using custom config from panel settings`;
+          }
+        } catch { /* custom config failed, fall through */ }
+      }
 
-      // Step 2: Get the detected config path from rclone itself
-      try {
-        const out = await execAsync(`${bin} config file 2>/dev/null || echo ""`);
-        const lines = out.split('\n').filter(Boolean);
-        configPath = lines[0]?.trim() || null;
-      } catch { /* ignore */ }
+      // Step 1: If custom config didn't work or not set, try default
+      if (remotes.length === 0) {
+        try {
+          const out = await execAsync(`${bin} listremotes 2>/dev/null || echo ""`);
+          remotes = out.split('\n').map(r => r.replace(':', '').trim()).filter(Boolean);
+        } catch { /* no remotes */ }
+      }
 
-      // Step 3: If remotes empty, try searching for configs in common locations
-      // (The user may have configured remotes as a different system user.)
+      // Step 2: Get detected config path from rclone itself
+      if (!configPath) {
+        try {
+          const out = await execAsync(`${bin} config file 2>/dev/null || echo ""`);
+          const lines = out.split('\n').filter(Boolean);
+          configPath = lines[0]?.trim() || null;
+        } catch { /* ignore */ }
+      }
+
+      // Step 3: If still empty, try searching common locations
       if (remotes.length === 0) {
         const commonPaths = [
-          // By SUDO_USER (user who invoked sudo)
           process.env.SUDO_USER
             ? `/home/${process.env.SUDO_USER}/.config/rclone/rclone.conf`
             : null,
-          // Common locations
           '/root/.config/rclone/rclone.conf',
           '/home/*/.config/rclone/rclone.conf',
         ];
 
-        // Expand wildcard paths
         const expanded = [];
         for (const p of commonPaths.filter(Boolean)) {
           if (p.includes('*')) {
             try {
-              const { readdirSync } = await import('fs');
               const baseDir = p.substring(0, p.indexOf('*'));
               const suffix = p.substring(p.indexOf('*') + 1);
               if (await fs.stat(baseDir).catch(() => null)) {
@@ -195,7 +260,6 @@ class BackupService {
           }
         }
 
-        // Try each config file with --config flag
         for (const cfgPath of expanded) {
           try {
             const out = await execAsync(
@@ -213,7 +277,7 @@ class BackupService {
       }
     }
 
-    return { ...info, remotes, configPath, configHint };
+    return { ...info, remotes, configPath, configHint, customConfigPath };
   }
 
   async installRclone() {

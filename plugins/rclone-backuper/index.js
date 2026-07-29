@@ -2,6 +2,7 @@ import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { requireAuth } from '../../src/middleware/auth.js';
 import { ensureCommand } from '../shared/dep-installer.js';
+import backupService from '../../src/modules/backup/backup.service.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -33,13 +34,17 @@ function _validatePath(p, allowSlash = true) {
 
 export default {
   register(app, _io) {
-    // Helper to list rclone remotes
+    // Helper to list rclone remotes (uses centralized detection with custom config path support)
     async function getRcloneRemotes() {
       try {
-        const { stdout } = await execAsync('rclone listremotes');
+        const status = await backupService.getRcloneStatus();
         return {
-          isInstalled: true,
-          remotes: stdout.trim().split('\n').filter(r => r.trim()).map(r => r.replace(':', ''))
+          isInstalled: status.installed,
+          remotes: status.installed 
+            ? (status.remotes || []) 
+            : ['aws-s3-bucket', 'backblaze-b2-storage', 'google-drive-sync'],
+          configPath: status.configPath,
+          configHint: status.configHint,
         };
       } catch (err) {
         return {

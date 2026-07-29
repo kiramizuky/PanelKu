@@ -240,9 +240,47 @@
             </div>
             <hr style="border-color:var(--glass-border);margin:15px 0;">
             <div id="rcloneConfigHint" style="display:none;background:rgba(245,158,11,0.08);border-radius:8px;font-size:11px;color:#f59e0b;" class="mb-2 p-2"></div>
+
+            <!-- Config Path Display -->
+            <div id="rcloneConfigPathRow" style="display:none;" class="mb-2">
+              <label style="font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">
+                <i class="bi bi-file-earmark-text me-1"></i> Config File Path
+              </label>
+              <div class="d-flex gap-1">
+                <code id="rcloneConfigPathValue" class="font-mono" style="flex:1;padding:5px 8px;background:rgba(0,0,0,0.2);border-radius:6px;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</code>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="BackupPage.copyConfigPath()" title="Copy config path to clipboard" style="padding:3px 8px;font-size:11px;flex-shrink:0;">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Custom Rclone Config Path Setting -->
+            <div id="rcloneCustomConfigRow" style="display:none;" class="mb-2">
+              <label style="font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">
+                <i class="bi bi-gear me-1"></i> Custom Config Path
+              </label>
+              <div class="d-flex gap-1">
+                <input type="text" id="rcloneCustomConfigInput" class="lp-input font-mono" style="flex:1;font-size:11px;padding:4px 8px;"
+                  placeholder="/home/user/.config/rclone/rclone.conf" spellcheck="false">
+                <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="BackupPage.saveCustomConfigPath()" title="Save custom config path" style="padding:3px 8px;font-size:10px;flex-shrink:0;">
+                  <i class="bi bi-floppy"></i>
+                </button>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="BackupPage.testCustomConfigPath()" title="Test config file" style="padding:3px 8px;font-size:11px;flex-shrink:0;">
+                  <i class="bi bi-lightning-fill"></i>
+                </button>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="BackupPage.clearCustomConfigPath()" title="Clear custom config path" style="padding:3px 8px;font-size:11px;flex-shrink:0;">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <div id="rcloneCustomConfigStatus" style="font-size:10px;color:var(--text-muted);margin-top:3px;"></div>
+            </div>
+
             <p style="font-size:11px;color:var(--text-muted);margin:0;">
               <i class="bi bi-info-circle me-1"></i> Manage remotes via terminal:
               <code class="font-mono" style="display:block;margin-top:4px;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:6px;">rclone config</code>
+              <span style="display:block;margin-top:4px;">
+                <i class="bi bi-folder me-1"></i> Set custom config path above if rclone uses a non-default config file.
+              </span>
             </p>
           </div>
         </div>

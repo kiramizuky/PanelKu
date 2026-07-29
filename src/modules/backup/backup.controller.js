@@ -188,6 +188,38 @@ class BackupController {
     }
   }
 
+  // ── Rclone Custom Config Path ───────────────────────────────────
+
+  async getRcloneConfigPath(req, res) {
+    try {
+      const result = await backupService.getRcloneConfigPathSetting();
+      return successResponse(res, { path: result });
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async setRcloneConfigPath(req, res) {
+    try {
+      const { path: customPath } = req.body;
+      const result = await backupService.setRcloneConfigPathSetting(customPath || null);
+      return successResponse(res, result, 'Config path saved');
+    } catch (error) {
+      return errorResponse(res, error.message, error.statusCode || 400);
+    }
+  }
+
+  async testRcloneConfigPath(req, res) {
+    try {
+      const { path: customPath } = req.body;
+      if (!customPath) return errorResponse(res, 'Path is required', 400);
+      const result = await backupService.testRcloneConfigPath(customPath);
+      return successResponse(res, result, `Found ${result.count} remote(s)`);
+    } catch (error) {
+      return errorResponse(res, error.message, 400);
+    }
+  }
+
   // ── Disaster Recovery: Remote Restore ────────────────────────────
 
   async listRemoteBackups(req, res) {
