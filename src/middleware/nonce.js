@@ -3,10 +3,17 @@
  *
  * Generates a cryptographically random nonce per HTTP request,
  * stores it in res.locals.nonce, and automatically injects it
- * into inline <script> and <style> tags after EJS rendering.
+ * into inline <script> tags after EJS rendering.
  *
- * This allows CSP to use 'nonce-...' instead of 'unsafe-inline'
- * for scriptSrc and styleSrc, drastically reducing XSS surface area.
+ * NOTE: <style> tags are intentionally skipped because:
+ * 1) style-src uses 'unsafe-inline' (not nonce) since CSP spec
+ *    ignores 'unsafe-inline' when a nonce is present
+ * 2) xterm.js, CodeMirror dynamically inject <style> elements
+ *    at runtime that cannot carry server-generated nonces
+ *
+ * This allows CSP to use 'nonce-...' only for scriptSrc,
+ * drastically reducing XSS surface area while keeping
+ * UI libraries working.
  *
  * Inline event handlers (onclick, onchange, etc.) still require
  * 'unsafe-inline' in scriptSrcAttr — those cannot use nonces.
@@ -26,11 +33,12 @@ export const nonceMiddleware = (req, res, next) => {
 
 /**
  * Post-render hook that injects the nonce into all inline
- * <script> and <style> tags within the rendered HTML.
+ * <script> tags within the rendered HTML.
  *
  * Skips:
  *  - External scripts (<script src="...">)
  *  - Tags that already have a nonce attribute
+ *  - <style> tags (style-src uses unsafe-inline, not nonce)
  *
  * This avoids modifying every single EJS view file.
  */
@@ -63,26 +71,29 @@ export const nonceInjector = (req, res, next) => {
 
 /**
  * Regex-based HTML post-processor that adds nonce to inline
- * <script> and <style> tags.
+ * <script> tags only.
+ *
+ * <style> tags are intentionally skipped:
+ * - style-src uses 'unsafe-inline' (nonce would override it)
+ * - xterm.js, CodeMirror inject runtime <style> elements
+ *   that can't carry server-generated nonces
  *
  * Pattern explanation:
- *   (<script|<style)  — capture opening tag name
+ *   (<script)         — capture 'script' tag name
  *   (                 — capture attributes (optional)
  *     \s              — must be preceded by whitespace
  *     [^>]*?          — any attributes, non-greedy
  *   )?                — attributes are optional
  *   >                 — close of opening tag
- *
- * We match the opening tag, check if it needs a nonce, and replace.
  */
 function injectNoncesIntoHtml(html, nonce) {
   return html.replace(
-    /<(script|style)(\s[^>]*?)?>/gi,
+    /<(script)(\s[^>]*?)?>/gi,
     (match, tagName, attrs) => {
       const attrStr = attrs || '';
 
       // Skip external scripts (they have src="...")
-      if (tagName.toLowerCase() === 'script' && /\bsrc\s*=/i.test(attrStr)) {
+      if (/\bsrc\s*=/i.test(attrStr)) {
         return match;
       }
 

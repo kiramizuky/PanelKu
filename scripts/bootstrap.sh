@@ -11,6 +11,7 @@
 #   bash scripts/bootstrap.sh --ci         # CI mode (exit on first fail)
 #   bash scripts/bootstrap.sh --report     # security report only, no setup
 #   bash scripts/bootstrap.sh --deploy     # git pull + install + restart + CSP verify
+#   bash scripts/bootstrap.sh --production # full bootstrap + production hardening
 # ============================================================
 
 set -o pipefail
@@ -35,16 +36,33 @@ EXIT_ON_FAIL=false
 REPORT_ONLY=false
 DEPLOY_MODE=false
 
+PRODUCTION_MODE=false
+
 case "$MODE" in
   --quick)    SKIP_NPM=true; SKIP_TESTS=true ;;
   --ci)       EXIT_ON_FAIL=true ;;
   --report)   REPORT_ONLY=true ;;
   --deploy)   DEPLOY_MODE=true; EXIT_ON_FAIL=true ;;
+  --production) PRODUCTION_MODE=true ;;
 esac
 
 # Determine project root (where package.json lives)
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_ROOT"
+
+# ── Production Config Paths ─────────────────────────────
+SYSTEMD_SERVICE="panelku"
+SYSTEMD_FILE="/etc/systemd/system/${SYSTEMD_SERVICE}.service"
+NGINX_CONF_AVAILABLE="/etc/nginx/sites-available/panelku"
+NGINX_CONF_ENABLED="/etc/nginx/sites-enabled/panelku"
+LOGROTATE_FILE="/etc/logrotate.d/panelku"
+BACKUP_SCRIPT="${PROJECT_ROOT}/scripts/backup-db.sh"
+BACKUP_CRON_FILE="/etc/cron.d/panelku-backup"
+PM2_STARTUP_SCRIPT=""
+SWAP_FILE="/swapfile"
+
+# Track what was set up
+PROD_STEPS=()
 
 # ── Output Helpers ──────────────────────────────────────
 pass() { echo -e "  ${GREEN}✓${NC} $1"; }
@@ -489,7 +507,685 @@ if [ "$REPORT_ONLY" = false ]; then
 fi # end REPORT_ONLY
 
 # ─────────────────────────────────────────────────────────
-#  4b. DEPLOY / RESTART (--deploy mode)
+#  5. PRODUCTION SETUP (--production mode)
+# ─────────────────────────────────────────────────────────
+if [ "$PRODUCTION_MODE" = true ]; then
+
+  # ── 5a. Swap Space ────────────────────────────────────
+  header "PRODUCTION — SWAP"
+  if [ "$(uname)" = "Linux" ]; then
+    TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
+    if [ -n "$TOTAL_RAM_KB" ]; then
+      TOTAL_RAM_MB=$((TOTAL_RAM_KB / 1024))
+      info "Detected RAM: ${TOTAL_RAM_MB}MB"
+      if [ "$TOTAL_RAM_MB" -lt 2048 ]; then
+        if [ -f "$SWAP_FILE" ]; then
+          SWAP_CURRENT=$(wc -c < "$SWAP_FILE" 2>/dev/null || echo 0)
+          SWAP_CURRENT_MB=$((SWAP_CURRENT / 1048576))
+          info "Swap file exists: ${SWAP_CURRENT_MB}MB"
+          if [ "$SWAP_CURRENT_MB" -lt 1024 ]; then
+            warn "Swap is only ${SWAP_CURRENT_MB}MB — recommend ≥2GB for low-RAM servers"
+          fi
+        else
+          info "Creating 2GB swap file..."
+          if command -v fallocate &>/dev/null; then
+            fallocate -l 2G "$SWAP_FILE" 2>/dev/null || dd if=/dev/zero of="$SWAP_FILE" bs=1M count=2048 2>/dev/null
+          else
+            dd if=/dev/zero of="$SWAP_FILE" bs=1M count=2048 2>/dev/null
+          fi
+          chmod 600 "$SWAP_FILE"
+          mkswap "$SWAP_FILE" 2>/dev/null
+          swapon "$SWAP_FILE" 2>/dev/null
+          # Add to fstab if not already
+          if ! grep -q "$SWAP_FILE" /etc/fstab 2>/dev/null; then
+            echo "$SWAP_FILE none swap sw 0 0" >> /etc/fstab 2>/dev/null && \
+              pass "Swap added to /etc/fstab" || \
+              warn "Could not add swap to /etc/fstab — add manually"
+          fi
+          pass "2GB swap created at $SWAP_FILE"
+          PROD_STEPS+=("swap")
+        fi
+      else
+        pass "RAM ≥ 2GB (${TOTAL_RAM_MB}MB) — swap not required"
+      fi
+    else
+      warn "Cannot detect RAM size — skipping swap check"
+    fi
+  else
+    info "Not Linux — skipping swap setup"
+  fi
+
+  # ── 5b. Systemd Service ───────────────────────────────
+  header "PRODUCTION — SYSTEMD SERVICE"
+  if [ "$(uname)" = "Linux" ] && command -v systemctl &>/dev/null; then
+    if [ -f "$SYSTEMD_FILE" ]; then
+      SYSTEMD_STATUS=$(systemctl is-active "$SYSTEMD_SERVICE" 2>/dev/null || echo "unknown")
+      SYSTEMD_ENABLED=$(systemctl is-enabled "$SYSTEMD_SERVICE" 2>/dev/null || echo "disabled")
+      pass "Systemd service exists ($SYSTEMD_STATUS, $SYSTEMD_ENABLED)"
+    else
+      info "Creating systemd service at $SYSTEMD_FILE..."
+      PANEL_USER="${SUDO_USER:-$USER}"
+      PANEL_HOME=$(eval echo ~"$PANEL_USER" 2>/dev/null || echo "$PROJECT_ROOT")
+      NODE_BIN=$(command -v node 2>/dev/null || echo "/usr/local/bin/node")
+      PM2_BIN=$(command -v pm2 2>/dev/null || echo "/usr/local/bin/pm2")
+
+      if command -v pm2 &>/dev/null; then
+        # PM2-based service
+        cat > /tmp/panelku.service << EOF
+[Unit]
+Description=Panelku — Server Management Panel
+Documentation=https://github.com/panelku/panelku
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=forking
+User=$PANEL_USER
+WorkingDirectory=$PROJECT_ROOT
+Environment=NODE_ENV=production
+ExecStart=$PM2_BIN start $PROJECT_ROOT/ecosystem.config.cjs --env production
+ExecReload=$PM2_BIN reload $PROJECT_ROOT/ecosystem.config.cjs
+ExecStop=$PM2_BIN stop $PROJECT_ROOT/ecosystem.config.cjs
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+      else
+        # Direct Node.js service
+        cat > /tmp/panelku.service << EOF
+[Unit]
+Description=Panelku — Server Management Panel
+Documentation=https://github.com/panelku/panelku
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=$PANEL_USER
+WorkingDirectory=$PROJECT_ROOT
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS="--max-old-space-size=1024"
+ExecStart=$NODE_BIN --experimental-vm-modules $PROJECT_ROOT/src/server.js
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+      fi
+
+      if sudo mv /tmp/panelku.service "$SYSTEMD_FILE" 2>/dev/null; then
+        sudo systemctl daemon-reload 2>/dev/null
+        sudo systemctl enable "$SYSTEMD_SERVICE" 2>/dev/null
+        pass "Systemd service created and enabled (auto-start on boot)"
+        PROD_STEPS+=("systemd")
+      else
+        warn "Could not create systemd service — need sudo/root"
+        info "  Preview: cat /tmp/panelku.service"
+      fi
+    fi
+  else
+    info "Not Linux or systemctl not found — skipping systemd setup"
+  fi
+
+  # ── 5c. PM2 Startup on Boot ───────────────────────────
+  header "PRODUCTION — PM2 STARTUP"
+  if command -v pm2 &>/dev/null && command -v systemctl &>/dev/null; then
+    # Check if PM2 startup hook is already installed
+    if pm2 startup 2>/dev/null | grep -q "already"; then
+      pass "PM2 startup already configured"
+    else
+      info "Configuring PM2 to start on boot..."
+      PM2_STARTUP_OUTPUT=$(pm2 startup systemd 2>&1)
+      if echo "$PM2_STARTUP_OUTPUT" | grep -qi "command\|sudo"; then
+        # PM2 outputs the sudo command we need to run
+        SUDO_CMD=$(echo "$PM2_STARTUP_OUTPUT" | grep -i 'sudo' | head -1)
+        warn "PM2 startup requires root — run manually:"
+        info "  $SUDO_CMD"
+      else
+        pass "PM2 startup configured"
+        PROD_STEPS+=("pm2-startup")
+      fi
+    fi
+    # Save current PM2 process list
+    pm2 save 2>/dev/null
+    pass "PM2 process list saved"
+  else
+    info "PM2 not installed — skipping PM2 startup"
+  fi
+
+  # ── 5d. Nginx Reverse Proxy ───────────────────────────
+  header "PRODUCTION — NGINX REVERSE PROXY"
+  PANEL_PORT=${PORT:-23456}
+  if command -v nginx &>/dev/null; then
+    NGINX_SITES_DIR="/etc/nginx/sites-available"
+    if [ -d "$NGINX_SITES_DIR" ]; then
+      if [ -f "/etc/nginx/sites-enabled/panelku" ]; then
+        pass "Nginx reverse proxy already configured"
+      else
+        info "Configuring Nginx reverse proxy..."
+
+        # Auto-detect domain or use IP
+        if [ -n "$(command -v hostname)" ]; then
+          SERVER_NAME=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "_")
+        else
+          SERVER_NAME="_"
+        fi
+
+        # Check for SSL certificates
+        SSL_CERT="/etc/letsencrypt/live/${SERVER_NAME}/fullchain.pem"
+        SSL_KEY="/etc/letsencrypt/live/${SERVER_NAME}/privkey.pem"
+
+        if [ -f "$SSL_CERT" ] && [ -f "$SSL_KEY" ]; then
+          info "SSL certificates found at $SSL_CERT — configuring HTTPS"
+          cat > /tmp/panelku-nginx.conf << EOF
+server {
+    listen 80;
+    server_name $SERVER_NAME;
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name $SERVER_NAME;
+
+    ssl_certificate $SSL_CERT;
+    ssl_certificate_key $SSL_KEY;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    location / {
+        proxy_pass http://127.0.0.1:$PANEL_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:$PANEL_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_read_timeout 86400s;
+    }
+
+    client_max_body_size 100m;
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript;
+}
+EOF
+          SSL_CONFIGURED=true
+        else
+          info "No SSL certificates found — configuring HTTP-only proxy"
+          cat > /tmp/panelku-nginx.conf << EOF
+server {
+    listen 80;
+    server_name $SERVER_NAME;
+
+    location / {
+        proxy_pass http://127.0.0.1:$PANEL_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:$PANEL_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_read_timeout 86400s;
+    }
+
+    client_max_body_size 100m;
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript;
+}
+EOF
+          SSL_CONFIGURED=false
+        fi
+
+        if sudo cp /tmp/panelku-nginx.conf "$NGINX_CONF_AVAILABLE" 2>/dev/null; then
+          sudo ln -sf "$NGINX_CONF_AVAILABLE" "$NGINX_CONF_ENABLED" 2>/dev/null
+          # Test nginx config
+          if sudo nginx -t 2>/dev/null; then
+            sudo systemctl reload nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null
+            pass "Nginx reverse proxy configured"
+            if [ "$SSL_CONFIGURED" = true ]; then
+              info "  HTTPS: https://$SERVER_NAME"
+            else
+              info "  HTTP: http://$SERVER_NAME"
+              info "  Configure SSL with: certbot --nginx -d $SERVER_NAME"
+            fi
+            PROD_STEPS+=("nginx")
+          else
+            warn "Nginx config test failed — check /etc/nginx/sites-available/panelku"
+            sudo rm -f "$NGINX_CONF_AVAILABLE" "$NGINX_CONF_ENABLED" 2>/dev/null
+          fi
+        else
+          warn "Could not create Nginx config — need sudo/root"
+          info "  Preview: cat /tmp/panelku-nginx.conf"
+        fi
+      fi
+    else
+      warn "Nginx sites-available directory not found ($NGINX_SITES_DIR)"
+    fi
+  else
+    info "Nginx not installed — skipping reverse proxy setup"
+    info "  Install: apt install nginx && bash scripts/bootstrap.sh --production"
+  fi
+
+  # ── 5e. Let's Encrypt SSL (if Certbot available) ──────
+  header "PRODUCTION — SSL / LET'S ENCRYPT"
+  if command -v certbot &>/dev/null && [ -f "$NGINX_CONF_ENABLED" ]; then
+    if [ -d "/etc/letsencrypt/live" ]; then
+      # Check if certs are expiring soon
+      for domain_dir in /etc/letsencrypt/live/*/; do
+        if [ -f "${domain_dir}fullchain.pem" ]; then
+          CERT_EXPIRY=$(openssl x509 -enddate -noout -in "${domain_dir}fullchain.pem" 2>/dev/null | cut -d= -f2)
+          if [ -n "$CERT_EXPIRY" ]; then
+            EXPIRY_EPOCH=$(date -d "$CERT_EXPIRY" +%s 2>/dev/null)
+            NOW_EPOCH=$(date +%s)
+            DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+            if [ "$DAYS_LEFT" -lt 30 ]; then
+              warn "SSL cert for $(basename $domain_dir) expires in ${DAYS_LEFT} days"
+              info "  Renew: certbot renew"
+            else
+              pass "SSL cert for $(basename $domain_dir) — ${DAYS_LEFT} days remaining"
+            fi
+          fi
+        fi
+      done
+      # Check auto-renewal
+      if systemctl list-timers 2>/dev/null | grep -q certbot; then
+        pass "Certbot auto-renewal timer active"
+      else
+        warn "Certbot auto-renewal not configured"
+        info "  Run: certbot renew --quiet"
+      fi
+    else
+      info "No Let's Encrypt certificates found"
+      if [ -f "$NGINX_CONF_ENABLED" ]; then
+        SERVER_NAME=$(grep server_name "$NGINX_CONF_AVAILABLE" 2>/dev/null | head -1 | awk '{print $2}' | tr -d ';')
+        if [ -n "$SERVER_NAME" ] && [ "$SERVER_NAME" != "_" ]; then
+          info "  Get SSL: certbot --nginx -d $SERVER_NAME"
+        fi
+      fi
+    fi
+  else
+    info "Certbot not installed — skipping SSL setup"
+    info "  Install: apt install certbot python3-certbot-nginx"
+  fi
+
+  # ── 5f. UFW Firewall ──────────────────────────────────
+  header "PRODUCTION — FIREWALL (UFW)"
+  if command -v ufw &>/dev/null; then
+    UFW_STATUS=$(ufw status 2>/dev/null | head -1)
+    if echo "$UFW_STATUS" | grep -qi "active"; then
+      pass "UFW is active ($UFW_STATUS)"
+      # Show current rules summary
+      ufw status verbose 2>/dev/null | grep -E "^[0-9]" | head -10 | while IFS= read -r line; do
+        info "  Rule: $line"
+      done
+    else
+      info "Configuring UFW firewall..."
+      # Default deny
+      ufw default deny incoming 2>/dev/null
+      ufw default allow outgoing 2>/dev/null
+
+      # Essential services
+      ufw allow ssh 2>/dev/null && info "  Allowed: SSH (22)"
+      ufw allow "${PANEL_PORT}/tcp" 2>/dev/null && info "  Allowed: Panel (${PANEL_PORT})"
+
+      # HTTP/HTTPS if Nginx is configured
+      if [ -f "$NGINX_CONF_ENABLED" ]; then
+        ufw allow 80/tcp 2>/dev/null && info "  Allowed: HTTP (80)"
+        ufw allow 443/tcp 2>/dev/null && info "  Allowed: HTTPS (443)"
+      fi
+
+      # Enable (non-interactive)
+      ufw --force enable 2>/dev/null
+      if [ $? -eq 0 ]; then
+        pass "UFW firewall enabled — ssh + port ${PANEL_PORT} allowed"
+        PROD_STEPS+=("ufw")
+      else
+        warn "Could not enable UFW — check manually"
+      fi
+    fi
+  else
+    info "UFW not installed — skipping firewall setup"
+    info "  Install: apt install ufw"
+  fi
+
+  # ── 5g. Log Rotation ──────────────────────────────────
+  header "PRODUCTION — LOG ROTATION"
+  if [ "$(uname)" = "Linux" ] && command -v logrotate &>/dev/null; then
+    if [ -f "$LOGROTATE_FILE" ]; then
+      pass "Logrotate config exists ($LOGROTATE_FILE)"
+    else
+      info "Creating logrotate config at $LOGROTATE_FILE..."
+      cat > /tmp/panelku-logrotate << 'EOF'
+# Panelku — Log Rotation
+# Managed by bootstrap.sh — do not edit manually
+
+/opt/panelku/storage/logs/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    dateext
+    dateformat -%Y%m%d
+}
+
+/opt/panelku/storage/logs/*.err {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    dateext
+    dateformat -%Y%m%d
+}
+EOF
+      # Replace path with actual project root
+      sed -i "s|/opt/panelku|$PROJECT_ROOT|g" /tmp/panelku-logrotate
+
+      if sudo mv /tmp/panelku-logrotate "$LOGROTATE_FILE" 2>/dev/null; then
+        pass "Logrotate configured (14 days retention)"
+        PROD_STEPS+=("logrotate")
+      else
+        warn "Could not create logrotate config — need sudo/root"
+        info "  Preview: cat /tmp/panelku-logrotate"
+      fi
+    fi
+  else
+    info "Logrotate not available — skipping log rotation setup"
+    info "  Install: apt install logrotate"
+  fi
+
+  # ── 5h. Database Backup Cron ──────────────────────────
+  header "PRODUCTION — DATABASE BACKUP"
+  DB_PATH="${PROJECT_ROOT}/storage/panelku.db"
+  BACKUP_DIR="${PROJECT_ROOT}/storage/backups"
+
+  if [ -f "$DB_PATH" ]; then
+    # Create backup script
+    cat > /tmp/backup-db.sh << 'BACKUPEOF'
+#!/bin/bash
+# Panelku — Database Backup Script
+# Generated by bootstrap.sh
+BACKUP_DIR="${1:-./storage/backups}"
+DB_PATH="${2:-./storage/panelku.db}"
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+BACKUP_FILE="${BACKUP_DIR}/panelku-${TIMESTAMP}.db"
+
+if [ ! -f "$DB_PATH" ]; then
+  echo "ERROR: Database not found at $DB_PATH" >&2
+  exit 1
+fi
+
+mkdir -p "$BACKUP_DIR"
+
+# Backup with timestamp
+cp "$DB_PATH" "$BACKUP_FILE"
+
+# Compress
+if command -v gzip &>/dev/null; then
+  gzip -f "$BACKUP_FILE"
+  BACKUP_FILE="${BACKUP_FILE}.gz"
+fi
+
+echo "Backup created: $BACKUP_FILE"
+
+# Cleanup backups older than 30 days
+find "$BACKUP_DIR" -name "panelku-*.db*" -type f -mtime +30 -delete 2>/dev/null
+echo "Cleaned up backups older than 30 days"
+
+# Keep last 7 daily backups minimum (in case find didn't work)
+BACKUP_COUNT=$(ls -1 "${BACKUP_DIR}"/panelku-*.db* 2>/dev/null | wc -l)
+if [ "$BACKUP_COUNT" -gt 30 ]; then
+  ls -1tr "${BACKUP_DIR}"/panelku-*.db* 2>/dev/null | head -n -30 | while IFS= read -r old; do
+    rm -f "$old"
+  done
+fi
+BACKUPEOF
+
+    chmod +x /tmp/backup-db.sh
+    cp /tmp/backup-db.sh "$BACKUP_SCRIPT" 2>/dev/null
+    chmod +x "$BACKUP_SCRIPT" 2>/dev/null
+    pass "Backup script created at $BACKUP_SCRIPT"
+
+    # Setup cron job
+    if command -v crontab &>/dev/null; then
+      CRON_EXPRESSION="0 3 * * *"  # Every day at 3 AM
+      CRON_JOB="${CRON_EXPRESSION} mkdir -p ${PROJECT_ROOT}/storage/logs && ${BACKUP_SCRIPT} ${BACKUP_DIR} ${DB_PATH} >> ${PROJECT_ROOT}/storage/logs/backup-cron.log 2>&1"
+
+      # Check if cron job already exists
+      EXISTING_CRON=$(crontab -l 2>/dev/null | grep -F "$BACKUP_SCRIPT" | head -1)
+      if [ -n "$EXISTING_CRON" ]; then
+        pass "Database backup cron job already exists"
+      else
+        (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab - 2>/dev/null
+        if [ $? -eq 0 ]; then
+          pass "Database backup cron installed (daily at 3 AM)"
+          PROD_STEPS+=("backup-cron")
+        else
+          warn "Could not install cron job — add manually:"
+          info "  $CRON_JOB"
+        fi
+      fi
+    else
+      warn "crontab not found — install backup script manually:"
+      info "  $BACKUP_SCRIPT $BACKUP_DIR $DB_PATH"
+    fi
+
+    # Rotate existing backups
+    OLD_BACKUPS=$(find "$BACKUP_DIR" -name "panelku-*.db*" -type f -mtime +30 2>/dev/null | wc -l)
+    if [ "$OLD_BACKUPS" -gt 0 ]; then
+      info "Cleaning $OLD_BACKUPS backups older than 30 days..."
+      find "$BACKUP_DIR" -name "panelku-*.db*" -type f -mtime +30 -delete 2>/dev/null
+    fi
+  else
+    info "Database not found yet — backup setup will run after first DB init"
+  fi
+
+  # ── 5i. Kernel Parameters (sysctl) ────────────────────
+  header "PRODUCTION — KERNEL PARAMETERS"
+  if [ "$(uname)" = "Linux" ] && [ -f /etc/sysctl.conf ]; then
+    SYSCTL_FILE="/etc/sysctl.d/99-panelku.conf"
+    if [ -f "$SYSCTL_FILE" ]; then
+      pass "Kernel parameters already configured ($SYSCTL_FILE)"
+    else
+      cat > /tmp/99-panelku.conf << 'EOF'
+# Panelku — Kernel Tuning for Production
+# Managed by bootstrap.sh
+
+# Reduce TIME_WAIT sockets
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_tw_reuse = 1
+
+# Increase network buffer sizes
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+
+# Increase max open files (needed for file manager, terminal)
+fs.file-max = 100000
+
+# Enable TCP keepalive (for WebSocket connections)
+net.ipv4.tcp_keepalive_time = 120
+net.ipv4.tcp_keepalive_intvl = 30
+net.ipv4.tcp_keepalive_probes = 8
+
+# Reduce swappiness for better responsiveness
+vm.swappiness = 10
+EOF
+
+      if sudo cp /tmp/99-panelku.conf "$SYSCTL_FILE" 2>/dev/null; then
+        sudo sysctl -p "$SYSCTL_FILE" 2>/dev/null
+        pass "Kernel parameters tuned (${SYSCTL_FILE})"
+        PROD_STEPS+=("sysctl")
+      else
+        warn "Could not create sysctl config — need sudo/root"
+        info "  Preview: cat /tmp/99-panelku.conf"
+      fi
+    fi
+  else
+    info "Not Linux — skipping kernel parameter tuning"
+  fi
+
+  # ── 5j. Node.js Memory Tuning ─────────────────────────
+  header "PRODUCTION — NODE.JS TUNING"
+  if [ -f ecosystem.config.cjs ]; then
+    # Check if memory limit is already set
+    if grep -q "max-old-space-size\|max_old_space_size" ecosystem.config.cjs 2>/dev/null; then
+      pass "Node.js memory limit configured in ecosystem.config.cjs"
+    else
+      info "Node.js memory limit not set in PM2 config"
+      warn "  Recommended: add --max-old-space-size=1024 to NODE_OPTIONS"
+    fi
+  fi
+
+  # Check node memory limit (for non-PM2 deployments)
+  if [ -n "$NODE_OPTIONS" ]; then
+    if echo "$NODE_OPTIONS" | grep -q "max-old-space-size"; then
+      pass "NODE_OPTIONS has memory limit: $NODE_OPTIONS"
+    else
+      warn "NODE_OPTIONS set but no --max-old-space-size — set to 1024 for servers with <2GB RAM"
+    fi
+  else
+    # Suggest setting it
+    warn "NODE_OPTIONS not set — add to .bashrc or systemd service:"
+    warn "  export NODE_OPTIONS='--max-old-space-size=1024'"
+  fi
+
+  # ── 5k. Health Check ──────────────────────────────────
+  header "PRODUCTION — HEALTH CHECK"
+  if command -v curl &>/dev/null; then
+    # Try to ping the panel
+    for attempt in 1 2 3; do
+      HEALTH_RESULT=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "http://127.0.0.1:${PANEL_PORT}/" 2>/dev/null)
+      if [ -n "$HEALTH_RESULT" ] && [ "$HEALTH_RESULT" -ge 200 ] && [ "$HEALTH_RESULT" -lt 500 ]; then
+        pass "Panel responds on port ${PANEL_PORT} (HTTP ${HEALTH_RESULT})"
+        break
+      fi
+      if [ "$attempt" -lt 3 ]; then
+        info "Panel not responding yet — retrying in 3s (attempt ${attempt}/3)..."
+        sleep 3
+      else
+        warn "Panel not responding on port ${PANEL_PORT} after 3 attempts"
+        info "  Check: systemctl status panelku  (if systemd configured)"
+        info "  Check: pm2 status               (if PM2 configured)"
+        info "  Check: node src/server.js       (direct start)"
+      fi
+    done
+
+    # Verify CSP headers
+    CSP_HEADER=$(curl -s -I "http://127.0.0.1:${PANEL_PORT}/" 2>/dev/null | grep -i content-security-policy | head -1)
+    if [ -n "$CSP_HEADER" ]; then
+      pass "Security headers verified (CSP present)"
+    fi
+  else
+    info "curl not found — skipping health check"
+  fi
+
+  # ── 5l. Security Hardening Summary ────────────────────
+  header "PRODUCTION — SECURITY HARDENING"
+
+  # Check if SSH password auth is disabled (recommended)
+  if [ -f /etc/ssh/sshd_config ]; then
+    if grep -qi "PasswordAuthentication no" /etc/ssh/sshd_config 2>/dev/null; then
+      pass "SSH password authentication disabled (key-only)"
+    else
+      warn "SSH password authentication is enabled — use SSH keys for better security"
+    fi
+  fi
+
+  # Check if unattended-upgrades is installed
+  if command -v unattended-upgrade &>/dev/null; then
+    pass "Unattended upgrades installed (auto security updates)"
+  elif [ -f /etc/apt/apt.conf.d/20auto-upgrades ]; then
+    pass "APT auto-upgrades configured"
+  else
+    warn "No automatic security updates configured"
+    info "  Install: apt install unattended-upgrades"
+  fi
+
+  # Check fail2ban
+  if command -v fail2ban-client &>/dev/null; then
+    FAIL2BAN_STATUS=$(fail2ban-client status 2>/dev/null | head -3)
+    pass "Fail2ban installed — ${FAIL2BAN_STATUS}"
+  else
+    warn "Fail2ban not installed — protects against brute force"
+    info "  Install: apt install fail2ban"
+  fi
+
+  # Check if root login is restricted
+  if [ -f /etc/ssh/sshd_config ]; then
+    if grep -qi "PermitRootLogin (no|prohibit-password)" /etc/ssh/sshd_config 2>/dev/null; then
+      pass "SSH root login restricted"
+    else
+      warn "SSH PermitRootLogin may be enabled — consider setting to 'prohibit-password'"
+    fi
+  fi
+
+  # Check for Docker socket exposure
+  if [ -S /var/run/docker.sock ]; then
+    DOCKER_GROUP=$(stat -c "%G" /var/run/docker.sock 2>/dev/null || echo "root")
+    if [ "$DOCKER_GROUP" = "docker" ]; then
+      warn "Docker socket is group-readable — users in 'docker' group have root-equivalent access"
+    fi
+  fi
+
+  # ── 5m. Final Production Summary ──────────────────────
+  if [ ${#PROD_STEPS[@]} -gt 0 ]; then
+    header "PRODUCTION SETUP COMPLETE"
+    echo ""
+    echo -e "  ${BOLD}Steps completed:${NC}"
+    for step in "${PROD_STEPS[@]}"; do
+      case "$step" in
+        swap)       echo -e "    ${GREEN}✓${NC} Swap file configured" ;;
+        systemd)    echo -e "    ${GREEN}✓${NC} Systemd service (auto-start on boot)" ;;
+        pm2-startup) echo -e "    ${GREEN}✓${NC} PM2 startup on boot" ;;
+        nginx)      echo -e "    ${GREEN}✓${NC} Nginx reverse proxy" ;;
+        ufw)        echo -e "    ${GREEN}✓${NC} UFW firewall" ;;
+        logrotate)  echo -e "    ${GREEN}✓${NC} Log rotation (14 days)" ;;
+        backup-cron) echo -e "    ${GREEN}✓${NC} Database backup (daily at 3 AM)" ;;
+        sysctl)     echo -e "    ${GREEN}✓${NC} Kernel parameters tuned" ;;
+        *)          echo -e "    ${GREEN}✓${NC} $step" ;;
+      esac
+    done
+    echo ""
+  fi
+
+fi # end PRODUCTION_MODE
+
+# ─────────────────────────────────────────────────────────
+#  6. DEPLOY / RESTART (--deploy mode)
 # ─────────────────────────────────────────────────────────
 if [ "$DEPLOY_MODE" = true ]; then
 
@@ -673,7 +1369,7 @@ if [ "$DEPLOY_MODE" = true ]; then
 fi
 
 # ─────────────────────────────────────────────────────────
-#  5. SUMMARY
+#  7. SUMMARY
 # ─────────────────────────────────────────────────────────
 header "SUMMARY"
 
@@ -700,6 +1396,9 @@ echo -e "  ${BLUE}→${NC} Lint & fix:              ${GREEN}npm run lint:fix${NC
 echo -e "  ${BLUE}→${NC} Default login:           ${YELLOW}admin / Admin@123456${NC}"
 echo -e "  ${BLUE}→${NC} Reset DB:                ${GREEN}npm run reset-db${NC}"
 echo -e "  ${BLUE}→${NC} Deploy update:           ${GREEN}bash scripts/bootstrap.sh --deploy${NC}"
+echo -e "  ${BLUE}→${NC} Production setup:        ${GREEN}bash scripts/bootstrap.sh --production${NC}"
+echo -e "  ${BLUE}→${NC} Backup database:         ${GREEN}bash scripts/backup-db.sh${NC}"
+echo -e "  ${BLUE}→${NC} View panel status:       ${GREEN}systemctl status panelku${NC} (if systemd configured)"
 echo ""
 
 # Exit code
