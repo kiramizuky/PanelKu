@@ -194,6 +194,7 @@ const createApp = () => {
   app.get('/mail', (req, res) => res.render('mail/index', { title: 'Mail Server' }));
   app.get('/cdn', (req, res) => res.render('cdn/index', { title: 'CDN Manager' }));
   app.get('/iot', (req, res) => res.render('iot/index', { title: 'IoT Manager' }));
+  app.get('/lvm-manager', (req, res) => res.render('lvm-manager/index', { title: 'LVM & RAID Manager' }));
 
   // Dynamic plugins router (loaded before 404 handler)
   app.use((req, res, next) => pluginLoader.handleProxy(req, res, next));

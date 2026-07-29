@@ -1,0 +1,379 @@
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;">
+  <div>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">LVM & Software RAID Manager</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Multi-drive management, RAID arrays, LVM storage pools & filesystem mounts</p>
+  </div>
+  <div style="display:flex;gap:10px;">
+    <button class="btn-lp btn-lp-secondary" onclick="LvmManagerPage.refreshAll()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
+    <button class="btn-lp btn-lp-primary" onclick="LvmManagerPage.openCreateRaidModal()"><i class="bi bi-disc me-1"></i> Create RAID</button>
+    <button class="btn-lp btn-lp-success" onclick="LvmManagerPage.openCreateVgModal()"><i class="bi bi-hdd-stack me-1"></i> Create Volume Group</button>
+  </div>
+</div>
+
+<!-- Tabs Navigation -->
+<ul class="nav nav-tabs lp-tabs mb-4" id="lvmTabs" role="tablist">
+  <li class="nav-item">
+    <button class="nav-link active" id="disks-tab" data-bs-toggle="tab" data-bs-target="#disks-content" type="button"><i class="bi bi-hdd-network me-2"></i>Physical Disks</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" id="raid-tab" data-bs-toggle="tab" data-bs-target="#raid-content" type="button"><i class="bi bi-disc me-2"></i>Software RAID (mdadm)</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" id="lvm-tab" data-bs-toggle="tab" data-bs-target="#lvm-content" type="button"><i class="bi bi-layers me-2"></i>LVM Pools & Volumes</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" id="smart-tab" data-bs-toggle="tab" data-bs-target="#smart-content" type="button"><i class="bi bi-heart-pulse me-2"></i>SMART Health</button>
+  </li>
+</ul>
+
+<div class="tab-content" id="lvmTabsContent">
+  <!-- TAB 1: PHYSICAL DISKS -->
+  <div class="tab-pane fade show active" id="disks-content" role="tabpanel">
+    <div class="lp-glass-card" style="padding:20px;">
+      <h5 style="font-size:16px; font-weight:600; margin-bottom:16px;"><i class="bi bi-hdd me-2 text-primary"></i>Detected Storage Devices</h5>
+      <div class="table-responsive">
+        <table class="table lp-table align-middle">
+          <thead>
+            <tr>
+              <th>Device</th>
+              <th>Model & Serial</th>
+              <th>Size</th>
+              <th>Type</th>
+              <th>Filesystem</th>
+              <th>Mountpoint</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="disksTableBody">
+            <tr><td colspan="7" class="text-center text-muted">Loading disks...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: SOFTWARE RAID -->
+  <div class="tab-pane fade" id="raid-content" role="tabpanel">
+    <div class="row g-4" id="raidArraysContainer">
+      <div class="col-12 text-center text-muted">Loading RAID arrays...</div>
+    </div>
+  </div>
+
+  <!-- TAB 3: LVM POOLS & VOLUMES -->
+  <div class="tab-pane fade" id="lvm-content" role="tabpanel">
+    <!-- Physical Volumes (PV) -->
+    <div class="lp-glass-card mb-4" style="padding:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h5 style="font-size:16px; font-weight:600; margin:0;"><i class="bi bi-hdd-fill me-2 text-info"></i>Physical Volumes (PV)</h5>
+        <button class="btn-lp btn-lp-sm btn-lp-primary" onclick="LvmManagerPage.openCreatePvModal()"><i class="bi bi-plus-lg me-1"></i> Create PV</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table lp-table align-middle">
+          <thead>
+            <tr>
+              <th>PV Name</th>
+              <th>Assigned VG</th>
+              <th>PV Size</th>
+              <th>Free Space</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pvTableBody">
+            <tr><td colspan="5" class="text-center text-muted">Loading Physical Volumes...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Volume Groups (VG) -->
+    <div class="lp-glass-card mb-4" style="padding:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h5 style="font-size:16px; font-weight:600; margin:0;"><i class="bi bi-hdd-stack me-2 text-warning"></i>Volume Groups (VG)</h5>
+        <button class="btn-lp btn-lp-sm btn-lp-success" onclick="LvmManagerPage.openCreateVgModal()"><i class="bi bi-plus-lg me-1"></i> Create VG</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table lp-table align-middle">
+          <thead>
+            <tr>
+              <th>VG Name</th>
+              <th>PV Count</th>
+              <th>LV Count</th>
+              <th>Total Size</th>
+              <th>Free Space</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="vgTableBody">
+            <tr><td colspan="6" class="text-center text-muted">Loading Volume Groups...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Logical Volumes (LV) -->
+    <div class="lp-glass-card" style="padding:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h5 style="font-size:16px; font-weight:600; margin:0;"><i class="bi bi-layers-half me-2 text-success"></i>Logical Volumes (LV)</h5>
+        <button class="btn-lp btn-lp-sm btn-lp-success" onclick="LvmManagerPage.openCreateLvModal()"><i class="bi bi-plus-lg me-1"></i> Create LV</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table lp-table align-middle">
+          <thead>
+            <tr>
+              <th>LV Name</th>
+              <th>Volume Group</th>
+              <th>Device Path</th>
+              <th>Size</th>
+              <th>Filesystem / Mount</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="lvTableBody">
+            <tr><td colspan="6" class="text-center text-muted">Loading Logical Volumes...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: SMART HEALTH -->
+  <div class="tab-pane fade" id="smart-content" role="tabpanel">
+    <div class="lp-glass-card" style="padding:20px;">
+      <div style="display:flex; gap:15px; align-items:center; margin-bottom:20px;">
+        <label class="lp-label mb-0" style="white-space:nowrap;">Select Drive:</label>
+        <select id="smartDriveSelect" class="lp-input" style="max-width:300px;" onchange="LvmManagerPage.fetchSmartDetails(this.value)">
+          <option value="">-- Choose Device --</option>
+        </select>
+      </div>
+
+      <div id="smartDetailsContainer">
+        <div class="text-center text-muted py-4">Select a drive above to view S.M.A.R.T. health diagnostics.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Create RAID Array -->
+<div class="modal fade" id="createRaidModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title"><i class="bi bi-disc text-primary me-2"></i>Create Software RAID Array</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="createRaidForm" onsubmit="event.preventDefault(); LvmManagerPage.submitCreateRaid();">
+          <div class="mb-3">
+            <label class="lp-label">RAID Device Name</label>
+            <input type="text" id="raidName" class="lp-input" placeholder="md0 (creates /dev/md0)" required>
+          </div>
+          <div class="mb-3">
+            <label class="lp-label">RAID Level</label>
+            <select id="raidLevel" class="lp-input" required>
+              <option value="raid0">RAID 0 (Stripe - Max performance, no redundancy)</option>
+              <option value="raid1" selected>RAID 1 (Mirror - Full redundancy)</option>
+              <option value="raid5">RAID 5 (Parity - Redundancy + efficiency)</option>
+              <option value="raid6">RAID 6 (Dual Parity - Double fault tolerance)</option>
+              <option value="raid10">RAID 10 (Striped Mirror)</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="lp-label">Select Active Member Disks</label>
+            <div id="raidMemberDisksList" class="p-2 border rounded" style="max-height:150px; overflow-y:auto; background:rgba(0,0,0,0.2);">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn-lp btn-lp-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="createRaidForm" class="btn-lp btn-lp-primary">Create RAID Array</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Create Physical Volume (PV) -->
+<div class="modal fade" id="createPvModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content lp-glass-card">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title"><i class="bi bi-hdd-fill text-info me-2"></i>Create PV</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="createPvForm" onsubmit="event.preventDefault(); LvmManagerPage.submitCreatePv();">
+          <div class="mb-3">
+            <label class="lp-label">Target Device Path</label>
+            <input type="text" id="pvDevicePath" class="lp-input" placeholder="/dev/sdb or /dev/md0" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn-lp btn-lp-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="createPvForm" class="btn-lp btn-lp-info">Initialize PV</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Create Volume Group (VG) -->
+<div class="modal fade" id="createVgModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title"><i class="bi bi-hdd-stack text-warning me-2"></i>Create Volume Group</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="createVgForm" onsubmit="event.preventDefault(); LvmManagerPage.submitCreateVg();">
+          <div class="mb-3">
+            <label class="lp-label">VG Name</label>
+            <input type="text" id="vgNameInput" class="lp-input" placeholder="e.g. vg_data or vg_storage" required>
+          </div>
+          <div class="mb-3">
+            <label class="lp-label">Select PV Devices to Include</label>
+            <div id="vgPvSelectList" class="p-2 border rounded" style="max-height:150px; overflow-y:auto; background:rgba(0,0,0,0.2);">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn-lp btn-lp-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="createVgForm" class="btn-lp btn-lp-warning">Create VG</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Extend VG -->
+<div class="modal fade" id="extendVgModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title"><i class="bi bi-arrows-angle-expand text-warning me-2"></i>Extend Volume Group</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="extendVgForm" onsubmit="event.preventDefault(); LvmManagerPage.submitExtendVg();">
+          <input type="hidden" id="extendVgTargetName">
+          <div class="mb-3">
+            <label class="lp-label">Select Additional PV Devices to Add</label>
+            <div id="extendVgPvSelectList" class="p-2 border rounded" style="max-height:150px; overflow-y:auto; background:rgba(0,0,0,0.2);">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn-lp btn-lp-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="extendVgForm" class="btn-lp btn-lp-warning">Extend VG</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Create Logical Volume (LV) -->
+<div class="modal fade" id="createLvModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title"><i class="bi bi-layers-half text-success me-2"></i>Create Logical Volume</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="createLvForm" onsubmit="event.preventDefault(); LvmManagerPage.submitCreateLv();">
+          <div class="mb-3">
+            <label class="lp-label">Select Volume Group</label>
+            <select id="createLvVgSelect" class="lp-input" required></select>
+          </div>
+          <div class="mb-3">
+            <label class="lp-label">LV Name</label>
+            <input type="text" id="lvNameInput" class="lp-input" placeholder="e.g. lv_storage" required>
+          </div>
+          <div class="mb-3">
+            <label class="lp-label">Size (e.g., 50G, 1T, or 100%FREE)</label>
+            <input type="text" id="lvSizeInput" class="lp-input" placeholder="100G" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn-lp btn-lp-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="createLvForm" class="btn-lp btn-lp-success">Create LV</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Extend Logical Volume (LV) -->
+<div class="modal fade" id="extendLvModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content lp-glass-card">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title"><i class="bi bi-arrows-angle-expand text-success me-2"></i>Extend LV</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="extendLvForm" onsubmit="event.preventDefault(); LvmManagerPage.submitExtendLv();">
+          <input type="hidden" id="extendLvVgName">
+          <input type="hidden" id="extendLvName">
+          <div class="mb-3">
+            <label class="lp-label">Additional Size to Add (e.g. 10G or +100%FREE)</label>
+            <input type="text" id="extendLvSizeInput" class="lp-input" placeholder="10G" required>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="extendLvResizeFs" checked>
+            <label class="form-check-label text-muted" for="extendLvResizeFs">Resize filesystem automatically</label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn-lp btn-lp-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="extendLvForm" class="btn-lp btn-lp-success">Extend LV</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Format & Mount Volume -->
+<div class="modal fade" id="formatMountModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title"><i class="bi bi-hdd-rack text-primary me-2"></i>Format & Mount Volume</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formatMountForm" onsubmit="event.preventDefault(); LvmManagerPage.submitFormatMount();">
+          <div class="mb-3">
+            <label class="lp-label">Device Path</label>
+            <input type="text" id="fmDevicePath" class="lp-input" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="lp-label">Filesystem Type</label>
+            <select id="fmFsType" class="lp-input" required>
+              <option value="ext4" selected>ext4 (Recommended)</option>
+              <option value="xfs">XFS</option>
+              <option value="btrfs">Btrfs</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="lp-label">Mount Point Path</label>
+            <input type="text" id="fmMountPoint" class="lp-input" placeholder="/mnt/data or /mnt/storage" required>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="fmFstabPersist" checked>
+            <label class="form-check-label text-muted" for="fmFstabPersist">Persist mount in <code>/etc/fstab</code> across reboots</label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn-lp btn-lp-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="formatMountForm" class="btn-lp btn-lp-primary">Format & Mount</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/lvm-manager.js"></script>

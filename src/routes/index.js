@@ -38,6 +38,7 @@ import powerRoutes from '../modules/power/power.routes.js';
 import mailRoutes from '../modules/mail/mail.routes.js';
 import cdnRoutes from '../modules/cdn/cdn.routes.js';
 import iotRoutes from '../modules/iot/iot.routes.js';
+import lvmManagerRoutes from '../modules/lvm-manager/lvm-manager.routes.js';
 
 const router = Router();
 
@@ -93,6 +94,7 @@ router.use('/power', powerRoutes);
 router.use('/mail', mailRoutes);
 router.use('/cdn', cdnRoutes);
 router.use('/iot', iotRoutes);
+router.use('/lvm-manager', lvmManagerRoutes);
 
 // API Documentation (mounted under /api prefix)
 router.use('/api-docs', apiDocsRoutes);
