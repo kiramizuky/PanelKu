@@ -2,7 +2,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { successResponse, errorResponse } from '../../src/helpers/response.js';
 import packageManager from '../../src/modules/system/package-manager.js';
-import backupService from '../../src/modules/backup/backup.service.js';
+import { getRcloneStatus } from '../shared/rclone-helper.js';
 
 const execPromise = promisify(exec);
 
@@ -11,8 +11,8 @@ export default {
     // 1. Rclone View
     app.get('/plugins/rclone-manager', async (req, res) => {
       try {
-        // Use centralized rclone status detection with custom config path support
-        const status = await backupService.getRcloneStatus();
+        // Use shared rclone helper for detection (supports custom config path + multi-user fallback)
+        const status = await getRcloneStatus();
         const isInstalled = status.installed;
         const rcloneVersionStr = status.version || '';
         const remotes = (status.remotes || []).map(r => r + ':') || [];
