@@ -289,6 +289,134 @@ async function getLvmData() {
 }
 
 // ─────────────────────────────────────────────
+// Software RAID (mdadm) management
+// ─────────────────────────────────────────────
+async function getRaidData() {
+  const result = { arrays: [], available: false };
+  try {
+    await run('which mdadm 2>/dev/null');
+    result.available = true;
+  } catch {
+    return result;
+  }
+
+  try {
+    const mdstat = await run('cat /proc/mdstat 2>/dev/null || echo ""');
+    // Parse /proc/mdstat to find active RAID arrays
+    const lines = mdstat.split('\n');
+    let currentArray = null;
+    for (const line of lines) {
+      const arrayMatch = line.match(/^(\S+)\s*:\s*(\S+)\s+(\S+)\s+(.*)/);
+      if (arrayMatch) {
+        if (currentArray) result.arrays.push(currentArray);
+        const name = arrayMatch[1];
+        const level = arrayMatch[2];
+        const status = arrayMatch[4] || '';
+        const devices = status.split(/\s+/).filter(s => s.startsWith('/dev/') || s.match(/^sd[a-z]+\d*$/) || s.match(/^nvme\d+n\d+$/));
+        const failed = status.includes('_') || status.includes('F');
+        currentArray = {
+          name: `/dev/${name}`,
+          level: level.toUpperCase(),
+          status: failed ? 'DEGRADED' : 'ACTIVE',
+          devices: devices.map(d => `/dev/${d.replace('/dev/', '')}`),
+          activeDevices: status.match(/\[(\d+)\/(\d+)\]/)?.[1] || devices.length,
+          totalDevices: status.match(/\[(\d+)\/(\d+)\]/)?.[2] || devices.length,
+          syncPercent: status.match(/(\d+\.?\d*)%/)?.[1] || null,
+          syncSpeed: status.match(/speed=\s*(\S+)/)?.[1] || null,
+        };
+      } else if (currentArray && line.includes('recovery') || line.includes('resync') || line.includes('reshape')) {
+        const pct = line.match(/(\d+\.?\d*)%/);
+        if (pct) currentArray.syncPercent = pct[1];
+      }
+    }
+    if (currentArray) result.arrays.push(currentArray);
+
+    // Get detailed info for each array via mdadm --detail
+    for (const arr of result.arrays) {
+      try {
+        const detail = await run(`mdadm --detail ${arr.name} 2>/dev/null | grep -E 'Raid Level|Array Size|Used Dev Size|Total Devices|Active Devices|Working Devices|Failed Devices|Spare Devices|UUID|Creation Time|Update Time'`);
+        const detailLines = detail.split('\n');
+        for (const dl of detailLines) {
+          const m = dl.match(/:\s+(.+)/);
+          if (m) {
+            const val = m[1].trim();
+            if (dl.includes('Raid Level')) arr.level = val;
+            else if (dl.includes('Array Size')) arr.size = val;
+            else if (dl.includes('Total Devices')) arr.totalDevices = parseInt(val) || arr.totalDevices;
+            else if (dl.includes('Active Devices')) arr.activeDevices = parseInt(val) || arr.activeDevices;
+            else if (dl.includes('Failed Devices')) arr.failedDevices = parseInt(val) || 0;
+            else if (dl.includes('Spare Devices')) arr.spareDevices = parseInt(val) || 0;
+            else if (dl.includes('UUID')) arr.uuid = val;
+          }
+        }
+      } catch {}
+    }
+  } catch {}
+
+  return result;
+}
+
+async function createRaid(name, level, devices) {
+  if (!name || !/^md\d+$/.test(name)) throw new Error('RAID name must be md0, md1, etc.');
+  if (!level || !/^raid[0-9]+$/.test(level)) throw new Error('Invalid RAID level');
+  if (!devices || !Array.isArray(devices) || devices.length < 2) throw new Error('At least 2 devices required');
+
+  const safeDevices = devices.map(d => {
+    const cleaned = d.replace(/['"]/g, '');
+    if (!/^\/dev\/[a-zA-Z0-9_\/-]+$/.test(cleaned)) throw new Error(`Invalid device path: ${d}`);
+    return cleaned;
+  });
+
+  // Check if md device already exists
+  try {
+    await run(`test -b /dev/${name} && echo exists`);
+    throw new Error(`Device /dev/${name} already exists`);
+  } catch (e) {
+    if (e.message.includes('already exists')) throw e;
+  }
+
+  const out = await run(`mdadm --create /dev/${name} --level=${level} --raid-devices=${safeDevices.length} ${safeDevices.join(' ')} --force 2>&1`, { timeout: 120000 });
+  return { output: out, device: `/dev/${name}` };
+}
+
+async function stopRaid(mdDevice) {
+  if (!/^\/dev\/md\d+$/.test(mdDevice)) throw new Error('Invalid RAID device path');
+  const out = await run(`mdadm --stop ${mdDevice} 2>&1`);
+  return { output: out };
+}
+
+async function formatVolume(devicePath, fsType) {
+  if (!/^\/dev\/(md\d+|sd[a-z]+\d*|nvme\d+n\d+p\d+)$/.test(devicePath)) throw new Error('Invalid device path');
+  if (!['ext4', 'xfs', 'btrfs'].includes(fsType)) throw new Error('Unsupported filesystem type');
+
+  const mkfsCmd = fsType === 'ext4' ? 'mkfs.ext4 -F' : fsType === 'xfs' ? 'mkfs.xfs -f' : 'mkfs.btrfs -f';
+  const out = await run(`${mkfsCmd} ${devicePath} 2>&1`, { timeout: 60000 });
+  return { output: out, fstype: fsType };
+}
+
+async function mountVolume(devicePath, mountPoint, persist) {
+  if (!/^\/dev\/(md\d+|sd[a-z]+\d*|nvme\d+n\d+p\d+)$/.test(devicePath)) throw new Error('Invalid device path');
+  if (!mountPoint || !mountPoint.startsWith('/') || mountPoint.includes('..')) throw new Error('Invalid mount point');
+
+  await run(`mkdir -p ${mountPoint} 2>&1`);
+  await run(`mount ${devicePath} ${mountPoint} 2>&1`);
+
+  if (persist) {
+    const uuid = await run(`blkid -s UUID -o value ${devicePath} 2>/dev/null || echo ""`);
+    if (uuid.trim()) {
+      try {
+        const fstab = await run('cat /etc/fstab 2>/dev/null || echo ""');
+        if (!fstab.includes(uuid.trim())) {
+          await run(`echo 'UUID=${uuid.trim()} ${mountPoint} auto defaults 0 2' >> /etc/fstab 2>&1`);
+        }
+      } catch {}
+    }
+  }
+
+  return { output: `Mounted ${devicePath} at ${mountPoint}` };
+}
+
+// ─────────────────────────────────────────────
 // HTML helpers
 // ─────────────────────────────────────────────
 function usageBar(sizeStr, freeStr, height = 8) {
@@ -716,6 +844,7 @@ ${statCards}
     ['volumes',     'bi-layers', 'Volumes'],
     ['filesystem',  'bi-file-earmark-binary', 'Filesystem'],
     ['tree',        'bi-diagram-3', 'Storage Map'],
+    ["raid",        "bi-disc", "RAID"],
   ].map(([id,icon,label], i) => `
     <li class="nav-item">
       <button class="btn-lp btn-lp-ghost lvm-tab-btn ${i===0?'lvm-tab-active':''}" onclick="LvmPage.switchTab('${id}')" data-tab="${id}" style="border-radius:8px 8px 0 0;font-size:13px;padding:8px 14px;border-bottom:2px solid ${i===0?'#f59e0b':'transparent'};">
@@ -812,6 +941,19 @@ ${statCards}
   </div>
 </div>
 
+
+<!-- ── Tab: Software RAID ── -->
+<div id="tab-raid" class="lvm-tab" style="display:none;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h5 style="font-size:15px;font-weight:700;margin:0;"><i class="bi bi-disc text-primary me-2"></i>Software RAID (mdadm)</h5>
+    <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LvmPage.showCreateRaidModal()">
+      <i class="bi bi-plus-lg me-1"></i>Create RAID
+    </button>
+  </div>
+  <div id="raidArraysContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;">
+    <!-- Populated by LvmPage.loadRaidData() -->
+  </div>
+</div>
 
 <!-- ══════════════════════════ MODALS ══════════════════════════ -->
 
@@ -1002,6 +1144,91 @@ ${statCards}
   </div>
 </div>
 
+<!-- Create RAID Array -->
+<div class="modal fade" id="createRaidModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.97);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title" style="font-size:15px;font-weight:700;"><i class="bi bi-disc text-primary me-2"></i>Create Software RAID</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="raidCreateDevice">
+        <div class="mb-3">
+          <label class="lp-label" style="font-size:11px;">RAID Device Name</label>
+          <input type="text" id="raidName" class="lp-input" placeholder="e.g. md0" value="md0">
+        </div>
+        <div class="mb-3">
+          <label class="lp-label" style="font-size:11px;">RAID Level</label>
+          <select id="raidLevel" class="lp-input">
+            <option value="raid0">RAID 0 (Stripe)</option>
+            <option value="raid1" selected>RAID 1 (Mirror)</option>
+            <option value="raid5">RAID 5 (Parity)</option>
+            <option value="raid6">RAID 6 (Dual Parity)</option>
+            <option value="raid10">RAID 10 (Striped Mirror)</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="lp-label" style="font-size:11px;">Select Member Disks</label>
+          <div id="raidMemberDisks" class="p-2" style="max-height:150px;overflow-y:auto;background:rgba(0,0,0,0.2);border-radius:8px;">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:12px;font-size:11px;color:#f59e0b;">
+          <i class="bi bi-exclamation-triangle me-1"></i>This will ERASE all data on selected disks!
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="LvmPage.createRaid()" style="background:#f59e0b;color:#000;">
+          <i class="bi bi-lightning-fill me-1"></i>Create RAID
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Format / Mount Volume -->
+<div class="modal fade" id="formatMountModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.97);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title" style="font-size:15px;font-weight:700;"><i class="bi bi-hdd-rack text-success me-2"></i>Format & Mount Volume</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="fmDevicePath">
+        <div class="mb-3">
+          <label class="lp-label" style="font-size:11px;">Device</label>
+          <input type="text" id="fmDeviceDisplay" class="lp-input" readonly style="font-family:monospace;">
+        </div>
+        <div class="mb-3">
+          <label class="lp-label" style="font-size:11px;">Filesystem</label>
+          <select id="fmFsType" class="lp-input">
+            <option value="ext4">ext4 (recommended)</option>
+            <option value="xfs">xfs</option>
+            <option value="btrfs">btrfs</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="lp-label" style="font-size:11px;">Mount Point</label>
+          <input type="text" id="fmMountPoint" class="lp-input" placeholder="/mnt/data">
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="fmFstab" checked>
+          <label class="form-check-label" style="font-size:12px;cursor:pointer;">Add to /etc/fstab for persistence</label>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-lp btn-lp-primary" onclick="LvmPage.submitFormatMount()">
+          <i class="bi bi-check-lg me-1"></i>Format & Mount
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Log Output -->
 <div class="modal fade" id="lvmLogModal" tabindex="-1">
   <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -1051,6 +1278,7 @@ const LvmPage = (() => {
     if (tab) tab.style.display = '';
     const btn = document.querySelector(\`[data-tab="\${id}"]\`);
     if (btn) { btn.classList.add('lvm-tab-active'); btn.style.borderBottom = '2px solid #f59e0b'; }
+    if (id === 'raid') { loadRaidData(); }
   }
 
   // ── Init Disk
@@ -1154,6 +1382,65 @@ const LvmPage = (() => {
     res?.success ? showLog('Restore Output', res.data?.output||'Done.') : showLog('Error', res?.message||'Failed', true);
     LP.toast(res?.success ? 'Restored!' : res?.message||'Failed', res?.success?'success':'error');
   }
+
+    // ── API: List RAID arrays ──────────────────────────────
+    app.post('/api/plugins/lvm-manager/raid/list', async (req, res) => {
+      try {
+        const data = await getRaidData();
+        return successResponse(res, data, 'RAID data loaded');
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    // ── API: List available disks for RAID ─────────────────
+    app.post('/api/plugins/lvm-manager/raid/disks', async (req, res) => {
+      try {
+        const lvmData = await getLvmData();
+        const availDisks = (lvmData.blockDevices || [])
+          .filter(d => !d.used && !d.isSystem && !d.isMounted)
+          .map(d => ({ name: d.name, path: '/dev/' + d.name, size: d.size }));
+        return successResponse(res, availDisks, 'Available disks');
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    // ── API: Create RAID ───────────────────────────────────
+    app.post('/api/plugins/lvm-manager/raid/create', async (req, res) => {
+      try {
+        const { name, level, devices } = req.body;
+        const result = await createRaid(name, level, devices);
+        return successResponse(res, result, 'RAID array created');
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    // ── API: Stop RAID ─────────────────────────────────────
+    app.post('/api/plugins/lvm-manager/raid/stop', async (req, res) => {
+      try {
+        const { mdDevice } = req.body;
+        if (!mdDevice) return errorResponse(res, 'mdDevice is required', 400);
+        const result = await stopRaid(mdDevice);
+        return successResponse(res, result, 'RAID array stopped');
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    // ── API: Format volume ────────────────────────────────
+    app.post('/api/plugins/lvm-manager/raid/format', async (req, res) => {
+      try {
+        const { devicePath, fsType } = req.body;
+        if (!devicePath || !fsType) return errorResponse(res, 'devicePath and fsType required', 400);
+        const result = await formatVolume(devicePath, fsType);
+        return successResponse(res, result, 'Volume formatted');
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    // ── API: Mount volume ─────────────────────────────────
+    app.post('/api/plugins/lvm-manager/raid/mount', async (req, res) => {
+      try {
+        const { devicePath, mountPoint, persist } = req.body;
+        if (!devicePath || !mountPoint) return errorResponse(res, 'devicePath and mountPoint required', 400);
+        const result = await mountVolume(devicePath, mountPoint, persist !== false);
+        return successResponse(res, result, 'Volume mounted');
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
   async function installLvm() {
     LP.toast('Installing LVM2…','info');
     const res = await apiPost('/api/plugins/lvm-manager/install-lvm', {});
@@ -1166,11 +1453,146 @@ const LvmPage = (() => {
     location.reload();
   }
 
+
+  // ── Software RAID Frontend Methods ──────────────────────
+
+  async function loadRaidData() {
+    const container = document.getElementById('raidArraysContainer');
+    if (!container) return;
+    container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 text-muted small">Loading RAID data...</p></div>';
+    const res = await apiPost('/api/plugins/lvm-manager/raid/list', {});
+    if (!res || !res.success) {
+      container.innerHTML = '<div class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle-fill fs-3"></i><p class="mt-2 small">' + (res?.message || 'Failed to load RAID data') + '</p></div>';
+      return;
+    }
+    const data = res.data || {};
+    const arrays = data.arrays || [];
+    const available = data.available;
+
+    if (!available) {
+      container.innerHTML = '<div class="lp-glass-card p-4 text-center"><i class="bi bi-exclamation-triangle-fill fs-2 text-warning"></i><p class="mt-2 text-muted">mdadm (RAID tools) not detected on this server.</p></div>';
+      return;
+    }
+
+    if (arrays.length === 0) {
+      container.innerHTML = '<div class="lp-glass-card p-4 text-center"><i class="bi bi-disc fs-2 text-muted"></i><p class="mt-2 text-muted">No RAID arrays configured.</p></div>';
+      return;
+    }
+
+    container.innerHTML = arrays.map(function(arr) {
+      const isDegraded = arr.status === 'DEGRADED';
+      const syncHtml = arr.syncPercent !== null
+        ? '<div style="margin-top:8px;"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-bottom:3px;"><span>Sync</span><span>' + arr.syncPercent + '%</span></div><div style="background:rgba(255,255,255,0.08);border-radius:99px;height:5px;overflow:hidden;"><div style="width:' + arr.syncPercent + '%;height:100%;background:#38bdf8;border-radius:99px;"></div></div></div>'
+        : '';
+      return '<div class="lp-glass-card p-4" style="border:1px solid ' + (isDegraded ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.15)') + ';">'
+        + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'
+        + '<div style="width:44px;height:44px;border-radius:12px;background:' + (isDegraded ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)') + ';display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">'
+        + '<i class="bi ' + (isDegraded ? 'bi-exclamation-triangle-fill text-danger' : 'bi-check-circle-fill text-success') + '"></i></div>'
+        + '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;">' + arr.name + '</div>'
+        + '<div style="font-size:11px;color:var(--text-muted);">' + arr.level + '  ·  ' + arr.activeDevices + '/' + arr.totalDevices + ' devices'
+        + (arr.size ? '  ·  ' + arr.size : '') + '</div></div>'
+        + '<span style="background:' + (isDegraded ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)') + ';color:' + (isDegraded ? '#ef4444' : '#10b981') + ';border:1px solid ' + (isDegraded ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)') + ';font-size:10px;font-weight:700;padding:3px 10px;border-radius:99px;white-space:nowrap;">'
+        + (isDegraded ? 'DEGRADED' : 'ACTIVE') + '</span></div>'
+        + ((arr.devices || []).length > 0 ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;">' + arr.devices.map(function(d) {
+          return '<code style="font-size:10px;background:rgba(56,189,248,0.08);color:#38bdf8;padding:2px 6px;border-radius:4px;">' + d + '</code>';
+        }).join('') + '</div>' : '')
+        + syncHtml
+        + (arr.uuid ? '<div style="margin-top:8px;font-size:9px;color:var(--text-muted);">UUID: <code>' + arr.uuid + '</code></div>' : '')
+        + '<div style="display:flex;gap:8px;margin-top:12px;">'
+        + '<button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LvmPage.showFormatMountModal('' + arr.name + '','ext4')" style="font-size:10px;flex:1;"><i class="bi bi-hdd-stack me-1"></i>Format & Mount</button>'
+        + '<button class="btn-lp btn-lp-danger btn-lp-sm" onclick="LvmPage.stopRaid('' + arr.name + '')" style="font-size:10px;flex:1;"><i class="bi bi-stop-circle me-1"></i>Stop</button>'
+        + '</div></div>';
+    }).join('');
+  }
+
+  async function showCreateRaidModal() {
+    // Fetch available disks from API
+    const res = await apiPost('/api/plugins/lvm-manager/raid/disks', {});
+    let diskHtml = '';
+    if (res && res.success && res.data && res.data.length > 0) {
+      diskHtml = res.data.map(function(d) {
+        return '<div class="form-check mb-1"><input class="form-check-input raid-disk-cb" type="checkbox" value="' + d.path + '" id="rd_' + d.name + '"><label class="form-check-label small" for="rd_' + d.name + '">' + d.path + ' (' + d.size + ')' + (d.model ? ' - ' + d.model : '') + '</label></div>';
+      }).join('');
+    } else {
+      diskHtml = '<div class="text-muted small py-2">No available disks found.</div>';
+    }
+    document.getElementById('raidMemberDisks').innerHTML = diskHtml;
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('createRaidModal'));
+    modal.show();
+  }
+
+  async function createRaid() {
+    const name = document.getElementById('raidName').value.trim() || 'md0';
+    const level = document.getElementById('raidLevel').value;
+    const disks = Array.from(document.querySelectorAll('.raid-disk-cb:checked')).map(function(cb) { return cb.value; });
+    if (disks.length < 2) {
+      LP.toast('Select at least 2 disks for RAID.', 'warning');
+      return;
+    }
+    const modal = bootstrap.Modal.getInstance(document.getElementById('createRaidModal'));
+    if (modal) modal.hide();
+    LP.toast('Creating RAID ' + name + '...', 'info');
+    const res = await apiPost('/api/plugins/lvm-manager/raid/create', { name, level, devices: disks });
+    if (res && res.success) {
+      LP.toast('RAID ' + name + ' created successfully!', 'success');
+      loadRaidData();
+    } else {
+      LP.toast('Failed: ' + (res?.message || 'Unknown error'), 'danger');
+    }
+  }
+
+  function showFormatMountModal(devicePath, fsType) {
+    document.getElementById('fmDevicePath').value = devicePath || '';
+    document.getElementById('fmDeviceDisplay').value = devicePath || '';
+    document.getElementById('fmFsType').value = fsType || 'ext4';
+    document.getElementById('fmMountPoint').value = '/mnt/vol';
+    document.getElementById('fmFstab').checked = true;
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('formatMountModal'));
+    modal.show();
+  }
+
+  async function submitFormatMount() {
+    const devicePath = document.getElementById('fmDevicePath').value;
+    const fsType = document.getElementById('fmFsType').value;
+    const mountPoint = document.getElementById('fmMountPoint').value.trim();
+    const persist = document.getElementById('fmFstab').checked;
+    if (!devicePath) { LP.toast('No device specified.', 'warning'); return; }
+    if (!mountPoint) { LP.toast('Mount point required.', 'warning'); return; }
+    const modal = bootstrap.Modal.getInstance(document.getElementById('formatMountModal'));
+    if (modal) modal.hide();
+    LP.toast('Formatting ' + devicePath + ' as ' + fsType + '...', 'info');
+    const fmtRes = await apiPost('/api/plugins/lvm-manager/raid/format', { devicePath, fsType });
+    if (!fmtRes || !fmtRes.success) {
+      LP.toast('Format failed: ' + (fmtRes?.message || 'Unknown error'), 'danger');
+      return;
+    }
+    LP.toast('Format complete. Mounting...', 'info');
+    const mntRes = await apiPost('/api/plugins/lvm-manager/raid/mount', { devicePath, mountPoint, persist });
+    if (mntRes && mntRes.success) {
+      LP.toast('Mounted at ' + mountPoint + '!', 'success');
+      loadRaidData();
+    } else {
+      LP.toast('Mount failed: ' + (mntRes?.message || 'Unknown error'), 'danger');
+    }
+  }
+
+  async function stopRaid(mdDevice) {
+    if (!confirm('Stop RAID array ' + mdDevice + '? All data on this array will become inaccessible.')) return;
+    LP.toast('Stopping ' + mdDevice + '...', 'info');
+    const res = await apiPost('/api/plugins/lvm-manager/raid/stop', { mdDevice });
+    if (res && res.success) {
+      LP.toast('RAID ' + mdDevice + ' stopped.', 'success');
+      loadRaidData();
+    } else {
+      LP.toast('Failed: ' + (res?.message || 'Unknown error'), 'danger');
+    }
+  }
+
   return { switchTab, showInitDiskModal, initDisk, showCreateLvModal, createLv,
            showExtendLvModal, extendLv, showExtendVgModal, extendVg,
-           showSnapshotModal, createSnapshot, restoreSnapshot, installLvm, refresh };
+           showSnapshotModal, createSnapshot, restoreSnapshot, installLvm, refresh, loadRaidData, showCreateRaidModal, createRaid, showFormatMountModal, submitFormatMount, stopRaid };
 })();
-// [FIX] Expose to window for LP.call() resolution
+
 window.LvmPage = LvmPage;
 </script>
 
@@ -1332,4 +1754,5 @@ window.LvmPage = LvmPage;
       } catch (e) { return errorResponse(res, e.message, 500); }
     });
   }
+
 };
