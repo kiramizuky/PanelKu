@@ -282,8 +282,10 @@ class AuthService {
       newRefreshToken: refreshToken,
       expiresAt: Date.now() + 60000,
     });
-    // Remove from cache after 60s to free memory
-    setTimeout(() => AuthService._recentlyRotated.delete(token), 60000);
+    // Remove from cache after 60s to free memory.
+    // [TEST FIX] unref() agar timer tidak menahan proses/Jest worker tetap hidup.
+    const cleanupTimer = setTimeout(() => AuthService._recentlyRotated.delete(token), 60000);
+    if (cleanupTimer.unref) cleanupTimer.unref();
 
     return { accessToken, refreshToken };
   }
