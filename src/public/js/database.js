@@ -170,6 +170,16 @@ const DB = (() => {
 
   // ── Explorer ─────────────────────────────────────────
 
+  // Show the selected schema in the explorer title so the context is always clear
+  function updateExplorerTitle() {
+    const titleEl = document.getElementById('exploreDbTitle');
+    if (!titleEl) return;
+    const base = `Explorer: ${activeDb} (${activeType.toUpperCase()})`;
+    titleEl.textContent = activeType === 'postgres'
+      ? `${base} — schema: ${activeSchema}`
+      : base;
+  }
+
   async function openExplorer(type, db) {
     activeType = String(type || '').replace(/^["']|["']$/g, '').trim();
     activeDb = String(db || '').replace(/^["']|["']$/g, '').trim();
@@ -178,12 +188,13 @@ const DB = (() => {
     currentPage = 1;
     currentSort = { column: null, dir: 'ASC' };
 
-    document.getElementById('exploreDbTitle').textContent = `Explorer: ${activeDb} (${activeType.toUpperCase()})`;
+    updateExplorerTitle();
     if (!explorerModal) explorerModal = new bootstrap.Modal(document.getElementById('exploreDbModal'));
     explorerModal.show();
 
     switchExplorerTab('browse');
     await loadSchemas();
+    updateExplorerTitle();
     await refreshExplorerTables();
   }
 
@@ -218,6 +229,7 @@ const DB = (() => {
     activeTable = null;
     currentPage = 1;
     currentSort = { column: null, dir: 'ASC' };
+    updateExplorerTitle();
 
     // Reset table-specific panels
     document.getElementById('browseTableName').textContent = '—';
