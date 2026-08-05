@@ -407,6 +407,12 @@ class DatabaseService {
     return name;
   }
 
+  // Identifier quoting per engine: backticks for MySQL/SQLite, double quotes for PostgreSQL.
+  // Callers MUST sanitize the identifier first (they are interpolated into SQL strings).
+  _quoteIdentifier(name, norm) {
+    return norm === 'postgres' ? '"' + name + '"' : '`' + name + '`';
+  }
+
   async listMysqlDatabases() {
     try {
       const pool = await this.getMysqlConnection();
@@ -908,35 +914,69 @@ class DatabaseService {
 
   // ── Import ─────────────────────────────────────────────────
 
-  async importSql(type, dbName, sqlContent) {
+  async importSql(type, dbName, sqlContent, schema = 'public') {
+    const norm = this._normalizeType(type);
     // Split by semicolons and execute each statement
     const statements = sqlContent.split(';').filter(s => s.trim().length > 0);
     let count = 0;
-    for (const stmt of statements) {
-      const trimmed = stmt.trim();
-      const upper = trimmed.toUpperCase();
-      // Only allow INSERT statements for safety
-      if (upper.startsWith('INSERT') || upper.startsWith('UPDATE') || upper.startsWith('DELETE')) {
-        try {
-          await this.runQuery(type, dbName, trimmed);
-          count++;
-        } catch (e) {
-          // Skip problematic statements
+    let pgClient = null;
+    try {
+      // PostgreSQL: run all statements on a single connection whose search_path
+      // points at the selected schema, so unqualified INSERT/UPDATE/DELETE
+      // statements land in that schema. (pg_dump-style SET search_path lines are
+      // filtered out below by the INSERT/UPDATE/DELETE prefix check.)
+      if (norm === 'postgres') {
+        this._sanitizeDbName(dbName);
+        schema = this._sanitizeSchemaName(schema);
+        pgClient = await this.getPgClientForDb(dbName);
+        await pgClient.query('SET search_path TO "' + schema + '"');
+      }
+
+      for (const stmt of statements) {
+        const trimmed = stmt.trim();
+        const upper = trimmed.toUpperCase();
+        // Only allow INSERT/UPDATE/DELETE statements for safety
+        if (upper.startsWith('INSERT') || upper.startsWith('UPDATE') || upper.startsWith('DELETE')) {
+          try {
+            if (pgClient) {
+              // [SECURITY] Keep the DROP/TRUNCATE/ALTER guard even though we
+              // bypass runQuery here (statements are checked per piece).
+              if (this._hasRestrictedStatement(trimmed, 'postgres')) continue;
+              await pgClient.query(trimmed);
+            } else {
+              await this.runQuery(type, dbName, trimmed);
+            }
+            count++;
+          } catch (e) {
+            // Skip problematic statements
+          }
         }
       }
+    } finally {
+      if (pgClient) await pgClient.end();
     }
     return { imported: count };
   }
 
-  async importCsv(type, dbName, tableName, csvContent) {
+  async importCsv(type, dbName, tableName, csvContent, schema = 'public') {
+    const norm = this._normalizeType(type);
     this._sanitizeTableName(tableName);
+    if (norm === 'postgres') {
+      this._sanitizeDbName(dbName);
+      schema = this._sanitizeSchemaName(schema);
+    }
     const lines = csvContent.split('\n').filter(l => l.trim());
     if (lines.length < 2) throw new Error('CSV must have header + at least one row');
 
     // [SECURITY] Sanitize header column names before interpolating into the INSERT —
     // a crafted header like `id`); DROP TABLE users; -- would otherwise break out of
-    // the backtick-quoted identifier. Values are escaped below, columns must be too.
+    // the quoted identifier. Values are escaped below, columns must be too.
     const columns = lines[0].split(',').map(c => this._sanitizeColumnName(c.trim().replace(/^"|"$/g, '')));
+    // Table reference: "schema"."table" for PostgreSQL (so imports go to the
+    // selected schema), backtick-quoted table for MySQL/SQLite.
+    const tableRef = norm === 'postgres'
+      ? this._quoteIdentifier(schema, norm) + '.' + this._quoteIdentifier(tableName, norm)
+      : this._quoteIdentifier(tableName, norm);
     let imported = 0;
 
     for (let i = 1; i < lines.length; i++) {
@@ -957,15 +997,15 @@ class DatabaseService {
         return { column: c, value: val === '' || val === undefined ? null : val };
       });
 
-      // Build INSERT statement per row
-      const colList = setClause.map(s => '`' + s.column + '`').join(', ');
+      // Build INSERT statement per row (identifiers quoted per engine)
+      const colList = setClause.map(s => this._quoteIdentifier(s.column, norm)).join(', ');
       const valList = setClause.map(s => {
         if (s.value === null) return 'NULL';
         return "'" + String(s.value).replace(/'/g, "''") + "'";
       }).join(', ');
 
       try {
-        await this.runQuery(type, dbName, `INSERT INTO \`${tableName}\` (${colList}) VALUES (${valList})`);
+        await this.runQuery(type, dbName, `INSERT INTO ${tableRef} (${colList}) VALUES (${valList})`);
         imported++;
       } catch (e) {
         // Skip failed rows

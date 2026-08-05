@@ -161,9 +161,9 @@ class DatabaseController {
 
   async importSql(req, res) {
     try {
-      const { type, database, sql } = req.body;
+      const { type, database, sql, schema = 'public' } = req.body;
       if (!type || !database || !sql) return error(res, 'Type, database, and SQL are required', 400);
-      const result = await databaseService.importSql(type, database, sql);
+      const result = await databaseService.importSql(type, database, sql, schema);
       return success(res, result, `${result.imported} statements imported`);
     } catch (err) {
       return error(res, err.message, 500);
@@ -172,9 +172,9 @@ class DatabaseController {
 
   async importCsv(req, res) {
     try {
-      const { type, database, table, csv } = req.body;
+      const { type, database, table, csv, schema = 'public' } = req.body;
       if (!type || !database || !table || !csv) return error(res, 'Type, database, table, and CSV are required', 400);
-      const result = await databaseService.importCsv(type, database, table, csv);
+      const result = await databaseService.importCsv(type, database, table, csv, schema);
       return success(res, result, `${result.imported} rows imported`);
     } catch (err) {
       return error(res, err.message, 500);

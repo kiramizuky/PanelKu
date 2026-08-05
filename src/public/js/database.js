@@ -497,10 +497,10 @@ const DB = (() => {
     try {
       let res;
       if (importType === 'sql') {
-        res = await LP.post('/database/import/sql', { type: activeType, database: activeDb, sql: content });
+        res = await LP.post('/database/import/sql', { type: activeType, database: activeDb, sql: content, schema: activeSchema });
       } else {
         const table = document.getElementById('importTableSelect').value;
-        res = await LP.post('/database/import/csv', { type: activeType, database: activeDb, table, csv: content });
+        res = await LP.post('/database/import/csv', { type: activeType, database: activeDb, table, csv: content, schema: activeSchema });
       }
       if (res?.success) LP.toast(`Imported successfully: ${res.message}`, 'success');
       else LP.toast(res?.message || 'Import failed', 'error');

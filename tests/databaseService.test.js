@@ -123,4 +123,16 @@ describe('DatabaseService schema support', () => {
     expect(() => databaseService._sanitizeSchemaName('bad schema; DROP')).toThrow(/Invalid schema name/);
     expect(() => databaseService._sanitizeSchemaName('../etc')).toThrow(/Invalid schema name/);
   });
+
+  test('_quoteIdentifier uses backticks for mysql/sqlite and double quotes for postgres', () => {
+    expect(databaseService._quoteIdentifier('users', 'mysql')).toBe('`users`');
+    expect(databaseService._quoteIdentifier('users', 'sqlite')).toBe('`users`');
+    expect(databaseService._quoteIdentifier('users', 'postgres')).toBe('"users"');
+    expect(databaseService._quoteIdentifier('analytics', 'postgres')).toBe('"analytics"');
+  });
+
+  test('importCsv rejects an invalid postgres schema before touching the database', async () => {
+    await expect(databaseService.importCsv('postgres', 'app_db', 'users', 'id,name\n1,a', 'bad schema; DROP'))
+      .rejects.toThrow(/Invalid schema name/);
+  });
 });
