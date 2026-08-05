@@ -3,6 +3,7 @@ const DB = (() => {
   let activeType = 'mysql';
   let activeDb = null;
   let activeTable = null;
+  let activeSchema = 'public';
   let currentPage = 1;
   let currentSort = { column: null, dir: 'ASC' };
   let _historyModal;
@@ -173,14 +174,60 @@ const DB = (() => {
     activeType = String(type || '').replace(/^["']|["']$/g, '').trim();
     activeDb = String(db || '').replace(/^["']|["']$/g, '').trim();
     activeTable = null;
+    activeSchema = 'public';
     currentPage = 1;
+    currentSort = { column: null, dir: 'ASC' };
 
     document.getElementById('exploreDbTitle').textContent = `Explorer: ${activeDb} (${activeType.toUpperCase()})`;
     if (!explorerModal) explorerModal = new bootstrap.Modal(document.getElementById('exploreDbModal'));
     explorerModal.show();
 
     switchExplorerTab('browse');
+    await loadSchemas();
     await refreshExplorerTables();
+  }
+
+  // PostgreSQL schema selector — loads schemas and shows the dropdown only for postgres
+  async function loadSchemas() {
+    const group = document.getElementById('explorerSchemaGroup');
+    const select = document.getElementById('explorerSchemaSelect');
+    if (!group || !select) return;
+    if (activeType !== 'postgres') {
+      group.style.display = 'none';
+      activeSchema = 'public';
+      return;
+    }
+    group.style.display = 'block';
+    select.innerHTML = '<option value="public">public</option>';
+    try {
+      const res = await LP.get(`/database/schemas?type=${activeType}&name=${encodeURIComponent(activeDb)}`);
+      const schemas = (res?.success && Array.isArray(res.data) && res.data.length > 0) ? res.data : ['public'];
+      if (!schemas.includes(activeSchema)) activeSchema = schemas.includes('public') ? 'public' : schemas[0];
+      select.innerHTML = schemas.map(s =>
+        `<option value="${LP.escHtml(s)}"${s === activeSchema ? ' selected' : ''}>${LP.escHtml(s)}</option>`
+      ).join('');
+    } catch {
+      activeSchema = 'public';
+    }
+  }
+
+  // Called when the user picks a different schema — reload tables for that schema
+  function switchSchema() {
+    const select = document.getElementById('explorerSchemaSelect');
+    if (select) activeSchema = select.value || 'public';
+    activeTable = null;
+    currentPage = 1;
+    currentSort = { column: null, dir: 'ASC' };
+
+    // Reset table-specific panels
+    document.getElementById('browseTableName').textContent = '—';
+    document.getElementById('browseRowInfo').textContent = '0 rows';
+    document.getElementById('browseDataHead').innerHTML = '<tr><th>Select a table to browse</th></tr>';
+    document.getElementById('browseDataBody').innerHTML = '<tr><td class="text-muted">Click a table name in the left panel.</td></tr>';
+    document.getElementById('browsePagination').innerHTML = '';
+    document.getElementById('structureContent').innerHTML = '<p class="text-muted">Select a table to view its structure.</p>';
+    refreshExplorerTables();
+    populateExportTables();
   }
 
   async function refreshExplorerTables() {
@@ -188,7 +235,7 @@ const DB = (() => {
     listEl.innerHTML = '<p class="text-muted" style="font-size:12px;">Loading...</p>';
 
     try {
-      const res = await LP.get(`/database/explore?type=${activeType}&name=${encodeURIComponent(activeDb)}`);
+      const res = await LP.get(`/database/explore?type=${activeType}&name=${encodeURIComponent(activeDb)}&schema=${encodeURIComponent(activeSchema)}`);
       if (res?.success && Array.isArray(res.data.tables)) {
         document.getElementById('explorerTableCount').textContent = res.data.tables.length;
         if (res.data.tables.length === 0) {
@@ -220,7 +267,7 @@ const DB = (() => {
   async function loadTableInfo() {
     if (!activeTable) return;
     try {
-      const res = await LP.get(`/database/table-info?type=${activeType}&database=${encodeURIComponent(activeDb)}&table=${encodeURIComponent(activeTable)}`);
+      const res = await LP.get(`/database/table-info?type=${activeType}&database=${encodeURIComponent(activeDb)}&table=${encodeURIComponent(activeTable)}&schema=${encodeURIComponent(activeSchema)}`);
       if (res?.success) {
         const info = res.data;
         const el = document.getElementById('structureContent');
@@ -251,7 +298,7 @@ const DB = (() => {
     if (!activeTable) return;
     const limit = document.getElementById('browseLimit').value;
     try {
-      let url = `/database/table-data?type=${activeType}&database=${encodeURIComponent(activeDb)}&table=${encodeURIComponent(activeTable)}&page=${currentPage}&limit=${limit}`;
+      let url = `/database/table-data?type=${activeType}&database=${encodeURIComponent(activeDb)}&table=${encodeURIComponent(activeTable)}&page=${currentPage}&limit=${limit}&schema=${encodeURIComponent(activeSchema)}`;
       if (currentSort.column) url += `&sortColumn=${encodeURIComponent(currentSort.column)}&sortDir=${currentSort.dir}`;
       const res = await LP.get(url);
       if (res?.success) {
@@ -409,7 +456,7 @@ const DB = (() => {
 
   async function populateExportTables() {
     try {
-      const res = await LP.get(`/database/explore?type=${activeType}&name=${encodeURIComponent(activeDb)}`);
+      const res = await LP.get(`/database/explore?type=${activeType}&name=${encodeURIComponent(activeDb)}&schema=${encodeURIComponent(activeSchema)}`);
       if (res?.success && Array.isArray(res.data.tables)) {
         const html = res.data.tables.map(t => `<option value="${LP.escHtml(t)}">${LP.escHtml(t)}</option>`).join('');
         document.getElementById('exportTableSelect').innerHTML = html;
@@ -424,7 +471,7 @@ const DB = (() => {
     if (!table) { LP.toast('Select a table', 'error'); return; }
 
     try {
-      const res = await LP.post('/database/export', { type: activeType, database: activeDb, table, format });
+      const res = await LP.post('/database/export', { type: activeType, database: activeDb, table, format, schema: activeSchema });
       if (res?.success) {
         const { content, filename, mime } = res.data;
         const blob = new Blob([content], { type: mime });
@@ -541,7 +588,7 @@ const DB = (() => {
   return {
     loadData, showCredentialsModal, saveCredentials, showCreateModal, createDatabase, deleteDb, installPackage,
     openExplorer, refreshExplorerTables, selectTable, loadTableData, loadTableInfo,
-    goToPage, sortColumn, switchExplorerTab,
+    loadSchemas, switchSchema, goToPage, sortColumn, switchExplorerTab,
     runQuery, loadHistory, clearHistory,
     exportTable, toggleImportFields, importData,
     enablePgRemoteAccess, loadPgConfigFiles, savePgConfigFile

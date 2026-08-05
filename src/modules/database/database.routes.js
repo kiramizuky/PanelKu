@@ -14,6 +14,7 @@ router.delete('/', requirePermission('database:delete'), databaseController.dele
 // Table explorer
 router.get('/explore', requirePermission('database:read'), databaseController.getTables.bind(databaseController));
 router.post('/explore', requirePermission('database:read'), databaseController.runQuery.bind(databaseController));
+router.get('/schemas', requirePermission('database:read'), databaseController.getSchemas.bind(databaseController));
 
 // Table info & data
 router.get('/table-info', requirePermission('database:read'), databaseController.getTableInfo.bind(databaseController));
@@ -27,6 +28,7 @@ router.post('/query-history/clear', requirePermission('database:write'), databas
 // Export / Import
 router.post('/export', requirePermission('database:read'), databaseController.exportTable.bind(databaseController));
 router.post('/import/sql', requirePermission('database:write'), databaseController.importSql.bind(databaseController));
+router.post('/import/csv', requirePermission('database:write'), databaseController.importCsv.bind(databaseController));
 // Credentials Settings
 router.get('/credentials', requirePermission('database:read'), databaseController.getCredentials.bind(databaseController));
 router.post('/credentials', requirePermission('database:write'), databaseController.updateCredentials.bind(databaseController));

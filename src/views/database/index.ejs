@@ -67,8 +67,15 @@
         </div>
       </div>
       <div class="modal-body" style="padding:0;display:flex;height:calc(100vh - 120px);overflow:hidden;">
-        <!-- Left Sidebar: Tables -->
+        <!-- Left Sidebar: Schema + Tables -->
         <div style="width:240px;background:#070a13;border-right:1px solid rgba(255,255,255,0.05);overflow-y:auto;padding:15px;flex-shrink:0;">
+          <!-- Schema selector (PostgreSQL only) -->
+          <div id="explorerSchemaGroup" style="display:none;margin-bottom:12px;">
+            <label class="lp-label" style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;margin:0 0 4px 0;">Schema</label>
+            <select id="explorerSchemaSelect" class="lp-input" onchange="DB.switchSchema()" style="width:100%;padding:4px 8px;font-size:11px;background:#0b0f19;color:#fff;">
+              <option value="public">public</option>
+            </select>
+          </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <h6 style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;margin:0;">Tables</h6>
             <span id="explorerTableCount" class="text-muted" style="font-size:10px;">0</span>

@@ -44,6 +44,39 @@ const SKIP_BODY_SCAN_PATHS = [
   '/api/filemanager/write',
   '/api/filemanager/read',
   '/api/filemanager/unzip',
+  // [FIX] Database admin endpoints carry arbitrary SQL/data by design:
+  // - /explore      → runs user-supplied SQL queries (SELECT/INSERT/UPDATE/DELETE/SHOW...)
+  // - /import/sql   → imports SQL dumps
+  // - /import/csv   → imports raw CSV data (cell values may resemble SQLi/XSS/traversal)
+  // The SQLi pattern would flag every legitimate statement ("SELECT * FROM ...",
+  // "INSERT INTO ...", "UPDATE ... SET ..."), so the whole body scan is skipped here.
+  // These endpoints are admin-only (requireAuth + requirePermission) and the service
+  // layer already restricts DROP/TRUNCATE/ALTER (runQuery) and only executes
+  // INSERT/UPDATE/DELETE statements (importSql / importCsv).
+  '/api/database/explore',
+  '/api/database/import/sql',
+  '/api/database/import/csv',
+  // [FIX] Other endpoints that carry arbitrary content by design:
+  // - /api/mongodb/query: arbitrary MongoDB queries (string values may contain
+  //   XSS/traversal/SQL-like text). Admin-only (requireAuth + RBAC).
+  // - /api/git-deploy/webhook: PUBLIC webhook receiving arbitrary GitHub/GitLab
+  //   JSON payloads — commit messages can legitimately contain SQLi/XSS-looking
+  //   strings. Authenticated by the :secret URL segment, so body scan is redundant.
+  // - /api/plugins/git-deploy: webhook configs carrying an arbitrary shell
+  //   "script" field (admin-only).
+  // - /plugins/db-admin-manager and /api/plugins/db-admin-manager: plugin UI
+  //   plus the reverse proxy to phpMyAdmin/Adminer/pgAdmin, whose POST bodies
+  //   carry arbitrary SQL queries (e.g. phpMyAdmin's sql_query field).
+  // - /api/whatsapp/accounts: arbitrary chat message text (may contain HTML
+  //   tags or ../ paths in captions/media URLs).
+  // - /api/ai-repair: arbitrary log content fed to AI log analysis.
+  '/api/mongodb/query',
+  '/api/git-deploy/webhook',
+  '/api/plugins/git-deploy',
+  '/plugins/db-admin-manager',
+  '/api/plugins/db-admin-manager',
+  '/api/whatsapp/accounts',
+  '/api/ai-repair',
 ];
 
 // Cache global rules to avoid DB hits on every request

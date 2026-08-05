@@ -50,12 +50,25 @@ class DatabaseController {
     }
   }
 
-  async getTables(req, res) {
+  async getSchemas(req, res) {
     try {
       const type = cleanStr(req.query.type);
       const name = cleanStr(req.query.name);
       if (!type || !name) return error(res, 'Type and name are required', 400);
-      const tables = await databaseService.getTables(type, name);
+      const schemas = await databaseService.getSchemas(type, name);
+      return success(res, schemas);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async getTables(req, res) {
+    try {
+      const type = cleanStr(req.query.type);
+      const name = cleanStr(req.query.name);
+      const schema = cleanStr(req.query.schema) || 'public';
+      if (!type || !name) return error(res, 'Type and name are required', 400);
+      const tables = await databaseService.getTables(type, name, schema);
       return success(res, { tables });
     } catch (err) {
       return error(res, err.message, 500);
@@ -67,8 +80,9 @@ class DatabaseController {
       const type = cleanStr(req.query.type);
       const database = cleanStr(req.query.database);
       const table = cleanStr(req.query.table);
+      const schema = cleanStr(req.query.schema) || 'public';
       if (!type || !database || !table) return error(res, 'Type, database, and table are required', 400);
-      const info = await databaseService.getTableInfo(type, database, table);
+      const info = await databaseService.getTableInfo(type, database, table, schema);
       return success(res, info);
     } catch (err) {
       return error(res, err.message, 500);
@@ -81,8 +95,9 @@ class DatabaseController {
       const database = cleanStr(req.query.database);
       const table = cleanStr(req.query.table);
       const { page = 1, limit = 50, sortColumn, sortDir } = req.query;
+      const schema = cleanStr(req.query.schema) || 'public';
       if (!type || !database || !table) return error(res, 'Type, database, and table are required', 400);
-      const data = await databaseService.getTableData(type, database, table, parseInt(page), parseInt(limit), sortColumn || null, sortDir || 'ASC');
+      const data = await databaseService.getTableData(type, database, table, parseInt(page), parseInt(limit), sortColumn || null, sortDir || 'ASC', schema);
       return success(res, data);
     } catch (err) {
       return error(res, err.message, 500);
@@ -93,8 +108,9 @@ class DatabaseController {
     try {
       const type = cleanStr(req.query.type);
       const database = cleanStr(req.query.database);
+      const schema = cleanStr(req.query.schema) || 'public';
       if (!type || !database) return error(res, 'Type and database are required', 400);
-      const stats = await databaseService.getDatabaseStats(type, database);
+      const stats = await databaseService.getDatabaseStats(type, database, schema);
       return success(res, stats);
     } catch (err) {
       return error(res, err.message, 500);
@@ -134,9 +150,9 @@ class DatabaseController {
 
   async exportTable(req, res) {
     try {
-      const { type, database, table, format = 'json' } = req.body;
+      const { type, database, table, format = 'json', schema = 'public' } = req.body;
       if (!type || !database || !table) return error(res, 'Type, database, and table are required', 400);
-      const result = await databaseService.exportData(type, database, table, format);
+      const result = await databaseService.exportData(type, database, table, format, schema);
       return success(res, result);
     } catch (err) {
       return error(res, err.message, 500);

@@ -4,6 +4,10 @@ const { Pool } = pkg;
 import path from 'path';
 import fs from 'fs/promises';
 
+// SQL keywords that are always restricted via the query UI, regardless of where
+// they appear in the query — comments or multi-statement chains cannot bypass.
+const RESTRICTED_SQL_KEYWORDS = new Set(['DROP', 'TRUNCATE', 'ALTER']);
+
 class DatabaseService {
   constructor() {
     this.mysqlPool = null;
@@ -387,6 +391,14 @@ class DatabaseService {
     return name;
   }
 
+  _sanitizeSchemaName(name) {
+    name = this._cleanStr(name);
+    if (!name || !/^[a-zA-Z_][a-zA-Z0-9_$]{0,127}$/.test(name)) {
+      throw new Error(`Invalid schema name: "${name}".`);
+    }
+    return name;
+  }
+
   _sanitizeColumnName(name) {
     name = this._cleanStr(name);
     if (!name || !/^[a-zA-Z_][a-zA-Z0-9_$]{0,127}$/.test(name)) {
@@ -468,7 +480,27 @@ class DatabaseService {
     return true;
   }
 
-  async getTables(type, name) {
+  async getSchemas(type, name) {
+    const norm = this._normalizeType(type);
+    if (norm !== 'postgres') return [];
+    this._sanitizeDbName(name);
+    const client = await this.getPgClientForDb(name);
+    try {
+      // Exclude system schemas: pg_% (pg_catalog, pg_toast*, pg_temp*) and information_schema
+      const res = await client.query(
+        "SELECT schema_name FROM information_schema.schemata " +
+        "WHERE schema_name NOT LIKE 'pg_%' AND schema_name != 'information_schema' " +
+        "ORDER BY schema_name"
+      );
+      await client.end();
+      return res.rows.map(r => r.schema_name);
+    } catch (err) {
+      await client.end();
+      throw err;
+    }
+  }
+
+  async getTables(type, name, schema = 'public') {
     const norm = this._normalizeType(type);
     if (norm === 'sqlite') {
       const Database = (await import('better-sqlite3')).default;
@@ -485,9 +517,13 @@ class DatabaseService {
       return rows.map(r => Object.values(r)[0]);
     } else if (norm === 'postgres') {
       this._sanitizeDbName(name);
+      schema = this._sanitizeSchemaName(schema);
       const client = await this.getPgClientForDb(name);
       try {
-        const res = await client.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name;");
+        const res = await client.query(
+          'SELECT table_name FROM information_schema.tables WHERE table_schema = $1 ORDER BY table_name;',
+          [schema]
+        );
         await client.end();
         return res.rows.map(r => r.table_name);
       } catch (err) {
@@ -498,7 +534,7 @@ class DatabaseService {
     throw new Error('Unsupported database type: ' + type);
   }
 
-  async getTableInfo(type, dbName, tableName) {
+  async getTableInfo(type, dbName, tableName, schema = 'public') {
     const norm = this._normalizeType(type);
     this._sanitizeTableName(tableName);
     if (norm === 'mysql') {
@@ -531,26 +567,27 @@ class DatabaseService {
       };
     } else if (norm === 'postgres') {
       this._sanitizeDbName(dbName);
+      schema = this._sanitizeSchemaName(schema);
       const client = await this.getPgClientForDb(dbName);
       try {
         const colRes = await client.query(
           "SELECT column_name, data_type, is_nullable, column_default, character_maximum_length " +
-          "FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 ORDER BY ordinal_position",
-          [tableName]
+          "FROM information_schema.columns WHERE table_schema=$2 AND table_name=$1 ORDER BY ordinal_position",
+          [tableName, schema]
         );
         const idxRes = await client.query(
-          "SELECT indexname, indexdef FROM pg_indexes WHERE tablename=$1 AND schemaname='public'",
-          [tableName]
+          "SELECT indexname, indexdef FROM pg_indexes WHERE tablename=$1 AND schemaname=$2",
+          [tableName, schema]
         );
         const fkRes = await client.query(
           "SELECT kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name " +
           "FROM information_schema.table_constraints AS tc " +
           "JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name " +
           "JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name " +
-          "WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1",
-          [tableName]
+          "WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1 AND tc.table_schema = $2",
+          [tableName, schema]
         );
-        const countRes = await client.query('SELECT COUNT(*) as cnt FROM "' + tableName + '"');
+        const countRes = await client.query('SELECT COUNT(*) as cnt FROM "' + schema + '"."' + tableName + '"');
         await client.end();
         return {
           columns: colRes.rows.map(c => ({
@@ -609,7 +646,7 @@ class DatabaseService {
     return Object.values(map);
   }
 
-  async getTableData(type, dbName, tableName, page = 1, limit = 50, sortColumn = null, sortDir = 'ASC') {
+  async getTableData(type, dbName, tableName, page = 1, limit = 50, sortColumn = null, sortDir = 'ASC', schema = 'public') {
     const norm = this._normalizeType(type);
     this._sanitizeTableName(tableName);
     const offset = (page - 1) * limit;
@@ -631,10 +668,12 @@ class DatabaseService {
       return { rows, total: countRows[0]?.total || 0 };
     } else if (norm === 'postgres') {
       this._sanitizeDbName(dbName);
+      schema = this._sanitizeSchemaName(schema);
       const client = await this.getPgClientForDb(dbName);
       try {
-        const dataRes = await client.query('SELECT * FROM "' + tableName + '"' + orderClause + ' LIMIT ' + parseInt(limit) + ' OFFSET ' + parseInt(offset));
-        const countRes = await client.query('SELECT COUNT(*) as total FROM "' + tableName + '"');
+        const tableRef = '"' + schema + '"."' + tableName + '"';
+        const dataRes = await client.query('SELECT * FROM ' + tableRef + orderClause + ' LIMIT ' + parseInt(limit) + ' OFFSET ' + parseInt(offset));
+        const countRes = await client.query('SELECT COUNT(*) as total FROM ' + tableRef);
         await client.end();
         return { rows: dataRes.rows, total: parseInt(countRes.rows[0]?.total || 0) };
       } catch (err) {
@@ -653,10 +692,116 @@ class DatabaseService {
     throw new Error('Unsupported database type: ' + type);
   }
 
+  /**
+   * Detect whether a query contains DROP / TRUNCATE / ALTER as the first keyword
+   * of ANY top-level statement — even when hidden behind leading comments,
+   * whitespace, or multi-statement chaining (e.g. "SELECT 1; DROP TABLE x").
+   *
+   * Quote-aware scanner: single/double-quoted strings, backtick identifiers,
+   * PostgreSQL dollar-quoted strings, line comments (--, #) and block comments
+   * are skipped so legitimate text containing these words is not flagged.
+   * MySQL versioned comments (/*! ...) are treated as CODE because MySQL
+   * executes their content, so restricted keywords inside them are caught too.
+   */
+  _hasRestrictedStatement(query, norm = '') {
+    const q = String(query);
+    const n = q.length;
+    let i = 0;
+    let atStmtStart = true; // at the beginning of a statement, no token seen yet
+
+    const skipLineComment = () => {
+      while (i < n && q[i] !== '\n') i++;
+    };
+
+    const skipQuoted = (quote) => {
+      i++; // opening quote
+      while (i < n) {
+        if (q[i] === quote) {
+          if (q[i + 1] === quote) { i += 2; continue; } // '' / "" escape
+          i++;
+          return;
+        }
+        if (q[i] === '\\') { i += 2; continue; } // backslash escape
+        i++;
+      }
+    };
+
+    const skipDollarQuoted = () => {
+      let j = i + 1;
+      while (j < n && /[A-Za-z0-9_]/.test(q[j])) j++;
+      if (j < n && q[j] === '$') {
+        const tag = q.slice(i, j + 1);
+        const close = q.indexOf(tag, j + 1);
+        i = close === -1 ? n : close + tag.length;
+      } else {
+        i++;
+      }
+    };
+
+    while (i < n) {
+      const ch = q[i];
+
+      if (/\s/.test(ch)) { i++; continue; }
+
+      // Line comments run to end of line. '--' is standard SQL, but '#' is
+      // MySQL/MariaDB-only: in PostgreSQL '#' is a real operator (bitwise XOR,
+      // JSONB #>), so treating it as a comment there would hide a following
+      // restricted statement (e.g. "SELECT 1 # 2; DROP TABLE x").
+      if ((ch === '-' && q[i + 1] === '-') || (ch === '#' && norm === 'mysql')) {
+        skipLineComment();
+        continue;
+      }
+
+      // Block comments. Versioned comments (/*! ... */) are executed by MySQL,
+      // so inspect each embedded statement instead of skipping them.
+      if (ch === '/' && q[i + 1] === '*') {
+        if (q[i + 2] === '!') {
+          const closeIdx = q.indexOf('*/', i + 3);
+          const content = closeIdx === -1 ? q.slice(i + 3) : q.slice(i + 3, closeIdx);
+          for (const piece of content.split(';')) {
+            const m = piece.match(/^\s*\d*\s*([A-Za-z][A-Za-z0-9_$]*)/);
+            if (m && RESTRICTED_SQL_KEYWORDS.has(m[1].toUpperCase())) return true;
+          }
+          i = closeIdx === -1 ? n : closeIdx + 2;
+          atStmtStart = false;
+          continue;
+        }
+        i += 2;
+        while (i < n && !(q[i] === '*' && q[i + 1] === '/')) i++;
+        i += 2;
+        continue;
+      }
+
+      // Strings and quoted identifiers are data, never keywords.
+      if (ch === "'" || ch === '"' || ch === '`') { skipQuoted(ch); atStmtStart = false; continue; }
+
+      // PostgreSQL dollar-quoted strings: $$ ... $$ or $tag$ ... $tag$.
+      if (ch === '$') { skipDollarQuoted(); atStmtStart = false; continue; }
+
+      // A semicolon ends the current statement and starts a new one.
+      if (ch === ';') { atStmtStart = true; i++; continue; }
+
+      // Inspect only the FIRST keyword of each statement.
+      if (atStmtStart && /[A-Za-z]/.test(ch)) {
+        let j = i;
+        while (j < n && /[A-Za-z0-9_$]/.test(q[j])) j++;
+        const word = q.slice(i, j).toUpperCase();
+        if (RESTRICTED_SQL_KEYWORDS.has(word)) return true;
+        atStmtStart = false;
+        i = j;
+        continue;
+      }
+
+      atStmtStart = false;
+      i++;
+    }
+    return false;
+  }
+
   async runQuery(type, name, query) {
     const norm = this._normalizeType(type);
     const upper = query.trim().toUpperCase();
-    if (upper.startsWith('DROP') || upper.startsWith('TRUNCATE') || upper.startsWith('ALTER')) {
+    if (this._hasRestrictedStatement(query, norm)) {
       throw new Error('DROP, TRUNCATE, and ALTER are restricted via UI.');
     }
 
@@ -711,9 +856,9 @@ class DatabaseService {
 
   // ── Export ─────────────────────────────────────────────────
 
-  async exportData(type, dbName, tableName, format = 'json') {
+  async exportData(type, dbName, tableName, format = 'json', schema = 'public') {
     this._sanitizeTableName(tableName);
-    const { rows } = await this.getTableData(type, dbName, tableName, 1, 100000);
+    const { rows } = await this.getTableData(type, dbName, tableName, 1, 100000, null, 'ASC', schema);
     const dbDir = path.resolve('storage', 'exports');
     await fs.mkdir(dbDir, { recursive: true });
 
@@ -788,7 +933,10 @@ class DatabaseService {
     const lines = csvContent.split('\n').filter(l => l.trim());
     if (lines.length < 2) throw new Error('CSV must have header + at least one row');
 
-    const columns = lines[0].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+    // [SECURITY] Sanitize header column names before interpolating into the INSERT —
+    // a crafted header like `id`); DROP TABLE users; -- would otherwise break out of
+    // the backtick-quoted identifier. Values are escaped below, columns must be too.
+    const columns = lines[0].split(',').map(c => this._sanitizeColumnName(c.trim().replace(/^"|"$/g, '')));
     let imported = 0;
 
     for (let i = 1; i < lines.length; i++) {
@@ -828,7 +976,7 @@ class DatabaseService {
 
   // ── Database Size & Stats ──────────────────────────────────
 
-  async getDatabaseStats(type, dbName) {
+  async getDatabaseStats(type, dbName, schema = 'public') {
     const norm = this._normalizeType(type);
     if (norm === 'mysql') {
       this._sanitizeDbName(dbName);
@@ -852,10 +1000,12 @@ class DatabaseService {
     } else if (norm === 'postgres') {
       try {
         this._sanitizeDbName(dbName);
+        schema = this._sanitizeSchemaName(schema);
         const client = await this.getPgClientForDb(dbName);
         const res = await client.query(
-          "SELECT table_name, pg_total_relation_size(quote_ident(table_name)) as size " +
-          "FROM information_schema.tables WHERE table_schema = 'public' ORDER BY size DESC"
+          "SELECT table_name, pg_total_relation_size(quote_ident($1) || '.' || quote_ident(table_name)) as size " +
+          "FROM information_schema.tables WHERE table_schema = $1 ORDER BY size DESC",
+          [schema]
         );
         await client.end();
         return {
