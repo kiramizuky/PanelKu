@@ -593,7 +593,7 @@ class DatabaseService {
           "WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1 AND tc.table_schema = $2",
           [tableName, schema]
         );
-        const countRes = await client.query('SELECT COUNT(*) as cnt FROM "' + schema + '"."' + tableName + '"');
+        const countRes = await client.query('SELECT COUNT(*) as cnt FROM ' + this._quoteIdentifier(schema, norm) + '.' + this._quoteIdentifier(tableName, norm));
         await client.end();
         return {
           columns: colRes.rows.map(c => ({
@@ -677,7 +677,7 @@ class DatabaseService {
       schema = this._sanitizeSchemaName(schema);
       const client = await this.getPgClientForDb(dbName);
       try {
-        const tableRef = '"' + schema + '"."' + tableName + '"';
+        const tableRef = this._quoteIdentifier(schema, norm) + '.' + this._quoteIdentifier(tableName, norm);
         const dataRes = await client.query('SELECT * FROM ' + tableRef + orderClause + ' LIMIT ' + parseInt(limit) + ' OFFSET ' + parseInt(offset));
         const countRes = await client.query('SELECT COUNT(*) as total FROM ' + tableRef);
         await client.end();
@@ -925,7 +925,7 @@ class DatabaseService {
       // points at the selected schema, so unqualified INSERT/UPDATE/DELETE
       // statements land in that schema. (pg_dump-style SET search_path lines are
       // filtered out below by the INSERT/UPDATE/DELETE prefix check.)
-      if (norm === 'postgres') {
+      if (norm === 'postgres' && statements.length > 0) {
         this._sanitizeDbName(dbName);
         schema = this._sanitizeSchemaName(schema);
         pgClient = await this.getPgClientForDb(dbName);
