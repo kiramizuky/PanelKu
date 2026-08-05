@@ -178,6 +178,19 @@ const DB = (() => {
     titleEl.textContent = activeType === 'postgres'
       ? `${base} — schema: ${activeSchema}`
       : base;
+    updateBrowseSchemaBadge();
+  }
+
+  // Show the active schema as a badge next to the browsed table name (PostgreSQL only)
+  function updateBrowseSchemaBadge() {
+    const badge = document.getElementById('browseSchemaBadge');
+    if (!badge) return;
+    if (activeType === 'postgres') {
+      badge.textContent = activeSchema;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
   }
 
   async function openExplorer(type, db) {
