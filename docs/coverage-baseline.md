@@ -2,8 +2,12 @@
 
 > **📌 Pembaruan 10 Agustus 2026 (R1 — Coverage Gate)**
 > - Pengukuran ulang dengan **8 suite test / 188 test** (bertambah `databaseService.test.js`, `waf.test.js`): Statements **13.01%** · Branches **6.93%** · Functions **11.33%** · Lines **13.3%** (backend `src/**/*.js` tanpa `public/` & `swagger*.js`).
-> - `collectCoverageFrom` + `coverageThreshold` kini **terpasang di `package.json`** (statements 10% / branches 5% / functions 9% / lines 10%) — buffer ±2–3% di bawah angka aktual agar CI hijau (anti-flaky antar-platform) sambil menahan regresi. Naikkan per sprint menuju target 60%.
+> - `collectCoverageFrom` + `coverageThreshold` terpasang di `package.json` (statements 10% / branches 5% / functions 9% / lines 10%) — buffer ±2–3% di bawah angka aktual agar CI hijau (anti-flaky antar-platform) sambil menahan regresi. Naikkan per sprint menuju target 60%.
 > - `npm audit --audit-level=high` = **0 vulnerabilities** (5 temuan high lama diperbaiki: brace-expansion→5.0.9, socket.io-parser→4.2.7, js-yaml, fast-uri, @eslint/eslintrc) dan kini menjadi **blocker** di `ci.yml` & `docker-publish.yml`.
+
+> **📌 Pembaruan kedua 10 Agustus 2026 (setelah audit R3 selesai)**
+> - Pengukuran ulang dengan **16 suite test / 279 test** (setelah +57 regression test keamanan R3 + audit): Statements **14.21%** · Branches **8.59%** · Functions **12.49%** · Lines **14.53%**.
+> - `coverageThreshold` **dinaikkan satu tingkat** → statements **12%** / branches **6%** / functions **10%** / lines **12%** (buffer ±2–2.5% tetap terjaga, anti-flaky). Target akhir tetap ≥60% (Phase 8.1).
 
 ---
 
