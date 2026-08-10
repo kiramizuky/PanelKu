@@ -20,6 +20,7 @@
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --testTimeout=30000",
     "test:ci": "npm run test:csp && npm test -- --no-cache --coverage --testTimeout=30000",
     "test:window-check": "node scripts/check-window-assignment.js",
+    "commitlint": "commitlint --edit",
     "check:plugin-imports": "node scripts/check-plugin-imports.mjs",
     "lint:ci": "npm run lint:check && npm run test:window-check && npm run check:plugin-imports && npm run test:ci"
   },
@@ -65,6 +66,8 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
     "eslint": "^9.18.0",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
@@ -82,14 +85,14 @@
       "!src/config/swagger.js",
       "!src/config/swagger.fixed.js"
     ],
-  "coverageThreshold": {
-    "global": {
-      "statements": 12,
-      "branches": 6,
-      "functions": 10,
-      "lines": 12
+    "coverageThreshold": {
+      "global": {
+        "statements": 12,
+        "branches": 6,
+        "functions": 10,
+        "lines": 12
+      }
     }
-  }
   },
   "lint-staged": {
     "*.{js,jsx}": [

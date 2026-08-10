@@ -2,6 +2,7 @@ import fileManagerService from './filemanager.service.js';
 import { success, error } from '../../helpers/response.js';
 import { createReadStream } from 'fs';
 import { createDownloadToken, verifyDownloadToken } from '../../helpers/crypto.js';
+import { verifyFileMagicBytes, removeUploadedFiles } from '../../helpers/file-validation.js';
 import appConfig from '../../config/app.js';
 
 class FileManagerController {
@@ -98,10 +99,23 @@ class FileManagerController {
   async upload(req, res) {
     try {
       if (!req.files?.length) return error(res, 'No files uploaded', 400);
+
+      // [9.1-UP] Validasi konten (magic bytes) tiap file yang sudah tersimpan.
+      // Multer hanya memfilter ekstensi; di sini kita pastikan isi file cocok
+      // dengan ekstensi yang diklaim & bukan executable tersembunyi.
+      for (const f of req.files) {
+        const result = verifyFileMagicBytes(f.path, f.originalname);
+        if (!result.ok) {
+          removeUploadedFiles(req.files.map((x) => x.path));
+          return error(res, result.reason, 400);
+        }
+      }
+
       return success(res, {
         uploaded: req.files.map((f) => ({ name: f.originalname, size: f.size })),
       }, `${req.files.length} file(s) uploaded`);
     } catch (err) {
+      removeUploadedFiles((req.files || []).map((f) => f.path));
       return error(res, err.message, 500);
     }
   }
