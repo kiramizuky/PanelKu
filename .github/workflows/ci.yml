@@ -49,6 +49,13 @@ jobs:
         run: npm run lint:check
         # lint:check exits with error if there are any warnings (--max-warnings 0)
 
+      - name: Check plugin imports resolve
+        working-directory: ./linux-panel
+        run: npm run check:plugin-imports
+        # [R3] BLOCKER — fails if any plugin imports a path that does not exist
+        # (e.g. '../../middleware/auth.js' instead of '../../src/middleware/auth.js'),
+        # which would silently prevent the plugin from loading at runtime.
+
   # ── Stage 2: Unit Tests (Jest) ──────────────────────────────────
   test:
     name: 🧪 Tests (Jest)
@@ -148,8 +155,9 @@ jobs:
       - name: Run npm audit
         working-directory: ./linux-panel
         run: npm audit --audit-level=high
-        # Exits with code 1 if any high/critical vulnerability is found
-        continue-on-error: true  # Don't block pipeline but flag in logs
+        # [R1] BLOCKER — exits with code 1 if any high/critical vulnerability is found.
+        # Do NOT set continue-on-error here; vulnerabilities must be fixed before merge.
+        continue-on-error: false
 
   # ── Stage 4: CodeQL SAST Analysis ───────────────────────────────
   codeql:

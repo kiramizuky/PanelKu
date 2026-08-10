@@ -3,6 +3,16 @@ import logger from '../../config/logger.js';
 import packageManager from '../system/package-manager.js';
 
 
+/**
+ * [R3-H2 FIX] Validate a docker-compose project name.
+ * Blocks shell injection (`docker compose -p ${projectName}`) and path
+ * traversal (projectName is also used as the compose directory name).
+ * Letters/digits/_/- only, first char must be alphanumeric, max 64 chars.
+ */
+export function validateProjectName(projectName) {
+  return typeof projectName === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(projectName);
+}
+
 class DockerService {
   constructor() {
     const isWindows = process.platform === 'win32';
@@ -246,6 +256,15 @@ class DockerService {
 
   async deployCompose(projectName, composeYaml) {
     try {
+      // [R3-H2 FIX] Defense-in-depth: validate here too because projectName is
+      // interpolated into the compose command AND used as a directory name
+      // (path traversal). All plugin callers pass hardcoded/validated names
+      // (adguard, minio, ... or `_validatePkg` output), so this never rejects
+      // legitimate use.
+      if (!validateProjectName(projectName)) {
+        throw new Error('Invalid project name: use letters, digits, underscore or dash (max 64 chars)');
+      }
+
       const fs = (await import('fs/promises')).default;
       const path = (await import('path')).default;
       const { exec } = await import('child_process');

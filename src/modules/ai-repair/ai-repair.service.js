@@ -73,7 +73,7 @@ const FIX_PATTERNS = {
     detect: (log) => /failed|not running|inactive|connection refused/i.test(log),
     diagnose: async (service) => {
       if (service) {
-        const { stdout } = await execAsync(`systemctl status ${service} 2>/dev/null | head -10`).catch(() => ({ stdout: '' }));
+        const { stdout } = await execAsync(`systemctl status "${service}" 2>/dev/null | head -10`).catch(() => ({ stdout: '' }));
         return `Service status:\n${stdout}`;
       }
       return 'Service not specified';
@@ -81,8 +81,8 @@ const FIX_PATTERNS = {
     fix: async (service) => {
       if (!service) return 'No service specified';
       try {
-        await execAsync(`systemctl restart ${service} 2>&1`, { timeout: 15000 });
-        const { stdout } = await execAsync(`systemctl is-active ${service} 2>/dev/null`).catch(() => ({ stdout: '' }));
+        await execAsync(`systemctl restart "${service}" 2>&1`, { timeout: 15000 });
+        const { stdout } = await execAsync(`systemctl is-active "${service}" 2>/dev/null`).catch(() => ({ stdout: '' }));
         return stdout.trim() === 'active'
           ? `${service} restarted successfully.`
           : `${service} restart attempted but still inactive.`;
@@ -308,15 +308,49 @@ class AIRepairService {
   //  AUTO-FIX PIPELINE
   // ═══════════════════════════════════════════════════════════════
 
+  /**
+   * [R3-M1 FIX] Validate user-supplied fix parameters BEFORE they can reach
+   * a shell command (used by both getAutoFixSuggestions and applyAutoFix).
+   * Fail-closed: anything that is not a known safe shape is rejected.
+   * Returns the validated context value passed to pattern.diagnose/fix.
+   */
+  _validateFixContext(params = {}) {
+    if (params.service) {
+      // systemd unit names: letters/digits, '_', '.', '@', '-' (e.g. nginx.service)
+      if (typeof params.service !== 'string' || !/^[a-zA-Z0-9_.@-]+$/.test(params.service)) {
+        throw new Error('Invalid service name');
+      }
+      return params.service;
+    }
+    if (params.port) {
+      const port = parseInt(params.port, 10);
+      if (isNaN(port) || port < 1 || port > 65535) throw new Error('Invalid port number (1-65535)');
+      return port;
+    }
+    if (params.path) {
+      // Only absolute paths starting with /, no traversal, no shell metacharacters
+      if (typeof params.path !== 'string' || !params.path.startsWith('/')
+        || params.path.includes('..') || /[;&|`$]/.test(params.path)) {
+        throw new Error('Invalid path: must start with / and contain no shell metacharacters');
+      }
+      return params.path;
+    }
+    return '';
+  }
+
   async getAutoFixSuggestions(fixId, params = {}) {
     const pattern = FIX_PATTERNS[fixId];
     if (!pattern) throw new Error(`Unknown fix pattern: ${fixId}`);
+
+    // [R3-M1 FIX] Validate before diagnose — raw params previously reached
+    // `systemctl status ${service}` etc. directly from the query string.
+    const context = this._validateFixContext(params);
 
     return {
       id: fixId,
       name: pattern.name,
       severity: pattern.severity,
-      diagnosis: await pattern.diagnose(params.path || params.service || params.port),
+      diagnosis: await pattern.diagnose(context),
       fixAvailable: !!pattern.fix,
       fixDescription: pattern.fix ? `Apply fix for: ${pattern.name}` : 'No automatic fix available',
     };
@@ -327,29 +361,15 @@ class AIRepairService {
     if (!pattern) throw new Error(`Unknown fix pattern: ${fixId}`);
     if (!pattern.fix) throw new Error(`No automatic fix available for: ${pattern.name}`);
 
-    // [SECURITY] Validate user-supplied parameters before they enter shell commands
-    let context;
-    if (params.service) {
-      if (!/^[a-zA-Z0-9_\-]+$/.test(params.service)) throw new Error('Invalid service name');
-      context = params.service;
-    } else if (params.port) {
-      const port = parseInt(params.port);
-      if (isNaN(port) || port < 1 || port > 65535) throw new Error('Invalid port number (1-65535)');
-      context = port;
-    } else if (params.path) {
-      // Only allow absolute paths starting with /
-      if (typeof params.path !== 'string' || !params.path.startsWith('/') || params.path.includes('..') || /[;&|`$]/.test(params.path)) {
-        throw new Error('Invalid path: must start with / and contain no shell metacharacters');
-      }
-      context = params.path;
-    } else {
-      context = '';
-    }
+    // [R3-M1 FIX] Validate user-supplied parameters before they enter shell
+    // commands (shared validator — also used by getAutoFixSuggestions).
+    const context = this._validateFixContext(params);
 
     const diagnosis = await pattern.diagnose(context);
 
     try {
-      const result = await pattern.fix(params.port || params.service || params.path);
+      // [R3-M1 FIX] Pass the validated context — never re-read raw params here.
+      const result = await pattern.fix(context);
       const message = `Auto-fix applied for "${pattern.name}": ${result}`;
 
       // Log the fix

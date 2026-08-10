@@ -1,8 +1,8 @@
 import { exec } from 'child_process';
 import crypto from 'crypto';
 import { promisify } from 'util';
-import { requireAuth } from '../../middleware/auth.js';
-import { webhookLimiter } from '../../middleware/rateLimiter.js';
+import { requireAuth } from '../../src/middleware/auth.js';
+import { webhookLimiter } from '../../src/middleware/rateLimiter.js';
 
 const execAsync = promisify(exec);
 
@@ -60,7 +60,7 @@ export default {
     // We will dynamically load Setting model to query/save configurations
     async function getWebhooks() {
       try {
-        const Setting = (await import('../../models/Setting.js')).default;
+        const Setting = (await import('../../src/models/Setting.js')).default;
         const webhooksStr = await Setting.get('git_deploy_webhooks') || '[]';
         return JSON.parse(typeof webhooksStr === 'string' ? webhooksStr : JSON.stringify(webhooksStr));
       } catch {
@@ -69,7 +69,7 @@ export default {
     }
 
     async function saveWebhooks(webhooks) {
-      const Setting = (await import('../../models/Setting.js')).default;
+      const Setting = (await import('../../src/models/Setting.js')).default;
       await Setting.set('git_deploy_webhooks', JSON.stringify(webhooks), 'json');
     }
 
@@ -409,6 +409,11 @@ export default {
       }
 
       try {
+        // [R3-L2 DOC] `hook.script` is ADMIN-TRUSTED INPUT by design: it is
+        // configured by the panel admin (who already has full shell access on
+        // the host) as the custom deploy command for their own webhook. It is
+        // intentionally executed via `exec` (shell) to support pipes/globs.
+        // DO NOT pass user-supplied webhook payload fields into this string.
         const { stdout, stderr } = await execAsync(hook.script, { cwd: hook.path });
         output += stdout + '\n' + stderr;
       } catch (err) {

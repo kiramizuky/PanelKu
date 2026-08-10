@@ -17,9 +17,11 @@
     "lint:check": "eslint src/ --max-warnings 0",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:csp": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/csp.test.js --no-cache --testTimeout=30000",
-    "test:ci": "npm run test:csp && npm test -- --no-cache --testTimeout=30000",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --testTimeout=30000",
+    "test:ci": "npm run test:csp && npm test -- --no-cache --coverage --testTimeout=30000",
     "test:window-check": "node scripts/check-window-assignment.js",
-    "lint:ci": "npm run lint:check && npm run test:window-check && npm run test:ci"
+    "check:plugin-imports": "node scripts/check-plugin-imports.mjs",
+    "lint:ci": "npm run lint:check && npm run test:window-check && npm run check:plugin-imports && npm run test:ci"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1085.0",
@@ -72,6 +74,23 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "jest": {
+    "testTimeout": 30000,
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/public/**",
+      "!src/config/swagger.js",
+      "!src/config/swagger.fixed.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 10,
+        "branches": 5,
+        "functions": 9,
+        "lines": 10
+      }
+    }
+  },
   "lint-staged": {
     "*.{js,jsx}": [
       "eslint --fix"
@@ -88,6 +107,6 @@
     "ssh2": true
   },
   "overrides": {
-    "brace-expansion": "5.0.8"
+    "brace-expansion": "5.0.9"
   }
 }

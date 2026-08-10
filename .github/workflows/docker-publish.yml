@@ -51,6 +51,11 @@ jobs:
         working-directory: ./linux-panel
         run: npm run lint:check
 
+      - name: Check plugin imports resolve
+        working-directory: ./linux-panel
+        run: npm run check:plugin-imports
+        # [R3] BLOCKER — fails if any plugin imports a path that does not exist.
+
   ci-audit:
     name: 🛡️ npm Audit
     runs-on: ubuntu-latest
@@ -73,7 +78,8 @@ jobs:
       - name: Run npm audit
         working-directory: ./linux-panel
         run: npm audit --audit-level=high
-        continue-on-error: true
+        # [R1] BLOCKER — high/critical vulnerabilities block image publication.
+        continue-on-error: false
 
   # ── Window Assignment Gate (fast — runs before build) ─────────
   # Ensures every `const ModuleName` has a matching `window.ModuleName`

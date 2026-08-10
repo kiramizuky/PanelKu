@@ -1,11 +1,22 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { requireAuth } from '../../middleware/auth.js';
+import { requireAuth } from '../../src/middleware/auth.js';
 
 const execAsync = promisify(exec);
 
+/**
+ * [R3-M8 FIX] Validate a PM2 application name before it is interpolated into
+ * a shell command. Blocks all shell metacharacters; fail-closed.
+ */
+export function validateAppName(name) {
+  if (!name || typeof name !== 'string' || !/^[a-zA-Z0-9_./-]+$/.test(name)) {
+    throw new Error('Invalid application name');
+  }
+  return name;
+}
+
 export default {
-  register(app, io) {
+  register(app, _io) {
     // Helper to get PM2 process list
     async function getPm2List() {
       try {
@@ -249,8 +260,17 @@ export default {
         return res.json({ success: false, message: 'Invalid app action or name' });
       }
 
+      // [R3-M8 FIX] Validate BEFORE the simulation-mode fallback so malicious
+      // input is rejected explicitly instead of silently "succeeding".
+      let safeName;
       try {
-        await execAsync(`pm2 ${action} ${name}`);
+        safeName = validateAppName(name);
+      } catch (err) {
+        return res.json({ success: false, message: err.message });
+      }
+
+      try {
+        await execAsync(`pm2 ${action} ${safeName}`);
         res.json({ success: true, message: `Application ${action}ed successfully` });
       } catch (err) {
         // Fallback for simulation mode
@@ -263,8 +283,17 @@ export default {
       const { name } = req.query;
       if (!name) return res.json({ success: false, message: 'Name is required' });
 
+      // [R3-M8 FIX] Validate BEFORE the simulation-mode fallback so malicious
+      // input is rejected explicitly instead of silently returning fake logs.
+      let safeName;
       try {
-        const { stdout } = await execAsync(`pm2 logs ${name} --raw --lines 100 --err --out`);
+        safeName = validateAppName(name);
+      } catch (err) {
+        return res.json({ success: false, message: err.message });
+      }
+
+      try {
+        const { stdout } = await execAsync(`pm2 logs ${safeName} --raw --lines 100 --err --out`);
         res.json({ success: true, data: stdout });
       } catch {
         // Mock fallback logs

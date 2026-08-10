@@ -6,6 +6,16 @@ import { ensureCommand } from '../shared/dep-installer.js';
 
 const execAsync = promisify(exec);
 
+/**
+ * [R3-L1 FIX] Validate a fail2ban jail name — only alphanumeric, underscore,
+ * hyphen. Fail-closed: anything else is rejected before it can reach a shell
+ * command (`fail2ban-client status ${name}`).
+ */
+export function validateJailName(name) {
+  if (!name || typeof name !== 'string') throw new Error('Invalid jail name');
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) throw new Error('Jail name contains invalid characters');
+  return name; // regex already guarantees no whitespace — trim() would be a no-op
+}
 
 export default {
   register(app, _io) {
@@ -22,7 +32,10 @@ export default {
 
         for (const name of jailNames) {
           try {
-            const { stdout: jailStatus } = await execAsync(`fail2ban-client status ${name}`);
+            // [R3-L1 FIX] Names come from `fail2ban-client status` output, but
+            // validate anyway (defense-in-depth) before shell interpolation.
+            const safeName = validateJailName(name);
+            const { stdout: jailStatus } = await execAsync(`fail2ban-client status ${safeName}`);
             const currentlyBannedMatch = jailStatus.match(/Currently banned:\s+(\d+)/);
             const totalBannedMatch = jailStatus.match(/Total banned:\s+(\d+)/);
             const listBannedMatch = jailStatus.match(/Banned IP list:\s+(.*)/);
@@ -248,15 +261,6 @@ export default {
 
     // ── Security helpers ────────────────────────────────────────────
     /**
-     * [CRIT-1 FIX] Validate jail name — only alphanumeric, underscores, hyphens.
-     */
-    function _validateJail(name) {
-      if (!name || typeof name !== 'string') throw new Error('Invalid jail name');
-      if (!/^[a-zA-Z0-9_-]+$/.test(name)) throw new Error('Jail name contains invalid characters');
-      return name.trim();
-    }
-
-    /**
      * [CRIT-1 FIX] Validate IP address format strictly using Node's built-in net.isIP/net.isIPv6.
      */
     function _validateIp(ip) {
@@ -271,7 +275,7 @@ export default {
       const { jail, ip } = req.body;
       try {
         // [CRIT-1 FIX] Validate jail and IP before using in any command
-        _validateJail(jail);
+        validateJailName(jail);
         _validateIp(ip);
         res.json({ success: true, message: `IP ${ip} banned successfully on ${jail} (simulation)` });
       } catch (err) {
@@ -284,7 +288,7 @@ export default {
       const { jail, ip } = req.body;
       try {
         // [CRIT-1 FIX] Validate jail and IP before using in any command
-        _validateJail(jail);
+        validateJailName(jail);
         _validateIp(ip);
         res.json({ success: true, message: `IP ${ip} unbanned successfully on ${jail} (simulation)` });
       } catch (err) {

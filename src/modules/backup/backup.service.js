@@ -56,6 +56,23 @@ function validatePath(name, allowSlash = true) {
   return validateName(name, pattern, 'Path');
 }
 
+/**
+ * [R3-L3 FIX] Resolve a files-restore target and ensure it stays inside
+ * /var/www. Boundary-aware (blocks /var/www2 style escapes) and blocks
+ * traversal via path.relative.
+ */
+export function validateRestoreTarget(target) {
+  if (!target || typeof target !== 'string' || !target.trim()) {
+    throw Object.assign(new Error('Restore target is required'), { statusCode: 400 });
+  }
+  const resolved = path.resolve('/var/www', target);
+  const rel = path.relative('/var/www', resolved);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw Object.assign(new Error('Restore target must be within /var/www'), { statusCode: 400 });
+  }
+  return resolved;
+}
+
 // ── Job ID generator ────────────────────────────────────────────────
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
@@ -751,10 +768,8 @@ class BackupService {
         if (pgPass) env.PGPASSWORD = pgPass;
         await spawnPromise('psql', ['-U', pgUser, '-d', target, '-f', filepath], { env });
       } else if (filename.startsWith('files_') && filename.endsWith('.tar.gz')) {
-        const resolvedTarget = path.resolve('/var/www', target);
-        if (!resolvedTarget.startsWith('/var/www')) {
-          throw Object.assign(new Error('Restore target must be within /var/www'), { statusCode: 400 });
-        }
+        // [R3-L3 FIX] Boundary-aware check (blocks /var/www2 escapes)
+        const resolvedTarget = validateRestoreTarget(target);
         await fs.mkdir(resolvedTarget, { recursive: true });
         await spawnPromise('tar', ['-xzf', filepath, '-C', resolvedTarget]);
       } else {

@@ -483,9 +483,12 @@ class NodeJSService {
     if (!['start', 'stop', 'restart', 'delete', 'reload'].includes(action)) {
       throw new Error(`Invalid action: ${action}`);
     }
+    // [R3-M2 FIX] Validate process name — blocks shell metacharacters
+    if (!/^[a-zA-Z0-9_./-]+$/.test(name)) throw new Error('Invalid process name');
 
     try {
-      const { stdout } = await execAsync(`pm2 ${action} ${name} 2>&1`, { timeout: 30000 });
+      // [R3-M2 FIX] execFile + args array (no shell) — double protection
+      const { stdout } = await execFileAsync('pm2', [action, name], { timeout: 30000 });
       return { message: `Process "${name}" ${action}ed successfully.`, output: stdout };
     } catch (err) {
       throw new Error(`Failed to ${action} process "${name}": ${err.message}`);
@@ -497,18 +500,22 @@ class NodeJSService {
    */
   async getPm2Logs(name, lines = 100) {
     if (!name) throw new Error('Process name is required');
+    // [R3-M2 FIX] Validate process name (also used in shell-free execFile below)
+    if (typeof name !== 'string' || !/^[a-zA-Z0-9_./-]+$/.test(name)) throw new Error('Invalid process name');
     const safeLines = Math.min(Math.max(parseInt(lines) || 100, 10), 500);
 
     try {
-      const { stdout } = await execAsync(
-        `pm2 logs ${name} --raw --lines ${safeLines} --nostream 2>&1 || pm2 show ${name} 2>&1`,
+      // [R3-M2 FIX] execFile + args array (no shell, no `||` fallback in shell)
+      const { stdout } = await execFileAsync(
+        'pm2',
+        ['logs', name, '--raw', '--lines', String(safeLines), '--nostream'],
         { timeout: 15000 }
       );
       return stdout;
     } catch (err) {
       // Fallback: try pm2 show
       try {
-        const { stdout } = await execAsync(`pm2 show ${name} 2>&1`, { timeout: 10000 });
+        const { stdout } = await execFileAsync('pm2', ['show', name], { timeout: 10000 });
         return stdout;
       } catch {
         return `No logs available for "${name}". PM2 may not have recorded any output.`;
@@ -526,15 +533,32 @@ class NodeJSService {
       throw new Error('Invalid script path');
     }
 
-    let cmd = `pm2 start ${script} --name "${name || path.basename(script, '.js')}"`;
-    if (args) cmd += ` -- ${args}`;
+    // [R3-M3 FIX] Validate app name too (was interpolated into a shell string)
+    const appName = name || path.basename(script, '.js');
+    if (typeof appName !== 'string' || !/^[a-zA-Z0-9_./\-]+$/.test(appName)) {
+      throw new Error('Invalid process name');
+    }
+
+    // [R3-M3 FIX] Build command via execFile with an args array — NO shell.
+    // `args` is split into individual argv tokens, so no metacharacter can be
+    // interpreted by a shell. NOTE: shell quoting is unavailable (no shell),
+    // so tokens containing quote characters fail loudly instead of silently
+    // being mis-parsed.
+    const pm2Args = ['start', script, '--name', appName];
+    if (args && typeof args === 'string' && args.trim()) {
+      const tokens = args.trim().split(/\s+/);
+      if (tokens.some(t => /["'`]/.test(t))) {
+        throw new Error('Invalid args: quote characters are not supported');
+      }
+      pm2Args.push('--', ...tokens);
+    }
 
     try {
       const opts = {};
       if (cwd) {
         opts.cwd = cwd;
       }
-      const { stdout } = await execAsync(cmd, { timeout: 30000, ...opts });
+      const { stdout } = await execFileAsync('pm2', pm2Args, { timeout: 30000, ...opts });
       return { message: `Process started from "${script}".`, output: stdout };
     } catch (err) {
       throw new Error(`Failed to start process: ${err.message}`);

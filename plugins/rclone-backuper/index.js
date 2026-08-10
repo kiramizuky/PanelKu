@@ -1,10 +1,9 @@
-import { exec, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { requireAuth } from '../../src/middleware/auth.js';
 import { ensureCommand } from '../shared/dep-installer.js';
 import { getRcloneStatus } from '../shared/rclone-helper.js';
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 // ── Security helpers ────────────────────────────────────────────
@@ -57,7 +56,7 @@ export default {
 
     async function getBackupJobs() {
       try {
-        const Setting = (await import('../../models/Setting.js')).default;
+        const Setting = (await import('../../src/models/Setting.js')).default;
         const jobsStr = await Setting.get('rclone_backup_jobs') || '[]';
         return JSON.parse(typeof jobsStr === 'string' ? jobsStr : JSON.stringify(jobsStr));
       } catch {
@@ -66,7 +65,7 @@ export default {
     }
 
     async function saveBackupJobs(jobs) {
-      const Setting = (await import('../../models/Setting.js')).default;
+      const Setting = (await import('../../src/models/Setting.js')).default;
       await Setting.set('rclone_backup_jobs', JSON.stringify(jobs), 'json');
     }
 

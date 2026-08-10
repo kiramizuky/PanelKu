@@ -1,11 +1,12 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import crypto from 'crypto';
 import util from 'util';
 import Website from '../../models/Website.js';
 
 const execAsync = util.promisify(exec);
+const execFileAsync = util.promisify(execFile);
 
 /**
  * [CRIT-4 FIX] Generate a cryptographically secure random token instead of Math.random().
@@ -147,6 +148,41 @@ class WebsiteService {
     return dir;
   }
 
+  /**
+   * [R3-H1 FIX] Validate a git repository URL to prevent command injection
+   * in `git clone ${gitRepo}`.
+   *
+   * Only URL-safe characters are allowed (no shell metacharacters), and the
+   * value must start with a known scheme: https/http/git/ssh/file, or a
+   * scp-like SSH URL (git@host:path or user@host:path — e.g. deploy keys).
+   * Empty string is allowed (means "no repo"). Strict by design: unusual
+   * but valid URLs (query strings, IPv6 literals) are rejected (fail-closed)
+   * because git clone does not need them.
+   */
+  _validateGitRepo(repo) {
+    if (repo === undefined || repo === null) return '';
+    if (typeof repo !== 'string') throw new Error('Git repository URL must be a string');
+
+    const value = repo.trim();
+    if (value === '') return ''; // clearing the repo is allowed
+
+    if (value.length > 512) throw new Error('Git repository URL is too long');
+
+    // Must start with a known scheme — including scp-like user@host:path
+    // (self-hosted git with deploy keys, non-`git` usernames).
+    if (!/^(https?:\/\/|git:\/\/|ssh:\/\/|git@|file:\/\/|[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+:)/i.test(value)) {
+      throw new Error('Git repository must be a valid https/http/ssh/git URL');
+    }
+
+    // Allow only URL-safe characters — blocks all shell metacharacters
+    // (;, |, &, $, `, quotes, parentheses, whitespace, etc.)
+    if (!/^[a-zA-Z0-9._:@%/+~#-]+$/.test(value)) {
+      throw new Error('Git repository URL contains invalid characters');
+    }
+
+    return value;
+  }
+
   async createWebsite(data, userId) {
     const exists = await Website.findOne({ domain: data.domain });
     if (exists) throw new Error('Domain already configured');
@@ -195,13 +231,22 @@ class WebsiteService {
     const website = await Website.findById(id);
     if (!website) throw new Error('Website not found');
 
+    // [R3-H1 FIX] Validate gitRepo before persisting (defense in depth —
+    // deployGit also re-validates, but reject bad values at the write point).
+    // Only validate when the field is actually being changed, so unrelated
+    // updates never fail on a pre-existing value.
+    let safeGitRepo = website.gitRepo;
+    if (data.gitRepo !== undefined) {
+      safeGitRepo = this._validateGitRepo(data.gitRepo);
+    }
+
     const updated = await Website.findByIdAndUpdate(id, {
       aliases:       data.aliases       ?? website.aliases,
       type:          data.type          ?? website.type,
       rootDirectory: data.rootDirectory ?? website.rootDirectory,
       port:          data.port          ?? website.port,
       status:        data.status        ?? website.status,
-      gitRepo:       data.gitRepo       !== undefined ? data.gitRepo       : website.gitRepo,
+      gitRepo:       safeGitRepo,
       autoDeploy:    data.autoDeploy    !== undefined ? data.autoDeploy    : website.autoDeploy,
       phpVersion:    data.phpVersion    ?? website.phpVersion,
       webhookToken:  website.webhookToken || secureToken(),
@@ -219,6 +264,10 @@ class WebsiteService {
   async deployGit(id) {
     const website = await Website.findById(id);
     if (!website || !website.gitRepo) throw new Error('Website or Git Repo not found');
+
+    // [R3-H1 FIX] Validate before execution — even if a bad value was stored
+    // previously (e.g. before this fix), the clone is blocked here.
+    const safeGitRepo = this._validateGitRepo(website.gitRepo);
     
     const logs = [];
     try {
@@ -237,7 +286,10 @@ class WebsiteService {
             await fs.rm(path.join(website.rootDirectory, f), { recursive: true, force: true });
           }
         } catch {}
-        await execAsync(`git clone ${website.gitRepo} .`, { cwd: website.rootDirectory, timeout: 120000 });
+        // [R3-H1 FIX] execFile + args array (NO shell) + validated URL.
+        // NEVER revert to `execAsync('git clone ' + repo)`: the URL may
+        // legally contain '%' sequences or '#' a shell would interpret.
+        await execFileAsync('git', ['clone', safeGitRepo, '.'], { cwd: website.rootDirectory, timeout: 120000 });
       }
 
       const filesInRoot = await fs.readdir(website.rootDirectory);

@@ -1,4 +1,4 @@
-import dockerService from './docker.service.js';
+import dockerService, { validateProjectName } from './docker.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
 
 function cleanId(id) {
@@ -142,11 +142,19 @@ class DockerController {
   async deployCompose(req, res) {
     try {
       const { projectName, yaml } = req.body;
-      if (!projectName || !yaml) return errorResponse(res, 400, 'Project name and docker-compose YAML are required');
+      // Note: errorResponse(res, message, statusCode) — fixed arg order
+      // (the old `errorResponse(res, 400, msg)` swapped them).
+      if (!projectName || !yaml) return errorResponse(res, 'Project name and docker-compose YAML are required', 400);
+      // [R3-H2 FIX] Validate project name — blocks shell injection in
+      // `docker compose -p ${projectName}` and path traversal via the
+      // compose directory name. Shared with docker.service.js.
+      if (!validateProjectName(projectName)) {
+        return errorResponse(res, 'Invalid project name: use letters, digits, underscore or dash (max 64 chars)', 400);
+      }
       const result = await dockerService.deployCompose(projectName, yaml);
       return successResponse(res, result, 'Docker Compose deployed successfully');
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
     }
   }
 }
