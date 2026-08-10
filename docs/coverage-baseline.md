@@ -6,7 +6,7 @@
 > - `npm audit --audit-level=high` = **0 vulnerabilities** (5 temuan high lama diperbaiki: brace-expansion→5.0.9, socket.io-parser→4.2.7, js-yaml, fast-uri, @eslint/eslintrc) dan kini menjadi **blocker** di `ci.yml` & `docker-publish.yml`.
 
 > **📌 Pembaruan kedua 10 Agustus 2026 (setelah audit R3 selesai)**
-> - Pengukuran ulang dengan **16 suite test / 279 test** (setelah +57 regression test keamanan R3 + audit): Statements **14.21%** · Branches **8.59%** · Functions **12.49%** · Lines **14.53%**.
+> - Pengukuran ulang dengan **16 suite test / 279 test** (setelah +91 regression test keamanan R3 + audit): Statements **14.21%** · Branches **8.59%** · Functions **12.49%** · Lines **14.53%**.
 > - `coverageThreshold` **dinaikkan satu tingkat** → statements **12%** / branches **6%** / functions **10%** / lines **12%** (buffer ±2–2.5% tetap terjaga, anti-flaky). Target akhir tetap ≥60% (Phase 8.1).
 
 ---

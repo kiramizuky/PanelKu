@@ -22,7 +22,7 @@
 | Tampilan EJS | 49 view (≈11.700 baris) |
 | LOC backend (`src/*.js`) | ≈47.900 baris |
 | LOC frontend (`public/js`) | ≈15.700 baris |
-| File test | 8 suite (≈2.650 baris) |
+| File test | **16 suite / 279 test** (sebelumnya 8 suite) |
 | Workflow CI/CD | 3 (CI, Docker Publish, Security Scan) |
 | Lisensi | MIT |
 
@@ -228,6 +228,26 @@ Rangkaian kerja pada modul database & WAF yang telah selesai dan terverifikasi:
 
 ---
 
+### 8.1 Audit R3 — Keamanan Eksekusi Perintah (tuntas)
+
+Audit menyeluruh atas **seluruh titik eksekusi perintah** (`29 file src/` + `9 plugin` dipindai) menemukan **16 temuan** (2 kritis, 8 sedang, 6 rendah) — **semuanya telah diselesaikan** dan di-commit (`810ad94`, `6c9b3cd`):
+
+| Grup | Temuan | Aksi | Status |
+|---|---|---|---|
+| **P0 (2)** | R3-H1 `gitRepo` injectable di clone; R3-H2 `projectName` interpolasi `docker compose -p` | `_validateGitRepo` + `execFile` args array (websites); regex `^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$` di controller + service (docker) + fix argumen `errorResponse` tertukar | ✅ |
+| **P1 (8)** | R3-M1..M8: ai-repair, nodejs (pm2), mail, gpu, analytics, caddy, pm2-manager | `_validateFixContext` (ai-repair); pm2 → `execFile` args array; `validateAppName` (pm2-manager); M4–M7 **terbukti aman** (whitelist/konstanta/ternary boolean) | ✅ |
+| **P2 (6)** | R3-L1..L6: fail2ban, git-deployer, backup, php, caddy, power | `validateJailName` `^[a-zA-Z0-9_-]+$` (fail2ban); `hook.script` = **trusted admin input** (dokumentasi); `validateRestoreTarget` boundary `path.relative` — menutup escape `/var/www2` (backup); L4–L6 terverifikasi aman | ✅ |
+
+**Perbaikan pendukung & guard permanen:**
+
+- **6 import plugin rusak** diperbaiki (`../../middleware|models` → `../../src/...`) di `git-deployer`, `pm2-manager`, `rclone-backuper` — beberapa di antaranya sudah memblokir plugin saat load
+- **`scripts/check-plugin-imports.mjs`** — scanner import plugin (komentar-safe, multiline-safe, fallback ekstensi/index) → npm script `check:plugin-imports` + step **blocker** di `ci.yml` & `docker-publish.yml` + regression test `tests/pluginImports.test.js`
+- **Gate kualitas R1**: `coverageThreshold` global terpasang & dinaikkan (statements 12 / branches 6 / functions 10 / lines 12), `npm audit` kini **blocker** di CI, 5 dependensi high-severity di-patch
+- **+91 regression test** (termasuk payload injeksi `'; rm -rf / #'`) → **16 suite / 279 test**, coverage gate hijau
+- **`CONTRIBUTING.md` + `PULL_REQUEST_TEMPLATE.md`** — aturan audit R3 (execFile+args/hardcoded, validasi input user, test payload injeksi, cek import plugin) menjadi checklist wajib PR
+
+---
+
 ## 9. Temuan, Risiko & Rekomendasi
 
 ### 🟢 Kekuatan
@@ -242,12 +262,12 @@ Rangkaian kerja pada modul database & WAF yang telah selesai dan terverifikasi:
 
 | # | Temuan | Tingkat | Rekomendasi |
 |---|---|---|---|
-| R1 | **Coverage test sangat rendah** — baseline 31 Jul 2026: 11.21% statement backend, 113 file 0% (termasuk 32 controller & 4 jobs & 6 websocket). Sekarang 8 suite (bertambah `databaseService` & `waf`), namun masih jauh dari target 60% | Tinggi | Prioritas Phase 8 rencana.md: integration test supertest per modul kritis (auth/users/database/docker/backup/websites/waf) |
-| R2 | **CI belum meng-gate coverage** — `npm audit` di CI memakai `continue-on-error`, tidak ada `coverageThreshold` di jest config | Tinggi | Pasang `coverageThreshold` bertahap (mulai 20% → 60%) + jadikan `npm audit --audit-level=high` blocker |
+| R1 | **Coverage test sangat rendah** — baseline 31 Jul 2026: 11.21% statement backend, 113 file 0% (termasuk 32 controller & 4 jobs & 6 websocket). 🚧 **Progres sesi ini**: 16 suite / 279 test, aktual 14.21% statement — **gate `coverageThreshold` sudah terpasang** (12/6/10/12%), namun masih jauh dari target 60% | Tinggi | Lanjut Phase 8 rencana.md: integration test supertest per modul kritis (auth/users/database/docker/backup/websites/waf) |
+| R2 | ~~CI belum meng-gate coverage~~ — ✅ **Selesai sesi ini**: `coverageThreshold` di jest config + `npm audit --audit-level=high` sebagai **blocker** di `ci.yml`/`docker-publish.yml`; 5 deps high di-patch | ~~Tinggi~~ ✅ | Naikkan threshold bertahap menuju 60% (rencana.md 8.1) |
 | R3 | **File raksasa** — `system.service.js` (850), `database.service.js` (1070), `caddy.service.js` (1003), `backup.service.js` (832), `updater.service.js` (765) | Sedang | Pecah per sub-domain (rencana.md 8.4) |
 | R4 | **BullMQ terpasang tapi tidak dipakai** — job berat (backup, deploy, SSL) berjalan sinkron di request/setInterval | Sedang | Migrasi bertahap ke BullMQ + UI progress (rencana.md 10.2) |
 | R5 | **Swagger dobel** — `swagger.js` (1497) + `swagger.fixed.js` (1305) | Rendah | Satukan, hilangkan duplikasi, generate `docs/openapi.json` |
-| R6 | **`exec` string interpolasi masih ada** di sebagian titik (mis. `savePgConfigFile` memakai `execAsync('systemctl restart postgresql ...')` — string statis, tapi audit penuh `src/` + `plugins/` perlu jalan (rencana.md 9.1) | Sedang | Audit & konversi menyeluruh ke `execFile` + args array |
+| R6 | ~~`exec` string interpolasi masih ada di sebagian titik~~ — ✅ **Selesai sesi ini**: audit penuh `src/` + `plugins/` (rencana.md 9.1) jalan — 16 temuan R3 (R3-H1..L6) tuntas; seluruh titik baru memakai `execFile` + args array atau string hardcoded; sisa `exec` statis di `savePgConfigFile` terdokumentasi aman | ~~Sedang~~ ✅ | Pertahankan aturan (CONTRIBUTING.md §Keamanan): setiap exec baru wajib `execFile`+args atau hardcoded |
 | R7 | **CSP masih memakai `'unsafe-inline'`** untuk `style-src`, `style-src-attr`, `script-src-attr` (126+ inline handler) | Rendah | Diterima secara desain (dikomentari baik di `app.js`); evaluasi bertahap |
 | R8 | **Frontend tanpa test sama sekali** (61 file, 0%) | Rendah | Pisahkan dari hitungan coverage backend; pertimbangkan jsdom smoke test |
 | R9 | **Dokumentasi `docs/` hampir kosong** (hanya coverage-baseline) | Rendah | Isi arsitektur, panduan instalasi, plugin SDK, FAQ (rencana.md 8.5) |
