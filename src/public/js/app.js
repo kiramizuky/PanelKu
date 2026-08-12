@@ -493,7 +493,6 @@ const LP = {
     return new Promise(resolve => {
       const id = 'lp_confirm_' + Date.now();
       const safeTitle = this.escHtml(title);
-      const safeMessage = this.escHtml(message);
       const modal = document.createElement('div');
       modal.innerHTML = `
         <div class="modal fade" id="${id}" tabindex="-1">
@@ -503,7 +502,7 @@ const LP = {
                 <h5 class="modal-title">${safeTitle}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
               </div>
-              <div class="modal-body">${safeMessage}</div>
+              <div class="modal-body">${message}</div>
               <div class="modal-footer border-0">
                 <button class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
                 <button class="btn-lp btn-lp-danger" id="${id}_ok">Confirm</button>
@@ -529,7 +528,6 @@ const LP = {
     return new Promise(resolve => {
       const id = 'lp_prompt_' + Date.now();
       const safeTitle = this.escHtml(title);
-      const safeMessage = this.escHtml(message);
       // type is restricted to 'text', 'password', 'email', 'number' — safe
       const modal = document.createElement('div');
       modal.innerHTML = `
@@ -541,7 +539,7 @@ const LP = {
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
               </div>
               <div class="modal-body pb-0">
-                <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">${safeMessage}</p>
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">${message}</p>
                 <input type="${type}" id="${id}_input" class="lp-input w-100" style="height:38px;">
               </div>
               <div class="modal-footer border-0">
@@ -570,7 +568,6 @@ const LP = {
     return new Promise(resolve => {
       const id = 'lp_alert_' + Date.now();
       const safeTitle = this.escHtml(title);
-      const safeMessage = this.escHtml(message);
       const modal = document.createElement('div');
       modal.innerHTML = `
         <div class="modal fade" id="${id}" tabindex="-1">
@@ -580,7 +577,7 @@ const LP = {
                 <h5 class="modal-title">${safeTitle}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
               </div>
-              <div class="modal-body">${safeMessage}</div>
+              <div class="modal-body">${message}</div>
               <div class="modal-footer border-0">
                 <button class="btn-lp btn-lp-primary" id="${id}_ok">OK</button>
               </div>
