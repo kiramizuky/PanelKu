@@ -18,6 +18,13 @@ const FMPage = (() => {
   let _zoomWheelInited = false;
   const ZOOM_LEVELS = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 
+  const ARCHIVE_EXTENSIONS = ['.zip', '.tar', '.gz', '.tgz', '.bz2', '.tbz2', '.xz', '.txz', '.tar.gz', '.tar.bz2', '.tar.xz', '.rar', '.7z', '.z'];
+  function isArchive(name) {
+    if (!name) return false;
+    const lower = name.toLowerCase();
+    return ARCHIVE_EXTENSIONS.some(ext => lower.endsWith(ext));
+  }
+
   const FILE_ICONS = {
     dir: '📁',
     // Images
@@ -129,6 +136,17 @@ const FMPage = (() => {
     e.preventDefault();
     selectItem(el);
 
+    const isArch = selectedItem && selectedItem.type !== 'dir' && isArchive(selectedItem.name);
+    const extractItem = document.getElementById('fmCtxExtract');
+    if (extractItem) {
+      extractItem.style.display = isArch ? 'flex' : 'none';
+    }
+
+    const pasteEl = document.getElementById('fmCtxPaste');
+    if (pasteEl) {
+      pasteEl.style.display = _clipboard ? 'flex' : 'none';
+    }
+
     const menu = document.getElementById('fmContextMenu');
     menu.style.display = 'block';
     menu.style.left = Math.min(e.pageX, window.innerWidth - 200) + 'px';
@@ -159,10 +177,14 @@ const FMPage = (() => {
     const checkboxes = document.querySelectorAll('.fm-checkbox:checked');
     const bulkBar = document.getElementById('fmBulkBar');
     const countSpan = document.getElementById('bulkSelectedCount');
+    const extractBtn = document.getElementById('fmBulkExtractBtn');
     
     if (checkboxes.length > 0) {
       if (bulkBar) bulkBar.style.display = 'flex';
       if (countSpan) countSpan.textContent = checkboxes.length;
+
+      const hasArchive = Array.from(checkboxes).some(chk => isArchive(chk.dataset.path));
+      if (extractBtn) extractBtn.style.display = hasArchive ? 'inline-flex' : 'none';
     } else {
       if (bulkBar) bulkBar.style.display = 'none';
     }
@@ -317,7 +339,13 @@ const FMPage = (() => {
         return;
       }
 
-      // 5. Binary file blocker (zip, tar, exe, db, etc.)
+      // 5. Archive file extraction modal on open
+      if (isArchive(item.name)) {
+        showExtractModal(item.path);
+        return;
+      }
+
+      // 6. Binary file blocker (exe, db, etc.)
       const isText = ['txt', 'md', 'js', 'ts', 'json', 'html', 'css', 'py', 'php', 'sh', 'bash', 'zsh', 'env', 'yml', 'yaml', 'xml', 'log', 'htaccess', 'conf', 'ini'].includes(ext);
       if (!isText && ext) {
         await LP.alert(`File <strong>${escHtml(item.name)}</strong> merupakan file biner (.${ext}) dan tidak dapat dibuka langsung menggunakan Text Editor. Silakan download file untuk membukanya.`, 'Buka File Gagal');
@@ -1305,6 +1333,121 @@ const FMPage = (() => {
     }
   }
 
+  function openSelected() {
+    if (selectedItem) openItem(selectedItem.el);
+  }
+
+  // ── Extract Archive Actions ───────────────────────
+  let _extractTargetPaths = [];
+
+  function showExtractModal(pathOrPaths) {
+    const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
+    if (!paths.length) return;
+
+    _extractTargetPaths = paths;
+    const firstPath = paths[0];
+    const parentDir = firstPath.substring(0, firstPath.lastIndexOf('/')) || '/';
+
+    const nameEl = document.getElementById('extractArchiveName');
+    if (nameEl) {
+      nameEl.textContent = paths.length === 1 ? firstPath.split('/').pop() : `${paths.length} archive files`;
+    }
+
+    const destInput = document.getElementById('extractDestPath');
+    if (destInput) {
+      destInput.value = parentDir;
+    }
+
+    const modalEl = document.getElementById('extractModal');
+    if (modalEl) {
+      const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      modal.show();
+    }
+  }
+
+  function extractSelected() {
+    if (!selectedItem || selectedItem.type === 'dir' || !isArchive(selectedItem.name)) return;
+    showExtractModal(selectedItem.path);
+  }
+
+  async function confirmExtract() {
+    if (!_extractTargetPaths.length) return;
+
+    const destInput = document.getElementById('extractDestPath');
+    const destination = destInput ? destInput.value.trim() || currentPath : currentPath;
+
+    const btn = document.getElementById('btnStartExtract');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Extracting...';
+    }
+
+    LP.toast(`Extracting ${_extractTargetPaths.length} archive(s)...`, 'info', null, 2500);
+
+    let successCount = 0;
+    try {
+      for (const p of _extractTargetPaths) {
+        const res = await LP.post('/filemanager/unzip', { path: p, destination });
+        if (res?.success) {
+          successCount++;
+        } else {
+          LP.toast(res?.message || `Failed to extract ${p.split('/').pop()}`, 'error');
+        }
+      }
+
+      if (successCount > 0) {
+        LP.toast(`Extracted ${successCount} archive(s) successfully`, 'success');
+        const modalEl = document.getElementById('extractModal');
+        if (modalEl) {
+          bootstrap.Modal.getInstance(modalEl)?.hide();
+        }
+        refresh();
+      }
+    } catch (e) {
+      LP.toast('Extraction failed: ' + e.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-box-arrow-up-right me-1"></i> Extract';
+      }
+    }
+  }
+
+  async function bulkExtract() {
+    const paths = getSelectedPaths().filter(p => isArchive(p));
+    if (paths.length === 0) {
+      LP.toast('No archive files selected to extract', 'warning');
+      return;
+    }
+    showExtractModal(paths);
+  }
+
+  async function pasteItem() {
+    if (!_clipboard) return;
+    const dest = currentPath;
+    const srcName = _clipboard.path.split('/').pop();
+    const destPath = (dest === '/' ? '' : dest) + '/' + srcName;
+    
+    if (_clipboard.action === 'move') {
+      const res = await LP.post('/filemanager/move', { source: _clipboard.path, destination: destPath });
+      if (res?.success) {
+        LP.toast(`Moved to ${destPath}`, 'success');
+        _clipboard = null;
+        refresh();
+      } else {
+        LP.toast(res?.message || 'Move failed', 'error');
+      }
+    } else {
+      const res = await LP.post('/filemanager/copy', { source: _clipboard.path, destination: destPath });
+      if (res?.success) {
+        LP.toast(`Copied to ${destPath}`, 'success');
+        refresh();
+      } else {
+        LP.toast(res?.message || 'Copy failed', 'error');
+      }
+    }
+  }
+
   function copySelected() {
     if (!selectedItem) return;
     _clipboard = { ...selectedItem, action: 'copy' };
@@ -1610,6 +1753,12 @@ const FMPage = (() => {
     startSelectedUploads,
     downloadSelected,
     zipSelected,
+    extractSelected,
+    showExtractModal,
+    confirmExtract,
+    bulkExtract,
+    openSelected,
+    pasteItem,
     showContextMenu,
     saveFile: _saveFile,
     _saveFile,

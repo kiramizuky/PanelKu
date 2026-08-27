@@ -1,6 +1,7 @@
 import { readdir, stat, rename, rm, mkdir, copyFile, writeFile, readFile } from 'fs/promises';
 import { createReadStream, createWriteStream } from 'fs';
 import { join, resolve, resolve as resolveUnzip, basename, dirname, sep } from 'path';
+import { execFile } from 'child_process';
 import archiver from 'archiver';
 import unzipper from 'unzipper';
 import logger from '../../config/logger.js';
@@ -173,43 +174,82 @@ class FileManagerService {
   }
 
   async unzip(zipPath, destDir) {
+    const targetDest = destDir || dirname(zipPath) || '/';
     const src = this._resolvePath(zipPath);
-    const dest = this._resolvePath(destDir);
+    const dest = this._resolvePath(targetDest);
     await mkdir(dest, { recursive: true });
 
-    // [CRIT-2 FIX] Manually parse ZIP entries to validate each entry path.
-    // unzipper.Extract({ path }) does NOT check entry names — vulnerable to Zip Slip.
-    // We resolve each entry's full path and ensure it stays inside dest.
-    return new Promise((resolve, reject) => {
-      createReadStream(src)
-        .pipe(unzipper.Parse())
-        .on('entry', async (entry) => {
-          const entryPath = entry.path;
-          // Normalize and validate entry path against dest directory
-          let entryFull;
-          try {
-            entryFull = resolveUnzip(join(dest, entryPath));
-          } catch {
-            entry.autodrain(); // Skip malformed entries
-            return;
+    const lowerPath = zipPath.toLowerCase();
+
+    // Check if it is tar, gz, bz2, xz, tgz, tbz2, txz
+    if (lowerPath.endsWith('.tar.gz') || lowerPath.endsWith('.tgz') ||
+        lowerPath.endsWith('.tar.bz2') || lowerPath.endsWith('.tbz2') ||
+        lowerPath.endsWith('.tar.xz') || lowerPath.endsWith('.txz') ||
+        lowerPath.endsWith('.tar')) {
+      return new Promise((resolvePromise, rejectPromise) => {
+        execFile('tar', ['-xf', src, '-C', dest], (err, _stdout, stderr) => {
+          if (err) {
+            return rejectPromise(new Error(`Failed to extract tar archive: ${stderr || err.message}`));
           }
-          // [CRIT-2 FIX] Core check: resolved path must start with destDir
-          if (!entryFull.startsWith(dest + sep) && entryFull !== dest) {
-            logger.warn(`[Zip Slip Blocked] Entry '${entryPath}' resolved outside dest: ${entryFull}`);
-            entry.autodrain(); // Discard this malicious entry
-            return;
+          resolvePromise();
+        });
+      });
+    }
+
+    if (lowerPath.endsWith('.rar')) {
+      return new Promise((resolvePromise, rejectPromise) => {
+        execFile('unrar', ['x', '-o+', '-y', src, dest + '/'], (err, _stdout, stderr) => {
+          if (err) {
+            return rejectPromise(new Error(`Failed to extract RAR: ${stderr || err.message}. Make sure 'unrar' is installed.`));
           }
-          if (entry.type === 'Directory') {
-            await mkdir(entryFull, { recursive: true }).catch(() => {});
-            entry.autodrain();
-          } else {
-            await mkdir(dirname(entryFull), { recursive: true }).catch(() => {});
-            entry.pipe(createWriteStream(entryFull));
+          resolvePromise();
+        });
+      });
+    }
+
+    if (lowerPath.endsWith('.7z')) {
+      return new Promise((resolvePromise, rejectPromise) => {
+        execFile('7z', ['x', '-y', `-o${dest}`, src], (err, _stdout, stderr) => {
+          if (err) {
+            return rejectPromise(new Error(`Failed to extract 7z: ${stderr || err.message}. Make sure 'p7zip' or '7z' is installed.`));
           }
-        })
-        .on('close', resolve)
-        .on('error', reject);
-    });
+          resolvePromise();
+        });
+      });
+    }
+
+    // Default: ZIP extraction with Zip Slip protection
+    const entries = createReadStream(src).pipe(unzipper.Parse({ forceStream: true }));
+    for await (const entry of entries) {
+      const entryPath = entry.path;
+      // Normalize and validate entry path against dest directory
+      let entryFull;
+      try {
+        entryFull = resolveUnzip(join(dest, entryPath));
+      } catch {
+        entry.autodrain(); // Skip malformed entries
+        continue;
+      }
+      // [CRIT-2 FIX] Core check: resolved path must start with destDir
+      if (!entryFull.startsWith(dest + sep) && entryFull !== dest) {
+        logger.warn(`[Zip Slip Blocked] Entry '${entryPath}' resolved outside dest: ${entryFull}`);
+        entry.autodrain(); // Discard this malicious entry
+        continue;
+      }
+      if (entry.type === 'Directory') {
+        await mkdir(entryFull, { recursive: true }).catch(() => {});
+        entry.autodrain();
+      } else {
+        await mkdir(dirname(entryFull), { recursive: true }).catch(() => {});
+        await new Promise((resEntry, rejEntry) => {
+          const ws = createWriteStream(entryFull);
+          entry.pipe(ws);
+          ws.on('finish', resEntry);
+          ws.on('error', rejEntry);
+          entry.on('error', rejEntry);
+        });
+      }
+    }
   }
 
   /**

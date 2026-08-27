@@ -26,6 +26,7 @@
   <div id="fmBulkBar" style="display:none; background: rgba(59,130,246,0.3); border-bottom:1px solid rgba(59,130,246,0.4); padding:8px 20px; align-items:center; gap:12px;">
     <span class="text-white font-mono" style="font-size:12px; font-weight:600;"><i class="bi bi-check2-all me-1"></i> <span id="bulkSelectedCount">0</span> selected</span>
     <div style="flex:1; display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" id="fmBulkExtractBtn" onclick="FMPage.bulkExtract()" style="display:none;"><i class="bi bi-box-arrow-up-right me-1"></i> Extract</button>
       <button class="btn-lp btn-lp-ghost btn-lp-sm text-white" onclick="FMPage.bulkCompress()"><i class="bi bi-file-zip-fill me-1"></i> Compress</button>
       <button class="btn-lp btn-lp-ghost btn-lp-sm text-white" onclick="FMPage.bulkDownload()"><i class="bi bi-download me-1"></i> Download</button>
       <button class="btn-lp btn-lp-ghost btn-lp-sm text-white" onclick="FMPage.bulkChmod()"><i class="bi bi-key-fill me-1"></i> Permission</button>
@@ -145,11 +146,14 @@
 </div>
 
 <!-- Context Menu -->
-<div id="fmContextMenu" style="display:none; position:fixed; background:var(--bg-secondary); border:1px solid var(--glass-border); border-radius:8px; min-width:160px; z-index:9000; box-shadow:0 8px 24px rgba(0,0,0,0.4); padding:4px 0;">
+<div id="fmContextMenu" style="display:none; position:fixed; background:var(--bg-secondary); border:1px solid var(--glass-border); border-radius:8px; min-width:170px; z-index:9000; box-shadow:0 8px 24px rgba(0,0,0,0.4); padding:4px 0;">
   <div class="fm-ctx-item" onclick="FMPage.openSelected()"><i class="bi bi-folder2-open"></i> Open</div>
+  <div class="fm-ctx-item text-warning" id="fmCtxExtract" onclick="FMPage.extractSelected()" style="display:none;"><i class="bi bi-box-arrow-up-right"></i> Extract / Unzip</div>
+  <div class="fm-ctx-item" onclick="FMPage.zipSelected()"><i class="bi bi-file-zip"></i> Compress (ZIP)</div>
   <div class="fm-ctx-item" onclick="FMPage.renameSelected()"><i class="bi bi-pencil"></i> Rename</div>
   <div class="fm-ctx-item" onclick="FMPage.copySelected()"><i class="bi bi-clipboard"></i> Copy</div>
-  <div class="fm-ctx-item" onclick="FMPage.pasteItem()"><i class="bi bi-clipboard-check"></i> Paste</div>
+  <div class="fm-ctx-item" onclick="FMPage.moveSelected()"><i class="bi bi-scissors"></i> Cut</div>
+  <div class="fm-ctx-item" id="fmCtxPaste" onclick="FMPage.pasteItem()" style="display:none;"><i class="bi bi-clipboard-check"></i> Paste</div>
   <div class="fm-ctx-item" onclick="FMPage.downloadSelected()"><i class="bi bi-download"></i> Download</div>
   <div class="fm-ctx-item text-info" onclick="FMPage.openTerminal()"><i class="bi bi-terminal"></i> Open Terminal Here</div>
   <hr style="margin:4px 0; border-color:var(--glass-border)">
@@ -193,6 +197,38 @@
       <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1); padding:15px 20px;">
         <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" data-bs-dismiss="modal">Close</button>
         <button type="button" id="btnStartUpload" class="btn-lp btn-lp-primary btn-lp-sm" onclick="FMPage.startSelectedUploads()" disabled><i class="bi bi-upload me-1"></i> Start Upload</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Extract Archive Modal -->
+<div class="modal fade" id="extractModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border: 1px solid rgba(255,255,255,0.1); background: rgba(20,20,25,0.98); border-radius:12px;">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1); padding:15px 20px;">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;"><i class="bi bi-box-arrow-up-right text-warning me-2"></i>Extract Archive</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div class="mb-3">
+          <label class="form-label text-muted" style="font-size:12px;">Archive File</label>
+          <div class="d-flex align-items-center gap-2 p-2 rounded" style="background:rgba(255,255,255,0.05); border:1px solid var(--glass-border);">
+            <span style="font-size:20px;">📦</span>
+            <span id="extractArchiveName" class="text-white font-mono text-truncate" style="font-size:13px;">-</span>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label for="extractDestPath" class="form-label text-muted" style="font-size:12px;">Extract to Directory</label>
+          <div class="input-group">
+            <input type="text" class="lp-input font-mono" id="extractDestPath" placeholder="/" style="width:100%; border-radius:6px;" onkeypress="if(event.key==='Enter') FMPage.confirmExtract()">
+          </div>
+          <small class="text-muted" style="font-size:11px; display:block; margin-top:4px;">Files will be extracted into this directory location.</small>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1); padding:15px 20px;">
+        <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="btnStartExtract" class="btn-lp btn-lp-primary btn-lp-sm" onclick="FMPage.confirmExtract()"><i class="bi bi-box-arrow-up-right me-1"></i> Extract</button>
       </div>
     </div>
   </div>

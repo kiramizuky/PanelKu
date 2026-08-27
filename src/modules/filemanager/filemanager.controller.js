@@ -210,10 +210,11 @@ class FileManagerController {
   async unzip(req, res) {
     try {
       const { path: zipPath, destination } = req.body;
+      if (!zipPath) return error(res, 'Archive path is required', 400);
       await fileManagerService.unzip(zipPath, destination);
       return success(res, {}, 'Extracted successfully');
     } catch (err) {
-      return error(res, err.message, 500);
+      return error(res, err.message, err.statusCode || 500);
     }
   }
 

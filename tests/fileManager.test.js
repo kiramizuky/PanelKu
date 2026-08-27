@@ -145,3 +145,55 @@ describe('FileManagerController.upload', () => {
     expect(fs.existsSync(tempFile)).toBe(false);
   });
 });
+
+describe('FileManagerService.unzip & FileManagerController.unzip', () => {
+  test('unzips an archive to target destination', async () => {
+    // 1. Create a folder with a file to zip
+    const sourceDir = path.join(tmpDir, 'to_zip');
+    fs.mkdirSync(sourceDir, { recursive: true });
+    fs.writeFileSync(path.join(sourceDir, 'hello.txt'), 'content inside zip');
+
+    const zipDest = path.join(tmpDir, 'test_archive.zip');
+    await fileManagerService.zip('/to_zip', '/test_archive.zip');
+    expect(fs.existsSync(zipDest)).toBe(true);
+
+    // 2. Unzip to /extracted folder
+    await fileManagerService.unzip('/test_archive.zip', '/extracted');
+    const extractedFile = path.join(tmpDir, 'extracted', 'hello.txt');
+    expect(fs.existsSync(extractedFile)).toBe(true);
+    expect(fs.readFileSync(extractedFile, 'utf8')).toBe('content inside zip');
+  });
+
+  test('controller returns 400 if zipPath is missing', async () => {
+    const req = { body: {} };
+    const res = {
+      status(code) { this.statusCode = code; return this; },
+      json(data) { this.body = data; return this; },
+    };
+
+    await fileManagerController.unzip(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  test('controller extracts archive successfully', async () => {
+    const req = {
+      body: {
+        path: '/test_archive.zip',
+        destination: '/controller_extracted',
+      },
+    };
+    const res = {
+      status(code) { this.statusCode = code; return this; },
+      json(data) { this.body = data; return this; },
+    };
+
+    await fileManagerController.unzip(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const extractedFile = path.join(tmpDir, 'controller_extracted', 'hello.txt');
+    expect(fs.existsSync(extractedFile)).toBe(true);
+  });
+});
+
