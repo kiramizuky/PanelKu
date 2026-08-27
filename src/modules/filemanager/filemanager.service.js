@@ -5,9 +5,6 @@ import archiver from 'archiver';
 import unzipper from 'unzipper';
 import logger from '../../config/logger.js';
 
-// Base directory — restrict all operations to this root
-const BASE_DIR = process.env.FM_BASE_DIR || '/';
-
 class FileManagerService {
   constructor() {
     this.uidMap = {};
@@ -51,9 +48,14 @@ class FileManagerService {
     return `${user}:${group}`;
   }
 
+  _getBaseDir() {
+    return process.env.FM_BASE_DIR || '/';
+  }
+
   _resolvePath(userPath) {
-    const resolvedBase = resolve(BASE_DIR);
-    const safe = resolve(join(BASE_DIR, userPath || '/'));
+    const baseDir = this._getBaseDir();
+    const resolvedBase = resolve(baseDir);
+    const safe = resolve(join(baseDir, userPath || '/'));
 
     // [MED-2 FIX] Always check path traversal, even when BASE_DIR is '/'.
     // Without this, BASE_DIR='/' would skip the check entirely, allowing
@@ -241,6 +243,41 @@ class FileManagerService {
         );
       }
     }
+  }
+
+  /**
+   * Save an uploaded file from temp storage to target directory.
+   */
+  async saveUploadedFile(tempPath, targetDir, originalName) {
+    const safeName = basename(originalName).replace(/[\r\n\0]/g, '');
+    if (!safeName || safeName === '.' || safeName === '..') {
+      throw Object.assign(new Error('Invalid file name'), { statusCode: 400 });
+    }
+
+    const resolvedDir = this._resolvePath(targetDir);
+    const dirStats = await stat(resolvedDir).catch(() => null);
+    if (!dirStats || !dirStats.isDirectory()) {
+      throw Object.assign(new Error('Target directory does not exist'), { statusCode: 400 });
+    }
+
+    const targetRelative = join(targetDir, safeName);
+    const fullDest = this._resolvePath(targetRelative);
+
+    try {
+      await rename(tempPath, fullDest);
+    } catch (err) {
+      if (err.code === 'EXDEV') {
+        await copyFile(tempPath, fullDest);
+        await rm(tempPath, { force: true });
+      } else {
+        throw err;
+      }
+    }
+
+    return {
+      name: safeName,
+      path: targetRelative.replace(/\\/g, '/'),
+    };
   }
 }
 

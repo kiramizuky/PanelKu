@@ -99,6 +99,7 @@ class FileManagerController {
   async upload(req, res) {
     try {
       if (!req.files?.length) return error(res, 'No files uploaded', 400);
+      const targetDir = (typeof req.body?.path === 'string' ? req.body.path : req.query?.path) || '/';
 
       // [9.1-UP] Validasi konten (magic bytes) tiap file yang sudah tersimpan.
       // Multer hanya memfilter ekstensi; di sini kita pastikan isi file cocok
@@ -111,12 +112,18 @@ class FileManagerController {
         }
       }
 
+      const uploaded = [];
+      for (const f of req.files) {
+        const saved = await fileManagerService.saveUploadedFile(f.path, targetDir, f.originalname);
+        uploaded.push({ name: saved.name, path: saved.path, size: f.size });
+      }
+
       return success(res, {
-        uploaded: req.files.map((f) => ({ name: f.originalname, size: f.size })),
-      }, `${req.files.length} file(s) uploaded`);
+        uploaded,
+      }, `${uploaded.length} file(s) uploaded`);
     } catch (err) {
       removeUploadedFiles((req.files || []).map((f) => f.path));
-      return error(res, err.message, 500);
+      return error(res, err.message, err.statusCode || 500);
     }
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "panelku",
-  "version": "2.0.0",
+  "version": "2.8.0",
   "description": "Panelku - Lightweight Linux Server Control Panel",
   "type": "module",
   "main": "src/server.js",

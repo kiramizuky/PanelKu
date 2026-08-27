@@ -1459,6 +1459,8 @@ const FMPage = (() => {
 
     try {
       await upload(selectedUploadFiles);
+      selectedUploadFiles = [];
+      renderSelectedUploadsQueue();
       bootstrap.Modal.getInstance(document.getElementById('uploadModal'))?.hide();
     } catch (e) {
       LP.toast('Upload failed: ' + e.message, 'error');
@@ -1492,7 +1494,13 @@ const FMPage = (() => {
     refresh();
   }
 
-  function refresh() { navigate(currentPath); }
+  function refresh() {
+    navigate(currentPath);
+    const splitView = document.getElementById('fmSplitView');
+    if (splitView && splitView.style.display !== 'none') {
+      refreshTree();
+    }
+  }
 
   function goUp() {
     const parts = currentPath.split('/').filter(Boolean);
