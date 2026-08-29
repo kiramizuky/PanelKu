@@ -419,7 +419,7 @@ async function mountVolume(devicePath, mountPoint, persist) {
 // ─────────────────────────────────────────────
 // HTML helpers
 // ─────────────────────────────────────────────
-function usageBar(sizeStr, freeStr, height = 8) {
+function _usageBar(sizeStr, freeStr, height = 8) {
   const total = parseG(sizeStr);
   const free = parseG(freeStr);
   if (total === 0) return '<span style="color:var(--text-muted);font-size:11px;">N/A</span>';
@@ -450,7 +450,7 @@ function tempBadge(temp) {
   return `<span style="color:${color};font-size:12px;font-weight:600;"><i class="bi ${icon} me-1"></i>${temp}°C</span>`;
 }
 
-function formatBytes(mb) {
+function _formatBytes(mb) {
   if (mb >= 1024 * 1024) return (mb / 1024 / 1024).toFixed(1) + ' TB';
   if (mb >= 1024) return (mb / 1024).toFixed(1) + ' GB';
   return mb + ' MB';
@@ -460,7 +460,7 @@ function formatBytes(mb) {
 // Plugin registration
 // ─────────────────────────────────────────────
 export default {
-  register(app, io) {
+  register(app, _io) {
 
     // ── GET /plugins/lvm-manager ──────────────────────────
     app.get('/plugins/lvm-manager', async (req, res) => {
@@ -1345,114 +1345,58 @@ const LvmPage = (() => {
     document.getElementById('extendVgDevice').value = '';
     getModal('extendVgModal').show();
   }
+
   async function extendVg() {
     const vg = document.getElementById('extendVgName').value;
     const device = document.getElementById('extendVgDevice').value.trim();
-    if (!device) { LP.toast('Enter device path.','error'); return; }
-    LP.toast('Adding disk to VG…','info'); getModal('extendVgModal').hide();
+    if (!device) { LP.toast('Masukkan path disk, misal /dev/sdb', 'error'); return; }
+    LP.toast('Menambahkan disk ke VG…', 'info'); getModal('extendVgModal').hide();
     const res = await apiPost('/api/plugins/lvm-manager/extend-vg', { vg, device });
-    res?.success ? showLog('vgextend Output', res.data?.output||'Done.') : showLog('Error', res?.message||'Failed', true);
-    LP.toast(res?.success ? 'Disk added!' : res?.message||'Failed', res?.success?'success':'error');
+    res?.success ? showLog('vgextend Output', res.data?.output || 'Done.') : showLog('Error', res?.message || 'Failed', true);
+    LP.toast(res?.success ? 'Disk ditambahkan!' : res?.message || 'Failed', res?.success ? 'success' : 'error');
   }
 
   // ── Snapshot
-  function showSnapshotModal(lv, vg) {
-    document.getElementById('snapshotOriginLv').value = lv;
-    document.getElementById('snapshotVg').value = vg;
-    document.getElementById('snapshotOriginDisplay').value = \`\${vg}/\${lv}\`;
-    document.getElementById('snapshotName').value = lv + '-snap';
-    document.getElementById('snapshotSize').value = '5';
+  function showSnapshotModal(lvName, vgName) {
+    document.getElementById('snapshotOriginLv').value = lvName;
+    document.getElementById('snapshotVg').value = vgName;
+    document.getElementById('snapshotOriginDisplay').value = '/dev/' + vgName + '/' + lvName;
+    document.getElementById('snapshotName').value = lvName + '_snap_' + Date.now().toString().slice(-4);
+    document.getElementById('snapshotSize').value = 5;
     getModal('snapshotModal').show();
   }
+
   async function createSnapshot() {
     const origin = document.getElementById('snapshotOriginLv').value;
-    const vg   = document.getElementById('snapshotVg').value;
+    const vg = document.getElementById('snapshotVg').value;
     const name = document.getElementById('snapshotName').value.trim();
     const size = document.getElementById('snapshotSize').value;
-    if (!name||!size) { LP.toast('Name and size required.','error'); return; }
-    LP.toast('Creating snapshot…','info'); getModal('snapshotModal').hide();
-    const res = await apiPost('/api/plugins/lvm-manager/snapshot', { origin, vg, name, size:+size });
-    res?.success ? showLog('Snapshot Output', res.data?.output||'Done.') : showLog('Error', res?.message||'Failed', true);
-    LP.toast(res?.success ? 'Snapshot created!' : res?.message||'Failed', res?.success?'success':'error');
+    if (!name || !size || +size < 1) { LP.toast('Nama dan ukuran snapshot wajib diisi.', 'error'); return; }
+    LP.toast('Membuat snapshot…', 'info'); getModal('snapshotModal').hide();
+    const res = await apiPost('/api/plugins/lvm-manager/snapshot', { origin, vg, name, size: +size });
+    res?.success ? showLog('Snapshot Output', res.data?.output || 'Done.') : showLog('Error', res?.message || 'Failed', true);
+    LP.toast(res?.success ? 'Snapshot dibuat!' : res?.message || 'Failed', res?.success ? 'success' : 'error');
   }
+
   async function restoreSnapshot(snapName, vg) {
-    if (!confirm(\`Restore \${snapName}? This will overwrite the origin volume!\`)) return;
-    LP.toast('Restoring…','info');
+    if (!confirm('Restore ' + snapName + '? This will overwrite the origin volume!')) return;
+    LP.toast('Restoring…', 'info');
     const res = await apiPost('/api/plugins/lvm-manager/restore-snapshot', { snapName, vg });
-    res?.success ? showLog('Restore Output', res.data?.output||'Done.') : showLog('Error', res?.message||'Failed', true);
-    LP.toast(res?.success ? 'Restored!' : res?.message||'Failed', res?.success?'success':'error');
+    res?.success ? showLog('Restore Output', res.data?.output || 'Done.') : showLog('Error', res?.message || 'Failed', true);
+    LP.toast(res?.success ? 'Restored!' : res?.message || 'Failed', res?.success ? 'success' : 'error');
   }
-
-    // ── API: List RAID arrays ──────────────────────────────
-    app.post('/api/plugins/lvm-manager/raid/list', async (req, res) => {
-      try {
-        const data = await getRaidData();
-        return successResponse(res, data, 'RAID data loaded');
-      } catch (e) { return errorResponse(res, e.message, 500); }
-    });
-
-    // ── API: List available disks for RAID ─────────────────
-    app.post('/api/plugins/lvm-manager/raid/disks', async (req, res) => {
-      try {
-        const lvmData = await getLvmData();
-        const availDisks = (lvmData.blockDevices || [])
-          .filter(d => !d.used && !d.isSystem && !d.isMounted)
-          .map(d => ({ name: d.name, path: '/dev/' + d.name, size: d.size }));
-        return successResponse(res, availDisks, 'Available disks');
-      } catch (e) { return errorResponse(res, e.message, 500); }
-    });
-
-    // ── API: Create RAID ───────────────────────────────────
-    app.post('/api/plugins/lvm-manager/raid/create', async (req, res) => {
-      try {
-        const { name, level, devices } = req.body;
-        const result = await createRaid(name, level, devices);
-        return successResponse(res, result, 'RAID array created');
-      } catch (e) { return errorResponse(res, e.message, 500); }
-    });
-
-    // ── API: Stop RAID ─────────────────────────────────────
-    app.post('/api/plugins/lvm-manager/raid/stop', async (req, res) => {
-      try {
-        const { mdDevice } = req.body;
-        if (!mdDevice) return errorResponse(res, 'mdDevice is required', 400);
-        const result = await stopRaid(mdDevice);
-        return successResponse(res, result, 'RAID array stopped');
-      } catch (e) { return errorResponse(res, e.message, 500); }
-    });
-
-    // ── API: Format volume ────────────────────────────────
-    app.post('/api/plugins/lvm-manager/raid/format', async (req, res) => {
-      try {
-        const { devicePath, fsType } = req.body;
-        if (!devicePath || !fsType) return errorResponse(res, 'devicePath and fsType required', 400);
-        const result = await formatVolume(devicePath, fsType);
-        return successResponse(res, result, 'Volume formatted');
-      } catch (e) { return errorResponse(res, e.message, 500); }
-    });
-
-    // ── API: Mount volume ─────────────────────────────────
-    app.post('/api/plugins/lvm-manager/raid/mount', async (req, res) => {
-      try {
-        const { devicePath, mountPoint, persist } = req.body;
-        if (!devicePath || !mountPoint) return errorResponse(res, 'devicePath and mountPoint required', 400);
-        const result = await mountVolume(devicePath, mountPoint, persist !== false);
-        return successResponse(res, result, 'Volume mounted');
-      } catch (e) { return errorResponse(res, e.message, 500); }
-    });
 
   async function installLvm() {
-    LP.toast('Installing LVM2…','info');
+    LP.toast('Installing LVM2…', 'info');
     const res = await apiPost('/api/plugins/lvm-manager/install-lvm', {});
-    res?.success ? (showLog('Install Output', res.data?.output||'Done.'), setTimeout(()=>location.reload(),2000)) : showLog('Error', res?.message||'Failed', true);
+    res?.success ? (showLog('Install Output', res.data?.output || 'Done.'), setTimeout(() => location.reload(), 2000)) : showLog('Error', res?.message || 'Failed', true);
   }
 
   function refresh() {
     const btn = document.getElementById('refreshBtn');
-    if (btn) { btn.innerHTML='<i class="bi bi-arrow-clockwise me-1 spin"></i>...'; btn.disabled=true; }
+    if (btn) { btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1 spin"></i>...'; btn.disabled = true; }
     location.reload();
   }
-
 
   // ── Software RAID Frontend Methods ──────────────────────
 
@@ -1467,15 +1411,14 @@ const LvmPage = (() => {
     }
     const data = res.data || {};
     const arrays = data.arrays || [];
-    const available = data.available;
+    renderRaidArrays(arrays);
+  }
 
-    if (!available) {
-      container.innerHTML = '<div class="lp-glass-card p-4 text-center"><i class="bi bi-exclamation-triangle-fill fs-2 text-warning"></i><p class="mt-2 text-muted">mdadm (RAID tools) not detected on this server.</p></div>';
-      return;
-    }
-
+  function renderRaidArrays(arrays) {
+    const container = document.getElementById('raidArraysContainer');
+    if (!container) return;
     if (arrays.length === 0) {
-      container.innerHTML = '<div class="lp-glass-card p-4 text-center"><i class="bi bi-disc fs-2 text-muted"></i><p class="mt-2 text-muted">No RAID arrays configured.</p></div>';
+      container.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-disc fs-1 opacity-25"></i><p class="mt-2 small">No active software RAID arrays detected.</p></div>';
       return;
     }
 
@@ -1499,14 +1442,13 @@ const LvmPage = (() => {
         + syncHtml
         + (arr.uuid ? '<div style="margin-top:8px;font-size:9px;color:var(--text-muted);">UUID: <code>' + arr.uuid + '</code></div>' : '')
         + '<div style="display:flex;gap:8px;margin-top:12px;">'
-        + '<button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LvmPage.showFormatMountModal('' + arr.name + '','ext4')" style="font-size:10px;flex:1;"><i class="bi bi-hdd-stack me-1"></i>Format & Mount</button>'
-        + '<button class="btn-lp btn-lp-danger btn-lp-sm" onclick="LvmPage.stopRaid('' + arr.name + '')" style="font-size:10px;flex:1;"><i class="bi bi-stop-circle me-1"></i>Stop</button>'
+        + '<button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LvmPage.showFormatMountModal(\'' + arr.name + '\',\'ext4\')" style="font-size:10px;flex:1;"><i class="bi bi-hdd-stack me-1"></i>Format & Mount</button>'
+        + '<button class="btn-lp btn-lp-danger btn-lp-sm" onclick="LvmPage.stopRaid(\'' + arr.name + '\')" style="font-size:10px;flex:1;"><i class="bi bi-stop-circle me-1"></i>Stop</button>'
         + '</div></div>';
     }).join('');
   }
 
   async function showCreateRaidModal() {
-    // Fetch available disks from API
     const res = await apiPost('/api/plugins/lvm-manager/raid/disks', {});
     let diskHtml = '';
     if (res && res.success && res.data && res.data.length > 0) {
@@ -1606,6 +1548,57 @@ window.LvmPage = LvmPage;
       } catch (err) {
         res.status(500).send(`LVM Manager Error: ${err.message}`);
       }
+    });
+
+    // ── API: RAID Routes ──────────────────────────────────
+    app.post('/api/plugins/lvm-manager/raid/list', async (req, res) => {
+      try {
+        const data = await getRaidData();
+        return successResponse(res, data);
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    app.post('/api/plugins/lvm-manager/raid/disks', async (req, res) => {
+      try {
+        const data = await getLvmData();
+        const freeDisks = (data.blockDevices || []).filter(d => !d.used);
+        return successResponse(res, freeDisks);
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    app.post('/api/plugins/lvm-manager/raid/create', async (req, res) => {
+      try {
+        const { name, level, devices } = req.body;
+        const result = await createRaid(name, level, devices);
+        return successResponse(res, result, 'RAID array created');
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    app.post('/api/plugins/lvm-manager/raid/stop', async (req, res) => {
+      try {
+        const { mdDevice } = req.body;
+        if (!mdDevice) return errorResponse(res, 'mdDevice is required', 400);
+        const result = await stopRaid(mdDevice);
+        return successResponse(res, result, 'RAID array stopped');
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    app.post('/api/plugins/lvm-manager/raid/format', async (req, res) => {
+      try {
+        const { devicePath, fsType } = req.body;
+        if (!devicePath || !fsType) return errorResponse(res, 'devicePath and fsType required', 400);
+        const result = await formatVolume(devicePath, fsType);
+        return successResponse(res, result, 'Volume formatted');
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    app.post('/api/plugins/lvm-manager/raid/mount', async (req, res) => {
+      try {
+        const { devicePath, mountPoint, persist } = req.body;
+        if (!devicePath || !mountPoint) return errorResponse(res, 'devicePath and mountPoint required', 400);
+        const result = await mountVolume(devicePath, mountPoint, persist !== false);
+        return successResponse(res, result, 'Volume mounted');
+      } catch (e) { return errorResponse(res, e.message, 500); }
     });
 
     // ── API: Install LVM2
