@@ -719,6 +719,8 @@ volumes:
   // ── Container Resource Limits & Live Stats ────────────────
   async function showResourceModal(containerId, containerName) {
     document.getElementById('resContainerId').value = containerId;
+    const titleEl = document.getElementById('resModalTitle');
+    if (titleEl) titleEl.innerHTML = `<i class="bi bi-sliders text-primary me-2"></i>Limits: ${LP.escHtml(containerName || containerId)}`;
     document.getElementById('resLiveCpu').textContent = 'Loading...';
     document.getElementById('resLiveMem').textContent = 'Loading...';
     document.getElementById('resMemoryLimit').value = '';
