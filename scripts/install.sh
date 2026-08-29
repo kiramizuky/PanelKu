@@ -193,23 +193,29 @@ install_nodejs() {
 
     if [ -n "$node_arch" ]; then
       info "Package manager did not provide Node.js >= $NODE_VERSION. Installing official prebuilt binary..."
-      local temp_tar="/tmp/node.tar.xz"
       case "$PM" in
-        apt) apt-get install -y tar xz-utils 2>/dev/null || true ;;
-        pacman) pacman -S --noconfirm --needed tar xz 2>/dev/null || true ;;
-        dnf|yum) $PM install -y tar xz 2>/dev/null || true ;;
-        apk) apk add tar xz 2>/dev/null || true ;;
-        zypper) zypper install -y tar xz 2>/dev/null || true ;;
+        apt)     DEBIAN_FRONTEND=noninteractive apt-get install -y tar gzip xz-utils 2>/dev/null || true ;;
+        pacman)  pacman -S --noconfirm --needed tar gzip xz 2>/dev/null || true ;;
+        dnf|yum) $PM install -y tar gzip xz 2>/dev/null || true ;;
+        apk)     apk add tar gzip xz 2>/dev/null || true ;;
+        zypper)  zypper install -y tar gzip xz 2>/dev/null || true ;;
       esac
       local node_dist_url="https://nodejs.org/dist/latest-v${NODE_VERSION}.x/"
-      local node_filename=$(curl -fsSL "$node_dist_url" 2>/dev/null | grep -oE "node-v[0-9.]+-linux-${node_arch}\.tar\.(xz|gz)" | head -1)
-      if [ -n "$node_filename" ]; then
-        curl -fsSL "${node_dist_url}${node_filename}" -o "$temp_tar" || true
-      else
-        curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}.0.0/node-v${NODE_VERSION}.0.0-linux-${node_arch}.tar.xz" -o "$temp_tar" || true
+      local node_filename=$(curl -fsSL "$node_dist_url" 2>/dev/null | grep -oE "node-v[0-9.]+-linux-${node_arch}\.tar\.gz" | head -1)
+      if [ -z "$node_filename" ]; then
+        node_filename=$(curl -fsSL "$node_dist_url" 2>/dev/null | grep -oE "node-v[0-9.]+-linux-${node_arch}\.tar\.xz" | head -1)
       fi
-      tar -xJf "$temp_tar" -C /usr/local --strip-components=1 2>/dev/null || true
-      rm -f "$temp_tar"
+      if [ -n "$node_filename" ]; then
+        local temp_archive="/tmp/${node_filename}"
+        curl -fsSL "${node_dist_url}${node_filename}" -o "$temp_archive" || true
+        tar -xf "$temp_archive" -C /usr/local --strip-components=1 2>/dev/null || true
+        rm -f "$temp_archive" || true
+      else
+        local temp_tar="/tmp/node.tar.xz"
+        curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}.0.0/node-v${NODE_VERSION}.0.0-linux-${node_arch}.tar.xz" -o "$temp_tar" || true
+        tar -xf "$temp_tar" -C /usr/local --strip-components=1 2>/dev/null || true
+        rm -f "$temp_tar" || true
+      fi
     else
       error "No prebuilt Node.js binary fallback available for architecture $ARCH. Installation failed."
     fi
