@@ -1,4 +1,5 @@
 import aiRepairService from './ai-repair.service.js';
+import anomalyDetectorService from './anomaly-detector.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
 
 class AIRepairController {
@@ -81,13 +82,43 @@ class AIRepairController {
     }
   }
 
-  // ── Predictive Alerts ────────────────────────────────────────────
+  // ── Predictive Alerts & Anomaly Detection ────────────────────────
 
   async analyzeTrends(req, res) {
     try {
       const hours = parseInt(req.query.hours) || 24;
       const result = await aiRepairService.analyzeTrends(Math.min(Math.max(hours, 1), 720));
       return successResponse(res, result);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async scanAnomalies(req, res) {
+    try {
+      const result = await anomalyDetectorService.scanLogAnomalies();
+      return successResponse(res, result, 'Log anomalies scanned');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  // ── Incident Post-Mortem Reports (Fase 3) ────────────────────────
+
+  async listIncidents(req, res) {
+    try {
+      const limit = parseInt(req.query.limit) || 20;
+      const reports = await anomalyDetectorService.listIncidentReports(limit);
+      return successResponse(res, { reports }, 'Incident reports retrieved');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async createIncident(req, res) {
+    try {
+      const report = await anomalyDetectorService.createIncidentReport(req.body);
+      return successResponse(res, { report }, 'Incident report created');
     } catch (error) {
       return errorResponse(res, error.message, 500);
     }
@@ -125,3 +156,4 @@ class AIRepairController {
 }
 
 export default new AIRepairController();
+

@@ -25,7 +25,13 @@ router.get('/fix-patterns', aiRepairController.getFixPatterns.bind(aiRepairContr
 router.get('/fix-suggestions', aiRepairController.getFixSuggestions.bind(aiRepairController));
 router.post('/apply-fix', aiRepairController.applyFix.bind(aiRepairController));
 
-// ── Predictive Alerts ──
+// ── Predictive Alerts & Anomaly Detection ──
 router.get('/trends', aiRepairController.analyzeTrends.bind(aiRepairController));
+router.get('/anomalies', aiRepairController.scanAnomalies.bind(aiRepairController));
+
+// ── Incident Post-Mortem Reports (Fase 3) ──
+router.get('/incidents', aiRepairController.listIncidents.bind(aiRepairController));
+router.post('/incidents', aiRepairController.createIncident.bind(aiRepairController));
 
 export default router;
+

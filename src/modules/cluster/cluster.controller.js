@@ -1,4 +1,5 @@
 import clusterService from './cluster.service.js';
+import k8sService from './k8s.service.js';
 import { success, error } from '../../helpers/response.js';
 
 class ClusterController {
@@ -53,6 +54,17 @@ class ClusterController {
       return error(res, err.message, 500);
     }
   }
+
+  // ── K3s / MicroK8s Cluster Support (Fase 5) ──
+  async getK8sSummary(req, res) {
+    try {
+      const summary = await k8sService.getClusterSummary();
+      return success(res, summary, 'Kubernetes cluster summary retrieved');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
 }
 
 export default new ClusterController();
+

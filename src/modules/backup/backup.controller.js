@@ -1,4 +1,5 @@
 import backupService from './backup.service.js';
+import snapshotService from './snapshot.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
 
 class BackupController {
@@ -220,8 +221,6 @@ class BackupController {
     }
   }
 
-  // ── Disaster Recovery: Remote Restore ────────────────────────────
-
   async listRemoteBackups(req, res) {
     try {
       const { remote, path: remotePath } = req.query;
@@ -245,6 +244,59 @@ class BackupController {
       return errorResponse(res, error.message, 500);
     }
   }
+
+  // ── Instant Volume Snapshots & Rollback (Fase 4) ──────────────────
+
+  async listSnapshots(req, res) {
+    try {
+      const snapshots = await snapshotService.listSnapshots();
+      return successResponse(res, { snapshots }, 'Snapshots retrieved');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async createSnapshot(req, res) {
+    try {
+      const { name, targetPath, description } = req.body;
+      if (!name) return errorResponse(res, 'Snapshot name is required', 400);
+      const snapshot = await snapshotService.createSnapshot(name, targetPath, description);
+      return successResponse(res, { snapshot }, 'Snapshot created successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async rollbackSnapshot(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await snapshotService.rollbackSnapshot(id);
+      return successResponse(res, result, result.message);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async verifySnapshot(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await snapshotService.verifySnapshot(id);
+      return successResponse(res, result, result.message);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async deleteSnapshot(req, res) {
+    try {
+      const { id } = req.params;
+      await snapshotService.deleteSnapshot(id);
+      return successResponse(res, null, 'Snapshot deleted successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
 }
 
 export default new BackupController();
+

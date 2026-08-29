@@ -1,4 +1,5 @@
 import terminalService from './terminal.service.js';
+import copilotService from './copilot.service.js';
 import { success, error } from '../../helpers/response.js';
 
 class TerminalController {
@@ -30,7 +31,30 @@ class TerminalController {
       return error(res, err.message, 500);
     }
   }
+
+  async generateCommand(req, res) {
+    try {
+      const { prompt, context } = req.body;
+      if (!prompt) return error(res, 'Prompt is required', 400);
+      const result = await copilotService.generateCommand(prompt, context);
+      return success(res, result, 'Command generated');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async explainCommand(req, res) {
+    try {
+      const { command } = req.body;
+      if (!command) return error(res, 'Command is required', 400);
+      const result = await copilotService.explainCommand(command);
+      return success(res, result, 'Command explained');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
 }
 
 const terminalController = new TerminalController();
 export default terminalController;
+

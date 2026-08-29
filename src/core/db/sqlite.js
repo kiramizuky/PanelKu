@@ -280,6 +280,35 @@ function initSchema(db) {
       created_at  TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_security_scans_created ON security_scans(created_at);
+
+    -- Incident Post-Mortem & RCA Reports (Fase 3)
+    CREATE TABLE IF NOT EXISTS incident_reports (
+      id                  TEXT PRIMARY KEY,
+      title               TEXT NOT NULL,
+      incident_type       TEXT NOT NULL,
+      severity            TEXT NOT NULL DEFAULT 'warning',
+      summary             TEXT NOT NULL,
+      root_cause          TEXT NOT NULL,
+      impact_timeline     TEXT NOT NULL DEFAULT '[]',
+      remediation_action  TEXT,
+      status              TEXT NOT NULL DEFAULT 'resolved',
+      created_at          TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_incident_created ON incident_reports(created_at);
+
+    -- Instant Volume Snapshots & Rollback Points (Fase 4)
+    CREATE TABLE IF NOT EXISTS backup_snapshots (
+      id            TEXT PRIMARY KEY,
+      name          TEXT NOT NULL,
+      target_path   TEXT NOT NULL,
+      snapshot_path TEXT NOT NULL,
+      size_bytes    INTEGER NOT NULL DEFAULT 0,
+      type          TEXT NOT NULL DEFAULT 'directory',
+      is_locked     INTEGER NOT NULL DEFAULT 0,
+      description   TEXT,
+      created_at    TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_snapshots_created ON backup_snapshots(created_at);
   `);
   
   try {

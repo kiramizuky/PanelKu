@@ -186,7 +186,73 @@ const TerminalPage = (() => {
     });
   }
 
-  return { init, connect, askAIFix };
+  let copilotModal = null;
+  let currentGeneratedCommand = '';
+
+  function openCopilotModal() {
+    if (!copilotModal) {
+      copilotModal = new bootstrap.Modal(document.getElementById('terminalCopilotModal'));
+    }
+    copilotModal.show();
+    setTimeout(() => {
+      const input = document.getElementById('copilotPromptInput');
+      if (input) input.focus();
+    }, 300);
+  }
+
+  async function generateCopilotCommand() {
+    const input = document.getElementById('copilotPromptInput');
+    const prompt = input?.value?.trim();
+    if (!prompt) return;
+
+    try {
+      LP.loading(true);
+      const res = await LP.api('/terminal/copilot/generate', {
+        method: 'POST',
+        body: JSON.stringify({ prompt, context: { cwd: initialCwd } }),
+      });
+      LP.loading(false);
+
+      if (res && res.data) {
+        currentGeneratedCommand = res.data.command;
+        const resultBox = document.getElementById('copilotResultBox');
+        const cmdOutput = document.getElementById('copilotCommandOutput');
+        const explOutput = document.getElementById('copilotExplanation');
+        const riskBadge = document.getElementById('copilotRiskBadge');
+
+        if (resultBox) resultBox.classList.remove('d-none');
+        if (cmdOutput) cmdOutput.textContent = res.data.command;
+        if (explOutput) explOutput.textContent = res.data.explanation;
+        if (riskBadge) {
+          const r = res.data.safety?.riskLevel || 'low';
+          riskBadge.className = `lp-badge lp-badge-${r === 'critical' ? 'danger' : r === 'medium' ? 'warning' : 'success'}`;
+          riskBadge.textContent = r.toUpperCase();
+        }
+      }
+    } catch (err) {
+      LP.loading(false);
+      LP.toast(err.message || 'Failed to generate command', 'error');
+    }
+  }
+
+  function copyCopilotCommand() {
+    if (!currentGeneratedCommand) return;
+    navigator.clipboard.writeText(currentGeneratedCommand);
+    LP.toast('Command copied to clipboard', 'success');
+  }
+
+  function runCopilotCommand() {
+    if (!currentGeneratedCommand) return;
+    if (socket && sessionId) {
+      socket.emit('terminal:input', { sessionId, data: currentGeneratedCommand + '\n' });
+      if (copilotModal) copilotModal.hide();
+      LP.toast('Command sent to terminal', 'info');
+    } else {
+      LP.toast('Terminal session is not connected', 'warning');
+    }
+  }
+
+  return { init, connect, askAIFix, openCopilotModal, generateCopilotCommand, copyCopilotCommand, runCopilotCommand };
 })();
 
 // [FIX] Expose to window for LP.call() resolution

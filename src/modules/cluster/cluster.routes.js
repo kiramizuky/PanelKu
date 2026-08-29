@@ -15,4 +15,8 @@ router.delete('/nodes/:id',            clusterController.deleteNode.bind(cluster
 router.post('/nodes/:id/ping',         clusterController.pingNode.bind(clusterController));
 router.get('/nodes/:id/metrics',       clusterController.getNodeMetrics.bind(clusterController));
 
+// ── K3s / MicroK8s Cluster Support (Fase 5) ──
+router.get('/k8s/summary',             clusterController.getK8sSummary.bind(clusterController));
+
 export default router;
+

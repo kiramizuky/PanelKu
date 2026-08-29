@@ -42,4 +42,12 @@ router.post('/s3/download',   requirePermission('backup', 'execute'), backupCont
 router.get('/remote-backups', requirePermission('backup', 'read'),    backupController.listRemoteBackups.bind(backupController));
 router.post('/remote-restore',requirePermission('backup', 'execute'), backupController.restoreFromRemote.bind(backupController));
 
+// ── Instant Volume Snapshots & Rollback (Fase 4) ──
+router.get('/snapshots',              requirePermission('backup', 'read'),    backupController.listSnapshots.bind(backupController));
+router.post('/snapshots',             requirePermission('backup', 'create'),  backupController.createSnapshot.bind(backupController));
+router.post('/snapshots/:id/rollback',requirePermission('backup', 'execute'), backupController.rollbackSnapshot.bind(backupController));
+router.post('/snapshots/:id/verify',  requirePermission('backup', 'read'),    backupController.verifySnapshot.bind(backupController));
+router.delete('/snapshots/:id',       requirePermission('backup', 'delete'),  backupController.deleteSnapshot.bind(backupController));
+
 export default router;
+

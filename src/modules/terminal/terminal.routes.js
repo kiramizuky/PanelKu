@@ -12,4 +12,9 @@ router.post('/sessions', terminalController.create.bind(terminalController));
 router.delete('/sessions/:sessionId', terminalController.kill.bind(terminalController));
 router.get('/stats', terminalController.getStats.bind(terminalController));
 
+// ── Terminal AI Copilot (Fase 3) ──
+router.post('/copilot/generate', terminalController.generateCommand.bind(terminalController));
+router.post('/copilot/explain', terminalController.explainCommand.bind(terminalController));
+
 export default router;
+

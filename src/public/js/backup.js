@@ -7,6 +7,7 @@ const BackupPage = {
   createJobBsModal: null,
   createLocalBsModal: null,
   jobLogBsModal: null,
+  createSnapshotBsModal: null,
 
   async init() {
     await LP.init();
@@ -14,6 +15,9 @@ const BackupPage = {
     this.createJobBsModal = new bootstrap.Modal(document.getElementById('createJobModal'));
     this.createLocalBsModal = new bootstrap.Modal(document.getElementById('createLocalBackupModal'));
     this.jobLogBsModal = new bootstrap.Modal(document.getElementById('jobLogModal'));
+    if (document.getElementById('createSnapshotModal')) {
+      this.createSnapshotBsModal = new bootstrap.Modal(document.getElementById('createSnapshotModal'));
+    }
     this.refresh();
   },
 
@@ -25,6 +29,7 @@ const BackupPage = {
       this.loadRcloneStatus(),
       this.loadS3Config(),
       this.loadDRRemotes(),
+      this.loadSnapshots(),
     ]);
   },
 
@@ -39,6 +44,10 @@ const BackupPage = {
 
     const tabContent = document.getElementById(`tab-${tabId}`);
     if (tabContent) tabContent.classList.add('active');
+
+    if (tabId === 'snapshots') {
+      this.loadSnapshots();
+    }
   },
 
   // ══════════════════════════════════════════════════════
@@ -981,9 +990,126 @@ const BackupPage = {
       LP.toast('Error: ' + err.message, 'error');
     }
   },
+
+  // ── Volume Snapshots & Rollback (Fase 4) ─────────────
+
+  async loadSnapshots() {
+    const tbody = document.getElementById('snapshotTableBody');
+    if (!tbody) return;
+
+    try {
+      const res = await LP.get('/backup/snapshots');
+      const snapshots = res?.data?.snapshots || [];
+
+      if (snapshots.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No snapshot recovery points created yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = snapshots.map(s => `
+        <tr>
+          <td>
+            <div class="fw-bold text-white"><i class="bi bi-camera text-info me-1"></i> ${LP.escHtml(s.name)}</div>
+            ${s.description ? `<small class="text-muted">${LP.escHtml(s.description)}</small>` : ''}
+          </td>
+          <td><code class="font-mono text-white">${LP.escHtml(s.targetPath)}</code></td>
+          <td><span class="lp-badge lp-badge-info">${s.sizeMb} MB</span></td>
+          <td class="text-secondary small">${new Date(s.createdAt).toLocaleString()}</td>
+          <td><span class="lp-badge lp-badge-success"><i class="bi bi-check-circle me-1"></i> Verified</span></td>
+          <td class="text-end">
+            <div class="d-flex justify-content-end gap-1">
+              <button class="btn-lp btn-lp-sm btn-lp-primary" onclick="BackupPage.rollbackSnapshot('${LP.escHtml(s.id)}', '${LP.escHtml(s.name)}')" title="Rollback to this snapshot">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Rollback
+              </button>
+              <button class="btn-lp btn-lp-sm btn-lp-ghost text-danger" onclick="BackupPage.deleteSnapshot('${LP.escHtml(s.id)}', '${LP.escHtml(s.name)}')" title="Delete">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error loading snapshots: ${LP.escHtml(err.message)}</td></tr>`;
+    }
+  },
+
+  showCreateSnapshotModal() {
+    if (this.createSnapshotBsModal) {
+      document.getElementById('snapName').value = `snapshot_${Date.now()}`;
+      this.createSnapshotBsModal.show();
+    }
+  },
+
+  async createSnapshot() {
+    const name = document.getElementById('snapName')?.value?.trim();
+    const targetPath = document.getElementById('snapTarget')?.value?.trim() || '/var/www';
+    const description = document.getElementById('snapDesc')?.value?.trim() || '';
+
+    if (!name) {
+      LP.toast('Snapshot name is required', 'error');
+      return;
+    }
+
+    try {
+      LP.loading(true);
+      const res = await LP.post('/backup/snapshots', { name, targetPath, description });
+      LP.loading(false);
+      if (res?.success) {
+        LP.toast('Volume snapshot created successfully!', 'success');
+        if (this.createSnapshotBsModal) this.createSnapshotBsModal.hide();
+        this.loadSnapshots();
+      } else {
+        LP.toast(res?.message || 'Failed to create snapshot', 'error');
+      }
+    } catch (err) {
+      LP.loading(false);
+      LP.toast(err.message || 'Snapshot creation error', 'error');
+    }
+  },
+
+  async rollbackSnapshot(id, name) {
+    if (!(await LP.confirm(
+      `Are you sure you want to rollback to snapshot <strong>${LP.escHtml(name)}</strong>? Target files will be restored to this snapshot point.`,
+      'Confirm Snapshot Rollback'
+    ))) return;
+
+    try {
+      LP.loading(true);
+      const res = await LP.post(`/backup/snapshots/${id}/rollback`, {});
+      LP.loading(false);
+      if (res?.success) {
+        LP.toast('Rollback completed successfully!', 'success');
+      } else {
+        LP.toast(res?.message || 'Rollback failed', 'error');
+      }
+    } catch (err) {
+      LP.loading(false);
+      LP.toast(err.message || 'Rollback error', 'error');
+    }
+  },
+
+  async deleteSnapshot(id, name) {
+    if (!(await LP.confirm(
+      `Delete snapshot <strong>${LP.escHtml(name)}</strong>? This cannot be undone.`,
+      'Delete Snapshot'
+    ))) return;
+
+    try {
+      const res = await LP.delete(`/backup/snapshots/${id}`);
+      if (res?.success) {
+        LP.toast('Snapshot deleted', 'success');
+        this.loadSnapshots();
+      } else {
+        LP.toast(res?.message || 'Failed to delete snapshot', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Delete error', 'error');
+    }
+  },
 };
 
 document.addEventListener('DOMContentLoaded', () => BackupPage.init());
 window.BackupPage = BackupPage;
 window.Backup = BackupPage;
 window.BackupManager = BackupPage;
+

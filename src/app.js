@@ -16,6 +16,7 @@ import { nonceMiddleware, nonceInjector } from './middleware/nonce.js';
 
 import expressEjsLayouts from 'express-ejs-layouts';
 import pluginLoader from './core/plugin-loader/PluginLoader.js';
+import prometheusService from './modules/monitor/prometheus.service.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -132,6 +133,17 @@ const createApp = () => {
 
   // Application level WAF
   app.use(wafMiddleware);
+
+  // ── Prometheus / OpenMetrics Metrics Exporter (Fase 5) ──
+  app.get(['/metrics', '/api/metrics'], async (req, res) => {
+    try {
+      const metrics = await prometheusService.getMetrics();
+      res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+      res.send(metrics);
+    } catch (err) {
+      res.status(500).send(`# Error collecting metrics: ${err.message}\n`);
+    }
+  });
 
   // API routes
   app.use('/api', apiRoutes);

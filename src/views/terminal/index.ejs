@@ -3,6 +3,11 @@
     <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Web Terminal</h1>
     <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Direct shell access to the host</p>
   </div>
+  <div>
+    <button class="btn-lp btn-lp-primary" onclick="TerminalPage.openCopilotModal()">
+      <i class="bi bi-stars me-1"></i> AI Copilot
+    </button>
+  </div>
 </div>
 
 <div class="lp-glass-card" style="padding: 10px; background: rgba(0,0,0,0.5); position: relative;">
@@ -10,9 +15,45 @@
   <button id="aiTerminalFixBtn" class="btn-lp btn-lp-primary d-none" style="position: absolute; bottom: 20px; right: 20px; z-index: 100; box-shadow: 0 4px 15px rgba(99,102,241,0.4);" onclick="TerminalPage.askAIFix()">
     <i class="bi bi-robot me-1"></i> AI Fix Suggestion
   </button>
-</div><link href="/css/xterm.min.css" rel="stylesheet">
-  <script src="/js/xterm.min.js"></script>
-  <script src="/js/xterm-addon-fit.min.js"></script>
+</div>
+<link href="/css/xterm.min.css" rel="stylesheet">
+<script src="/js/xterm.min.js"></script>
+<script src="/js/xterm-addon-fit.min.js"></script>
+
+<!-- Terminal AI Copilot Modal (Fase 3) -->
+<div class="modal fade" id="terminalCopilotModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title" style="font-size: 16px; font-weight: 600;">
+          <i class="bi bi-stars text-primary me-1"></i> Terminal AI Copilot
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-3 pb-2">
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Describe what you want to do in natural language</label>
+          <div class="input-group">
+            <input type="text" id="copilotPromptInput" class="lp-input" placeholder="e.g. Find large files over 100MB, check listening ports..." onkeydown="if(event.key==='Enter') TerminalPage.generateCopilotCommand()">
+            <button class="btn-lp btn-lp-primary" onclick="TerminalPage.generateCopilotCommand()"><i class="bi bi-arrow-right"></i> Generate</button>
+          </div>
+        </div>
+        <div id="copilotResultBox" class="d-none mt-3 p-3 rounded" style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color);">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-white fw-bold" style="font-size: 13px;">Generated Command</span>
+            <span id="copilotRiskBadge" class="lp-badge lp-badge-success" style="font-size: 10px;">Safe</span>
+          </div>
+          <pre id="copilotCommandOutput" class="p-2 rounded text-success mb-2" style="background:#000; font-family:monospace; font-size:12px; white-space:pre-wrap;"></pre>
+          <p id="copilotExplanation" class="text-secondary small mb-3" style="font-size:12px;"></p>
+          <div class="d-flex justify-content-end gap-2">
+            <button class="btn-lp btn-lp-secondary" onclick="TerminalPage.copyCopilotCommand()"><i class="bi bi-clipboard"></i> Copy</button>
+            <button class="btn-lp btn-lp-primary" onclick="TerminalPage.runCopilotCommand()"><i class="bi bi-play-fill"></i> Insert &amp; Run</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Terminal Login Modal -->
 <div class="modal fade" id="terminalLoginModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
