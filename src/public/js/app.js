@@ -24,6 +24,7 @@ const LP = {
     this.initToasts();
     this.highlightActiveNav();
     this.initTheme();
+    this.initServiceWorker();
 
     // Try to restore session
     const token = localStorage.getItem('lp_token');
@@ -786,6 +787,28 @@ const LP = {
       }
     } catch (e) {
       console.warn('Failed to perform automated panel update check:', e);
+    }
+  },
+
+  initServiceWorker() {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/public/sw.js').then((reg) => {
+          // Check for SW updates
+          reg.onupdatefound = () => {
+            const installingWorker = reg.installing;
+            if (installingWorker) {
+              installingWorker.onstatechange = () => {
+                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.info('[PWA] New version available in background.');
+                }
+              };
+            }
+          };
+        }).catch((err) => {
+          console.warn('[PWA] Service worker registration failed:', err);
+        });
+      });
     }
   },
 

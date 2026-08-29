@@ -7,6 +7,239 @@ const ProfilePage = (() => {
     await LP.init();
     await loadProfile();
     await loadAiSettings();
+    await loadPasskeys();
+    await loadPushStatus();
+  }
+
+  // ── WebAuthn / Passkey Helper Functions ──
+  function b64urlToBuf(b64url) {
+    const padding = '='.repeat((4 - (b64url.length % 4)) % 4);
+    const base64 = (b64url + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const arr = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) arr[i] = rawData.charCodeAt(i);
+    return arr.buffer;
+  }
+
+  function bufToB64url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  }
+
+  async function loadPasskeys() {
+    const container = document.getElementById('passkeyList');
+    if (!container) return;
+
+    try {
+      const res = await LP.get('/auth/passkey/list');
+      if (res?.data?.passkeys && res.data.passkeys.length > 0) {
+        container.innerHTML = res.data.passkeys.map(k => `
+          <div class="d-flex align-items-center justify-content-between p-2 rounded" style="background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);">
+            <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+              <i class="bi bi-shield-check text-primary" style="font-size:16px;"></i>
+              <div style="min-width:0;">
+                <div style="font-size:12px; font-weight:600; color:#fff; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${LP.escHtml(k.deviceName)}</div>
+                <small class="text-muted" style="font-size:10px;">Added: ${new Date(k.createdAt).toLocaleDateString()}</small>
+              </div>
+            </div>
+            <button class="btn-lp btn-lp-ghost text-danger btn-lp-sm" onclick="ProfilePage.deletePasskey('${k.id}')" title="Delete Passkey" style="padding:2px 6px;">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        `).join('');
+      } else {
+        container.innerHTML = '<p class="text-muted mb-0" style="font-size:11.5px;">No passkeys registered yet.</p>';
+      }
+    } catch {
+      container.innerHTML = '<p class="text-danger mb-0" style="font-size:11px;">Failed to load passkeys.</p>';
+    }
+  }
+
+  async function registerPasskey() {
+    if (!window.PublicKeyCredential) {
+      LP.toast('Passkeys / WebAuthn is not supported on this browser.', 'error');
+      return;
+    }
+
+    const deviceName = prompt('Enter a friendly name for this passkey (e.g. MacBook Touch ID, YubiKey 5):', 'Security Key / Device');
+    if (!deviceName) return;
+
+    LP.toast('Follow your device prompt to register passkey...', 'info');
+
+    try {
+      const optRes = await LP.get('/auth/passkey/register-options');
+      if (!optRes?.data) throw new Error(optRes?.message || 'Failed to get registration options');
+
+      const options = optRes.data;
+      const publicKeyOpts = {
+        ...options,
+        challenge: b64urlToBuf(options.challenge),
+        user: {
+          ...options.user,
+          id: b64urlToBuf(options.user.id),
+        },
+      };
+      if (publicKeyOpts.excludeCredentials) {
+        publicKeyOpts.excludeCredentials = publicKeyOpts.excludeCredentials.map(c => ({
+          ...c,
+          id: b64urlToBuf(c.id),
+        }));
+      }
+
+      const credential = await navigator.credentials.create({ publicKey: publicKeyOpts });
+      if (!credential) throw new Error('Passkey registration cancelled');
+
+      const responsePayload = {
+        id: credential.id,
+        rawId: bufToB64url(credential.rawId),
+        type: credential.type,
+        response: {
+          clientDataJSON: bufToB64url(credential.response.clientDataJSON),
+          attestationObject: bufToB64url(credential.response.attestationObject),
+          transports: credential.response.getTransports ? credential.response.getTransports() : ['internal'],
+        },
+      };
+
+      const verifyRes = await LP.post('/auth/passkey/register-verify', {
+        response: responsePayload,
+        deviceName,
+      });
+
+      if (verifyRes?.success) {
+        LP.toast('Passkey registered successfully!', 'success');
+        loadPasskeys();
+      } else {
+        throw new Error(verifyRes?.message || 'Verification failed');
+      }
+    } catch (err) {
+      if (err.name !== 'NotAllowedError') {
+        LP.toast(err.message || 'Error registering passkey', 'error');
+      }
+    }
+  }
+
+  async function deletePasskey(id) {
+    if (!(await LP.confirm('Delete this passkey? You will no longer be able to log in with this device.', 'Delete Passkey'))) return;
+
+    try {
+      const res = await LP.del(`/auth/passkey/${id}`);
+      if (res?.success) {
+        LP.toast('Passkey deleted', 'success');
+        loadPasskeys();
+      } else {
+        LP.toast(res?.message || 'Failed to delete passkey', 'error');
+      }
+    } catch {
+      LP.toast('Error deleting passkey', 'error');
+    }
+  }
+
+  // ── WebPush Notification Management ──
+  async function loadPushStatus() {
+    const badge = document.getElementById('pushBadge');
+    const btnToggle = document.getElementById('btnTogglePush');
+    const btnTest = document.getElementById('btnTestPush');
+    if (!badge || !btnToggle) return;
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      badge.textContent = 'Unsupported';
+      badge.className = 'lp-badge lp-badge-secondary';
+      btnToggle.disabled = true;
+      btnToggle.textContent = 'Push Not Supported';
+      return;
+    }
+
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+
+      if (sub) {
+        badge.textContent = 'Active';
+        badge.className = 'lp-badge lp-badge-success';
+        btnToggle.textContent = 'Disable Push Alerts';
+        btnToggle.className = 'btn-lp btn-lp-ghost text-danger flex-1';
+        if (btnTest) btnTest.style.display = 'inline-flex';
+      } else {
+        badge.textContent = 'Disabled';
+        badge.className = 'lp-badge lp-badge-secondary';
+        btnToggle.textContent = 'Enable Push Alerts';
+        btnToggle.className = 'btn-lp btn-lp-primary flex-1';
+        if (btnTest) btnTest.style.display = 'none';
+      }
+    } catch {
+      badge.textContent = 'Error';
+    }
+  }
+
+  async function togglePushSubscription() {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+
+    if (sub) {
+      // Unsubscribe
+      try {
+        await LP.post('/alerts/webpush/unsubscribe', { endpoint: sub.endpoint });
+        await sub.unsubscribe();
+        LP.toast('Push alerts disabled on this device', 'info');
+        loadPushStatus();
+      } catch (err) {
+        LP.toast('Failed to unsubscribe', 'error');
+      }
+    } else {
+      // Subscribe
+      if (!window.Notification) {
+        LP.toast('Notifications are not supported by this browser', 'error');
+        return;
+      }
+      const perm = await window.Notification.requestPermission();
+      if (perm !== 'granted') {
+        LP.toast('Notification permission was denied in browser settings', 'error');
+        return;
+      }
+
+      try {
+        const keyRes = await LP.get('/alerts/webpush/vapid-public-key');
+        if (!keyRes?.data?.publicKey) {
+          throw new Error('VAPID public key not available from server');
+        }
+
+        const applicationServerKey = b64urlToBuf(keyRes.data.publicKey);
+        const newSub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
+
+        const subJson = newSub.toJSON();
+        const saveRes = await LP.post('/alerts/webpush/subscribe', {
+          subscription: subJson,
+        });
+
+        if (saveRes?.success) {
+          LP.toast('Push notifications enabled successfully!', 'success');
+          loadPushStatus();
+        } else {
+          throw new Error(saveRes?.message || 'Failed to save push subscription');
+        }
+      } catch (err) {
+        LP.toast(err.message || 'Failed to subscribe to push notifications', 'error');
+      }
+    }
+  }
+
+  async function sendTestPush() {
+    try {
+      LP.toast('Dispatching test push notification...', 'info');
+      const res = await LP.post('/alerts/test');
+      if (res?.success) {
+        LP.toast('Test notification dispatched!', 'success');
+      } else {
+        LP.toast(res?.message || 'Failed to send test alert', 'error');
+      }
+    } catch {
+      LP.toast('Error sending test notification', 'error');
+    }
   }
 
   async function loadProfile() {
@@ -331,7 +564,25 @@ const ProfilePage = (() => {
     }
   }
 
-  return { init, updateProfile, changePassword, checkPasswordStrength, regenerateApiKey, toggleApiKeyVisibility, copyApiKey, toggle2FA, confirmEnable2FA, toggleAiFields, saveAiSettings, loadAiSettings };
+  return {
+    init,
+    updateProfile,
+    changePassword,
+    checkPasswordStrength,
+    regenerateApiKey,
+    toggleApiKeyVisibility,
+    copyApiKey,
+    toggle2FA,
+    confirmEnable2FA,
+    toggleAiFields,
+    saveAiSettings,
+    loadAiSettings,
+    registerPasskey,
+    deletePasskey,
+    loadPasskeys,
+    togglePushSubscription,
+    sendTestPush,
+  };
 })();
 
 window.ProfilePage = ProfilePage;

@@ -59,6 +59,7 @@ const DockerPage = (() => {
                  <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning me-1" onclick="DockerPage.action('restart', '${LP.escHtml(containerId)}')" title="Restart"><i class="bi bi-arrow-clockwise"></i> Restart</button>`
               : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success me-1" onclick="DockerPage.action('start', '${LP.escHtml(containerId)}')" title="Start"><i class="bi bi-play-fill"></i> Start</button>`
             }
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DockerPage.showResourceModal('${LP.escHtml(containerId)}', '${LP.escHtml(containerName)}')" title="Resource Limits &amp; Stats"><i class="bi bi-sliders"></i> Resources</button>
             <button class="btn-lp btn-lp-ghost btn-lp-sm text-info me-1" onclick="DockerPage.viewLogs('${LP.escHtml(containerId)}', '${LP.escHtml(containerName)}')" title="Logs"><i class="bi bi-justify-left"></i> Logs</button>
             ${isRunning ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-light me-1" onclick="DockerPage.viewConsole('${LP.escHtml(containerId)}', '${LP.escHtml(containerName)}')" title="Terminal Console"><i class="bi bi-terminal"></i> Console</button>` : ''}
             <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.action('delete', '${LP.escHtml(containerId)}')" title="Delete"><i class="bi bi-trash"></i> Delete</button>
@@ -557,6 +558,220 @@ volumes:
     }
   }
 
+  // ── 1-Click App Store Logic ──────────────────────────────
+  let appStoreCatalog = [];
+  let currentCategory = 'all';
+  let activeTemplate = null;
+
+  async function loadAppStore() {
+    const grid = document.getElementById('appStoreGrid');
+    if (!grid) return;
+    grid.innerHTML = '<div class="col-12 text-center p-4"><p class="text-muted"><i class="spinner-border spinner-border-sm me-2"></i>Loading App Store Catalog...</p></div>';
+
+    try {
+      const res = await LP.get('/docker/appstore');
+      if (res?.success && res.data?.catalog) {
+        appStoreCatalog = res.data.catalog;
+        renderAppStoreGrid();
+      } else {
+        grid.innerHTML = `<div class="col-12 text-center text-danger p-4">${LP.escHtml(res?.message || 'Failed to load App Store')}</div>`;
+      }
+    } catch {
+      grid.innerHTML = '<div class="col-12 text-center text-danger p-4">Error loading App Store catalog.</div>';
+    }
+  }
+
+  function renderAppStoreGrid(filteredList = null) {
+    const grid = document.getElementById('appStoreGrid');
+    if (!grid) return;
+
+    let list = filteredList || appStoreCatalog;
+    if (currentCategory !== 'all' && !filteredList) {
+      list = appStoreCatalog.filter(a => a.category === currentCategory);
+    }
+
+    if (list.length === 0) {
+      grid.innerHTML = '<div class="col-12 text-center p-4 text-muted"><i class="bi bi-inbox me-1"></i> No matching apps found.</div>';
+      return;
+    }
+
+    grid.innerHTML = list.map(app => `
+      <div class="col-12 col-md-6 col-xl-4">
+        <div class="lp-glass-card h-100 p-3 d-flex flex-column justify-content-between" style="border-radius:14px; transition: transform 0.2s, border-color 0.2s;">
+          <div>
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:12px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:42px; height:42px; border-radius:12px; background:rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; font-size:22px; color:${app.color || 'var(--accent-primary)'}; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+                  <i class="bi ${app.icon || 'bi-box-seam'}"></i>
+                </div>
+                <div>
+                  <h5 style="font-size:14px; font-weight:700; margin:0; color:#fff;">${LP.escHtml(app.name)}</h5>
+                  <span class="lp-badge lp-badge-primary mt-1" style="font-size:9.5px; padding:2px 6px;">${LP.escHtml(app.category)}</span>
+                </div>
+              </div>
+            </div>
+            <p style="font-size:11.5px; color:var(--text-muted); line-height:1.45; margin-bottom:14px;">${LP.escHtml(app.description)}</p>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.06); padding-top:10px;">
+            <small class="text-muted font-mono" style="font-size:10.5px;">Port: ${app.defaultPort || 'Custom'}</small>
+            <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="DockerPage.showAppInstallModal('${app.id}')" style="font-size:11.5px; padding:4px 12px;">
+              <i class="bi bi-download me-1"></i> Install
+            </button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function filterAppStore(category, btn) {
+    currentCategory = category;
+    const container = document.getElementById('appStoreCategories');
+    if (container) {
+      container.querySelectorAll('button').forEach(b => {
+        b.className = 'btn-lp btn-lp-ghost btn-lp-sm';
+      });
+    }
+    if (btn) btn.className = 'btn-lp btn-lp-primary btn-lp-sm';
+    renderAppStoreGrid();
+  }
+
+  function searchAppStore(term) {
+    const q = (term || '').toLowerCase().trim();
+    if (!q) {
+      renderAppStoreGrid();
+      return;
+    }
+    const filtered = appStoreCatalog.filter(a =>
+      a.name.toLowerCase().includes(q) ||
+      a.description.toLowerCase().includes(q) ||
+      a.category.toLowerCase().includes(q)
+    );
+    renderAppStoreGrid(filtered);
+  }
+
+  function showAppInstallModal(templateId) {
+    const template = appStoreCatalog.find(t => t.id === templateId);
+    if (!template) return;
+    activeTemplate = template;
+
+    document.getElementById('appModalTitle').textContent = `Install ${template.name}`;
+    document.getElementById('appModalCategory').textContent = template.category;
+    document.getElementById('appModalDesc').textContent = template.description;
+    document.getElementById('appProjectName').value = `${template.id}-app`;
+
+    const iconEl = document.getElementById('appModalIcon');
+    iconEl.innerHTML = `<i class="bi ${template.icon || 'bi-box-seam'}"></i>`;
+    iconEl.style.color = template.color || 'var(--accent-primary)';
+    iconEl.style.background = 'rgba(255,255,255,0.06)';
+
+    const fieldsContainer = document.getElementById('appDynamicFields');
+    fieldsContainer.innerHTML = template.fields.map(f => `
+      <div class="lp-form-group mb-0">
+        <label class="lp-label" style="font-size:11px; font-weight:600; color:var(--text-muted);">${LP.escHtml(f.label)}</label>
+        <input type="${f.type === 'password' ? 'password' : (f.type === 'number' ? 'number' : 'text')}" 
+               id="app_field_${f.key}" 
+               class="lp-input font-mono" 
+               value="${LP.escHtml(String(f.default))}" 
+               style="font-size:12px;" required>
+      </div>
+    `).join('');
+
+    new bootstrap.Modal(document.getElementById('appInstallModal')).show();
+  }
+
+  async function submitAppInstall(e) {
+    e.preventDefault();
+    if (!activeTemplate) return;
+
+    const btn = document.getElementById('btnDeployApp');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Deploying App...';
+
+    const projectName = document.getElementById('appProjectName').value.trim();
+    const customValues = {};
+    for (const f of activeTemplate.fields) {
+      const input = document.getElementById(`app_field_${f.key}`);
+      if (input) customValues[f.key] = input.value;
+    }
+
+    try {
+      const res = await LP.post('/docker/appstore/install', {
+        templateId: activeTemplate.id,
+        projectName,
+        customValues,
+      });
+
+      if (res?.success) {
+        LP.toast(`${activeTemplate.name} deployed successfully!`, 'success');
+        bootstrap.Modal.getInstance(document.getElementById('appInstallModal')).hide();
+        loadData();
+      } else {
+        LP.toast(res?.message || 'Failed to deploy app', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Error deploying app', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-rocket-takeoff me-1"></i> Deploy App Now';
+    }
+  }
+
+  // ── Container Resource Limits & Live Stats ────────────────
+  async function showResourceModal(containerId, containerName) {
+    document.getElementById('resContainerId').value = containerId;
+    document.getElementById('resLiveCpu').textContent = 'Loading...';
+    document.getElementById('resLiveMem').textContent = 'Loading...';
+    document.getElementById('resMemoryLimit').value = '';
+    document.getElementById('resNanoCpus').value = '';
+
+    new bootstrap.Modal(document.getElementById('resourceModal')).show();
+
+    try {
+      const res = await LP.get(`/docker/containers/${containerId}/stats`);
+      if (res?.success && res.data?.stats) {
+        const s = res.data.stats;
+        document.getElementById('resLiveCpu').textContent = `${s.cpuPercent}%`;
+        document.getElementById('resLiveMem').textContent = `${s.memoryUsageMb} MB / ${s.memoryLimitMb} MB (${s.memoryPercent}%)`;
+      }
+    } catch {
+      document.getElementById('resLiveCpu').textContent = 'Unavailable';
+      document.getElementById('resLiveMem').textContent = 'Unavailable';
+    }
+  }
+
+  async function saveContainerResources(e) {
+    e.preventDefault();
+    const containerId = document.getElementById('resContainerId').value;
+    const memoryLimitMb = document.getElementById('resMemoryLimit').value;
+    const nanoCpus = document.getElementById('resNanoCpus').value;
+    const restartPolicy = document.getElementById('resRestartPolicy').value;
+
+    const btn = document.getElementById('btnSaveResources');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Applying...';
+
+    try {
+      const res = await LP.post(`/docker/containers/${containerId}/resources`, {
+        memoryLimitMb: memoryLimitMb ? parseInt(memoryLimitMb, 10) : undefined,
+        nanoCpus: nanoCpus ? parseFloat(nanoCpus) : undefined,
+        restartPolicy,
+      });
+
+      if (res?.success) {
+        LP.toast('Container resource limits updated successfully!', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('resourceModal')).hide();
+        loadData();
+      } else {
+        LP.toast(res?.message || 'Failed to update resource limits', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Error updating resource limits', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Apply Resource Limits';
+    }
+  }
+
   return {
     loadData,
     action,
@@ -573,7 +788,14 @@ volumes:
     selectOnlineImage,
     deployCompose,
     loadComposeTemplate,
-    installPackage
+    installPackage,
+    loadAppStore,
+    filterAppStore,
+    searchAppStore,
+    showAppInstallModal,
+    submitAppInstall,
+    showResourceModal,
+    saveContainerResources,
   };
 })();
 
@@ -582,3 +804,4 @@ window.DockerPage = DockerPage;
 document.addEventListener('DOMContentLoaded', () => {
   DockerPage.loadData();
 });
+

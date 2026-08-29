@@ -10,9 +10,14 @@ router.use(requireAuth);
 router.use(requirePermission('docker_manage', 'read'));
 
 router.get('/summary', dockerController.getSummary);
+router.get('/appstore', dockerController.getAppStore);
+router.post('/appstore/install', requirePermission('docker_manage', 'execute'), dockerController.installAppTemplate);
+
 router.get('/containers', dockerController.listContainers);
 router.post('/containers', requirePermission('docker_manage', 'execute'), dockerController.createContainer);
 router.get('/containers/:id', dockerController.getContainer);
+router.get('/containers/:id/stats', dockerController.getContainerStats);
+router.post('/containers/:id/resources', requirePermission('docker_manage', 'execute'), dockerController.updateContainerResources);
 router.post('/containers/:id/start', requirePermission('docker_manage', 'execute'), dockerController.startContainer);
 router.post('/containers/:id/stop', requirePermission('docker_manage', 'execute'), dockerController.stopContainer);
 router.post('/containers/:id/restart', requirePermission('docker_manage', 'execute'), dockerController.restartContainer);

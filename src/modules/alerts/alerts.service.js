@@ -1,8 +1,7 @@
 import AlertConfig from '../../models/AlertConfig.js';
 import logger from '../../config/logger.js';
-// Node mailer for email might be needed, but we can just stub or use a basic fetch for Telegram
-// To make it simple, we use fetch for Telegram. For Email, we can require nodemailer.
 import nodemailer from 'nodemailer';
+import webpushService from './webpush.service.js';
 
 class AlertsService {
   async getConfig() {
@@ -134,14 +133,22 @@ class AlertsService {
 
   async triggerAlert(subject, message) {
     const config = await this.getConfig();
-    // Fire and forget
+    // Fire and forget multi-channel dispatch
     this.sendTelegram(message, config);
     this.sendEmail(subject, message, config);
     this.sendDiscord(subject, message, config);
     this.sendSlack(subject, message, config);
     this.sendWebhook(subject, message, config);
     this.sendWhatsApp(message, config);
+
+    // Browser WebPush notification
+    webpushService.sendNotification(null, {
+      title: subject,
+      body: message,
+      url: '/alerts',
+    }).catch(err => logger.warn(`[WebPush] triggerAlert push error: ${err.message}`));
   }
 }
 
 export default new AlertsService();
+

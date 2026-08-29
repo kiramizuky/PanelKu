@@ -1,4 +1,5 @@
 import alertsService from './alerts.service.js';
+import webpushService from './webpush.service.js';
 import { success, error } from '../../helpers/response.js';
 
 class AlertsController {
@@ -28,6 +29,37 @@ class AlertsController {
       return error(res, err.message, 500);
     }
   }
+
+  async getVapidPublicKey(req, res) {
+    try {
+      const publicKey = webpushService.getPublicKey();
+      return success(res, { publicKey });
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async subscribeWebPush(req, res) {
+    try {
+      const { subscription } = req.body;
+      const userAgent = req.headers['user-agent'] || '';
+      const result = await webpushService.subscribe(req.user._id, subscription, userAgent);
+      return success(res, result, 'Subscribed to WebPush notifications');
+    } catch (err) {
+      return error(res, err.message, err.statusCode || 500);
+    }
+  }
+
+  async unsubscribeWebPush(req, res) {
+    try {
+      const { endpoint } = req.body;
+      const result = await webpushService.unsubscribe(endpoint);
+      return success(res, result, 'Unsubscribed from WebPush notifications');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
 }
 
 export default new AlertsController();
+

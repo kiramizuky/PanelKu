@@ -1,4 +1,6 @@
 import wafService from './waf.service.js';
+import securityScannerService from './security-scanner.service.js';
+import geoipService from './geoip.service.js';
 import { success, errorResponse } from '../../helpers/response.js';
 
 class WafController {
@@ -43,6 +45,71 @@ class WafController {
       return errorResponse(res, error, 500);
     }
   }
+
+  async getSecurityScan(req, res) {
+    try {
+      const scan = await securityScannerService.getLatestScan();
+      return success(res, scan);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async runSecurityScan(req, res) {
+    try {
+      const scan = await securityScannerService.runScan();
+      return success(res, scan, 'Security audit scan completed');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async fixSecurityIssue(req, res) {
+    try {
+      const { fixAction } = req.body;
+      if (!fixAction) {
+        return errorResponse(res, new Error('fixAction is required'), 400);
+      }
+      const result = await securityScannerService.applyFix(fixAction);
+      return success(res, result, result.message || 'Fix applied successfully');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async getThreatMap(req, res) {
+    try {
+      const mapData = await geoipService.getThreatMapData();
+      return success(res, mapData, 'Threat map data retrieved');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async blockCountry(req, res) {
+    try {
+      const { countryCode, description } = req.body;
+      if (!countryCode) {
+        return errorResponse(res, new Error('countryCode is required'), 400);
+      }
+      const result = await geoipService.blockCountry(countryCode, description);
+      return success(res, result, `Country ${countryCode} has been blocked`);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async unblockCountry(req, res) {
+    try {
+      const { code } = req.params;
+      const result = await geoipService.unblockCountry(code);
+      return success(res, result, `Country ${code} has been unblocked`);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
 }
 
 export default new WafController();
+
+

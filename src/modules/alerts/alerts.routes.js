@@ -6,11 +6,16 @@ import { RESOURCES, ACTIONS } from '../../config/constants.js';
 
 const router = Router();
 router.use(authenticate);
-// Ensure only super admin or roles with explicit EXECUTE permission on SYSTEM can manage alerts
-router.use(rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE));
 
-router.get('/config', alertsController.getConfig.bind(alertsController));
-router.post('/config', alertsController.updateConfig.bind(alertsController));
-router.post('/test', alertsController.testAlert.bind(alertsController));
+// ── WebPush (All authenticated users can subscribe/unsubscribe) ──
+router.get('/webpush/vapid-public-key', alertsController.getVapidPublicKey.bind(alertsController));
+router.post('/webpush/subscribe', alertsController.subscribeWebPush.bind(alertsController));
+router.post('/webpush/unsubscribe', alertsController.unsubscribeWebPush.bind(alertsController));
+
+// ── System Alert Config (System EXECUTE permission) ──
+router.get('/config', rbac(RESOURCES.SYSTEM, ACTIONS.READ), alertsController.getConfig.bind(alertsController));
+router.post('/config', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), alertsController.updateConfig.bind(alertsController));
+router.post('/test', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), alertsController.testAlert.bind(alertsController));
 
 export default router;
+

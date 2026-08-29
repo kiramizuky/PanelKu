@@ -1,0 +1,48 @@
+{
+  "name": "Panelku - Server Control Panel",
+  "short_name": "Panelku",
+  "description": "Next-Generation Linux Server Management Platform",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0e1a",
+  "theme_color": "#4f46e5",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    {
+      "src": "/public/img/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/public/img/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/dashboard",
+      "description": "View server dashboard"
+    },
+    {
+      "name": "Web Terminal",
+      "url": "/terminal",
+      "description": "Open web shell terminal"
+    },
+    {
+      "name": "File Manager",
+      "url": "/filemanager",
+      "description": "Manage server files"
+    },
+    {
+      "name": "Security & WAF",
+      "url": "/waf",
+      "description": "View security status"
+    }
+  ]
+}

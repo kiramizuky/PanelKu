@@ -50,10 +50,11 @@
 </style>
 
 <ul class="nav nav-tabs mb-4 dk-tabs">
-  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#containers">Containers</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#images">Images</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#create-container">Create Container</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#docker-compose">Docker Compose</a></li>
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#containers"><i class="bi bi-hdd-stack me-1"></i> Containers</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#app-store" onclick="DockerPage.loadAppStore()"><i class="bi bi-shop me-1 text-primary"></i> App Store (1-Click)</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#images"><i class="bi bi-disc me-1"></i> Images</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#create-container"><i class="bi bi-plus-circle me-1"></i> Custom Container</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#docker-compose"><i class="bi bi-file-earmark-code me-1"></i> Compose Stack</a></li>
 </ul>
 
 <!-- Tab Content -->
@@ -77,6 +78,29 @@
         </tbody>
       </table>
       <div id="containersPagination" style="padding: 0 15px 15px 15px;"></div>
+    </div>
+  </div>
+
+  <!-- 1-Click App Store Tab -->
+  <div class="tab-pane fade" id="app-store">
+    <!-- Category Filter Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+      <div class="d-flex gap-2 flex-wrap" id="appStoreCategories">
+        <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="DockerPage.filterAppStore('all', this)">All Apps</button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.filterAppStore('Web & CMS', this)">Web &amp; CMS</button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.filterAppStore('AI & LLM', this)">AI &amp; LLM</button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.filterAppStore('Dev & Tools', this)">Dev &amp; Tools</button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.filterAppStore('Database', this)">Database</button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DockerPage.filterAppStore('Media & Home', this)">Media &amp; Home</button>
+      </div>
+      <div style="width: 240px;">
+        <input type="text" id="appStoreSearch" class="lp-input" placeholder="Search apps..." oninput="DockerPage.searchAppStore(this.value)" style="height:32px; font-size:12px;">
+      </div>
+    </div>
+
+    <!-- App Store Grid -->
+    <div class="row g-3" id="appStoreGrid">
+      <div class="col-12 text-center p-4"><p class="text-muted">Loading App Store Catalog...</p></div>
     </div>
   </div>
 
@@ -106,24 +130,24 @@
     </div>
   </div>
 
-  <!-- Create Container Tab -->
+  <!-- Create Custom Container Tab -->
   <div class="tab-pane fade" id="create-container">
     <div class="row g-4">
       <div class="col-12 col-lg-8">
         <div class="lp-glass-card p-4">
           <h4 style="margin-bottom:20px; font-size:16px; font-weight:600">Create Container</h4>
-          <form id="createContainerForm" onsubmit="DockerPage.submitContainer(event)">
+          <form onsubmit="DockerPage.submitContainer(event)">
             <div class="row g-3">
-              <div class="col-12 col-md-6">
+              <div class="col-md-6">
                 <div class="lp-form-group">
                   <label class="lp-label">Container Name</label>
-                  <input type="text" class="lp-input" id="cName" placeholder="my-app" required>
+                  <input type="text" id="cName" class="lp-input" placeholder="my-app" required>
                 </div>
               </div>
-              <div class="col-12 col-md-6">
+              <div class="col-md-6">
                 <div class="lp-form-group">
                   <label class="lp-label">Image Name</label>
-                  <input type="text" class="lp-input" id="cImage" placeholder="nginx:alpine" required>
+                  <input type="text" id="cImage" class="lp-input" placeholder="e.g. nginx:alpine" required>
                 </div>
               </div>
             </div>
@@ -133,12 +157,7 @@
                 <span>Port Mappings</span>
                 <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" style="padding:2px 8px" onclick="DockerPage.addPortRow()">+ Add</button>
               </label>
-              <div id="portMappingsContainer">
-                <div class="dynamic-row">
-                  <input type="number" class="lp-input" placeholder="Host Port (e.g. 8080)" data-type="host">
-                  <input type="number" class="lp-input" placeholder="Container Port (e.g. 80)" data-type="container">
-                </div>
-              </div>
+              <div id="portsContainer"></div>
             </div>
 
             <div class="lp-form-group mt-3">
@@ -146,7 +165,7 @@
                 <span>Volume Mappings</span>
                 <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" style="padding:2px 8px" onclick="DockerPage.addVolumeRow()">+ Add</button>
               </label>
-              <div id="volumeMappingsContainer"></div>
+              <div id="volumesContainer"></div>
             </div>
 
             <div class="lp-form-group mt-3">
@@ -171,7 +190,7 @@
               <label class="form-check-label text-white" for="cStart">Start container immediately after creation</label>
             </div>
 
-            <button type="submit" class="btn-lp btn-lp-primary mt-4 w-100">Create & Deploy Container</button>
+            <button type="submit" class="btn-lp btn-lp-primary mt-4 w-100">Create &amp; Deploy Container</button>
           </form>
         </div>
       </div>
@@ -196,31 +215,99 @@
     <div class="lp-glass-card p-4">
       <h4 style="margin-bottom:20px; font-size:16px; font-weight:600">Deploy with Docker Compose</h4>
       <form onsubmit="DockerPage.deployCompose(event)">
-        <div class="lp-form-group mb-3">
-          <label class="lp-label">Select App Template (Optional)</label>
-          <select id="composeTemplateSelect" class="lp-input" onchange="DockerPage.loadComposeTemplate()">
-            <option value="">-- Choose a template to pre-fill --</option>
-            <option value="wordpress">WordPress + MySQL Database</option>
-            <option value="nextcloud">Nextcloud + PostgreSQL Database</option>
-            <option value="n8n">n8n Workflow Automation</option>
-            <option value="uptime-kuma">Uptime Kuma Monitoring</option>
-          </select>
-        </div>
         <div class="lp-form-group">
           <label class="lp-label">Project Name</label>
           <input type="text" id="composeProjectName" class="lp-input" placeholder="my-stack" required>
         </div>
         <div class="lp-form-group mt-3">
           <label class="lp-label">compose.yml content</label>
-          <textarea id="composeYaml" class="lp-input font-mono" rows="15" placeholder="version: '3.8'
-services:
-  web:
-    image: nginx:alpine
-    ports:
-      - '8080:80'" style="resize: vertical" required></textarea>
+          <textarea id="composeYaml" class="lp-input font-mono" rows="15" placeholder="version: '3.8'&#10;services:&#10;  web:&#10;    image: nginx:alpine&#10;    ports:&#10;      - '8080:80'" style="resize: vertical" required></textarea>
         </div>
         <button type="submit" class="btn-lp btn-lp-primary mt-3 w-100">Deploy Stack</button>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- App Store 1-Click Install Modal -->
+<div class="modal fade" id="appInstallModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:#0f172a; border:1px solid var(--glass-border); color:#fff; border-radius:16px;">
+      <div class="modal-header border-0 pb-0">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div id="appModalIcon" style="width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px;"></div>
+          <div>
+            <h5 class="modal-title font-mono" id="appModalTitle" style="font-size:15px; font-weight:700; margin:0;">Install App</h5>
+            <small class="text-muted" id="appModalCategory">Category</small>
+          </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="appInstallForm" onsubmit="DockerPage.submitAppInstall(event)">
+        <div class="modal-body pt-3">
+          <p class="text-muted" id="appModalDesc" style="font-size:12px; line-height:1.4; margin-bottom:16px;"></p>
+          <div class="lp-form-group mb-3">
+            <label class="lp-label" style="font-size:11px; font-weight:600;">Stack / Project Name</label>
+            <input type="text" id="appProjectName" class="lp-input font-mono" required>
+          </div>
+          <div id="appDynamicFields" style="display:flex; flex-direction:column; gap:12px;"></div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" id="btnDeployApp" class="btn-lp btn-lp-primary"><i class="bi bi-rocket-takeoff me-1"></i> Deploy App Now</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Container Live Stats & Resource Limits Modal -->
+<div class="modal fade" id="resourceModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:#0f172a; border:1px solid var(--glass-border); color:#fff; border-radius:16px;">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title font-mono" style="font-size:14px;"><i class="bi bi-sliders text-primary me-2"></i>Container Resource Limits &amp; Stats</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <!-- Live Stats Gauge -->
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <div class="p-2 rounded text-center" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border);">
+              <small class="text-muted d-block" style="font-size:10px;">CPU USAGE</small>
+              <h4 id="resLiveCpu" style="font-weight:700; margin:4px 0 0 0; color:var(--accent-primary);">-- %</h4>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 rounded text-center" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border);">
+              <small class="text-muted d-block" style="font-size:10px;">MEMORY USAGE</small>
+              <h4 id="resLiveMem" style="font-weight:700; margin:4px 0 0 0; color:var(--accent-success);">-- MB</h4>
+            </div>
+          </div>
+        </div>
+
+        <form id="resourceForm" onsubmit="DockerPage.saveContainerResources(event)">
+          <input type="hidden" id="resContainerId">
+          <div class="lp-form-group mb-3">
+            <label class="lp-label" style="font-size:11px; font-weight:600;">Memory Limit (MB) <small class="text-muted">(0 for unlimited)</small></label>
+            <input type="number" id="resMemoryLimit" class="lp-input font-mono" placeholder="512" min="0">
+          </div>
+          <div class="lp-form-group mb-3">
+            <label class="lp-label" style="font-size:11px; font-weight:600;">CPU Quota / Limit (Cores) <small class="text-muted">(e.g. 1, 2 or leave empty)</small></label>
+            <input type="number" id="resNanoCpus" class="lp-input font-mono" placeholder="1" min="0" step="0.5">
+          </div>
+          <div class="lp-form-group mb-3">
+            <label class="lp-label" style="font-size:11px; font-weight:600;">Restart Policy</label>
+            <select id="resRestartPolicy" class="lp-input">
+              <option value="unless-stopped">Unless Stopped</option>
+              <option value="always">Always</option>
+              <option value="on-failure">On Failure</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <button type="submit" id="btnSaveResources" class="btn-lp btn-lp-primary w-100"><i class="bi bi-check2-circle me-1"></i> Apply Resource Limits</button>
+        </form>
+      </div>
     </div>
   </div>
 </div>
@@ -238,7 +325,9 @@ services:
       </div>
     </div>
   </div>
-</div><link href="/css/xterm.min.css" rel="stylesheet">
-  <script src="/js/xterm.min.js"></script>
-  <script src="/js/xterm-addon-fit.min.js"></script>
+</div>
+
+<link href="/css/xterm.min.css" rel="stylesheet">
+<script src="/js/xterm.min.js"></script>
+<script src="/js/xterm-addon-fit.min.js"></script>
 <script src="/js/docker.js"></script>

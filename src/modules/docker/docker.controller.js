@@ -142,12 +142,7 @@ class DockerController {
   async deployCompose(req, res) {
     try {
       const { projectName, yaml } = req.body;
-      // Note: errorResponse(res, message, statusCode) — fixed arg order
-      // (the old `errorResponse(res, 400, msg)` swapped them).
       if (!projectName || !yaml) return errorResponse(res, 'Project name and docker-compose YAML are required', 400);
-      // [R3-H2 FIX] Validate project name — blocks shell injection in
-      // `docker compose -p ${projectName}` and path traversal via the
-      // compose directory name. Shared with docker.service.js.
       if (!validateProjectName(projectName)) {
         return errorResponse(res, 'Invalid project name: use letters, digits, underscore or dash (max 64 chars)', 400);
       }
@@ -157,6 +152,47 @@ class DockerController {
       return errorResponse(res, error.message, 500);
     }
   }
+
+  async getAppStore(req, res) {
+    try {
+      const catalog = dockerService.getAppStoreCatalog();
+      return successResponse(res, { catalog }, 'App Store catalog retrieved');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async installAppTemplate(req, res) {
+    try {
+      const { templateId, projectName, customValues } = req.body;
+      if (!templateId) return errorResponse(res, 'templateId is required', 400);
+      const result = await dockerService.installAppStoreTemplate(templateId, projectName, customValues);
+      return successResponse(res, result, 'App template installed and deployed successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async getContainerStats(req, res) {
+    try {
+      const id = cleanId(req.params.id);
+      const stats = await dockerService.getContainerStats(id);
+      return successResponse(res, { stats }, 'Container stats retrieved');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async updateContainerResources(req, res) {
+    try {
+      const id = cleanId(req.params.id);
+      const result = await dockerService.updateContainerResources(id, req.body);
+      return successResponse(res, result, 'Container resources updated successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
 }
 
 export default new DockerController();
+

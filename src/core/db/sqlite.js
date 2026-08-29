@@ -242,6 +242,44 @@ function initSchema(db) {
       created_at    TEXT NOT NULL,
       updated_at    TEXT NOT NULL
     );
+
+    -- WebAuthn / Passkeys (FIDO2 credentials)
+    CREATE TABLE IF NOT EXISTS passkeys (
+      id             TEXT PRIMARY KEY,
+      user_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      credential_id  TEXT UNIQUE NOT NULL,
+      public_key     TEXT NOT NULL,
+      counter        INTEGER NOT NULL DEFAULT 0,
+      device_name    TEXT,
+      transports     TEXT NOT NULL DEFAULT '[]',
+      aaguid         TEXT,
+      created_at     TEXT NOT NULL,
+      last_used_at   TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON passkeys(user_id);
+    CREATE INDEX IF NOT EXISTS idx_passkeys_cred_id ON passkeys(credential_id);
+
+    -- WebPush Subscriptions
+    CREATE TABLE IF NOT EXISTS webpush_subscriptions (
+      id          TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      endpoint    TEXT UNIQUE NOT NULL,
+      keys_p256dh TEXT NOT NULL,
+      keys_auth   TEXT NOT NULL,
+      user_agent  TEXT,
+      created_at  TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_webpush_user_id ON webpush_subscriptions(user_id);
+
+    -- Automated Security & CVE Scans
+    CREATE TABLE IF NOT EXISTS security_scans (
+      id          TEXT PRIMARY KEY,
+      score       INTEGER NOT NULL,
+      summary     TEXT NOT NULL DEFAULT '{}',
+      findings    TEXT NOT NULL DEFAULT '[]',
+      created_at  TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_security_scans_created ON security_scans(created_at);
   `);
   
   try {

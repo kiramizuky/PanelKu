@@ -1,6 +1,7 @@
 import Docker from 'dockerode';
 import logger from '../../config/logger.js';
 import packageManager from '../system/package-manager.js';
+import APP_STORE_CATALOG from './appstore.catalog.js';
 
 
 /**
@@ -347,6 +348,106 @@ class DockerService {
       throw new Error(`Failed to deploy Docker Compose: ${error.message}`);
     }
   }
+
+  // ── 1-Click App Store Catalog ─────────────────────────────────
+
+  getAppStoreCatalog() {
+    return APP_STORE_CATALOG;
+  }
+
+  async installAppStoreTemplate(templateId, projectName, customValues = {}) {
+    const template = APP_STORE_CATALOG.find(t => t.id === templateId);
+    if (!template) {
+      throw new Error(`App template '${templateId}' not found in catalog`);
+    }
+
+    const cleanProjectName = (projectName || templateId).toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    if (!validateProjectName(cleanProjectName)) {
+      throw new Error('Invalid project name. Letters, numbers, hyphens and underscores only.');
+    }
+
+    // Substitute variables in compose template
+    let composeContent = template.compose;
+    for (const field of template.fields) {
+      const val = customValues[field.key] !== undefined ? customValues[field.key] : field.default;
+      const regex = new RegExp(`\\$\\{${field.key}\\}`, 'g');
+      composeContent = composeContent.replace(regex, String(val));
+    }
+
+    return await this.deployComposeProject(cleanProjectName, composeContent);
+  }
+
+  // ── Live Container Resource Stats & Limits ────────────────────
+
+  async getContainerStats(id) {
+    try {
+      const container = this.docker.getContainer(id);
+      const stats = await container.stats({ stream: false });
+
+      // CPU % calculation
+      let cpuPercent = 0.0;
+      if (stats.cpu_stats && stats.precpu_stats) {
+        const cpuDelta = (stats.cpu_stats.cpu_usage?.total_usage || 0) - (stats.precpu_stats.cpu_usage?.total_usage || 0);
+        const systemDelta = (stats.cpu_stats.system_cpu_usage || 0) - (stats.precpu_stats.system_cpu_usage || 0);
+        const cpuCount = stats.cpu_stats.online_cpus || stats.cpu_stats.cpu_usage?.percpu_usage?.length || 1;
+        if (systemDelta > 0 && cpuDelta > 0) {
+          cpuPercent = (cpuDelta / systemDelta) * cpuCount * 100.0;
+        }
+      }
+
+      // Memory calculation
+      const memUsage = stats.memory_stats?.usage || 0;
+      const memLimit = stats.memory_stats?.limit || 1;
+      const memPercent = (memUsage / memLimit) * 100.0;
+
+      // Network calculation
+      let rxBytes = 0;
+      let txBytes = 0;
+      if (stats.networks) {
+        for (const iface of Object.values(stats.networks)) {
+          rxBytes += iface.rx_bytes || 0;
+          txBytes += iface.tx_bytes || 0;
+        }
+      }
+
+      return {
+        id,
+        cpuPercent: parseFloat(cpuPercent.toFixed(2)),
+        memoryUsageMb: parseFloat((memUsage / (1024 * 1024)).toFixed(2)),
+        memoryLimitMb: parseFloat((memLimit / (1024 * 1024)).toFixed(2)),
+        memoryPercent: parseFloat(memPercent.toFixed(2)),
+        networkRxMb: parseFloat((rxBytes / (1024 * 1024)).toFixed(2)),
+        networkTxMb: parseFloat((txBytes / (1024 * 1024)).toFixed(2)),
+        pids: stats.pids_stats?.current || 0,
+      };
+    } catch (error) {
+      throw new Error(`Failed to get container stats: ${error.message}`);
+    }
+  }
+
+  async updateContainerResources(id, { memoryLimitMb, cpuShares, nanoCpus, restartPolicy }) {
+    try {
+      const container = this.docker.getContainer(id);
+      const updateOpts = {};
+      if (memoryLimitMb) {
+        updateOpts.Memory = parseInt(memoryLimitMb, 10) * 1024 * 1024;
+      }
+      if (cpuShares) {
+        updateOpts.CpuShares = parseInt(cpuShares, 10);
+      }
+      if (nanoCpus) {
+        updateOpts.NanoCPUs = parseInt(nanoCpus, 10) * 1e9;
+      }
+      if (restartPolicy) {
+        updateOpts.RestartPolicy = { Name: restartPolicy };
+      }
+      const res = await container.update(updateOpts);
+      return res;
+    } catch (error) {
+      throw new Error(`Failed to update container resources: ${error.message}`);
+    }
+  }
 }
 
 export default new DockerService();
+

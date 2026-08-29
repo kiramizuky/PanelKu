@@ -169,6 +169,41 @@
         </div>
       </div>
 
+      <!-- WebAuthn / Passkeys (FIDO2) Card -->
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card h-100 mb-0" style="border-radius:16px; padding:25px; display:flex; flex-direction:column;">
+          <div style="border-bottom:1px solid var(--glass-border); padding-bottom:12px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <h5 style="font-weight:700; margin:0; color:var(--text-primary);"><i class="bi bi-key-fill me-2 text-primary"></i>Passkeys (FIDO2)</h5>
+            <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="ProfilePage.registerPasskey()" id="btnAddPasskey" style="font-size:11px; padding:4px 10px;">
+              <i class="bi bi-plus-lg me-1"></i> Add Passkey
+            </button>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+            <div id="passkeyList" style="display:flex; flex-direction:column; gap:8px; max-height:160px; overflow-y:auto;">
+              <small class="text-muted">Loading registered passkeys...</small>
+            </div>
+            <small class="text-muted mt-2 d-block" style="font-size:10.5px; line-height:1.4;">Use Touch ID, Windows Hello, Face ID, or YubiKey for passwordless, phishing-resistant logins.</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- WebPush Mobile / Browser Notifications Card -->
+      <div class="col-12 col-md-6">
+        <div class="lp-glass-card h-100 mb-0" style="border-radius:16px; padding:25px; display:flex; flex-direction:column;">
+          <div style="border-bottom:1px solid var(--glass-border); padding-bottom:12px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+            <h5 style="font-weight:700; margin:0; color:var(--text-primary);"><i class="bi bi-bell-fill me-2 text-warning"></i>WebPush Notifications</h5>
+            <span id="pushBadge" class="lp-badge lp-badge-secondary" style="font-size:10px;">Checking...</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:12px; flex:1; justify-content:center;">
+            <p class="text-muted mb-0" style="font-size:11.5px; line-height:1.5;">Receive instant alerts for server failures, security threats, and auto-repair notifications directly on this device.</p>
+            <div style="display:flex; gap:8px;">
+              <button id="btnTogglePush" class="btn-lp btn-lp-primary flex-1" onclick="ProfilePage.togglePushSubscription()" style="font-size:12px; padding:6px 12px;">Enable Push Alerts</button>
+              <button id="btnTestPush" class="btn-lp btn-lp-ghost" onclick="ProfilePage.sendTestPush()" style="font-size:12px; padding:6px 12px; display:none;"><i class="bi bi-send me-1"></i> Test</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Change Password Card -->
       <div class="col-12">
         <div class="lp-glass-card" style="border-radius:16px; padding:25px;">

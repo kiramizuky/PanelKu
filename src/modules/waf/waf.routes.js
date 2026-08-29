@@ -14,4 +14,16 @@ router.post('/rules', wafController.addRule.bind(wafController));
 router.delete('/rules/:id', wafController.deleteRule.bind(wafController));
 router.get('/fail2ban/logs', wafController.getFail2BanLogs.bind(wafController));
 
+// ── Security Health & Vulnerability Scanner ──
+router.get('/security/scan', wafController.getSecurityScan.bind(wafController));
+router.post('/security/scan', wafController.runSecurityScan.bind(wafController));
+router.post('/security/fix', wafController.fixSecurityIssue.bind(wafController));
+
+// ── Real-time GeoIP Threat Map & Geo-Blocking ──
+router.get('/threat-map', wafController.getThreatMap.bind(wafController));
+router.post('/geo-block', wafController.blockCountry.bind(wafController));
+router.delete('/geo-block/:code', wafController.unblockCountry.bind(wafController));
+
 export default router;
+
+

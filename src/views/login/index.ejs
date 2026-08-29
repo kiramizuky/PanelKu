@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#4f46e5">
   <title>Login - Panelku</title>
   <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="manifest" href="/public/manifest.json">
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <link href="/css/app.css" rel="stylesheet">
@@ -211,6 +213,13 @@
             <button type="submit" id="submitBtn" class="btn-lp btn-lp-primary w-100 d-flex align-items-center justify-content-center" style="padding:10px; font-size:15px; border-radius:10px;">
               <span id="btnText">Sign In</span>
               <span id="btnSpinner" class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true" style="display: none;"></span>
+            </button>
+
+            <!-- Passkey Login Button -->
+            <button type="button" id="passkeyBtn" class="btn-lp btn-lp-ghost w-100 d-flex align-items-center justify-content-center mt-2" style="padding:9px; font-size:14px; border-radius:10px; border:1px solid rgba(255,255,255,0.12);" onclick="loginWithPasskey()">
+              <i class="bi bi-key-fill text-primary me-2"></i>
+              <span id="passkeyBtnText">Sign In with Passkey</span>
+              <span id="passkeySpinner" class="spinner-border spinner-border-sm ms-2" style="display:none;"></span>
             </button>
 
             <!-- SSO Login Buttons -->
@@ -449,6 +458,120 @@
         btnSpinner.style.display = 'none';
       }
     });
+
+    // ── Helper WebAuthn Base64URL encoding/decoding ──
+    function b64urlToBuf(b64url) {
+      const padding = '='.repeat((4 - (b64url.length % 4)) % 4);
+      const base64 = (b64url + padding).replace(/\-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const arr = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) arr[i] = rawData.charCodeAt(i);
+      return arr.buffer;
+    }
+
+    function bufToB64url(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    // ── Passkey Authentication Handler ──
+    async function loginWithPasskey() {
+      if (!window.PublicKeyCredential) {
+        alert('Passkeys / WebAuthn is not supported by your browser or device.');
+        return;
+      }
+
+      const btn = document.getElementById('passkeyBtn');
+      const btnText = document.getElementById('passkeyBtnText');
+      const spinner = document.getElementById('passkeySpinner');
+      const err = document.getElementById('errorMsg');
+
+      btn.disabled = true;
+      btnText.textContent = 'Waiting for Passkey...';
+      spinner.style.display = 'inline-block';
+      err.style.display = 'none';
+
+      try {
+        const u = document.getElementById('username').value.trim();
+        const url = '/api/auth/passkey/auth-options' + (u ? `?username=${encodeURIComponent(u)}` : '');
+        const optRes = await fetch(url).then(r => r.json());
+
+        if (!optRes?.success || !optRes?.data?.options) {
+          throw new Error(optRes?.message || 'Failed to initialize Passkey authentication');
+        }
+
+        const { options, challengeKey } = optRes.data;
+
+        // Convert base64url challenge & credential IDs
+        const publicKeyOpts = {
+          ...options,
+          challenge: b64urlToBuf(options.challenge),
+        };
+        if (publicKeyOpts.allowCredentials) {
+          publicKeyOpts.allowCredentials = publicKeyOpts.allowCredentials.map(c => ({
+            ...c,
+            id: b64urlToBuf(c.id),
+          }));
+        }
+
+        // Trigger native biometric / security key prompt
+        const credential = await navigator.credentials.get({ publicKey: publicKeyOpts });
+        if (!credential) throw new Error('Passkey verification was cancelled');
+
+        // Serialize response to JSON
+        const responsePayload = {
+          id: credential.id,
+          rawId: bufToB64url(credential.rawId),
+          type: credential.type,
+          response: {
+            clientDataJSON: bufToB64url(credential.response.clientDataJSON),
+            authenticatorData: bufToB64url(credential.response.authenticatorData),
+            signature: bufToB64url(credential.response.signature),
+            userHandle: credential.response.userHandle ? bufToB64url(credential.response.userHandle) : null,
+          },
+        };
+
+        const verifyRes = await fetch('/api/auth/passkey/auth-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ response: responsePayload, challengeKey }),
+        }).then(r => r.json());
+
+        if (verifyRes?.success) {
+          LP.state.accessToken = verifyRes.data.accessToken;
+          LP.state.user = verifyRes.data.user;
+          sessionStorage.setItem('access_token', verifyRes.data.accessToken);
+          localStorage.setItem('user', JSON.stringify(verifyRes.data.user));
+
+          if (verifyRes.data.mustChangePassword) {
+            window.location.href = '/settings/profile?forceChange=1';
+          } else {
+            window.location.href = '/dashboard';
+          }
+        } else {
+          throw new Error(verifyRes?.message || 'Passkey verification failed');
+        }
+      } catch (e) {
+        if (e.name !== 'NotAllowedError') {
+          err.textContent = e.message || 'Passkey authentication failed';
+          err.style.display = 'block';
+        }
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = 'Sign In with Passkey';
+        spinner.style.display = 'none';
+      }
+    }
+    window.loginWithPasskey = loginWithPasskey;
+
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/public/sw.js').catch(() => {});
+      });
+    }
   </script>
 </body>
 </html>

@@ -103,65 +103,201 @@ const WAFPage = {
 
   async scanSecurity() {
     const listEl = document.getElementById('securityAdvisorList');
-    listEl.innerHTML = '<p class="text-muted mb-0" style="font-size:13px;"><i class="spinner-border spinner-border-sm me-1"></i> Scanning system security configuration...</p>';
+    listEl.innerHTML = '<p class="text-muted mb-0" style="font-size:13px;"><i class="spinner-border spinner-border-sm me-1"></i> Running comprehensive security & vulnerability scan...</p>';
     
     try {
-      const res = await LP.get('/system/security/scan');
+      const res = await LP.get('/waf/security/scan');
       if (res?.success && res.data) {
-        const score = res.data.score;
-        const issues = res.data.issues;
+        const summary = res.data.summary || {};
+        const score = summary.score !== undefined ? summary.score : 100;
+        const findings = res.data.findings || [];
         
         const scoreTextEl = document.getElementById('securityScoreText');
         scoreTextEl.textContent = score;
         
         const ringEl = document.getElementById('securityScoreRing');
         if (score >= 90) {
-          ringEl.style.borderColor = 'var(--accent-success)';
-          scoreTextEl.style.color = 'var(--accent-success)';
-        } else if (score >= 70) {
-          ringEl.style.borderColor = 'var(--accent-warning)';
-          scoreTextEl.style.color = 'var(--accent-warning)';
+          ringEl.style.borderColor = '#10b981';
+          scoreTextEl.style.color = '#10b981';
+        } else if (score >= 75) {
+          ringEl.style.borderColor = '#3b82f6';
+          scoreTextEl.style.color = '#3b82f6';
+        } else if (score >= 50) {
+          ringEl.style.borderColor = '#f59e0b';
+          scoreTextEl.style.color = '#f59e0b';
         } else {
-          ringEl.style.borderColor = 'var(--accent-danger)';
-          scoreTextEl.style.color = 'var(--accent-danger)';
+          ringEl.style.borderColor = '#ef4444';
+          scoreTextEl.style.color = '#ef4444';
         }
         
-        if (issues.length === 0) {
-          listEl.innerHTML = '<p class="text-muted mb-0" style="font-size:13px;"><i class="bi bi-check2-circle text-success me-1"></i> No security vulnerabilities found. Your server is well-configured!</p>';
+        if (findings.length === 0) {
+          listEl.innerHTML = '<div class="p-3 rounded" style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.2);"><p class="text-success mb-0" style="font-size:13px;"><i class="bi bi-shield-check me-2"></i><strong>Excellent Security Posture!</strong> No vulnerabilities or configuration flaws detected.</p></div>';
         } else {
-          listEl.innerHTML = issues.map(issue => `
-            <div class="d-flex justify-content-between align-items-center p-2 rounded mb-2" style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05);">
-              <div>
-                <span class="d-block" style="font-size:12.5px; font-weight:600; color:#fff;">
-                  <span class="badge bg-${issue.severity === 'danger' ? 'danger' : 'warning'} me-1" style="font-size:9px;">${LP.escHtml(issue.severity.toUpperCase())}</span>
-                  ${LP.escHtml(issue.title)}
-                </span>
-                <small class="text-muted d-block" style="font-size:11px; margin-top:2px;">${LP.escHtml(issue.description)}</small>
-                <small class="text-info d-block" style="font-size:11px; margin-top:2px;"><i class="bi bi-lightbulb"></i> Recommendation: ${LP.escHtml(issue.recommendation)}</small>
+          listEl.innerHTML = findings.map(f => {
+            const sevBadge = f.severity === 'critical' ? 'badge bg-danger' : (f.severity === 'high' ? 'badge bg-warning text-dark' : 'badge bg-secondary');
+            return `
+              <div class="d-flex justify-content-between align-items-center p-2 rounded mb-2" style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06);">
+                <div style="flex:1; min-width:0; padding-right:12px;">
+                  <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                    <span class="${sevBadge}" style="font-size:9px; text-transform:uppercase;">${LP.escHtml(f.severity)}</span>
+                    <span class="badge bg-dark" style="font-size:9px; border:1px solid rgba(255,255,255,0.1);">${LP.escHtml(f.category || 'Security')}</span>
+                    <strong style="font-size:12.5px; color:#fff;">${LP.escHtml(f.title)}</strong>
+                  </div>
+                  <small class="text-muted d-block" style="font-size:11px; margin-top:2px;">${LP.escHtml(f.description)}</small>
+                  ${f.recommendation ? `<small class="text-info d-block" style="font-size:10.5px; margin-top:2px;"><i class="bi bi-lightbulb me-1"></i>${LP.escHtml(f.recommendation)}</small>` : ''}
+                </div>
+                ${f.canAutoFix && f.fixAction ? `
+                  <button class="btn-lp btn-lp-primary btn-lp-sm" style="font-size:11px; padding:4px 10px; height:28px; white-space:nowrap;" onclick="LP.call('WAFPage.fixIssue', '${LP.encJsArg(f.fixAction)}')">
+                    <i class="bi bi-magic me-1"></i> Auto Fix
+                  </button>
+                ` : ''}
               </div>
-              ${issue.fixable ? `
-                <button class="btn-lp btn-lp-primary btn-lp-sm" style="font-size:11px; padding:4px 8px; height: 28px;" onclick="LP.call('WAFPage.fixIssue', '${LP.encJsArg(issue.id)}')"><i class="bi bi-wrench"></i> Fix</button>
-              ` : ''}
-            </div>
-          `).join('');
+            `;
+          }).join('');
         }
+      } else {
+        listEl.innerHTML = `<p class="text-danger mb-0" style="font-size:13px;">${LP.escHtml(res?.message || 'Failed to load security scan')}</p>`;
       }
-    } catch (e) {
-      listEl.innerHTML = '<p class="text-danger mb-0" style="font-size:13px;">Failed to execute security scan.</p>';
+    } catch {
+      listEl.innerHTML = '<p class="text-danger mb-0" style="font-size:13px;">Failed to execute security audit scan.</p>';
     }
   },
 
-  async fixIssue(id) {
+  async fixIssue(fixAction) {
+    if (!(await LP.confirm(`Apply automated remediation for this security issue?`, 'Apply Security Fix'))) return;
+
+    LP.toast('Applying security remediation...', 'info');
     try {
-      const res = await LP.post('/system/security/fix', { id });
+      const res = await LP.post('/waf/security/fix', { fixAction });
       if (res?.success) {
-        LP.toast(res.message || 'Issue resolved successfully', 'success');
+        LP.toast(res.message || 'Security fix applied successfully!', 'success');
         this.scanSecurity();
       } else {
-        LP.toast(res?.message || 'Failed to fix issue', 'error');
+        LP.toast(res?.message || 'Failed to apply security fix', 'error');
       }
     } catch {
-      LP.toast('Connection error', 'error');
+      LP.toast('Error applying security fix', 'error');
+    }
+  },
+
+  // ── Real-Time GeoIP Threat Map & Geo-Shield ────────────────
+  async loadThreatMap() {
+    try {
+      const res = await LP.get('/waf/threat-map');
+      if (res?.success && res.data) {
+        this.renderThreatMap(res.data);
+      }
+    } catch {
+      LP.toast('Failed to load Threat Map data', 'error');
+    }
+  },
+
+  renderThreatMap(data) {
+    document.getElementById('tmTotalThreats').textContent = data.totalThreats || 0;
+    document.getElementById('tmUniqueIps').textContent = data.uniqueIps || 0;
+    document.getElementById('tmTopCountry').textContent = data.topAttackingCountries[0]?.countryName || 'None';
+    document.getElementById('tmBlockedCount').textContent = data.blockedCountriesList?.length || 0;
+
+    // Populate country select dropdown
+    const selectEl = document.getElementById('geoBlockCountrySelect');
+    if (selectEl && data.allCountryOptions) {
+      selectEl.innerHTML = '<option value="">-- Choose Country --</option>' +
+        data.allCountryOptions.map(c => `<option value="${c.code}">${LP.escHtml(c.name)} (${c.code})</option>`).join('');
+    }
+
+    // Render Country Bars
+    const barsEl = document.getElementById('tmCountryBars');
+    if (barsEl) {
+      if (!data.countries || data.countries.length === 0) {
+        barsEl.innerHTML = '<p class="text-muted" style="font-size:12px;">No intrusion events recorded yet.</p>';
+      } else {
+        barsEl.innerHTML = data.countries.slice(0, 8).map(c => `
+          <div>
+            <div style="display:flex; justify-content:space-between; font-size:11.5px; margin-bottom:4px;">
+              <span style="font-weight:600; color:#fff;">
+                <span class="badge bg-secondary me-1" style="font-size:9px;">${LP.escHtml(c.countryCode)}</span>
+                ${LP.escHtml(c.countryName)}
+              </span>
+              <span class="text-muted font-mono">${c.count} threats (${c.percentage}%)</span>
+            </div>
+            <div class="progress" style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px;">
+              <div class="progress-bar bg-danger" style="width: ${c.percentage}%; border-radius:3px;"></div>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Render Threat Feed Table
+    const tbody = document.getElementById('tmThreatsTableBody');
+    if (tbody) {
+      if (!data.threats || data.threats.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No recent blocked attacks</td></tr>';
+      } else {
+        tbody.innerHTML = data.threats.map(t => `
+          <tr>
+            <td class="font-mono" style="font-weight:600; color:var(--text-primary);">${LP.escHtml(t.ip)}</td>
+            <td>
+              <span class="badge bg-dark border border-secondary" style="font-size:9.5px; margin-right:4px;">${LP.escHtml(t.countryCode)}</span>
+              ${LP.escHtml(t.countryName)}
+            </td>
+            <td class="font-mono">${t.count}</td>
+            <td><span class="lp-badge lp-badge-danger"><span class="lp-badge-dot"></span>BLOCKED</span></td>
+            <td style="text-align:right;">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="WAFPage.quickBlockIp('${LP.escHtml(t.ip)}')" style="font-size:11px; padding:2px 8px;" title="Add permanent WAF IP Block">
+                <i class="bi bi-slash-circle"></i> Permanent
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+  },
+
+  async quickBlockIp(ip) {
+    if (!(await LP.confirm(`Add permanent WAF block rule for ${ip}?`, 'Block IP'))) return;
+    try {
+      const res = await LP.post('/waf/rules', {
+        type: 'ip',
+        value: ip,
+        action: 'block',
+        description: 'Auto-blocked from Threat Map live feed',
+      });
+      if (res?.success) {
+        LP.toast(`IP ${ip} permanently blocked in WAF`, 'success');
+        this.loadRules();
+      } else {
+        LP.toast(res?.message || 'Failed to block IP', 'error');
+      }
+    } catch {
+      LP.toast('Error blocking IP', 'error');
+    }
+  },
+
+  async submitGeoBlock() {
+    const selectEl = document.getElementById('geoBlockCountrySelect');
+    const countryCode = selectEl?.value;
+    if (!countryCode) {
+      LP.toast('Please select a country to block', 'warning');
+      return;
+    }
+
+    if (!(await LP.confirm(`Are you sure you want to block all incoming traffic from ${countryCode}?`, 'Confirm Geo-Block'))) return;
+
+    try {
+      const res = await LP.post('/waf/geo-block', {
+        countryCode,
+        description: `Geo-Shield 1-click block for ${countryCode}`,
+      });
+      if (res?.success) {
+        LP.toast(`Country ${countryCode} blocked successfully!`, 'success');
+        this.loadThreatMap();
+        this.loadRules();
+      } else {
+        LP.toast(res?.message || 'Failed to block country', 'error');
+      }
+    } catch {
+      LP.toast('Error blocking country', 'error');
     }
   }
 };
@@ -172,3 +308,4 @@ window.WAFPage = WAFPage;
 document.addEventListener('DOMContentLoaded', () => {
   WAFPage.init();
 });
+

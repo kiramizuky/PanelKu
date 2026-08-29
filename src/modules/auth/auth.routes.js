@@ -2,6 +2,7 @@ import { Router } from 'express';
 import authController from './auth.controller.js';
 import ssoController from './sso.controller.js';
 import ldapController from './ldap.controller.js';
+import passkeyController from './passkey.controller.js';
 import { authenticate } from '../../middleware/auth.js';
 import { authLimiter, twoFactorLimiter } from '../../middleware/rateLimiter.js';
 
@@ -12,6 +13,10 @@ router.post('/login', authLimiter, authController.login.bind(authController));
 // [MED-4 FIX] Use dedicated 2FA rate limiter (5 attempts per 15 min) keyed by tempToken + IP
 router.post('/2fa/verify', twoFactorLimiter, authController.verifyTwoFactor.bind(authController));
 router.post('/refresh', authController.refresh.bind(authController));
+
+// ── Public Passkey (FIDO2) Login ──
+router.get('/passkey/auth-options', authLimiter, passkeyController.getAuthenticationOptions.bind(passkeyController));
+router.post('/passkey/auth-verify', authLimiter, passkeyController.verifyAuthentication.bind(passkeyController));
 
 // ── Public SSO & LDAP status endpoints ──
 // Safe: only returns enabled/disabled status (no secrets)
@@ -29,9 +34,14 @@ router.post('/2fa/setup', authController.setup2FA.bind(authController));
 router.post('/2fa/enable', authController.enable2FA.bind(authController));
 router.post('/2fa/disable', authController.disable2FA.bind(authController));
 
+// ── Protected Passkey Management ──
+router.get('/passkey/register-options', passkeyController.getRegistrationOptions.bind(passkeyController));
+router.post('/passkey/register-verify', passkeyController.verifyRegistration.bind(passkeyController));
+router.get('/passkey/list', passkeyController.listPasskeys.bind(passkeyController));
+router.delete('/passkey/:id', passkeyController.deletePasskey.bind(passkeyController));
+
 // ── SSO Routes ──
 // SSO config (authenticated)
-router.get('/sso/config', ssoController.getConfig.bind(ssoController));
 router.post('/sso/config', ssoController.saveConfig.bind(ssoController));
 
 // SSO authorize & callback (public)
@@ -45,3 +55,4 @@ router.post('/ldap/test', ldapController.testConnection.bind(ldapController));
 router.post('/ldap/login', authLimiter, ldapController.login.bind(ldapController));
 
 export default router;
+
