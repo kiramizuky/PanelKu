@@ -1442,8 +1442,8 @@ const LvmPage = (() => {
         + syncHtml
         + (arr.uuid ? '<div style="margin-top:8px;font-size:9px;color:var(--text-muted);">UUID: <code>' + arr.uuid + '</code></div>' : '')
         + '<div style="display:flex;gap:8px;margin-top:12px;">'
-        + '<button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LvmPage.showFormatMountModal(\'' + arr.name + '\',\'ext4\')" style="font-size:10px;flex:1;"><i class="bi bi-hdd-stack me-1"></i>Format & Mount</button>'
-        + '<button class="btn-lp btn-lp-danger btn-lp-sm" onclick="LvmPage.stopRaid(\'' + arr.name + '\')" style="font-size:10px;flex:1;"><i class="bi bi-stop-circle me-1"></i>Stop</button>'
+        + '<button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LvmPage.showFormatMountModal(\\\'' + arr.name + '\\\',\\\'ext4\\\')" style="font-size:10px;flex:1;"><i class="bi bi-hdd-stack me-1"></i>Format & Mount</button>'
+        + '<button class="btn-lp btn-lp-danger btn-lp-sm" onclick="LvmPage.stopRaid(\\\'' + arr.name + '\\\')" style="font-size:10px;flex:1;"><i class="bi bi-stop-circle me-1"></i>Stop</button>'
         + '</div></div>';
     }).join('');
   }
