@@ -195,15 +195,20 @@ install_nodejs() {
       info "Package manager did not provide Node.js >= $NODE_VERSION. Installing official prebuilt binary..."
       local temp_tar="/tmp/node.tar.xz"
       case "$PM" in
-        apt) apt-get install -y tar xz-utils ;;
-        pacman) pacman -S --noconfirm --needed tar xz ;;
-        dnf|yum) $PM install -y tar xz ;;
-        apk) apk add tar xz ;;
-        zypper) zypper install -y tar xz ;;
+        apt) apt-get install -y tar xz-utils 2>/dev/null || true ;;
+        pacman) pacman -S --noconfirm --needed tar xz 2>/dev/null || true ;;
+        dnf|yum) $PM install -y tar xz 2>/dev/null || true ;;
+        apk) apk add tar xz 2>/dev/null || true ;;
+        zypper) zypper install -y tar xz 2>/dev/null || true ;;
       esac
-      curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}.11.0/node-v${NODE_VERSION}.11.0-linux-${node_arch}.tar.xz" -o "$temp_tar" || \
-        curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}.0.0/node-v${NODE_VERSION}.0.0-linux-${node_arch}.tar.xz" -o "$temp_tar"
-      tar -xJf "$temp_tar" -C /usr/local --strip-components=1
+      local node_dist_url="https://nodejs.org/dist/latest-v${NODE_VERSION}.x/"
+      local node_filename=$(curl -fsSL "$node_dist_url" 2>/dev/null | grep -oE "node-v[0-9.]+-linux-${node_arch}\.tar\.(xz|gz)" | head -1)
+      if [ -n "$node_filename" ]; then
+        curl -fsSL "${node_dist_url}${node_filename}" -o "$temp_tar" || true
+      else
+        curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}.0.0/node-v${NODE_VERSION}.0.0-linux-${node_arch}.tar.xz" -o "$temp_tar" || true
+      fi
+      tar -xJf "$temp_tar" -C /usr/local --strip-components=1 2>/dev/null || true
       rm -f "$temp_tar"
     else
       error "No prebuilt Node.js binary fallback available for architecture $ARCH. Installation failed."
@@ -215,11 +220,11 @@ install_nodejs() {
 install_pm2() {
   if ! command -v pm2 &>/dev/null; then
     info "Installing PM2..."
-    npm install -g pm2 -q
+    npm install -g pm2 -q 2>/dev/null || true
     if command -v systemctl &>/dev/null; then
-      pm2 startup systemd -u root --hp /root || true
+      pm2 startup systemd -u root --hp /root 2>/dev/null || true
     else
-      pm2 startup || true
+      pm2 startup 2>/dev/null || true
     fi
     log "PM2 installed"
   else
@@ -230,11 +235,13 @@ install_pm2() {
 setup_panel() {
   info "Setting up Panelku in $PANEL_DIR..."
   mkdir -p "$PANEL_DIR"
-  cp -r . "$PANEL_DIR/"
+  if [ "$PWD" != "$PANEL_DIR" ]; then
+    cp -r . "$PANEL_DIR/"
+  fi
   cd "$PANEL_DIR"
 
   info "Setting up storage directories..."
-  mkdir -p storage/logs storage/backups storage/websites storage/uploads storage/temp
+  mkdir -p storage/logs storage/backups storage/websites storage/uploads storage/temp storage/snapshots
   # [MED-7 FIX] Use 750 instead of 777 — storage contains SQLite DB and secrets.
   # Only panel process (running as root or dedicated user) needs access.
   chmod -R 750 storage
@@ -263,8 +270,8 @@ setup_panel() {
   npm install --production -q
   # [LOW-1 FIX] Rebuild native addons after npm install.
   # node-pty and better-sqlite3 are native modules that must match the running Node.js ABI.
-  npm rebuild better-sqlite3
-  npm rebuild node-pty
+  npm rebuild better-sqlite3 2>/dev/null || true
+  npm rebuild node-pty 2>/dev/null || true
 
   # Create systemd service so 'systemctl restart panelku' works
   # [HIGH-4 FIX] Service name 'panelku' matches system.service.js restartPanel()
@@ -273,17 +280,20 @@ setup_panel() {
     cat > /etc/systemd/system/panelku.service << EOF
 [Unit]
 Description=Panelku Linux Control Panel
-After=network.target redis.service
-Wants=redis.service
+After=network.target redis.service redis-server.service
+Wants=redis.service redis-server.service
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=$PANEL_DIR
-ExecStart=$(which node) src/server.js
+ExecStart=$(which node) --max-old-space-size=512 src/server.js
 Restart=on-failure
 RestartSec=5
 Environment=NODE_ENV=production
+MemoryHigh=400M
+MemoryMax=512M
+LimitNOFILE=65535
 StandardOutput=journal
 StandardError=journal
 
@@ -291,8 +301,8 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
-    systemctl enable panelku
-    systemctl start panelku
+    systemctl enable panelku 2>/dev/null || true
+    systemctl restart panelku 2>/dev/null || systemctl start panelku
     log "Panelku service created and started"
   else
     info "Starting panel with PM2..."
