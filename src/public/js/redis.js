@@ -196,7 +196,7 @@ const RedisPage = {
     this.ttlModal.hide();
     try {
       const res = await LP.post(`/redis/keys/${encodeURIComponent(key)}/ttl`, { seconds: parseInt(seconds) });
-      if (res?.success) { LP.toast(res.message, 'success'); this.scanKeys(); }
+      if (res?.success) { LP.toast(res?.message || 'TTL updated', 'success'); this.scanKeys(); }
       else { LP.toast(res?.message || 'Failed', 'error'); }
     } catch { LP.toast('Error', 'error'); }
   },
@@ -245,7 +245,7 @@ const RedisPage = {
     if (newValue === null) return;
     try {
       const res = await LP.post('/redis/config', { key, value: newValue });
-      if (res?.success) { LP.toast(res.message, 'success'); this.loadConfig(); }
+      if (res?.success) { LP.toast(res?.message || 'Config saved', 'success'); this.loadConfig(); }
       else { LP.toast(res?.message || 'Failed', 'error'); }
     } catch { LP.toast('Error', 'error'); }
   },
@@ -288,7 +288,7 @@ const RedisPage = {
     if (!(await LP.confirm(`Kill client "${addr}"?`, 'Kill Client'))) return;
     try {
       const res = await LP.post('/redis/clients/kill', { addr });
-      if (res?.success) { LP.toast(res.message, 'success'); this.loadClients(); }
+      if (res?.success) { LP.toast(res?.message || 'Client disconnected', 'success'); this.loadClients(); }
       else { LP.toast(res?.message || 'Failed', 'error'); }
     } catch { LP.toast('Error', 'error'); }
   },

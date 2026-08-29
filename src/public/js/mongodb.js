@@ -110,7 +110,7 @@ const MongoDBPage = {
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Installing...'; }
     try {
       const res = await LP.post('/mongodb/install');
-      if (res?.success) { LP.toast(res.message, 'success'); this.refresh(); }
+      if (res?.success) { LP.toast(res?.message || 'MongoDB installed successfully', 'success'); this.refresh(); }
       else { LP.toast(res?.message || 'Install failed', 'error'); }
     } catch { LP.toast('Error', 'error'); }
     finally { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-download me-1"></i> Install MongoDB'; } }
@@ -361,7 +361,7 @@ const MongoDBPage = {
     LP.toast('Starting MongoDB backup...', 'info');
     try {
       const res = await LP.post('/mongodb/backup', { database: database || undefined });
-      if (res?.success) { LP.toast(res.message, 'success'); }
+      if (res?.success) { LP.toast(res?.message || 'Backup completed', 'success'); }
       else { LP.toast(res?.message || 'Backup failed', 'error'); }
     } catch { LP.toast('Backup error', 'error'); }
   },
@@ -376,7 +376,7 @@ const MongoDBPage = {
     LP.toast('Starting MongoDB restore...', 'info');
     try {
       const res = await LP.post('/mongodb/restore', { path, database: database || undefined });
-      if (res?.success) { LP.toast(res.message, 'success'); this.loadDatabases(); }
+      if (res?.success) { LP.toast(res?.message || 'Restore completed', 'success'); this.loadDatabases(); }
       else { LP.toast(res?.message || 'Restore failed', 'error'); }
     } catch { LP.toast('Restore error', 'error'); }
   },

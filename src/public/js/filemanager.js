@@ -1311,25 +1311,22 @@ const FMPage = (() => {
     const confirmed = await LP.confirm(`Delete <strong>${escHtml(selectedItem.name)}</strong>?<br><small class="text-danger">This action cannot be undone.</small>`, 'Delete File');
     if (!confirmed) return;
 
-    const _res = await LP.del('/filemanager/delete', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${LP.state.accessToken}` },
-      body: JSON.stringify({ path: selectedItem.path }),
-    });
+    try {
+      const delRes = await fetch('/api/filemanager/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${LP.state.accessToken}` },
+        credentials: 'include',
+        body: JSON.stringify({ path: selectedItem.path }),
+      }).then(r => r.json()).catch(() => null);
 
-    // Custom delete call (LP.del wraps body issue)
-    const delRes = await fetch('/api/filemanager/delete', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${LP.state.accessToken}` },
-      credentials: 'include',
-      body: JSON.stringify({ path: selectedItem.path }),
-    }).then(r => r.json());
-
-    if (delRes?.success) {
-      LP.toast('Deleted', 'success');
-      refresh();
-    } else {
-      LP.toast(delRes?.message || 'Delete failed', 'error');
+      if (delRes?.success) {
+        LP.toast('Deleted', 'success');
+        refresh();
+      } else {
+        LP.toast(delRes?.message || 'Delete failed', 'error');
+      }
+    } catch {
+      LP.toast('Error deleting file', 'error');
     }
   }
 

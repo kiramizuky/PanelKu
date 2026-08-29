@@ -89,7 +89,7 @@ const SystemPage = {
           </tr>
         `).join('');
       } else {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${LP.escHtml(res.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${LP.escHtml(res?.message || 'Failed to load services')}</td></tr>`;
       }
     } catch (err) {
       tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--accent-danger)">Failed to load services</td></tr>';
@@ -108,7 +108,7 @@ const SystemPage = {
         LP.toast(`Service ${service} ${action}ed`, 'success');
         this.loadServices();
       } else {
-        LP.toast(res.message, 'error');
+        LP.toast(res?.message || `Failed to ${action} service`, 'error');
         btn.innerHTML = oldHtml;
         btn.disabled = false;
       }
@@ -132,7 +132,7 @@ const SystemPage = {
         new bootstrap.Modal(document.getElementById('aptLogModal')).show();
         LP.toast(`${this.pmInfo ? this.pmInfo.name : 'Package Manager'} ${action} completed`, 'success');
       } else {
-        LP.toast(res.message, 'error');
+        LP.toast(res?.message || 'Package manager operation failed', 'error');
       }
     } catch (err) {
       LP.toast('Connection error', 'error');
@@ -155,7 +155,7 @@ const SystemPage = {
         LP.toast('Panel is restarting. Page will reload automatically...', 'warning');
         setTimeout(() => window.location.reload(), 4000);
       } else {
-        LP.toast(res.message, 'error');
+        LP.toast(res?.message || 'Failed to restart panel', 'error');
       }
     } catch (err) {
       // Net connection drops are expected during restart
@@ -185,7 +185,7 @@ const SystemPage = {
           </tr>
         `).join('');
       } else {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:15px; color:var(--accent-danger);">Error: ${res.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:15px; color:var(--accent-danger);">Error: ${LP.escHtml(res?.message || 'Failed to load SSH keys.')}</td></tr>`;
       }
     } catch {
       tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:15px; color:var(--accent-danger);">Failed to load SSH keys.</td></tr>';
@@ -223,7 +223,7 @@ const SystemPage = {
         bootstrap.Modal.getInstance(document.getElementById('addSshKeyModal')).hide();
         this.loadSshKeys();
       } else {
-        LP.toast(res.message || 'Failed to add SSH key', 'error');
+        LP.toast(res?.message || 'Failed to add SSH key', 'error');
       }
     } catch {
       LP.toast('Error adding SSH key', 'error');
@@ -238,7 +238,7 @@ const SystemPage = {
         LP.toast('SSH key deleted successfully.', 'success');
         this.loadSshKeys();
       } else {
-        LP.toast(res.message || 'Failed to delete SSH key', 'error');
+        LP.toast(res?.message || 'Failed to delete SSH key', 'error');
       }
     } catch {
       LP.toast('Error deleting SSH key', 'error');
@@ -262,7 +262,7 @@ const SystemPage = {
         LP.toast('SSH configuration updated and daemon restarted.', 'success');
         this.loadSshConfig();
       } else {
-        LP.toast(res.message || 'Failed to save config', 'error');
+        LP.toast(res?.message || 'Failed to save config', 'error');
       }
     } catch {
       LP.toast('Error saving config', 'error');
@@ -300,7 +300,7 @@ const SystemPage = {
         LP.toast('PHP-FPM pool configuration saved and reloaded.', 'success');
         this.loadPHPConfig();
       } else {
-        LP.toast(res.message || 'Failed to save config', 'error');
+        LP.toast(res?.message || 'Failed to save config', 'error');
       }
     } catch {
       LP.toast('Error saving PHP FPM config', 'error');
@@ -316,7 +316,7 @@ const SystemPage = {
         LP.toast('Server is rebooting. You will be disconnected...', 'warning');
         setTimeout(() => window.location.reload(), 15000); // Try reload after 15s
       } else {
-        LP.toast(res.message, 'error');
+        LP.toast(res?.message || 'Failed to reboot server', 'error');
       }
     } catch (err) {
       LP.toast('Failed to initiate reboot', 'error');

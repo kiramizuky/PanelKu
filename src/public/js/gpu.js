@@ -126,8 +126,8 @@ const GPU = (() => {
     if (!(await LP.confirm(`Kill process ${pid} (${name})?`, 'Kill Process'))) return;
     try {
       const res = await LP.post('/gpu/kill', { pid });
-      if (res?.success) { LP.toast('Process killed: ' + res.data.method, 'success'); loadProcesses(); }
-      else LP.toast('Failed to kill process', 'error');
+      if (res?.success) { LP.toast('Process killed: ' + (res.data?.method || 'success'), 'success'); loadProcesses(); }
+      else LP.toast(res?.message || 'Failed to kill process', 'error');
     } catch { LP.toast('Error killing process', 'error'); }
   }
 
@@ -138,8 +138,8 @@ const GPU = (() => {
     try {
       const res = await LP.post('/gpu/power-limit', { gpuIndex: parseInt(gpuIndex), watts: parseInt(watts) });
       if (res?.success) LP.toast(`Power limit set to ${watts}W`, 'success');
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to set power limit', 'error');
+    } catch { LP.toast('Error setting power limit', 'error'); }
   }
 
   async function resetGpu() {
@@ -148,8 +148,8 @@ const GPU = (() => {
     try {
       const res = await LP.post('/gpu/reset', { gpuIndex: parseInt(gpuIndex) });
       if (res?.success) LP.toast('GPU reset initiated', 'success');
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to reset GPU', 'error');
+    } catch { LP.toast('Error resetting GPU', 'error'); }
   }
 
   async function checkGpu() { loadData(); }

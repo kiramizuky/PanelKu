@@ -340,7 +340,7 @@ const ClusterPage = (() => {
         bootstrap.Modal.getInstance(document.getElementById('addNodeModal')).hide();
         loadNodes();
       } else {
-        LP.toast(res.message || 'Gagal menambahkan node', 'error');
+        LP.toast(res?.message || 'Gagal menambahkan node', 'error');
       }
     } catch {
       LP.toast('Error saat mengirim request', 'error');
@@ -462,10 +462,10 @@ const ClusterPage = (() => {
     try {
       const res = await LP.delete(`/cluster/nodes/${id}`);
       if (res?.success) {
-        LP.toast('Node berhasil dihapus.', 'success');
+        LP.toast('Agent Node berhasil dihapus', 'success');
         loadNodes();
       } else {
-        LP.toast(res.message || 'Gagal menghapus node', 'error');
+        LP.toast(res?.message || 'Gagal menghapus node', 'error');
       }
     } catch {
       LP.toast('Error saat menghapus node', 'error');

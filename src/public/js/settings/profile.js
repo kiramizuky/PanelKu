@@ -107,11 +107,11 @@ const ProfilePage = (() => {
         newPassword
       });
 
-      if (res.success) {
+      if (res?.success) {
         LP.toast('Password updated successfully', 'success');
         e.target.reset(); // Clear the form
       } else {
-        LP.toast(res.message || 'Failed to update password', 'error');
+        LP.toast(res?.message || 'Failed to update password', 'error');
       }
     } catch (err) {
       LP.toast(err.message || 'Error updating password', 'error');

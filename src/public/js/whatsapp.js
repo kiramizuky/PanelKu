@@ -114,7 +114,7 @@ const WhatsappPage = (() => {
       webhookModal.hide();
       loadData();
     } else {
-      LP.toast('Failed to save webhook', 'error');
+      LP.toast(res?.message || 'Failed to save webhook', 'error');
     }
   }
 
@@ -154,7 +154,7 @@ const WhatsappPage = (() => {
       }
       loadData();
     } else {
-      LP.toast('Failed to delete session', 'error');
+      LP.toast(res?.message || 'Failed to delete session', 'error');
     }
   }
 

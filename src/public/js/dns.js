@@ -335,7 +335,7 @@ const DNSPage = {
     try {
       const res = await LP.post(`/dns/providers/${this.activeProvider}/test`);
       if (res?.success) {
-        LP.toast(res.message || 'Connection OK!', 'success');
+        LP.toast(res?.message || 'Connection OK!', 'success');
         document.getElementById('currentProviderStatus').textContent = 'Connection OK ✓';
         // Reload zones
         await this.selectProvider(this.activeProvider);

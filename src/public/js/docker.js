@@ -265,7 +265,7 @@ const DockerPage = (() => {
       document.getElementById('envContainer').innerHTML = '';
       loadData();
     } else {
-      LP.toast(`Failed to create container: ${res?.message}`, 'error');
+      LP.toast(res?.message || 'Failed to create container', 'error');
     }
   }
 
@@ -316,7 +316,7 @@ const DockerPage = (() => {
       LP.toast('Compose Stack deployed successfully!', 'success');
       loadData();
     } else {
-      LP.toast(`Deployment failed: ${res?.message}`, 'error');
+      LP.toast(res?.message || 'Failed to deploy compose stack', 'error');
     }
   }
 

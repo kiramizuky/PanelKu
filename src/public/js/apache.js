@@ -130,10 +130,12 @@ const ApachePage = {
       const res = await LP.get('/apache/configtest');
       if (res?.success) {
         const isValid = res.data?.valid;
-        LP.toast(res.message || (isValid ? 'Config syntax OK!' : 'Config has errors'), isValid ? 'success' : 'error');
+        LP.toast(res?.message || (isValid ? 'Config syntax OK!' : 'Config has errors'), isValid ? 'success' : 'error');
         if (!isValid && res.data?.output) {
           // Configtest output available in res.data.output
         }
+      } else {
+        LP.toast(res?.message || 'Config test failed', 'error');
       }
     } catch {
       LP.toast('Config test error', 'error');
@@ -251,7 +253,7 @@ const ApachePage = {
     try {
       const res = await LP.post('/apache/vhosts/toggle', { name, enable });
       if (res?.success) {
-        LP.toast(res.message, 'success');
+        LP.toast(res?.message || `Vhost ${enable ? 'enabled' : 'disabled'}`, 'success');
         this.loadVhosts();
       } else {
         LP.toast(res?.message || 'Failed to toggle vhost', 'error');

@@ -72,16 +72,16 @@ const IOT = (() => {
     try {
       const res = await LP.post('/iot/mqtt/install');
       if (res?.success) { LP.toast('Mosquitto installed', 'success'); loadMqtt(); }
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to install Mosquitto', 'error');
+    } catch { LP.toast('Error installing Mosquitto', 'error'); }
   }
 
   async function mqttAction(action) {
     try {
       const res = await LP.post('/iot/mqtt/control', { action });
       if (res?.success) { LP.toast(`Mosquitto ${action}ed`, 'success'); loadMqtt(); }
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || `Failed to ${action} Mosquitto`, 'error');
+    } catch { LP.toast(`Error ${action}ing Mosquitto`, 'error'); }
   }
 
   async function saveMqttConfig() {
@@ -89,8 +89,8 @@ const IOT = (() => {
     try {
       const res = await LP.post('/iot/mqtt/config', { config });
       if (res?.success) LP.toast('Config saved & restarted', 'success');
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to save MQTT config', 'error');
+    } catch { LP.toast('Error saving MQTT config', 'error'); }
   }
 
   async function addMqttUser() {
@@ -104,8 +104,8 @@ const IOT = (() => {
         document.getElementById('mqttUserInput').value = '';
         document.getElementById('mqttPassInput').value = '';
         loadMqtt();
-      } else LP.toast(res?.message || 'Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      } else LP.toast(res?.message || 'Failed to add MQTT user', 'error');
+    } catch { LP.toast('Error adding user', 'error'); }
   }
 
   async function deleteMqttUser(username) {
@@ -113,8 +113,8 @@ const IOT = (() => {
     try {
       const res = await LP.delete('/iot/mqtt/users', { username });
       if (res?.success) { LP.toast('User deleted', 'success'); loadMqtt(); }
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to delete user', 'error');
+    } catch { LP.toast('Error deleting user', 'error'); }
   }
 
   async function publish() {
@@ -125,8 +125,8 @@ const IOT = (() => {
     try {
       const res = await LP.post('/iot/mqtt/publish', { topic, message, qos: parseInt(qos) });
       if (res?.success) LP.toast('Message published', 'success');
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to publish message', 'error');
+    } catch { LP.toast('Error publishing message', 'error'); }
   }
 
   // ── Home Assistant ───────────────────────────────────
@@ -161,8 +161,8 @@ const IOT = (() => {
     try {
       const res = await LP.post('/iot/homeassistant/install');
       if (res?.success) { LP.toast('Home Assistant installed', 'success'); loadHa(); }
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to install Home Assistant', 'error');
+    } catch { LP.toast('Error installing Home Assistant', 'error'); }
   }
 
   // ── Node-RED ─────────────────────────────────────────
@@ -197,8 +197,8 @@ const IOT = (() => {
     try {
       const res = await LP.post('/iot/nodered/install');
       if (res?.success) { LP.toast('Node-RED installed', 'success'); loadNodeRed(); }
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to install Node-RED', 'error');
+    } catch { LP.toast('Error installing Node-RED', 'error'); }
   }
 
   // ── Device Discovery ─────────────────────────────────

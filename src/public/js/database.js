@@ -527,7 +527,7 @@ const DB = (() => {
         const table = document.getElementById('importTableSelect').value;
         res = await LP.post('/database/import/csv', { type: activeType, database: activeDb, table, csv: content, schema: activeSchema });
       }
-      if (res?.success) LP.toast(`Imported successfully: ${res.message}`, 'success');
+      if (res?.success) LP.toast(res?.message ? `Imported successfully: ${res.message}` : 'Imported successfully', 'success');
       else LP.toast(res?.message || 'Import failed', 'error');
     } catch { LP.toast('Import error', 'error'); }
   }

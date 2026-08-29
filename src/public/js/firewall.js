@@ -33,7 +33,7 @@ const FirewallPage = {
         if (searchInput) searchInput.value = '';
         
       } else {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${LP.escHtml(res.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${LP.escHtml(res?.message || 'Failed to load firewall status')}</td></tr>`;
       }
     } catch (err) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Failed to load firewall status</td></tr>';
@@ -53,7 +53,7 @@ const FirewallPage = {
         this.loadStatus();
       } else {
         el.checked = !enable;
-        LP.toast(res.message, 'error');
+        LP.toast(res?.message || 'Failed to toggle firewall', 'error');
       }
     } catch (err) {
       el.checked = !enable;
@@ -71,26 +71,34 @@ const FirewallPage = {
     const protocol = document.getElementById('ruleProtocol').value;
     const action = document.getElementById('ruleAction').value;
 
-    const res = await LP.post('/firewall/rules', { port, protocol, action });
-    if (res?.success) {
-      LP.toast('Rule added', 'success');
-      bootstrap.Modal.getInstance(document.getElementById('addRuleModal')).hide();
-      document.getElementById('addRuleForm').reset();
-      this.loadStatus();
-    } else {
-      LP.toast(res.message, 'error');
+    try {
+      const res = await LP.post('/firewall/rules', { port, protocol, action });
+      if (res?.success) {
+        LP.toast('Rule added', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('addRuleModal')).hide();
+        document.getElementById('addRuleForm').reset();
+        this.loadStatus();
+      } else {
+        LP.toast(res?.message || 'Failed to add rule', 'error');
+      }
+    } catch {
+      LP.toast('Error adding rule', 'error');
     }
   },
 
   async deleteRule(id) {
     if (!(await LP.confirm(`Are you sure you want to delete rule [${id}]?`, 'Delete Rule'))) return;
     
-    const res = await LP.delete(`/firewall/rules/${id}`);
-    if (res?.success) {
-      LP.toast('Rule deleted', 'success');
-      this.loadStatus();
-    } else {
-      LP.toast(res.message, 'error');
+    try {
+      const res = await LP.delete(`/firewall/rules/${id}`);
+      if (res?.success) {
+        LP.toast('Rule deleted', 'success');
+        this.loadStatus();
+      } else {
+        LP.toast(res?.message || 'Failed to delete rule', 'error');
+      }
+    } catch {
+      LP.toast('Error deleting rule', 'error');
     }
   },
 

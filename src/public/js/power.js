@@ -72,8 +72,8 @@ const POWER = (() => {
     try {
       const res = await LP.post('/power/cpu/governor', { governor: gov });
       if (res?.success) { LP.toast(`Governor set to ${gov}`, 'success'); loadCpuInfo(); }
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to set governor', 'error');
+    } catch { LP.toast('Error setting governor', 'error'); }
   }
 
   async function setFrequency() {
@@ -83,8 +83,8 @@ const POWER = (() => {
     try {
       const res = await LP.post('/power/cpu/frequency', { khz });
       if (res?.success) LP.toast(`Frequency set to ${mhz} MHz`, 'success');
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to set frequency', 'error');
+    } catch { LP.toast('Error setting frequency', 'error'); }
   }
 
   // ── Power Profiles ───────────────────────────────────

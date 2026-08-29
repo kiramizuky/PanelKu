@@ -32,7 +32,7 @@ const WAFPage = {
           </tr>
         `, 'No WAF rules found', 5);
       } else {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${LP.escHtml(res.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${LP.escHtml(res?.message || 'Failed to load WAF rules')}</td></tr>`;
       }
     } catch (err) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger)">Failed to load WAF rules</td></tr>';
@@ -50,14 +50,18 @@ const WAFPage = {
     const action = document.getElementById('ruleAction').value;
     const description = document.getElementById('ruleDescription').value;
 
-    const res = await LP.post('/waf/rules', { type, value, action, description });
-    if (res?.success) {
-      LP.toast('WAF Rule added successfully', 'success');
-      bootstrap.Modal.getInstance(document.getElementById('addRuleModal')).hide();
-      document.getElementById('addRuleForm').reset();
-      this.loadRules();
-    } else {
-      LP.toast(res.message, 'error');
+    try {
+      const res = await LP.post('/waf/rules', { type, value, action, description });
+      if (res?.success) {
+        LP.toast('WAF Rule added successfully', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('addRuleModal')).hide();
+        document.getElementById('addRuleForm').reset();
+        this.loadRules();
+      } else {
+        LP.toast(res?.message || 'Failed to add WAF rule', 'error');
+      }
+    } catch {
+      LP.toast('Error adding WAF rule', 'error');
     }
   },
 
@@ -70,7 +74,7 @@ const WAFPage = {
         LP.toast('Rule deleted', 'success');
         this.loadRules();
       } else {
-        LP.toast(res.message, 'error');
+        LP.toast(res?.message || 'Failed to delete rule', 'error');
       }
     } catch (err) {
       LP.toast('Connection error', 'error');

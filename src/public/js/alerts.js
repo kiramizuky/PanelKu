@@ -92,7 +92,7 @@ const AlertsPage = {
       if (res?.success) {
         LP.toast('Alert configuration saved successfully', 'success');
       } else {
-        LP.toast(res.message, 'error');
+        LP.toast(res?.message || 'Failed to save alert configuration', 'error');
       }
     } catch (err) {
       LP.toast('Connection error', 'error');
@@ -106,7 +106,7 @@ const AlertsPage = {
       if (res?.success) {
         LP.toast('Test alert dispatched!', 'success');
       } else {
-        LP.toast(res.message, 'error');
+        LP.toast(res?.message || 'Failed to send test alert', 'error');
       }
     } catch (err) {
       LP.toast('Connection error', 'error');

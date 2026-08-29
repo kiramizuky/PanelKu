@@ -240,7 +240,7 @@ const PythonPage = {
     LP.toast('Creating virtual environment...', 'info');
     try {
       const res = await LP.post('/python/venvs', { name, pythonVersion: pyVer || undefined });
-      if (res?.success) { LP.toast(res.message, 'success'); this.loadVirtualEnvs(); }
+      if (res?.success) { LP.toast(res?.message || 'Virtual environment created', 'success'); this.loadVirtualEnvs(); }
       else { LP.toast(res?.message || 'Failed', 'error'); }
     } catch { LP.toast('Error', 'error'); }
   },
@@ -354,7 +354,7 @@ const PythonPage = {
 
     try {
       const res = await LP.post('/python/wsgi/start', { type, appModule, port, host, workers, venvPath: venvPath || undefined });
-      if (res?.success) { LP.toast(res.message, 'success'); setTimeout(() => this.loadWsgiServers(), 1000); }
+      if (res?.success) { LP.toast(res?.message || 'Server started', 'success'); setTimeout(() => this.loadWsgiServers(), 1000); }
       else { LP.toast(res?.message || 'Failed', 'error'); }
     } catch { LP.toast('Error starting server', 'error'); }
   },
@@ -447,7 +447,7 @@ const PythonPage = {
         numprocs: parseInt(numprocs) || 1,
         environment: environment || undefined,
       });
-      if (res?.success) { LP.toast(res.message, 'success'); this.loadSupervisor(); }
+      if (res?.success) { LP.toast(res?.message || 'Supervisor config created', 'success'); this.loadSupervisor(); }
       else { LP.toast(res?.message || 'Failed', 'error'); }
     } catch { LP.toast('Error', 'error'); }
   },

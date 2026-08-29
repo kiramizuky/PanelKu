@@ -123,10 +123,10 @@ const MAIL = (() => {
     if (!(await LP.confirm('Install Postfix, Dovecot & SpamAssassin? This may take a few minutes.', 'Install Mail Server'))) return;
     try {
       const res = await LP.post('/mail/install');
-      if (res?.success) LP.toast('Mail server installed', 'success');
-      else LP.toast('Failed', 'error');
+      if (res?.success) LP.toast(res?.message || 'Mail server installed', 'success');
+      else LP.toast(res?.message || 'Failed to install mail server', 'error');
       loadData();
-    } catch { LP.toast('Error', 'error'); }
+    } catch { LP.toast('Error installing mail server', 'error'); }
   }
 
   function showAddDomainModal() {
@@ -141,8 +141,8 @@ const MAIL = (() => {
     try {
       const res = await LP.post('/mail/domains', { domain });
       if (res?.success) { LP.toast('Domain added', 'success'); domModal.hide(); loadDomains(); }
-      else LP.toast(res?.message || 'Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to add domain', 'error');
+    } catch { LP.toast('Error adding domain', 'error'); }
   }
 
   async function removeDomain(domain) {
@@ -150,8 +150,8 @@ const MAIL = (() => {
     try {
       const res = await LP.delete('/mail/domains', { domain });
       if (res?.success) { LP.toast('Domain removed', 'success'); loadDomains(); }
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to remove domain', 'error');
+    } catch { LP.toast('Error removing domain', 'error'); }
   }
 
   function showAddAccountModal() {
@@ -169,8 +169,8 @@ const MAIL = (() => {
     try {
       const res = await LP.post('/mail/accounts', { email, password });
       if (res?.success) { LP.toast('Account created', 'success'); accModal.hide(); loadAccounts(); }
-      else LP.toast(res?.message || 'Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to create account', 'error');
+    } catch { LP.toast('Error creating account', 'error'); }
   }
 
   async function deleteAccount(email) {
@@ -178,8 +178,8 @@ const MAIL = (() => {
     try {
       const res = await LP.delete('/mail/accounts', { email });
       if (res?.success) { LP.toast('Account deleted', 'success'); loadAccounts(); }
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to delete account', 'error');
+    } catch { LP.toast('Error deleting account', 'error'); }
   }
 
   async function flushQueue() {
@@ -187,8 +187,8 @@ const MAIL = (() => {
     try {
       const res = await LP.post('/mail/queue/flush');
       if (res?.success) { LP.toast('Queue flushed', 'success'); loadQueue(); }
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to flush queue', 'error');
+    } catch { LP.toast('Error flushing queue', 'error'); }
   }
 
   async function updateSpamScore() {
@@ -196,8 +196,8 @@ const MAIL = (() => {
     try {
       const res = await LP.post('/mail/spam', { requiredScore: parseFloat(score) });
       if (res?.success) LP.toast('Spam score updated', 'success');
-      else LP.toast('Failed', 'error');
-    } catch { LP.toast('Error', 'error'); }
+      else LP.toast(res?.message || 'Failed to update spam score', 'error');
+    } catch { LP.toast('Error updating spam score', 'error'); }
   }
 
   document.addEventListener('DOMContentLoaded', loadData);
