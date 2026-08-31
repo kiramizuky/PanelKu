@@ -224,27 +224,33 @@
     </button>
     
     <!-- Chat Window Box -->
-    <div id="aiChatWindow" class="lp-glass-card" style="display:none; position:absolute; bottom:60px; right:0; width:340px; height:450px; background:rgba(15,20,30,0.95); backdrop-filter:blur(20px); border:1px solid var(--glass-border); border-radius:16px; box-shadow:0 12px 40px rgba(0,0,0,0.5); flex-direction:column; overflow:hidden;">
+    <div id="aiChatWindow" class="lp-glass-card" style="display:none; position:absolute; bottom:60px; right:0; width:460px; height:580px; max-width:calc(100vw - 30px); max-height:calc(100vh - 100px); background:rgba(12,16,28,0.97); backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.12); border-radius:18px; box-shadow:0 16px 48px rgba(0,0,0,0.6); flex-direction:column; overflow:hidden; transition:width 0.25s ease, height 0.25s ease;">
       <!-- Header -->
-      <div style="background:rgba(99,102,241,0.15); padding:12px 16px; border-bottom:1px solid var(--glass-border); display:flex; justify-content:space-between; align-items:center;">
+      <div style="background:rgba(99,102,241,0.15); padding:12px 18px; border-bottom:1px solid var(--glass-border); display:flex; justify-content:space-between; align-items:center;">
         <div style="display:flex; align-items:center; gap:8px;">
-          <i class="bi bi-robot text-primary" style="font-size:18px;"></i>
-          <span style="font-weight:600; font-size:13.5px; color:#fff;">OpenClaw AI Copilot</span>
+          <i class="bi bi-robot text-primary" style="font-size:20px;"></i>
+          <div>
+            <span style="font-weight:600; font-size:14px; color:#fff;">OpenClaw AI Copilot</span>
+            <span class="badge bg-primary-subtle text-primary ms-2" style="font-size:10px;">Assistant</span>
+          </div>
         </div>
-        <button class="btn-lp btn-lp-ghost btn-lp-sm p-0" onclick="toggleAIChat()" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:50%;"><i class="bi bi-x-lg"></i></button>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm p-0" id="aiExpandBtn" onclick="toggleAIChatExpand()" title="Perbesar / Perkecil Jendela" style="width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:6px;"><i class="bi bi-arrows-fullscreen" style="font-size:12px;"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm p-0" onclick="toggleAIChat()" title="Tutup" style="width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:50%;"><i class="bi bi-x-lg" style="font-size:12px;"></i></button>
+        </div>
       </div>
       
       <!-- Messages Area -->
-      <div id="aiChatMessages" style="flex:1; padding:15px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; font-size:12.5px;">
-        <div style="background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:12px; max-width:85%; align-self:flex-start; line-height:1.4; color:var(--text-secondary);">
-          Halo! Saya adalah **OpenClaw AI Copilot**. Ada yang bisa saya bantu terkait pengelolaan server Anda hari ini?
+      <div id="aiChatMessages" style="flex:1; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; font-size:13px;">
+        <div style="background:rgba(255,255,255,0.05); padding:12px 14px; border-radius:12px; max-width:88%; align-self:flex-start; line-height:1.5; color:var(--text-secondary); border:1px solid rgba(255,255,255,0.06);">
+          Halo! Saya adalah <strong>OpenClaw AI Copilot</strong>. Ada yang bisa saya bantu terkait pengelolaan server, diagnosa error, atau optimasi Linux Anda hari ini?
         </div>
       </div>
       
       <!-- Input Area -->
-      <div style="padding:10px 12px; border-top:1px solid var(--glass-border); display:flex; gap:8px; background:rgba(0,0,0,0.2);">
-        <input type="text" id="aiChatInput" class="lp-input" style="flex:1; margin:0; padding:6px 12px; font-size:12.5px; height:36px;" placeholder="Tanyakan sesuatu..." onkeypress="if(event.key==='Enter') sendAIMessage()">
-        <button class="btn-lp btn-lp-primary" onclick="sendAIMessage()" style="width:36px; height:36px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:8px;"><i class="bi bi-send-fill" style="font-size:13px;"></i></button>
+      <div style="padding:12px 16px; border-top:1px solid var(--glass-border); display:flex; gap:8px; background:rgba(0,0,0,0.3);">
+        <input type="text" id="aiChatInput" class="lp-input" style="flex:1; margin:0; padding:8px 14px; font-size:13px; height:40px;" placeholder="Tanyakan seputar Linux, konfigurasi server, atau minta bantuan..." onkeypress="if(event.key==='Enter') sendAIMessage()">
+        <button class="btn-lp btn-lp-primary" onclick="sendAIMessage()" style="width:40px; height:40px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:8px;" title="Kirim"><i class="bi bi-send-fill" style="font-size:14px;"></i></button>
       </div>
     </div>
   </div>
@@ -268,12 +274,30 @@
   <%- typeof script !== 'undefined' ? script : '' %>
   
   <script>
+    let isAIChatExpanded = false;
+
     function toggleAIChat() {
       const windowBox = document.getElementById('aiChatWindow');
       const isVisible = windowBox.style.display === 'flex';
       windowBox.style.display = isVisible ? 'none' : 'flex';
       if (!isVisible) {
         document.getElementById('aiChatInput').focus();
+      }
+    }
+
+    function toggleAIChatExpand() {
+      const windowBox = document.getElementById('aiChatWindow');
+      const expandBtn = document.getElementById('aiExpandBtn');
+      isAIChatExpanded = !isAIChatExpanded;
+
+      if (isAIChatExpanded) {
+        windowBox.style.width = '720px';
+        windowBox.style.height = '720px';
+        if (expandBtn) expandBtn.innerHTML = '<i class="bi bi-fullscreen-exit" style="font-size:12px;"></i>';
+      } else {
+        windowBox.style.width = '460px';
+        windowBox.style.height = '580px';
+        if (expandBtn) expandBtn.innerHTML = '<i class="bi bi-arrows-fullscreen" style="font-size:12px;"></i>';
       }
     }
 
@@ -288,14 +312,14 @@
       
       // Append User message
       const userMsgDiv = document.createElement('div');
-      userMsgDiv.style.cssText = 'background:rgba(99,102,241,0.2); padding:10px 12px; border-radius:12px; max-width:85%; align-self:flex-end; color:#fff; word-break:break-word; line-height:1.4;';
+      userMsgDiv.style.cssText = 'background:rgba(99,102,241,0.25); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-end; color:#fff; word-break:break-word; line-height:1.45; border:1px solid rgba(99,102,241,0.3);';
       userMsgDiv.textContent = message;
       container.appendChild(userMsgDiv);
       container.scrollTop = container.scrollHeight;
 
       // Append Typing Indicator
       const typingDiv = document.createElement('div');
-      typingDiv.style.cssText = 'background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--text-muted); font-style:italic;';
+      typingDiv.style.cssText = 'background:rgba(255,255,255,0.05); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--text-muted); font-style:italic; border:1px solid rgba(255,255,255,0.06);';
       typingDiv.innerHTML = '<span class="spinner-border spinner-border-sm text-primary me-2"></span>AI sedang berpikir...';
       container.appendChild(typingDiv);
       container.scrollTop = container.scrollHeight;
@@ -306,28 +330,31 @@
 
         if (res?.success && res.data) {
           const aiMsgDiv = document.createElement('div');
-          aiMsgDiv.style.cssText = 'background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--text-secondary); line-height:1.4;';
-          // Convert basic markdown code blocks and lists
-          let text = res.data.answer;
-          // Escape html but keep markdown replacements safe
+          aiMsgDiv.style.cssText = 'background:rgba(255,255,255,0.05); padding:12px 14px; border-radius:12px; max-width:90%; align-self:flex-start; color:var(--text-secondary); line-height:1.5; border:1px solid rgba(255,255,255,0.06);';
+          
+          let text = res.data.answer || '';
           text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          text = text.replace(/`{3}([\s\S]+?)`{3}/g, '<pre style="background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; font-family:monospace; margin-top:5px; overflow-x:auto; white-space:pre-wrap; word-break:break-all;">$1</pre>');
+          text = text.replace(/`{3}(?:bash|sh)?\n?([\s\S]+?)`{3}/g, (match, code) => {
+            const escCode = code.replace(/"/g, '&quot;');
+            return `<div class="position-relative my-2"><pre style="background:#05070d; padding:10px; border-radius:6px; font-family:'JetBrains Mono', monospace; font-size:12.5px; border:1px solid rgba(255,255,255,0.08); white-space:pre-wrap; margin:0;">${code}</pre><button class="btn btn-sm btn-dark position-absolute top-0 end-0 m-1 py-0 px-2" style="font-size:11px;" onclick="navigator.clipboard.writeText('${escCode}'); LP.toast('Code copied', 'success');"><i class="bi bi-clipboard"></i> Copy</button></div>`;
+          });
           text = text.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:4px; font-family:monospace;">$1</code>');
           text = text.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
           text = text.replace(/\n/g, '<br>');
+          
           aiMsgDiv.innerHTML = text;
           container.appendChild(aiMsgDiv);
         } else {
           const errDiv = document.createElement('div');
-          errDiv.style.cssText = 'background:rgba(239,68,68,0.1); padding:10px 12px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--accent-danger);';
+          errDiv.style.cssText = 'background:rgba(239,68,68,0.1); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--accent-danger); border:1px solid rgba(239,68,68,0.2);';
           errDiv.textContent = 'Gagal menghubungi asisten AI.';
           container.appendChild(errDiv);
         }
       } catch (err) {
         typingDiv.remove();
         const errDiv = document.createElement('div');
-        errDiv.style.cssText = 'background:rgba(239,68,68,0.1); padding:10px 12px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--accent-danger);';
-        errDiv.textContent = 'Error koneksi ke asisten AI.';
+        errDiv.style.cssText = 'background:rgba(239,68,68,0.1); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--accent-danger); border:1px solid rgba(239,68,68,0.2);';
+        errDiv.textContent = 'Error koneksi ke asisten AI: ' + err.message;
         container.appendChild(errDiv);
       }
       container.scrollTop = container.scrollHeight;

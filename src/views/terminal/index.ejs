@@ -4,51 +4,141 @@
     <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Direct shell access to the host</p>
   </div>
   <div>
-    <button class="btn-lp btn-lp-primary" onclick="TerminalPage.openCopilotModal()">
-      <i class="bi bi-stars me-1"></i> AI Copilot
+    <button class="btn-lp btn-lp-primary" onclick="TerminalPage.openCopilotModal('generate')">
+      <i class="bi bi-stars me-1"></i> AI Copilot &amp; Assistant
     </button>
   </div>
 </div>
 
 <div class="lp-glass-card" style="padding: 10px; background: rgba(0,0,0,0.5); position: relative;">
   <div id="terminal" style="width: 100%; height: calc(100vh - 250px);"></div>
-  <button id="aiTerminalFixBtn" class="btn-lp btn-lp-primary d-none" style="position: absolute; bottom: 20px; right: 20px; z-index: 100; box-shadow: 0 4px 15px rgba(99,102,241,0.4);" onclick="TerminalPage.askAIFix()">
-    <i class="bi bi-robot me-1"></i> AI Fix Suggestion
+  <button id="aiTerminalFixBtn" class="btn-lp btn-lp-primary d-none" style="position: absolute; bottom: 20px; right: 20px; z-index: 100; box-shadow: 0 4px 20px rgba(99,102,241,0.5); border: 1px solid rgba(255,255,255,0.2);" onclick="TerminalPage.openCopilotModal('fix')">
+    <i class="bi bi-magic me-1"></i> Fix Error with AI
   </button>
 </div>
 <link href="/css/xterm.min.css" rel="stylesheet">
 <script src="/js/xterm.min.js"></script>
 <script src="/js/xterm-addon-fit.min.js"></script>
 
-<!-- Terminal AI Copilot Modal (Fase 3) -->
+<!-- Unified Terminal AI Copilot & Diagnostics Modal -->
 <div class="modal fade" id="terminalCopilotModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content lp-glass-card">
-      <div class="modal-header border-0 pb-0">
-        <h5 class="modal-title" style="font-size: 16px; font-weight: 600;">
-          <i class="bi bi-stars text-primary me-1"></i> Terminal AI Copilot
-        </h5>
+  <div class="modal-dialog modal-dialog-centered modal-lg" style="max-width: 820px;">
+    <div class="modal-content lp-glass-card" style="background: rgba(15,20,32,0.98); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 16px 48px rgba(0,0,0,0.6); border-radius: 16px;">
+      <div class="modal-header border-0 pb-2 pt-3 px-4" style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h5 class="modal-title" style="font-size: 17px; font-weight: 600; display:flex; align-items:center; gap:8px;">
+            <i class="bi bi-stars text-primary"></i> Terminal AI Copilot &amp; Diagnostics
+          </h5>
+          <p style="color:var(--text-muted); font-size:12px; margin:2px 0 0 0;">Asisten cerdas pembuatan perintah shell, diagnosa error, dan konsultasi server.</p>
+        </div>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body pt-3 pb-2">
-        <div class="lp-form-group mb-3">
-          <label class="lp-label">Describe what you want to do in natural language</label>
-          <div class="input-group">
-            <input type="text" id="copilotPromptInput" class="lp-input" placeholder="e.g. Find large files over 100MB, check listening ports..." onkeydown="if(event.key==='Enter') TerminalPage.generateCopilotCommand()">
-            <button class="btn-lp btn-lp-primary" onclick="TerminalPage.generateCopilotCommand()"><i class="bi bi-arrow-right"></i> Generate</button>
+
+      <!-- Navigation Tabs -->
+      <div class="px-4 pt-2">
+        <ul class="nav nav-pills gap-2" id="copilotTabs" role="tablist" style="background: rgba(0,0,0,0.3); padding: 5px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
+          <li class="nav-item" role="presentation" style="flex:1;">
+            <button class="nav-link active w-100 text-center py-2" id="tab-generate-btn" data-bs-toggle="pill" data-bs-target="#tab-generate" type="button" role="tab" style="font-size:13px; font-weight:500; border-radius:8px;">
+              <i class="bi bi-terminal-plus me-1"></i> Generate Command
+            </button>
+          </li>
+          <li class="nav-item" role="presentation" style="flex:1;">
+            <button class="nav-link w-100 text-center py-2" id="tab-fix-btn" data-bs-toggle="pill" data-bs-target="#tab-fix" type="button" role="tab" style="font-size:13px; font-weight:500; border-radius:8px;">
+              <i class="bi bi-wrench-adjustable me-1"></i> Diagnose &amp; Fix Error
+            </button>
+          </li>
+          <li class="nav-item" role="presentation" style="flex:1;">
+            <button class="nav-link w-100 text-center py-2" id="tab-chat-btn" data-bs-toggle="pill" data-bs-target="#tab-chat" type="button" role="tab" style="font-size:13px; font-weight:500; border-radius:8px;">
+              <i class="bi bi-chat-dots me-1"></i> Ask AI Assistant
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <div class="modal-body pt-3 pb-4 px-4">
+        <div class="tab-content" id="copilotTabContent">
+          
+          <!-- Tab 1: Generate Command -->
+          <div class="tab-pane fade show active" id="tab-generate" role="tabpanel">
+            <div class="lp-form-group mb-3">
+              <label class="lp-label" style="font-size:12.5px; font-weight:500; margin-bottom:6px;">Tuliskan apa yang ingin Anda lakukan dalam bahasa sehari-hari:</label>
+              <div class="input-group">
+                <input type="text" id="copilotPromptInput" class="lp-input" style="font-size:13.5px; height:42px;" placeholder="Contoh: Cari file > 100MB di disk, periksa port aktif, cek pemakaian RAM..." onkeydown="if(event.key==='Enter') TerminalPage.generateCopilotCommand()">
+                <button class="btn-lp btn-lp-primary px-3" onclick="TerminalPage.generateCopilotCommand()"><i class="bi bi-arrow-right me-1"></i> Generate</button>
+              </div>
+            </div>
+
+            <!-- Quick Suggestion Badges -->
+            <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+              <span style="font-size:11px; color:var(--text-muted);">Saran Cepat:</span>
+              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Cari file berukuran lebih dari 100MB')">📁 Cari File > 100MB</button>
+              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Tampilkan daftar port yang sedang listening')">🔌 Port Listening</button>
+              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Tampilkan penggunaan RAM dan 10 proses terboros')">📊 Top Memori Proses</button>
+              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Cek penggunaan disk dan direktori terbesar')">💾 Penggunaan Disk</button>
+              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Bersihkan kontainer dan image docker yang tidak terpakai')">🐳 Docker Cleanup</button>
+            </div>
+
+            <!-- Result Box -->
+            <div id="copilotResultBox" class="d-none p-3 rounded" style="background: rgba(10,14,24,0.9); border: 1px solid var(--glass-border);">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-white fw-bold" style="font-size: 13px;"><i class="bi bi-terminal me-1 text-primary"></i> Generated Linux Command</span>
+                <span id="copilotRiskBadge" class="lp-badge lp-badge-success" style="font-size: 11px;">Safe</span>
+              </div>
+              <div class="position-relative mb-2">
+                <pre id="copilotCommandOutput" class="p-3 rounded text-success mb-0" style="background:#05070d; font-family:'JetBrains Mono', monospace; font-size:13px; line-height:1.5; white-space:pre-wrap; border:1px solid rgba(255,255,255,0.08);"></pre>
+              </div>
+              <div id="copilotExplanationBox" class="p-2 mb-3 rounded" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);">
+                <p id="copilotExplanation" class="text-secondary small mb-0" style="font-size:12.5px; line-height:1.4;"></p>
+              </div>
+              <div class="d-flex justify-content-end gap-2">
+                <button class="btn-lp btn-lp-secondary" onclick="TerminalPage.copyCopilotCommand()"><i class="bi bi-clipboard me-1"></i> Copy Command</button>
+                <button class="btn-lp btn-lp-primary" onclick="TerminalPage.runCopilotCommand()"><i class="bi bi-play-fill me-1"></i> Insert &amp; Run di Terminal</button>
+              </div>
+            </div>
           </div>
-        </div>
-        <div id="copilotResultBox" class="d-none mt-3 p-3 rounded" style="background: rgba(15,23,42,0.8); border: 1px solid var(--border-color);">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="text-white fw-bold" style="font-size: 13px;">Generated Command</span>
-            <span id="copilotRiskBadge" class="lp-badge lp-badge-success" style="font-size: 10px;">Safe</span>
+
+          <!-- Tab 2: Diagnose & Fix Error -->
+          <div class="tab-pane fade" id="tab-fix" role="tabpanel">
+            <div class="mb-3">
+              <label class="lp-label" style="font-size:12.5px; font-weight:500; margin-bottom:6px;">Log Output Terakhir Terminal yang Terdeteksi:</label>
+              <textarea id="fixLogInput" class="form-control font-mono" rows="4" style="background:#05070d; color:#f87171; font-size:12px; border:1px solid rgba(255,255,255,0.1); border-radius:8px; resize:vertical;" placeholder="Output terminal error akan muncul di sini..."></textarea>
+              <div class="d-flex justify-content-between align-items-center mt-2">
+                <small class="text-muted" style="font-size:11.5px;">AI akan mendiagnosa akar masalah error di atas dan memberikan perintah solutif.</small>
+                <button class="btn-lp btn-lp-primary" onclick="TerminalPage.analyzeTerminalError()"><i class="bi bi-magic me-1"></i> Diagnosa &amp; Buat Solusi</button>
+              </div>
+            </div>
+
+            <!-- Fix Result Box -->
+            <div id="fixResultBox" class="d-none p-3 rounded" style="background: rgba(10,14,24,0.9); border: 1px solid var(--glass-border);">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-check2-circle text-success" style="font-size:18px;"></i>
+                <span class="text-white fw-bold" style="font-size: 13.5px;">Hasil Diagnosa AI &amp; Solusi</span>
+              </div>
+              <div id="fixExplanationOutput" class="p-3 rounded mb-3" style="background:rgba(255,255,255,0.04); font-size:13px; line-height:1.5; color:var(--text-secondary); border:1px solid rgba(255,255,255,0.06);"></div>
+              <div id="fixCmdContainer" class="d-none">
+                <label class="lp-label" style="font-size:11.5px;">Perintah Solusi yang Disarankan:</label>
+                <pre id="fixCommandOutput" class="p-3 rounded text-info mb-3" style="background:#05070d; font-family:'JetBrains Mono', monospace; font-size:13px; line-height:1.5; white-space:pre-wrap; border:1px solid rgba(255,255,255,0.08);"></pre>
+                <div class="d-flex justify-content-end gap-2">
+                  <button class="btn-lp btn-lp-secondary" onclick="TerminalPage.copyFixCommand()"><i class="bi bi-clipboard me-1"></i> Copy Perintah Solusi</button>
+                  <button class="btn-lp btn-lp-primary" onclick="TerminalPage.runFixCommand()"><i class="bi bi-play-fill me-1"></i> Jalankan Solusi di Terminal</button>
+                </div>
+              </div>
+            </div>
           </div>
-          <pre id="copilotCommandOutput" class="p-2 rounded text-success mb-2" style="background:#000; font-family:monospace; font-size:12px; white-space:pre-wrap;"></pre>
-          <p id="copilotExplanation" class="text-secondary small mb-3" style="font-size:12px;"></p>
-          <div class="d-flex justify-content-end gap-2">
-            <button class="btn-lp btn-lp-secondary" onclick="TerminalPage.copyCopilotCommand()"><i class="bi bi-clipboard"></i> Copy</button>
-            <button class="btn-lp btn-lp-primary" onclick="TerminalPage.runCopilotCommand()"><i class="bi bi-play-fill"></i> Insert &amp; Run</button>
+
+          <!-- Tab 3: AI Assistant Chat -->
+          <div class="tab-pane fade" id="tab-chat" role="tabpanel">
+            <div id="modalChatMessages" class="p-3 rounded mb-3" style="background:#05070d; border:1px solid rgba(255,255,255,0.08); height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; font-size:13px;">
+              <div style="background:rgba(255,255,255,0.05); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; line-height:1.5; color:var(--text-secondary);">
+                Halo! Saya adalah <strong>Terminal AI Assistant</strong>. Tanyakan apa saja mengenai sintaks bash, perbaikan sistem Linux, konfigurasi service, atau manajemen server.
+              </div>
+            </div>
+            <div class="input-group">
+              <input type="text" id="modalChatInput" class="lp-input" style="font-size:13.5px; height:42px;" placeholder="Tanyakan seputar Linux, bash command, atau problem server..." onkeydown="if(event.key==='Enter') TerminalPage.sendModalChatMessage()">
+              <button class="btn-lp btn-lp-primary px-3" onclick="TerminalPage.sendModalChatMessage()"><i class="bi bi-send-fill me-1"></i> Kirim</button>
+            </div>
           </div>
+
         </div>
       </div>
     </div>

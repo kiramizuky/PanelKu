@@ -176,28 +176,72 @@ const TerminalPage = (() => {
     }
   }
 
+  function cleanAnsi(str) {
+    if (!str) return '';
+    return str.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
+  }
+
+  function getLatestOutputText() {
+    const raw = lastOutputBuffer.join('');
+    return cleanAnsi(raw).trim();
+  }
+
   function askAIFix() {
-    const textBuffer = lastOutputBuffer.join('');
-    const btn = document.getElementById('aiTerminalFixBtn');
-    if (btn) btn.classList.add('d-none');
-    window.askAI("Tolong berikan petunjuk perbaikan dan perintah solutif dari error terminal berikut ini.", {
-      logType: 'terminal_error',
-      logText: textBuffer
-    });
+    openCopilotModal('fix');
   }
 
   let copilotModal = null;
   let currentGeneratedCommand = '';
+  let currentFixCommand = '';
 
-  function openCopilotModal() {
+  function openCopilotModal(activeTab = 'generate') {
     if (!copilotModal) {
       copilotModal = new bootstrap.Modal(document.getElementById('terminalCopilotModal'));
     }
+
+    const btn = document.getElementById('aiTerminalFixBtn');
+    if (btn) btn.classList.add('d-none');
+
     copilotModal.show();
+
     setTimeout(() => {
-      const input = document.getElementById('copilotPromptInput');
-      if (input) input.focus();
-    }, 300);
+      if (activeTab === 'fix') {
+        const fixTabTrigger = document.getElementById('tab-fix-btn');
+        if (fixTabTrigger) {
+          const tab = new bootstrap.Tab(fixTabTrigger);
+          tab.show();
+        }
+        const logInput = document.getElementById('fixLogInput');
+        if (logInput) {
+          logInput.value = getLatestOutputText();
+          analyzeTerminalError();
+        }
+      } else if (activeTab === 'chat') {
+        const chatTabTrigger = document.getElementById('tab-chat-btn');
+        if (chatTabTrigger) {
+          const tab = new bootstrap.Tab(chatTabTrigger);
+          tab.show();
+        }
+        const chatInput = document.getElementById('modalChatInput');
+        if (chatInput) chatInput.focus();
+      } else {
+        const genTabTrigger = document.getElementById('tab-generate-btn');
+        if (genTabTrigger) {
+          const tab = new bootstrap.Tab(genTabTrigger);
+          tab.show();
+        }
+        const input = document.getElementById('copilotPromptInput');
+        if (input) input.focus();
+      }
+    }, 250);
+  }
+
+  function setQuickPrompt(promptText) {
+    const input = document.getElementById('copilotPromptInput');
+    if (input) {
+      input.value = promptText;
+      generateCopilotCommand();
+    }
   }
 
   async function generateCopilotCommand() {
@@ -252,7 +296,163 @@ const TerminalPage = (() => {
     }
   }
 
-  return { init, connect, askAIFix, openCopilotModal, generateCopilotCommand, copyCopilotCommand, runCopilotCommand };
+  async function analyzeTerminalError() {
+    const logInput = document.getElementById('fixLogInput');
+    const logText = logInput?.value?.trim() || getLatestOutputText();
+    if (!logText) {
+      LP.toast('Tidak ada log error yang terdeteksi', 'warning');
+      return;
+    }
+
+    try {
+      LP.loading(true);
+      const res = await LP.post('/ai/chat', {
+        message: 'Tolong berikan analisis singkat error terminal ini dan sertakan 1 perintah perbaikan solutif.',
+        context: { logType: 'terminal_error', logText, cwd: initialCwd },
+      });
+      LP.loading(false);
+
+      if (res?.success && res.data) {
+        const text = res.data.answer || '';
+        const fixResultBox = document.getElementById('fixResultBox');
+        const fixExplanationOutput = document.getElementById('fixExplanationOutput');
+        const fixCmdContainer = document.getElementById('fixCmdContainer');
+        const fixCommandOutput = document.getElementById('fixCommandOutput');
+
+        if (fixResultBox) fixResultBox.classList.remove('d-none');
+
+        // Extract code block if any
+        const codeMatch = text.match(/`{3}(?:bash|sh)?\n?([\s\S]+?)`{3}/) || text.match(/`([^`\n]+)`/);
+        if (codeMatch && codeMatch[1]) {
+          currentFixCommand = codeMatch[1].trim();
+          if (fixCmdContainer) fixCmdContainer.classList.remove('d-none');
+          if (fixCommandOutput) fixCommandOutput.textContent = currentFixCommand;
+        } else {
+          currentFixCommand = '';
+          if (fixCmdContainer) fixCmdContainer.classList.add('d-none');
+        }
+
+        // Format explanation
+        let formatted = text
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/`{3}([\s\S]+?)`{3}/g, '<pre style="background:#05070d; padding:8px; border-radius:6px; font-family:monospace; margin-top:5px; white-space:pre-wrap;">$1</pre>')
+          .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:4px; font-family:monospace;">$1</code>')
+          .replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\n/g, '<br>');
+
+        if (fixExplanationOutput) fixExplanationOutput.innerHTML = formatted;
+      }
+    } catch (err) {
+      LP.loading(false);
+      LP.toast('Gagal menganalisis error: ' + err.message, 'error');
+    }
+  }
+
+  function copyFixCommand() {
+    if (!currentFixCommand) return;
+    navigator.clipboard.writeText(currentFixCommand);
+    LP.toast('Perintah solusi berhasil disalin', 'success');
+  }
+
+  function runFixCommand() {
+    if (!currentFixCommand) return;
+    if (socket && sessionId) {
+      socket.emit('terminal:input', { sessionId, data: currentFixCommand + '\n' });
+      if (copilotModal) copilotModal.hide();
+      LP.toast('Perintah solusi dikirim ke terminal', 'info');
+    } else {
+      LP.toast('Terminal session is not connected', 'warning');
+    }
+  }
+
+  async function sendModalChatMessage() {
+    const input = document.getElementById('modalChatInput');
+    const message = input?.value?.trim();
+    if (!message) return;
+    input.value = '';
+
+    const container = document.getElementById('modalChatMessages');
+    if (!container) return;
+
+    // Append user message
+    const userDiv = document.createElement('div');
+    userDiv.style.cssText = 'background:rgba(99,102,241,0.25); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-end; color:#fff; word-break:break-word; line-height:1.4;';
+    userDiv.textContent = message;
+    container.appendChild(userDiv);
+    container.scrollTop = container.scrollHeight;
+
+    // Typing indicator
+    const typingDiv = document.createElement('div');
+    typingDiv.style.cssText = 'background:rgba(255,255,255,0.05); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--text-muted); font-style:italic;';
+    typingDiv.innerHTML = '<span class="spinner-border spinner-border-sm text-primary me-2"></span>AI sedang menganalisis...';
+    container.appendChild(typingDiv);
+    container.scrollTop = container.scrollHeight;
+
+    try {
+      const res = await LP.post('/ai/chat', {
+        message,
+        context: { logType: 'terminal_chat', logText: getLatestOutputText(), cwd: initialCwd },
+      });
+      typingDiv.remove();
+
+      if (res?.success && res.data) {
+        const aiDiv = document.createElement('div');
+        aiDiv.style.cssText = 'background:rgba(255,255,255,0.05); padding:12px 14px; border-radius:12px; max-width:90%; align-self:flex-start; color:var(--text-secondary); line-height:1.5;';
+
+        let text = res.data.answer || '';
+        text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        text = text.replace(/`{3}(?:bash|sh)?\n?([\s\S]+?)`{3}/g, (match, code) => {
+          const escCode = code.replace(/"/g, '&quot;');
+          return `<div class="position-relative my-2"><pre style="background:#05070d; padding:10px; border-radius:6px; font-family:'JetBrains Mono', monospace; font-size:12.5px; border:1px solid rgba(255,255,255,0.08); white-space:pre-wrap; margin:0;">${code}</pre><button class="btn btn-sm btn-dark position-absolute top-0 end-0 m-1 py-0 px-2" style="font-size:11px;" onclick="TerminalPage.insertCodeToTerminal('${escCode}')"><i class="bi bi-play-fill"></i> Run in Terminal</button></div>`;
+        });
+        text = text.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:4px; font-family:monospace;">$1</code>');
+        text = text.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+        text = text.replace(/\n/g, '<br>');
+
+        aiDiv.innerHTML = text;
+        container.appendChild(aiDiv);
+      } else {
+        const errDiv = document.createElement('div');
+        errDiv.style.cssText = 'background:rgba(239,68,68,0.1); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--accent-danger);';
+        errDiv.textContent = 'Gagal menghubungi asisten AI.';
+        container.appendChild(errDiv);
+      }
+    } catch (err) {
+      typingDiv.remove();
+      const errDiv = document.createElement('div');
+      errDiv.style.cssText = 'background:rgba(239,68,68,0.1); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--accent-danger);';
+      errDiv.textContent = 'Error koneksi AI: ' + err.message;
+      container.appendChild(errDiv);
+    }
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function insertCodeToTerminal(cmd) {
+    if (!cmd) return;
+    if (socket && sessionId) {
+      socket.emit('terminal:input', { sessionId, data: cmd.trim() + '\n' });
+      if (copilotModal) copilotModal.hide();
+      LP.toast('Perintah dikirim ke terminal', 'info');
+    } else {
+      LP.toast('Terminal session is not connected', 'warning');
+    }
+  }
+
+  return {
+    init,
+    connect,
+    askAIFix,
+    openCopilotModal,
+    setQuickPrompt,
+    generateCopilotCommand,
+    copyCopilotCommand,
+    runCopilotCommand,
+    analyzeTerminalError,
+    copyFixCommand,
+    runFixCommand,
+    sendModalChatMessage,
+    insertCodeToTerminal,
+  };
 })();
 
 // [FIX] Expose to window for LP.call() resolution
