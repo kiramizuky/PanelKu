@@ -179,7 +179,8 @@ const DockerPage = (() => {
   // --- Search, Create Container, and Compose Logic ---
 
   function addPortRow() {
-    const container = document.getElementById('portMappingsContainer');
+    const container = document.getElementById('portsContainer') || document.getElementById('portMappingsContainer');
+    if (!container) return;
     const row = document.createElement('div');
     row.className = 'dynamic-row';
     row.innerHTML = `
@@ -191,7 +192,8 @@ const DockerPage = (() => {
   }
 
   function addVolumeRow() {
-    const container = document.getElementById('volumeMappingsContainer');
+    const container = document.getElementById('volumesContainer') || document.getElementById('volumeMappingsContainer');
+    if (!container) return;
     const row = document.createElement('div');
     row.className = 'dynamic-row';
     row.innerHTML = `
@@ -204,6 +206,7 @@ const DockerPage = (() => {
 
   function addEnvRow() {
     const container = document.getElementById('envContainer');
+    if (!container) return;
     const row = document.createElement('div');
     row.className = 'dynamic-row';
     row.innerHTML = `
@@ -217,40 +220,50 @@ const DockerPage = (() => {
   async function submitContainer(e) {
     e.preventDefault();
 
-    const name = document.getElementById('cName').value.trim();
-    const image = document.getElementById('cImage').value.trim();
-    const restart = document.getElementById('cRestart').value;
-    const startAfterCreate = document.getElementById('cStart').checked;
+    const name = document.getElementById('cName')?.value?.trim() || '';
+    const image = document.getElementById('cImage')?.value?.trim() || '';
+    const restart = document.getElementById('cRestart')?.value || 'unless-stopped';
+    const cStartEl = document.getElementById('cStart');
+    const startAfterCreate = cStartEl ? cStartEl.checked : true;
 
     // Fetch port mappings
     const ports = [];
-    document.querySelectorAll('#portMappingsContainer .dynamic-row').forEach(row => {
-      const hostVal = row.querySelector('[data-type="host"]').value;
-      const containerVal = row.querySelector('[data-type="container"]').value;
-      if (hostVal && containerVal) {
-        ports.push({ hostPort: parseInt(hostVal), containerPort: parseInt(containerVal) });
-      }
-    });
+    const portsContainer = document.getElementById('portsContainer') || document.getElementById('portMappingsContainer');
+    if (portsContainer) {
+      portsContainer.querySelectorAll('.dynamic-row').forEach(row => {
+        const hostVal = row.querySelector('[data-type="host"]')?.value;
+        const containerVal = row.querySelector('[data-type="container"]')?.value;
+        if (hostVal && containerVal) {
+          ports.push({ hostPort: parseInt(hostVal, 10), containerPort: parseInt(containerVal, 10) });
+        }
+      });
+    }
 
     // Fetch volume mappings
     const volumes = [];
-    document.querySelectorAll('#volumeMappingsContainer .dynamic-row').forEach(row => {
-      const hostPath = row.querySelector('[data-type="host-path"]').value.trim();
-      const containerPath = row.querySelector('[data-type="container-path"]').value.trim();
-      if (hostPath && containerPath) {
-        volumes.push({ hostPath, containerPath });
-      }
-    });
+    const volumesContainer = document.getElementById('volumesContainer') || document.getElementById('volumeMappingsContainer');
+    if (volumesContainer) {
+      volumesContainer.querySelectorAll('.dynamic-row').forEach(row => {
+        const hostPath = row.querySelector('[data-type="host-path"]')?.value?.trim();
+        const containerPath = row.querySelector('[data-type="container-path"]')?.value?.trim();
+        if (hostPath && containerPath) {
+          volumes.push({ hostPath, containerPath });
+        }
+      });
+    }
 
     // Fetch envs
     const env = [];
-    document.querySelectorAll('#envContainer .dynamic-row').forEach(row => {
-      const key = row.querySelector('[data-type="env-key"]').value.trim();
-      const value = row.querySelector('[data-type="env-value"]').value.trim();
-      if (key && value) {
-        env.push({ key, value });
-      }
-    });
+    const envContainer = document.getElementById('envContainer');
+    if (envContainer) {
+      envContainer.querySelectorAll('.dynamic-row').forEach(row => {
+        const key = row.querySelector('[data-type="env-key"]')?.value?.trim();
+        const value = row.querySelector('[data-type="env-value"]')?.value?.trim();
+        if (key && value) {
+          env.push({ key, value });
+        }
+      });
+    }
 
     LP.toast('Creating container...', 'info');
 
@@ -260,10 +273,10 @@ const DockerPage = (() => {
 
     if (res?.success) {
       LP.toast('Container deployed successfully!', 'success');
-      document.getElementById('createContainerForm').reset();
-      document.getElementById('portMappingsContainer').innerHTML = '';
-      document.getElementById('volumeMappingsContainer').innerHTML = '';
-      document.getElementById('envContainer').innerHTML = '';
+      document.getElementById('createContainerForm')?.reset();
+      if (portsContainer) portsContainer.innerHTML = '';
+      if (volumesContainer) volumesContainer.innerHTML = '';
+      if (envContainer) envContainer.innerHTML = '';
       loadData();
     } else {
       LP.toast(res?.message || 'Failed to create container', 'error');

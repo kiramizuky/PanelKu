@@ -49,12 +49,14 @@ const ThemesPage = {
 
   loadCustomCSS() {
     const saved = localStorage.getItem('lp_custom_css_' + this.currentTheme) || '';
-    document.getElementById('customCSS').value = saved;
+    const el = document.getElementById('customCSS');
+    if (el) el.value = saved;
     this.applyCustomCSS();
   },
 
   saveCustomCSS() {
-    const css = document.getElementById('customCSS').value;
+    const el = document.getElementById('customCSS');
+    const css = el ? el.value : '';
     localStorage.setItem('lp_custom_css_' + this.currentTheme, css);
     this.applyCustomCSS();
     LP.toast('Custom CSS applied!', 'success');

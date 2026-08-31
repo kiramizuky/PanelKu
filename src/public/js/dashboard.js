@@ -142,91 +142,103 @@ const Dashboard = (() => {
     networkChart?.update('none');
   }
 
+  // ── Safe DOM Helpers ─────────────────────────────────
+  function setElText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+
+  function setElHTML(id, html) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+  }
+
   // ── UI Update ────────────────────────────────────────
   function updateStatCards(metrics) {
     // CPU
     const cpuPct = Math.round(metrics.cpu || 0);
-    document.getElementById('cpuPct').textContent = cpuPct + '%';
+    setElText('cpuPct', cpuPct + '%');
     const cpuBar = document.getElementById('cpuBar');
-    cpuBar.style.width = cpuPct + '%';
+    if (cpuBar) cpuBar.style.width = cpuPct + '%';
 
     // RAM
     const ramPct = metrics.ramPercent || 0;
-    document.getElementById('ramPct').textContent = ramPct + '%';
-    document.getElementById('ramUsed').textContent =
-      LP.formatBytes(metrics.ramUsed) + ' / ' + LP.formatBytes(metrics.ramTotal);
-    document.getElementById('ramBar').style.width = ramPct + '%';
+    setElText('ramPct', ramPct + '%');
+    setElText('ramUsed', LP.formatBytes(metrics.ramUsed) + ' / ' + LP.formatBytes(metrics.ramTotal));
+    const ramBar = document.getElementById('ramBar');
+    if (ramBar) ramBar.style.width = ramPct + '%';
 
     // Disk
     const diskPct = Math.round(metrics.diskPercent || 0);
-    document.getElementById('diskPct').textContent = diskPct + '%';
-    document.getElementById('diskUsed').textContent =
-      LP.formatBytes(metrics.diskUsed) + ' / ' + LP.formatBytes(metrics.diskTotal);
+    setElText('diskPct', diskPct + '%');
+    setElText('diskUsed', LP.formatBytes(metrics.diskUsed) + ' / ' + LP.formatBytes(metrics.diskTotal));
     const dBar = document.getElementById('diskBar');
-    dBar.style.width = diskPct + '%';
-    const dColor = LP.progressColor(diskPct);
-    dBar.className = `lp-progress-bar ${dColor}`;
+    if (dBar) {
+      dBar.style.width = diskPct + '%';
+      const dColor = LP.progressColor(diskPct);
+      dBar.className = `lp-progress-bar ${dColor}`;
+    }
 
     // Temperature
     const temp = metrics.cpuTemp;
-    document.getElementById('tempVal').textContent = temp ? `${Math.round(temp)}°C` : 'N/A';
+    setElText('tempVal', temp ? `${Math.round(temp)}°C` : 'N/A');
 
     // Load avg
     const load = metrics.loadAvg || [0, 0, 0];
-    document.getElementById('loadAvg').textContent = load.map(l => l.toFixed(2)).join(' / ');
+    setElText('loadAvg', load.map(l => l.toFixed(2)).join(' / '));
 
     // Uptime
-    document.getElementById('uptimeDisplay').textContent = LP.formatUptime(metrics.uptime || 0) + ' uptime';
+    setElText('uptimeDisplay', LP.formatUptime(metrics.uptime || 0) + ' uptime');
 
     // Last update
-    document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    setElText('lastUpdate', 'Updated ' + new Date().toLocaleTimeString());
   }
 
   function updateSystemInfo(info) {
     const s = info.system || {};
-    document.getElementById('infoHostname').textContent = s.hostname || '—';
-    document.getElementById('infoOS').textContent = `${s.distro || ''} ${s.release || ''}`.trim();
-    document.getElementById('infoKernel').textContent = s.kernel || '—';
-    document.getElementById('infoArch').textContent = s.arch || '—';
-    document.getElementById('infoPublicIP').textContent = info.publicIp || '—';
-
-    const sysInfo = document.getElementById('sysInfo');
-    sysInfo.textContent = `${s.hostname} · ${s.distro} · Kernel ${s.kernel}`;
+    setElText('infoHostname', s.hostname || '—');
+    setElText('infoOS', `${s.distro || ''} ${s.release || ''}`.trim());
+    setElText('infoKernel', s.kernel || '—');
+    setElText('infoArch', s.arch || '—');
+    setElText('infoPublicIP', info.publicIp || '—');
+    setElText('sysInfo', `${s.hostname} · ${s.distro} · Kernel ${s.kernel}`);
 
     // Swap
     const metrics = info.metrics || {};
-    document.getElementById('infoSwap').textContent =
-      LP.formatBytes(metrics.swapUsed || 0) + ' / ' + LP.formatBytes(metrics.swapTotal || 0);
+    setElText('infoSwap', LP.formatBytes(metrics.swapUsed || 0) + ' / ' + LP.formatBytes(metrics.swapTotal || 0));
 
     // Services
     const services = info.services || [];
     const tbl = document.getElementById('servicesTable');
-    if (services.length) {
-      tbl.innerHTML = services.slice(0, 8).map(s =>
-        `<tr><td style="color:var(--text-secondary)">${LP.escHtml(s.name || '—')}</td>
-         <td><span class="lp-badge lp-badge-success"><span class="lp-badge-dot"></span>running</span></td></tr>`
-      ).join('');
-    } else {
-      tbl.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:20px">No service data</td></tr>';
-    }
+    if (tbl) {
+      if (services.length) {
+        tbl.innerHTML = services.slice(0, 8).map(srv =>
+          `<tr><td style="color:var(--text-secondary)">${LP.escHtml(srv.name || '—')}</td>
+           <td><span class="lp-badge lp-badge-success"><span class="lp-badge-dot"></span>running</span></td></tr>`
+        ).join('');
+      } else {
+        tbl.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:20px">No service data</td></tr>';
+      }
 
-    // Docker status
-    const docker = info.docker || {};
-    const fw = info.firewall || {};
-    tbl.innerHTML += `
-      <tr><td style="color:var(--text-muted)">Docker</td><td>
-        <span class="lp-badge ${docker.running ? 'lp-badge-success' : 'lp-badge-danger'}">
-          <span class="lp-badge-dot"></span>${docker.running ? docker.containers + ' containers' : 'not running'}
-        </span></td></tr>
-      <tr><td style="color:var(--text-muted)">Firewall</td><td>
-        <span class="lp-badge ${fw.enabled ? 'lp-badge-success' : 'lp-badge-warning'}">
-          <span class="lp-badge-dot"></span>${fw.enabled ? 'Active (' + fw.tool + ')' : 'Inactive'}
-        </span></td></tr>
-    `;
+      // Docker status
+      const docker = info.docker || {};
+      const fw = info.firewall || {};
+      tbl.innerHTML += `
+        <tr><td style="color:var(--text-muted)">Docker</td><td>
+          <span class="lp-badge ${docker.running ? 'lp-badge-success' : 'lp-badge-danger'}">
+            <span class="lp-badge-dot"></span>${docker.running ? docker.containers + ' containers' : 'not running'}
+          </span></td></tr>
+        <tr><td style="color:var(--text-muted)">Firewall</td><td>
+          <span class="lp-badge ${fw.enabled ? 'lp-badge-success' : 'lp-badge-warning'}">
+            <span class="lp-badge-dot"></span>${fw.enabled ? 'Active (' + fw.tool + ')' : 'Inactive'}
+          </span></td></tr>
+      `;
+    }
   }
 
   function updateDiskPartitions(disks) {
     const container = document.getElementById('diskPartitions');
+    if (!container) return;
     if (!disks?.length) {
       container.innerHTML = '<div style="text-align:center;color:var(--text-muted)">No disk data</div>';
       return;
@@ -303,13 +315,8 @@ const Dashboard = (() => {
   function updateConnectionStatus(online) {
     const el = document.getElementById('connStatus');
     const label = document.getElementById('connLabel');
-    if (online) {
-      el.className = 'lp-status lp-status-online';
-      label.textContent = 'Live';
-    } else {
-      el.className = 'lp-status lp-status-offline';
-      label.textContent = 'Offline';
-    }
+    if (el) el.className = online ? 'lp-status lp-status-online' : 'lp-status lp-status-offline';
+    if (label) label.textContent = online ? 'Live' : 'Offline';
   }
 
   // ── Public API ────────────────────────────────────────
@@ -361,14 +368,13 @@ const Dashboard = (() => {
             status = true;
             this.activeWebserver = name.toLowerCase();
           } else {
-            // Check if installed but offline, we'll try to find out by checking info but for now fallback to Nginx
             this.activeWebserver = 'nginx';
           }
           
-          document.getElementById('wsName').textContent = this.activeWebserver === 'nginx' ? 'Nginx' : (this.activeWebserver === 'apache2' ? 'Apache' : 'Webserver');
-          document.getElementById('wsStatusSpan').innerHTML = status 
+          setElText('wsName', this.activeWebserver === 'nginx' ? 'Nginx' : (this.activeWebserver === 'apache2' ? 'Apache' : 'Webserver'));
+          setElHTML('wsStatusSpan', status 
             ? '<span class="lp-badge lp-badge-success"><span class="lp-badge-dot"></span>Online</span>' 
-            : '<span class="lp-badge lp-badge-danger"><span class="lp-badge-dot"></span>Offline</span>';
+            : '<span class="lp-badge lp-badge-danger"><span class="lp-badge-dot"></span>Offline</span>');
         }
       } catch (err) {
         console.error('Failed to load webserver status', err);
@@ -392,3 +398,4 @@ const Dashboard = (() => {
 
 document.addEventListener('DOMContentLoaded', () => Dashboard.init());
 window.Dashboard = Dashboard;
+window.controlWebserver = function(action) { return Dashboard.controlWebserver(action); };
