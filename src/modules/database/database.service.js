@@ -1062,8 +1062,110 @@ class DatabaseService {
       } catch (err) {
         return { tables: [], totalSize: 0, totalDataFree: 0 };
       }
+    } else if (norm === 'sqlite') {
+      try {
+        const Database = (await import('better-sqlite3')).default;
+        const dbPath = path.resolve('storage', 'databases', dbName);
+        const db = new Database(dbPath);
+        const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all();
+        const statRows = tables.map(t => {
+          const count = db.prepare(`SELECT COUNT(*) as count FROM "${t.name}"`).get()?.count || 0;
+          return { name: t.name, engine: 'SQLite', rows: count, size: 0, dataFree: 0 };
+        });
+        db.close();
+        return { tables: statRows, totalSize: 0, totalDataFree: 0 };
+      } catch (_) {
+        return { tables: [], totalSize: 0, totalDataFree: 0 };
+      }
     }
     return { tables: [], totalSize: 0, totalDataFree: 0 };
+  }
+
+  // ── Visual Table Data Editor (Row CRUD) ─────────────────────
+
+  async insertRow(type, dbName, tableName, rowData = {}, schema = 'public') {
+    const norm = this._normalizeType(type);
+    this._sanitizeTableName(tableName);
+    const keys = Object.keys(rowData).map(k => this._sanitizeColumnName(k));
+    if (keys.length === 0) throw new Error('No data provided to insert');
+
+    const tableRef = norm === 'postgres'
+      ? this._quoteIdentifier(this._sanitizeSchemaName(schema), norm) + '.' + this._quoteIdentifier(tableName, norm)
+      : this._quoteIdentifier(tableName, norm);
+
+    const colList = keys.map(k => this._quoteIdentifier(k, norm)).join(', ');
+    const valList = keys.map(k => {
+      const v = rowData[k];
+      if (v === null || v === undefined) return 'NULL';
+      return "'" + String(v).replace(/'/g, "''") + "'";
+    }).join(', ');
+
+    const sql = `INSERT INTO ${tableRef} (${colList}) VALUES (${valList})`;
+    return await this.runQuery(type, dbName, sql);
+  }
+
+  async updateRow(type, dbName, tableName, pkColumn, pkValue, updatedFields = {}, schema = 'public') {
+    const norm = this._normalizeType(type);
+    this._sanitizeTableName(tableName);
+    this._sanitizeColumnName(pkColumn);
+
+    const keys = Object.keys(updatedFields).map(k => this._sanitizeColumnName(k));
+    if (keys.length === 0) throw new Error('No fields provided to update');
+
+    const tableRef = norm === 'postgres'
+      ? this._quoteIdentifier(this._sanitizeSchemaName(schema), norm) + '.' + this._quoteIdentifier(tableName, norm)
+      : this._quoteIdentifier(tableName, norm);
+
+    const setClauses = keys.map(k => {
+      const v = updatedFields[k];
+      const valStr = (v === null || v === undefined) ? 'NULL' : ("'" + String(v).replace(/'/g, "''") + "'");
+      return `${this._quoteIdentifier(k, norm)} = ${valStr}`;
+    }).join(', ');
+
+    const pkValStr = typeof pkValue === 'number' ? pkValue : ("'" + String(pkValue).replace(/'/g, "''") + "'");
+    const sql = `UPDATE ${tableRef} SET ${setClauses} WHERE ${this._quoteIdentifier(pkColumn, norm)} = ${pkValStr}`;
+    return await this.runQuery(type, dbName, sql);
+  }
+
+  async deleteRow(type, dbName, tableName, pkColumn, pkValue, schema = 'public') {
+    const norm = this._normalizeType(type);
+    this._sanitizeTableName(tableName);
+    this._sanitizeColumnName(pkColumn);
+
+    const tableRef = norm === 'postgres'
+      ? this._quoteIdentifier(this._sanitizeSchemaName(schema), norm) + '.' + this._quoteIdentifier(tableName, norm)
+      : this._quoteIdentifier(tableName, norm);
+
+    const pkValStr = typeof pkValue === 'number' ? pkValue : ("'" + String(pkValue).replace(/'/g, "''") + "'");
+    const sql = `DELETE FROM ${tableRef} WHERE ${this._quoteIdentifier(pkColumn, norm)} = ${pkValStr}`;
+    return await this.runQuery(type, dbName, sql);
+  }
+
+  // ── SQL Query Scratchpad with EXPLAIN ─────────────────────────
+
+  async explainQuery(type, dbName, query) {
+    const norm = this._normalizeType(type);
+    const trimmed = query.trim();
+    let explainSql = '';
+
+    if (norm === 'sqlite') {
+      explainSql = `EXPLAIN QUERY PLAN ${trimmed}`;
+    } else if (norm === 'postgres') {
+      explainSql = `EXPLAIN (ANALYZE, VERBOSE, BUFFERS, FORMAT JSON) ${trimmed}`;
+    } else {
+      // MySQL
+      explainSql = `EXPLAIN ${trimmed}`;
+    }
+
+    try {
+      return await this.runQuery(type, dbName, explainSql);
+    } catch (err) {
+      if (norm === 'postgres') {
+        // Fallback for Postgres without ANALYZE
+        return await this.runQuery(type, dbName, `EXPLAIN ${trimmed}`);
+      }
+      throw err;
+    }
   }
 }
 

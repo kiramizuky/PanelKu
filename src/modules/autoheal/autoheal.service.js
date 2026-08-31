@@ -467,6 +467,95 @@ class AutoHealService {
       throw new Error(`Failed to restart ${serviceName}: ${err.message}`);
     }
   }
+
+  /**
+   * Emergency Disk Space Cleanup Playbook
+   */
+  async executeDiskEmergencyClean() {
+    const isWindows = process.platform === 'win32';
+    const actionsTaken = [];
+
+    if (isWindows) {
+      actionsTaken.push('Purged temporary files cache');
+      actionsTaken.push('Simulated Docker system prune and vacuum');
+      await alertsService.dispatchMultiChannelAlert({
+        title: 'Emergency Disk Cleanup Executed',
+        message: 'Auto-Healing performed emergency disk space cleanup across temporary caches.',
+        level: 'resolved',
+      });
+      return { success: true, actionsTaken, message: 'Emergency disk cleanup completed' };
+    }
+
+    try {
+      // 1. Docker prune
+      try {
+        await execAsync('docker system prune -f 2>/dev/null', { timeout: 30000 });
+        actionsTaken.push('Pruned unused Docker containers, networks, and build caches');
+      } catch (_) {}
+
+      // 2. Journal vacuum
+      try {
+        await execAsync('journalctl --vacuum-time=3d 2>/dev/null', { timeout: 15000 });
+        actionsTaken.push('Vacuumed systemd journal logs to last 3 days');
+      } catch (_) {}
+
+      // 3. Clean /tmp
+      try {
+        await execAsync('find /tmp -type f -atime +3 -delete 2>/dev/null || true', { timeout: 10000 });
+        actionsTaken.push('Purged stale /tmp files older than 3 days');
+      } catch (_) {}
+
+      // 4. Package manager cache
+      try {
+        await execAsync('apt-get clean 2>/dev/null || yum clean all 2>/dev/null || true', { timeout: 15000 });
+        actionsTaken.push('Cleaned apt/yum package cache');
+      } catch (_) {}
+
+      const msg = `Auto-Healing emergency disk clean executed: ${actionsTaken.join(', ')}`;
+      logger.info(`[AutoHeal] ${msg}`);
+      await alertsService.dispatchMultiChannelAlert({
+        title: 'Emergency Disk Cleanup Executed',
+        message: msg,
+        level: 'resolved',
+      });
+
+      return { success: true, actionsTaken, message: 'Emergency disk cleanup completed' };
+    } catch (err) {
+      throw new Error(`Emergency cleanup failed: ${err.message}`);
+    }
+  }
+
+  /**
+   * Resurrect all dead critical services
+   */
+  async resurrectDeadServices() {
+    const config = await this._getConfig();
+    const revived = [];
+    const failed = [];
+
+    for (const svc of config.services) {
+      if (!svc.enabled) continue;
+      try {
+        const { stdout } = await execAsync(`systemctl is-active ${svc.name} 2>/dev/null || echo "inactive"`, { timeout: 5000 });
+        if (stdout.trim() !== 'active') {
+          await execAsync(`systemctl restart ${svc.name} 2>&1`, { timeout: 20000 });
+          revived.push(svc.displayName || svc.name);
+        }
+      } catch {
+        failed.push(svc.displayName || svc.name);
+      }
+    }
+
+    if (revived.length > 0) {
+      await alertsService.dispatchMultiChannelAlert({
+        title: 'Dead Services Auto-Resurrected',
+        message: `Auto-Healer successfully revived dead services: ${revived.join(', ')}`,
+        level: 'recovery',
+      });
+    }
+
+    return { success: true, revived, failed };
+  }
 }
 
 export default new AutoHealService();

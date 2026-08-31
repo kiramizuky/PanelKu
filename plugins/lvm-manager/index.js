@@ -1746,6 +1746,134 @@ window.LvmPage = LvmPage;
         return successResponse(res, { output: out }, 'Snapshot merge scheduled');
       } catch (e) { return errorResponse(res, e.message, 500); }
     });
+
+    // ── API: Unified ZFS / Btrfs / LVM Instant Snapshots ───────────
+    app.get('/api/plugins/lvm-manager/snapshots-unified', async (req, res) => {
+      try {
+        const isWindows = process.platform === 'win32';
+        if (isWindows) {
+          return successResponse(res, {
+            snapshots: [
+              { engine: 'lvm', name: 'snap_root_backup', origin: 'root_lv', poolOrVg: 'vg_system', size: '5.00g', createdAt: new Date().toISOString() },
+              { engine: 'zfs', name: 'tank/data@daily-20260831', origin: 'tank/data', poolOrVg: 'tank', size: '1.20g', createdAt: new Date().toISOString() },
+              { engine: 'btrfs', name: '@var_snap_pre_update', origin: '/var', poolOrVg: '/dev/sdb1', size: '850m', createdAt: new Date().toISOString() },
+            ],
+            supportedEngines: ['lvm', 'zfs', 'btrfs'],
+          });
+        }
+
+        const snapshots = [];
+        // 1. LVM Snapshots
+        try {
+          const lvsOut = await run("lvs --noheadings --separator '|' -o lv_name,vg_name,lv_attr,lv_size,origin 2>/dev/null");
+          lvsOut.split('\n').filter(Boolean).forEach(line => {
+            const p = line.trim().split('|').map(s => s.trim());
+            if (p[4] && p[4] !== '') {
+              snapshots.push({
+                engine: 'lvm',
+                name: p[0],
+                origin: p[4],
+                poolOrVg: p[1],
+                size: p[3],
+                createdAt: new Date().toISOString(),
+              });
+            }
+          });
+        } catch (_) {}
+
+        // 2. ZFS Snapshots
+        try {
+          const zfsOut = await run('zfs list -t snapshot -o name,used,creation -H 2>/dev/null');
+          zfsOut.split('\n').filter(Boolean).forEach(line => {
+            const [name, used, creation] = line.trim().split(/\t+/);
+            const [dataset] = (name || '').split('@');
+            snapshots.push({
+              engine: 'zfs',
+              name,
+              origin: dataset,
+              poolOrVg: dataset?.split('/')[0] || 'zfs',
+              size: used || '0B',
+              createdAt: creation || new Date().toISOString(),
+            });
+          });
+        } catch (_) {}
+
+        // 3. Btrfs Snapshots
+        try {
+          const btrfsOut = await run('btrfs subvolume list -s / 2>/dev/null');
+          btrfsOut.split('\n').filter(Boolean).forEach(line => {
+            const match = line.match(/path\s+(.+)$/);
+            if (match) {
+              snapshots.push({
+                engine: 'btrfs',
+                name: match[1],
+                origin: '/',
+                poolOrVg: 'btrfs_root',
+                size: 'N/A (CoW)',
+                createdAt: new Date().toISOString(),
+              });
+            }
+          });
+        } catch (_) {}
+
+        return successResponse(res, { snapshots, supportedEngines: ['lvm', 'zfs', 'btrfs'] });
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    app.post('/api/plugins/lvm-manager/snapshots-unified/create', async (req, res) => {
+      try {
+        const { engine = 'lvm', target, snapName, size = 5 } = req.body;
+        if (!target || !snapName) return errorResponse(res, 'Target and snapName are required', 400);
+
+        let out = '';
+        if (engine === 'zfs') {
+          out = await run(`zfs snapshot ${target}@${snapName} 2>&1`);
+        } else if (engine === 'btrfs') {
+          await run(`mkdir -p ${target}/.snapshots 2>/dev/null || true`);
+          out = await run(`btrfs subvolume snapshot -r ${target} ${target}/.snapshots/${snapName} 2>&1`);
+        } else {
+          // LVM
+          await ensureLvmInstalled();
+          out = await run(`lvcreate -s -L ${size}G -n ${snapName} ${target} 2>&1`);
+        }
+        return successResponse(res, { output: out, engine, snapName }, `Instant ${engine.toUpperCase()} Snapshot created`);
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    app.post('/api/plugins/lvm-manager/snapshots-unified/rollback', async (req, res) => {
+      try {
+        const { engine = 'lvm', target, snapName } = req.body;
+        if (!target || !snapName) return errorResponse(res, 'Target and snapName are required', 400);
+
+        let out = '';
+        if (engine === 'zfs') {
+          out = await run(`zfs rollback -r ${target}@${snapName} 2>&1`);
+        } else if (engine === 'btrfs') {
+          out = await run(`btrfs subvolume snapshot ${target}/.snapshots/${snapName} ${target}/.rollback_${Date.now()} 2>&1`);
+        } else {
+          // LVM
+          out = await run(`lvconvert --merge ${target}/${snapName} 2>&1`);
+        }
+        return successResponse(res, { output: out, engine, snapName }, `Rollback to ${snapName} executed`);
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
+
+    app.post('/api/plugins/lvm-manager/snapshots-unified/delete', async (req, res) => {
+      try {
+        const { engine = 'lvm', target, snapName } = req.body;
+        if (!target || !snapName) return errorResponse(res, 'Target and snapName are required', 400);
+
+        let out = '';
+        if (engine === 'zfs') {
+          out = await run(`zfs destroy ${target}@${snapName} 2>&1`);
+        } else if (engine === 'btrfs') {
+          out = await run(`btrfs subvolume delete ${target}/.snapshots/${snapName} 2>&1`);
+        } else {
+          out = await run(`lvremove -y ${target}/${snapName} 2>&1`);
+        }
+        return successResponse(res, { output: out }, 'Snapshot removed');
+      } catch (e) { return errorResponse(res, e.message, 500); }
+    });
   }
 
 };

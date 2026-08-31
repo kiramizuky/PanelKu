@@ -23,8 +23,13 @@ class AlertsController {
 
   async testAlert(req, res) {
     try {
+      const { channel } = req.params;
+      if (channel) {
+        const result = await alertsService.testChannel(channel);
+        return success(res, result, result.message);
+      }
       await alertsService.triggerAlert('Test Alert', 'This is a test alert from your Linux Server Control Panel.');
-      return success(res, null, 'Test alert dispatched');
+      return success(res, null, 'Test alert dispatched across all channels');
     } catch (err) {
       return error(res, err.message, 500);
     }

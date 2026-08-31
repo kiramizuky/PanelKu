@@ -21,6 +21,14 @@ router.get('/table-info', requirePermission('database:read'), databaseController
 router.get('/table-data', requirePermission('database:read'), databaseController.getTableData.bind(databaseController));
 router.get('/stats', requirePermission('database:read'), databaseController.getDatabaseStats.bind(databaseController));
 
+// Row CRUD
+router.post('/row/insert', requirePermission('database:write'), databaseController.insertRow.bind(databaseController));
+router.post('/row/update', requirePermission('database:write'), databaseController.updateRow.bind(databaseController));
+router.post('/row/delete', requirePermission('database:write'), databaseController.deleteRow.bind(databaseController));
+
+// Query & Explain
+router.post('/query/explain', requirePermission('database:read'), databaseController.explainQuery.bind(databaseController));
+
 // Query history
 router.get('/query-history', requirePermission('database:read'), databaseController.getQueryHistory.bind(databaseController));
 router.post('/query-history/clear', requirePermission('database:write'), databaseController.clearQueryHistory.bind(databaseController));

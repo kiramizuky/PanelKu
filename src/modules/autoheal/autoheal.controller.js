@@ -68,6 +68,26 @@ class AutoHealController {
       return errorResponse(res, error.message, 500);
     }
   }
+
+  // ── Emergency Playbooks ──
+
+  async emergencyClean(req, res) {
+    try {
+      const result = await autohealService.executeDiskEmergencyClean();
+      return successResponse(res, result, result.message);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async resurrectServices(req, res) {
+    try {
+      const result = await autohealService.resurrectDeadServices();
+      return successResponse(res, result, 'Service resurrect routine finished');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
 }
 
 export default new AutoHealController();

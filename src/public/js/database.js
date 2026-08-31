@@ -532,6 +532,240 @@ const DB = (() => {
     } catch { LP.toast('Import error', 'error'); }
   }
 
+  // ── Visual Table Data Editor (Row CRUD) ─────────────────────
+
+  let currentColumns = [];
+
+  function renderTableData(rows) {
+    const head = document.getElementById('browseDataHead');
+    const body = document.getElementById('browseDataBody');
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      head.innerHTML = '<tr><th>No Data</th></tr>';
+      body.innerHTML = '<tr><td class="text-muted">Table is empty. <button class="btn-lp btn-lp-primary btn-lp-sm ms-2" onclick="DB.showInsertRowModal()"><i class="bi bi-plus"></i> Add First Row</button></td></tr>';
+      return;
+    }
+
+    currentColumns = Object.keys(rows[0]);
+    const pkCol = currentColumns.find(c => c.toLowerCase() === 'id' || c.toLowerCase().endsWith('_id')) || currentColumns[0];
+
+    head.innerHTML = `
+      <tr>
+        <th style="width:40px;text-align:center;">#</th>
+        ${currentColumns.map(c => `<th class="sortable${currentSort.column === c ? ' ' + currentSort.dir.toLowerCase() : ''}" onclick="LP.call('DB.sortColumn', '${LP.encJsArg(c)}')">${LP.escHtml(c)}</th>`).join('')}
+        <th style="width:70px;text-align:center;">Actions</th>
+      </tr>
+    `;
+
+    body.innerHTML = rows.map((row, idx) => {
+      const pkVal = row[pkCol];
+      return `
+        <tr>
+          <td style="text-align:center;color:var(--text-muted);font-size:11px;">${(currentPage - 1) * parseInt(document.getElementById('browseLimit')?.value || 50) + idx + 1}</td>
+          ${currentColumns.map(col => `
+            <td ondblclick="DB.makeCellEditable(this, '${LP.escHtml(col)}', '${LP.escHtml(pkCol)}', '${LP.escHtml(String(pkVal))}')" title="Double click to edit" style="cursor:pointer;">
+              ${formatCellValue(row[col])}
+            </td>
+          `).join('')}
+          <td style="text-align:center;">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" style="padding:2px 6px;" onclick="DB.deleteRow('${LP.escHtml(pkCol)}', '${LP.escHtml(String(pkVal))}')" title="Delete Row">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function makeCellEditable(td, colName, pkCol, pkVal) {
+    if (td.querySelector('input')) return;
+    const oldText = td.textContent.trim();
+    const isNull = oldText === 'NULL';
+    const initialVal = isNull ? '' : oldText;
+
+    td.innerHTML = `<input type="text" class="lp-input" value="${LP.escHtml(initialVal)}" style="padding:2px 6px;font-size:11px;width:100%;margin:0;">`;
+    const input = td.querySelector('input');
+    input.focus();
+
+    async function commit() {
+      const newVal = input.value;
+      if (newVal === initialVal) {
+        td.innerHTML = formatCellValue(isNull ? null : initialVal);
+        return;
+      }
+      try {
+        const updatedFields = {};
+        updatedFields[colName] = newVal;
+        const res = await LP.post('/database/row/update', {
+          type: activeType,
+          database: activeDb,
+          table: activeTable,
+          pkColumn: pkCol,
+          pkValue: pkVal,
+          updatedFields,
+          schema: activeSchema,
+        });
+        if (res?.success) {
+          LP.toast('Cell updated', 'success');
+          td.innerHTML = formatCellValue(newVal);
+        } else {
+          LP.toast(res?.message || 'Update failed', 'error');
+          td.innerHTML = formatCellValue(isNull ? null : initialVal);
+        }
+      } catch (err) {
+        LP.toast(err.message || 'Error updating cell', 'error');
+        td.innerHTML = formatCellValue(isNull ? null : initialVal);
+      }
+    }
+
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { input.removeEventListener('blur', commit); commit(); }
+      if (e.key === 'Escape') { input.removeEventListener('blur', commit); td.innerHTML = formatCellValue(isNull ? null : initialVal); }
+    });
+  }
+
+  async function deleteRow(pkCol, pkVal) {
+    if (!(await LP.confirm(`Delete row where ${pkCol} = "${pkVal}"?`, 'Delete Row'))) return;
+    try {
+      const res = await LP.post('/database/row/delete', {
+        type: activeType,
+        database: activeDb,
+        table: activeTable,
+        pkColumn: pkCol,
+        pkValue: pkVal,
+        schema: activeSchema,
+      });
+      if (res?.success) {
+        LP.toast('Row deleted successfully', 'success');
+        loadTableData();
+      } else {
+        LP.toast(res?.message || 'Delete failed', 'error');
+      }
+    } catch {
+      LP.toast('Failed to delete row', 'error');
+    }
+  }
+
+  async function showInsertRowModal() {
+    if (!activeTable) {
+      LP.toast('Please select a table first', 'warning');
+      return;
+    }
+    const cols = currentColumns.length > 0 ? currentColumns : ['column1'];
+    const fieldsHtml = cols.map(c => `
+      <div class="mb-2">
+        <label class="lp-label font-mono" style="font-size:11px;">${LP.escHtml(c)}</label>
+        <input type="text" name="${LP.escHtml(c)}" class="lp-input" placeholder="Value for ${LP.escHtml(c)}" style="font-size:12px;">
+      </div>
+    `).join('');
+
+    const modalHtml = `
+      <div class="modal fade" id="dbInsertRowModal" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content" style="background:#0f172a;border:1px solid var(--glass-border);color:#fff;">
+            <div class="modal-header">
+              <h5 class="modal-title font-mono" style="font-size:14px;"><i class="bi bi-plus-circle text-primary me-2"></i>Insert Row into <code>${LP.escHtml(activeTable)}</code></h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="insertRowForm" onsubmit="DB.submitInsertRow(event)">
+              <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+                ${fieldsHtml}
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn-lp btn-lp-primary"><i class="bi bi-save me-1"></i> Insert Row</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const old = document.getElementById('dbInsertRowModal');
+    if (old) old.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const m = new bootstrap.Modal(document.getElementById('dbInsertRowModal'));
+    m.show();
+  }
+
+  async function submitInsertRow(e) {
+    e.preventDefault();
+    const form = e.target;
+    const inputs = form.querySelectorAll('input[name]');
+    const rowData = {};
+    inputs.forEach(inp => {
+      if (inp.value !== '') rowData[inp.name] = inp.value;
+    });
+
+    try {
+      const res = await LP.post('/database/row/insert', {
+        type: activeType,
+        database: activeDb,
+        table: activeTable,
+        rowData,
+        schema: activeSchema,
+      });
+      if (res?.success) {
+        LP.toast('Row inserted successfully!', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('dbInsertRowModal'))?.hide();
+        loadTableData();
+      } else {
+        LP.toast(res?.message || 'Insert failed', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Error inserting row', 'error');
+    }
+  }
+
+  // ── SQL Query Explain ────────────────────────────────────────
+
+  async function explainQuery() {
+    const query = document.getElementById('queryInput')?.value?.trim();
+    if (!query) {
+      LP.toast('Please enter a query to explain', 'warning');
+      return;
+    }
+    const statusEl = document.getElementById('queryStatus');
+    if (statusEl) {
+      statusEl.textContent = '⏳ Generating execution plan...';
+      statusEl.style.color = 'var(--accent-warning)';
+    }
+
+    try {
+      const res = await LP.post('/database/query/explain', { type: activeType, name: activeDb, query });
+      if (res?.success && res.data) {
+        if (statusEl) {
+          statusEl.textContent = '✅ Execution Plan Generated';
+          statusEl.style.color = '#22c55e';
+        }
+        const head = document.getElementById('queryResultsHead');
+        const body = document.getElementById('queryResultsBody');
+        const { rows, columns } = res.data;
+
+        if (columns && columns.length > 0) {
+          head.innerHTML = `<tr>${columns.map(c => `<th>${LP.escHtml(c)}</th>`).join('')}</tr>`;
+          body.innerHTML = rows.map(row => `<tr>${columns.map(c => `<td>${formatCellValue(row[c])}</td>`).join('')}</tr>`).join('');
+        } else {
+          head.innerHTML = '<tr><th>Plan</th></tr>';
+          body.innerHTML = `<tr><td class="font-mono">${JSON.stringify(rows, null, 2)}</td></tr>`;
+        }
+      } else {
+        if (statusEl) {
+          statusEl.textContent = '❌ ' + (res?.message || 'Explain failed');
+          statusEl.style.color = 'var(--accent-danger)';
+        }
+      }
+    } catch (err) {
+      if (statusEl) {
+        statusEl.textContent = '❌ ' + err.message;
+        statusEl.style.color = 'var(--accent-danger)';
+      }
+    }
+  }
+
+  // ── PostgreSQL Config Management ─────────────────────
+
   async function enablePgRemoteAccess() {
     const btn = document.getElementById('btnEnablePgRemote');
     if (btn) {
@@ -571,7 +805,7 @@ const DB = (() => {
         if (labelConf) labelConf.textContent = confPath || 'postgresql.conf';
         if (labelHba) labelHba.textContent = hbaPath || 'pg_hba.conf';
       }
-    } catch (e) {
+    } catch {
       LP.toast('Failed to load PostgreSQL config files', 'error');
     }
   }
@@ -614,9 +848,10 @@ const DB = (() => {
     loadData, showCredentialsModal, saveCredentials, showCreateModal, createDatabase, deleteDb, installPackage,
     openExplorer, refreshExplorerTables, selectTable, loadTableData, loadTableInfo,
     loadSchemas, switchSchema, goToPage, sortColumn, switchExplorerTab,
-    runQuery, loadHistory, clearHistory,
+    runQuery, explainQuery, loadHistory, clearHistory,
     exportTable, toggleImportFields, importData,
-    enablePgRemoteAccess, loadPgConfigFiles, savePgConfigFile
+    enablePgRemoteAccess, loadPgConfigFiles, savePgConfigFile,
+    makeCellEditable, deleteRow, showInsertRowModal, submitInsertRow
   };
 })();
 

@@ -16,6 +16,7 @@ router.post('/webpush/unsubscribe', alertsController.unsubscribeWebPush.bind(ale
 router.get('/config', rbac(RESOURCES.SYSTEM, ACTIONS.READ), alertsController.getConfig.bind(alertsController));
 router.post('/config', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), alertsController.updateConfig.bind(alertsController));
 router.post('/test', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), alertsController.testAlert.bind(alertsController));
+router.post('/test/:channel', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), alertsController.testAlert.bind(alertsController));
 
 export default router;
 

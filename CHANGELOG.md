@@ -5,15 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.5.0] — 2026-08-31
 
 ### Added
-- Upload content validation (magic bytes) in file manager — polyglot/executable
-  files rejected even when extension is spoofed (`src/helpers/file-validation.js`) [9.1]
-- Dependabot config for weekly npm + GitHub Actions updates (`.github/dependabot.yml`) [8.3]
-- Testing matrix in CI: Jest now runs on **Node 20 & 24 LTS** [8.3]
-- `SECURITY.md` + GitHub issue templates (bug report, feature request) [8.5]
-- `CHANGELOG.md` (this file, Keep a Changelog format) [8.5]
+- **Multi-Node Server Clustering & Distributed Agent Mesh**: Centralized fleet capacity aggregator (CPU cores, RAM, Disk), 1-Click pairing tokens with 15-minute TTL, single-line bash installer generator, and distributed concurrent remote command runner.
+- **Docker Compose Visual Studio & Auto HTTPS**: 2-way Visual Form $\leftrightarrow$ YAML editor with stack logs tailing, environment matrix, and 1-Click Let's Encrypt / ZeroSSL auto-reverse proxy.
+- **CrowdSec Community Defense & Honeypot Traps**: Native CrowdSec decisions integration, automated honeypot trap interceptor (`/.env`, `/.git`, `/wp-login.php`), RCE Shellshock filter, GeoIP country shield, and 1-Click System Hardening.
+- **ZFS / Btrfs / LVM Instant Snapshots**: Unified storage snapshot manager supporting LVM thin pools, ZFS datasets (`zfs snapshot`), and Btrfs subvolumes (`btrfs subvolume snapshot`) with 1-second instant rollback.
+- **Real-Time Multi-Channel Alerting & Auto-Remediation Playbooks**: Centralized incident dispatcher broadcasting to Telegram, Discord, Slack, WhatsApp, Email, and WebPush with automated incident recovery (Emergency Disk Cleanup, Dead Service Resurrect, OOM mitigation).
+- **Advanced Database GUI Studio**: Visual table browser with double-click inline cell editing, dynamic row insertion modal, primary-key safe row deletion, and interactive SQL Scratchpad with `EXPLAIN` query execution plan visualization.
+
+## [3.3.0] — 2026-08-29
+
+### Added
+- **Prometheus / OpenMetrics Exporter**: Native `/metrics` endpoint exposing host metrics and container stats for Grafana scraping.
+- **Lightweight Kubernetes Inspector**: Real-time Pod, Node, and Workload manager for K3s and MicroK8s clusters.
 
 ## [2.0.0] — 2026-08-10
 

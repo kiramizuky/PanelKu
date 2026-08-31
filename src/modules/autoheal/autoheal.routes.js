@@ -9,11 +9,13 @@ const router = Router();
 router.use(requireAuth);
 router.use(requirePermission(RESOURCES.SYSTEM, ACTIONS.EXECUTE));
 
-router.get('/config',   autohealController.getConfig.bind(autohealController));
-router.post('/config',  autohealController.saveConfig.bind(autohealController));
-router.get('/status',   autohealController.getStatus.bind(autohealController));
-router.post('/check',   autohealController.runCheck.bind(autohealController));
-router.post('/heal',    autohealController.healService.bind(autohealController));
-router.get('/incidents', autohealController.getIncidents.bind(autohealController));
+router.get('/config',             autohealController.getConfig.bind(autohealController));
+router.post('/config',            autohealController.saveConfig.bind(autohealController));
+router.get('/status',             autohealController.getStatus.bind(autohealController));
+router.post('/check',             autohealController.runCheck.bind(autohealController));
+router.post('/heal',              autohealController.healService.bind(autohealController));
+router.get('/incidents',          autohealController.getIncidents.bind(autohealController));
+router.post('/emergency-clean',   autohealController.emergencyClean.bind(autohealController));
+router.post('/resurrect-services', autohealController.resurrectServices.bind(autohealController));
 
 export default router;

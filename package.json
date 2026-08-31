@@ -1,7 +1,7 @@
 {
   "name": "panelku",
-  "version": "3.3.0",
-  "description": "Panelku - Lightweight Linux Server Control Panel",
+  "version": "3.5.0",
+  "description": "Modern Linux Server Control Panel with Real-time Monitoring and Management",
   "type": "module",
   "main": "src/server.js",
   "scripts": {

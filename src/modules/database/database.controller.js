@@ -130,6 +130,56 @@ class DatabaseController {
     }
   }
 
+  async explainQuery(req, res) {
+    try {
+      const type = cleanStr(req.body.type);
+      const name = cleanStr(req.body.name);
+      const query = req.body.query;
+      if (!type || !name || !query) return error(res, 'Type, name, and query are required', 400);
+      const result = await databaseService.explainQuery(type, name, query);
+      return success(res, result);
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  async insertRow(req, res) {
+    try {
+      const { type, database, table, rowData, schema = 'public' } = req.body;
+      if (!type || !database || !table || !rowData) return error(res, 'Type, database, table, and rowData are required', 400);
+      const result = await databaseService.insertRow(cleanStr(type), cleanStr(database), cleanStr(table), rowData, cleanStr(schema));
+      return success(res, result, 'Row inserted successfully');
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  async updateRow(req, res) {
+    try {
+      const { type, database, table, pkColumn, pkValue, updatedFields, schema = 'public' } = req.body;
+      if (!type || !database || !table || !pkColumn || pkValue === undefined || !updatedFields) {
+        return error(res, 'Type, database, table, pkColumn, pkValue, and updatedFields are required', 400);
+      }
+      const result = await databaseService.updateRow(cleanStr(type), cleanStr(database), cleanStr(table), cleanStr(pkColumn), pkValue, updatedFields, cleanStr(schema));
+      return success(res, result, 'Row updated successfully');
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  async deleteRow(req, res) {
+    try {
+      const { type, database, table, pkColumn, pkValue, schema = 'public' } = req.body;
+      if (!type || !database || !table || !pkColumn || pkValue === undefined) {
+        return error(res, 'Type, database, table, pkColumn, and pkValue are required', 400);
+      }
+      const result = await databaseService.deleteRow(cleanStr(type), cleanStr(database), cleanStr(table), cleanStr(pkColumn), pkValue, cleanStr(schema));
+      return success(res, result, 'Row deleted successfully');
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
   async getQueryHistory(req, res) {
     try {
       const history = databaseService.getQueryHistory();
