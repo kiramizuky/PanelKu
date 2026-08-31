@@ -1,5 +1,7 @@
 import pty from 'node-pty';
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
 import logger from '../../config/logger.js';
 
 /**
@@ -24,14 +26,30 @@ class TerminalService {
     let shellPath = this._resolveShell(shell);
     let shellArgs = [];
 
-    if (!isWin && osUser && osUser !== 'root') {
-      shellPath = 'su';
-      shellArgs = ['-', osUser];
+    let workingDir = isWin ? (process.env.USERPROFILE || 'C:\\') : (process.env.HOME || '/root');
+    let hasCustomCwd = false;
+
+    if (cwd && typeof cwd === 'string' && cwd.trim()) {
+      const trimmed = cwd.trim();
+      try {
+        if (fs.existsSync(trimmed)) {
+          const stat = fs.statSync(trimmed);
+          workingDir = stat.isDirectory() ? trimmed : path.dirname(trimmed);
+          hasCustomCwd = true;
+        } else {
+          workingDir = trimmed;
+          hasCustomCwd = true;
+        }
+      } catch (_) {
+        workingDir = trimmed;
+        hasCustomCwd = true;
+      }
     }
 
-    let workingDir = isWin ? process.env.USERPROFILE : (process.env.HOME || '/root');
-    if (cwd && typeof cwd === 'string' && cwd.trim()) {
-      workingDir = cwd.trim();
+    if (!isWin && osUser && osUser !== 'root') {
+      shellPath = 'su';
+      // If custom working directory is specified, avoid '-' which forces reset to user home directory
+      shellArgs = hasCustomCwd ? [osUser] : ['-', osUser];
     }
 
     const ptyProcess = pty.spawn(shellPath, shellArgs, {
@@ -46,6 +64,18 @@ class TerminalService {
       },
     });
 
+    // Ensure shell switches to target directory if requested
+    if (hasCustomCwd && workingDir) {
+      setTimeout(() => {
+        try {
+          if (ptyProcess && !ptyProcess.killed) {
+            const escapedDir = workingDir.replace(/"/g, '\\"');
+            ptyProcess.write(`cd "${escapedDir}"\n`);
+          }
+        } catch (_) {}
+      }, 250);
+    }
+
     this._sessions.set(sessionId, {
       pty: ptyProcess,
       userId: String(userId),
@@ -55,7 +85,7 @@ class TerminalService {
       createdAt: new Date(),
     });
 
-    logger.info(`Terminal session created: ${sessionId} (${shell}) for user ${userId}`);
+    logger.info(`Terminal session created: ${sessionId} (${shell}) for user ${userId} in ${workingDir}`);
     return { sessionId, pid: ptyProcess.pid };
   }
 

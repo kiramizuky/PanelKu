@@ -8,7 +8,7 @@ const agentTerminalWss = new WebSocketServer({ noServer: true });
 
 agentTerminalWss.on('connection', (ws, request) => {
   const parsedUrl = url.parse(request.url, true);
-  const { cols = 80, rows = 24, osUser = 'root', shell = 'bash' } = parsedUrl.query;
+  const { cols = 80, rows = 24, osUser = 'root', shell = 'bash', cwd } = parsedUrl.query;
 
   // Read API key from header first, fallback to query param for backwards compat
   const apiKey = request.headers['x-api-key'] || parsedUrl.query.apiKey;
@@ -34,7 +34,7 @@ agentTerminalWss.on('connection', (ws, request) => {
 
   let sessionId;
   try {
-    const result = terminalService.create(user.id, safeShell, parseInt(cols, 10), parseInt(rows, 10), safeOsUser);
+    const result = terminalService.create(user.id, safeShell, parseInt(cols, 10), parseInt(rows, 10), safeOsUser, cwd);
     sessionId = result.sessionId;
 
     // Send created notification

@@ -30,7 +30,7 @@ const TerminalPage = (() => {
 
     if (initialCwd) {
       const subTitleEl = document.querySelector('.lp-page-subtitle');
-      if (subTitleEl) subTitleEl.textContent = `Directory: ${initialCwd}`;
+      if (subTitleEl) subTitleEl.innerHTML = `Direct shell access to <code class="text-info" style="font-size:12px;">${LP.escHtml(initialCwd)}</code>`;
     }
 
     const savedUser = sessionStorage.getItem('lp_terminal_user');
@@ -57,7 +57,7 @@ const TerminalPage = (() => {
     });
 
     socket.on('connect', () => {
-      if (term) {
+      if (term && !sessionId) {
         socket.emit('terminal:create', {
           cols: term.cols,
           rows: term.rows,
@@ -164,7 +164,7 @@ const TerminalPage = (() => {
       } catch (e) {}
     });
 
-    if (socket && socket.connected) {
+    if (socket && socket.connected && !sessionId) {
       socket.emit('terminal:create', {
         cols: term.cols,
         rows: term.rows,

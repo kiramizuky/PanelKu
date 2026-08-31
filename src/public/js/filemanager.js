@@ -1489,8 +1489,11 @@ const FMPage = (() => {
   }
 
   function openTerminal() {
-    const path = currentPath || '/';
-    window.location.href = `/terminal?path=${encodeURIComponent(path)}`;
+    let target = currentPath || '/';
+    if (selectedItem && selectedItem.path) {
+      target = selectedItem.type === 'dir' ? selectedItem.path : (currentPath || '/');
+    }
+    window.location.href = `/terminal?path=${encodeURIComponent(target)}`;
   }
 
   async function upload(files) {

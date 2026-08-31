@@ -45,7 +45,8 @@ export const registerTerminalSocket = (namespace) => {
           const portStr = node.port ? `:${node.port}` : '';
           const safeOsUser = /^[a-zA-Z0-9_.-]{1,32}$/.test(osUser) ? osUser : 'root';
           const safeShell = /^[a-zA-Z0-9_-]{1,32}$/.test(shell) ? shell : 'bash';
-          const wsUrl = `${protocol}://${node.ip_address}${portStr}/api/agent/terminal/ws?cols=${cols}&rows=${rows}&osUser=${safeOsUser}&shell=${safeShell}`;
+          const cwdParam = cwd ? `&cwd=${encodeURIComponent(cwd)}` : '';
+          const wsUrl = `${protocol}://${node.ip_address}${portStr}/api/agent/terminal/ws?cols=${cols}&rows=${rows}&osUser=${safeOsUser}&shell=${safeShell}${cwdParam}`;
 
           // Log URL without API key to prevent credential leakage
           logger.info(`Connecting terminal proxy to remote node: ${node.name}`);
