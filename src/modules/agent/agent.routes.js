@@ -65,4 +65,50 @@ router.get('/info', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/agent/exec
+ * Execute remote maintenance command from Master Panel
+ */
+router.post('/exec', async (req, res) => {
+  const { command, timeout = 30000 } = req.body;
+  if (!command || typeof command !== 'string') {
+    return error(res, 'Command is required', 400);
+  }
+
+  const { exec } = await import('child_process');
+  const safeTimeout = Math.min(Math.max(parseInt(timeout, 10) || 30000, 1000), 60000);
+
+  exec(command, { timeout: safeTimeout, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
+    const exitCode = err ? (err.code ?? 1) : 0;
+    return success(res, {
+      stdout: stdout ? stdout.toString() : '',
+      stderr: stderr ? stderr.toString() : (err ? err.message : ''),
+      exitCode,
+      success: exitCode === 0,
+      timestamp: new Date().toISOString(),
+    }, 'Command executed');
+  });
+});
+
+/**
+ * GET /api/agent/processes
+ * Inspect top running processes on this agent node
+ */
+router.get('/processes', async (req, res) => {
+  const isWindows = process.platform === 'win32';
+  const { exec } = await import('child_process');
+  const cmd = isWindows
+    ? 'tasklist /FO CSV /NH'
+    : 'ps -eo pid,user,%cpu,%mem,comm --sort=-%cpu | head -n 25';
+
+  exec(cmd, { timeout: 5000 }, (err, stdout) => {
+    if (err) {
+      return error(res, 'Failed to fetch processes', 500);
+    }
+    const lines = (stdout || '').trim().split('\n');
+    const processes = lines.slice(0, 20).map(l => l.trim()).filter(Boolean);
+    return success(res, { processes, count: processes.length }, 'Process list retrieved');
+  });
+});
+
 export default router;

@@ -6,8 +6,17 @@ import { RESOURCES, ACTIONS } from '../../config/constants.js';
 
 const router = Router();
 
+// ── Public / Token-Authenticated Agent Pairing Endpoints ─────
+router.get('/install-script', clusterController.getInstallScript.bind(clusterController));
+router.post('/register-token', clusterController.registerNodeByToken.bind(clusterController));
+
+// ── Protected Cluster & Fleet Management Routes ──────────────
 router.use(authenticate);
 router.use(rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE));
+
+router.get('/fleet-summary',            clusterController.getFleetSummary.bind(clusterController));
+router.post('/pairing-token',           clusterController.generatePairingToken.bind(clusterController));
+router.post('/exec',                    clusterController.executeCommand.bind(clusterController));
 
 router.get('/nodes',                   clusterController.getNodes.bind(clusterController));
 router.post('/nodes',                  clusterController.addNode.bind(clusterController));

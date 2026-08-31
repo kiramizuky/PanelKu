@@ -24,6 +24,20 @@ router.get('/threat-map', wafController.getThreatMap.bind(wafController));
 router.post('/geo-block', wafController.blockCountry.bind(wafController));
 router.delete('/geo-block/:code', wafController.unblockCountry.bind(wafController));
 
+// ── CrowdSec Community Threat Intel & Bouncers ──
+router.get('/crowdsec/status', wafController.getCrowdSecStatus.bind(wafController));
+router.get('/crowdsec/decisions', wafController.getCrowdSecDecisions.bind(wafController));
+router.post('/crowdsec/decisions', wafController.addCrowdSecDecision.bind(wafController));
+router.delete('/crowdsec/decisions/:ip', wafController.deleteCrowdSecDecision.bind(wafController));
+router.post('/crowdsec/sync', wafController.syncCrowdSecHub.bind(wafController));
+
+// ── Honeypot Bot Traps & Hits ──
+router.get('/honeypot/hits', wafController.getHoneypotHits.bind(wafController));
+router.post('/honeypot/clear', wafController.clearHoneypotHits.bind(wafController));
+
+// ── 1-Click System Hardening ──
+router.post('/harden', wafController.applySystemHardening.bind(wafController));
+
 export default router;
 
 

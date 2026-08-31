@@ -1,6 +1,7 @@
 import wafService from './waf.service.js';
 import securityScannerService from './security-scanner.service.js';
 import geoipService from './geoip.service.js';
+import crowdsecService from './crowdsec.service.js';
 import { success, errorResponse } from '../../helpers/response.js';
 
 class WafController {
@@ -104,6 +105,90 @@ class WafController {
       const { code } = req.params;
       const result = await geoipService.unblockCountry(code);
       return success(res, result, `Country ${code} has been unblocked`);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  // ── CrowdSec Endpoints ────────────────────────────────────────
+
+  async getCrowdSecStatus(req, res) {
+    try {
+      const status = await crowdsecService.getStatus();
+      return success(res, status, 'CrowdSec status retrieved');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async getCrowdSecDecisions(req, res) {
+    try {
+      const decisions = await crowdsecService.getDecisions();
+      return success(res, { decisions }, 'CrowdSec decisions retrieved');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async addCrowdSecDecision(req, res) {
+    try {
+      const { ip, duration, reason } = req.body;
+      if (!ip) return errorResponse(res, new Error('IP is required'), 400);
+      const result = await crowdsecService.addDecision(ip, duration, reason);
+      return success(res, result, `IP ${ip} banned via CrowdSec`);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async deleteCrowdSecDecision(req, res) {
+    try {
+      const { ip } = req.params;
+      if (!ip) return errorResponse(res, new Error('IP is required'), 400);
+      const result = await crowdsecService.deleteDecision(decodeURIComponent(ip));
+      return success(res, result, `IP ${ip} unbanned from CrowdSec`);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async syncCrowdSecHub(req, res) {
+    try {
+      const result = await crowdsecService.syncCommunityBlocklist();
+      return success(res, result, result.message);
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  // ── Honeypot Endpoints ────────────────────────────────────────
+
+  async getHoneypotHits(req, res) {
+    try {
+      const limit = parseInt(req.query.limit, 10) || 50;
+      const hits = await wafService.getHoneypotHits(limit);
+      const traps = wafService.getHoneypotTraps();
+      return success(res, { hits, traps }, 'Honeypot hits retrieved');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async clearHoneypotHits(req, res) {
+    try {
+      const result = await wafService.clearHoneypotHits();
+      return success(res, result, 'Honeypot hits cleared');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  // ── System Hardening ──────────────────────────────────────────
+
+  async applySystemHardening(req, res) {
+    try {
+      const result = await wafService.applySystemHardening();
+      return success(res, result, result.message);
     } catch (error) {
       return errorResponse(res, error, 500);
     }

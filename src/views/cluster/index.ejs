@@ -1,56 +1,222 @@
 <div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
   <div>
-    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Cluster &amp; Multi-Node Manager</h1>
-    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage and monitor secondary Agent Nodes from this Master dashboard</p>
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
+      <i class="bi bi-diagram-3-fill text-primary me-2"></i>Multi-Node Fleet &amp; Cluster Mesh
+    </h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
+      Centralized server fleet management, 1-click agent installer, and distributed command execution
+    </p>
   </div>
-  <button class="btn-lp btn-lp-primary" onclick="ClusterPage.showAddModal()"><i class="bi bi-diagram-3-fill me-2"></i>Add Agent Node</button>
+  <div class="d-flex gap-2">
+    <button class="btn-lp btn-lp-ghost" onclick="ClusterPage.refreshAll()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh Fleet</button>
+    <button class="btn-lp btn-lp-primary" onclick="ClusterPage.showAddModal()"><i class="bi bi-plus-lg me-1"></i> Add Node Manually</button>
+  </div>
 </div>
 
-<div class="row g-4" id="nodesContainer">
-  <!-- Dynamic node cards will go here -->
-  <div class="col-12 text-center" style="padding:40px; color:var(--text-muted);">
-    <i class="bi bi-diagram-3" style="font-size: 40px; display:block; margin-bottom:10px;"></i>
-    Loading agent nodes...
+<!-- Fleet Capacity Aggregator Banner -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="lp-glass-card p-3 text-center">
+      <small class="text-muted d-block font-mono" style="font-size:10.5px; letter-spacing:0.5px;">FLEET NODES</small>
+      <h3 id="fleetNodesCount" style="font-weight:700; margin:4px 0 0 0; color:#fff;">--</h3>
+      <small id="fleetNodesRatio" class="text-muted" style="font-size:10px;">-- online</small>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="lp-glass-card p-3 text-center">
+      <small class="text-muted d-block font-mono" style="font-size:10.5px; letter-spacing:0.5px;">TOTAL CPU CORES</small>
+      <h3 id="fleetCpusCount" style="font-weight:700; margin:4px 0 0 0; color:var(--accent-primary);">--</h3>
+      <small class="text-muted" style="font-size:10px;">Across fleet</small>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="lp-glass-card p-3 text-center">
+      <small class="text-muted d-block font-mono" style="font-size:10.5px; letter-spacing:0.5px;">TOTAL MEMORY (RAM)</small>
+      <h3 id="fleetRamTotal" style="font-weight:700; margin:4px 0 0 0; color:var(--accent-info);">--</h3>
+      <small id="fleetRamUsed" class="text-muted" style="font-size:10px;">-- used</small>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="lp-glass-card p-3 text-center">
+      <small class="text-muted d-block font-mono" style="font-size:10.5px; letter-spacing:0.5px;">TOTAL STORAGE</small>
+      <h3 id="fleetDiskTotal" style="font-weight:700; margin:4px 0 0 0; color:var(--accent-warning);">--</h3>
+      <small id="fleetDiskUsed" class="text-muted" style="font-size:10px;">-- used</small>
+    </div>
+  </div>
+</div>
+
+<!-- Navigation Tabs -->
+<ul class="nav nav-tabs mb-4 dk-tabs">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#cluster-nodes"><i class="bi bi-hdd-network me-1"></i> Fleet Nodes &amp; Servers</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#cluster-installer"><i class="bi bi-magic me-1 text-primary"></i> 1-Click Agent Installer</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#cluster-commands"><i class="bi bi-terminal-split me-1 text-warning"></i> Distributed Command Runner</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#cluster-k8s" onclick="ClusterPage.loadK8sSummary()"><i class="bi bi-boxes me-1 text-info"></i> Kubernetes / K3s Engine</a></li>
+</ul>
+
+<div class="tab-content">
+  <!-- TAB 1: Nodes Overview -->
+  <div class="tab-pane fade show active" id="cluster-nodes">
+    <div class="row g-4" id="nodesContainer">
+      <div class="col-12 text-center py-5 text-muted">
+        <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading fleet nodes...
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: 1-Click Agent Installer -->
+  <div class="tab-pane fade" id="cluster-installer">
+    <div class="row g-4">
+      <div class="col-12 col-lg-7">
+        <div class="lp-glass-card p-4" style="border-radius:16px;">
+          <h5 style="font-weight:700; color:#fff; font-size:16px; margin-bottom:8px;">
+            <i class="bi bi-link-45deg text-primary me-2"></i>Generate 1-Click Agent Pairing Token
+          </h5>
+          <p class="text-muted" style="font-size:13px; line-height:1.5; margin-bottom:20px;">
+            Deploy the Panelku Agent on remote Linux VPS/Bare-metal machines with a single command. The agent will automatically register with this Master Panel using a secure 15-minute cryptographic token.
+          </p>
+
+          <div class="lp-form-group mb-3">
+            <label class="lp-label" style="font-size:11.5px; font-weight:600;">Optional Node Name</label>
+            <input type="text" id="installerSuggestedName" class="lp-input" placeholder="e.g. edge-sgp-01 (leave empty for auto hostname)">
+          </div>
+
+          <button class="btn-lp btn-lp-primary mb-4" onclick="ClusterPage.generatePairingScript()"><i class="bi bi-key-fill me-1"></i> Generate Pairing Command</button>
+
+          <!-- Generated Command Box -->
+          <div id="pairingCommandBox" style="display:none;">
+            <label class="lp-label" style="font-size:11.5px; font-weight:600;">Run this command on your remote server (as root / sudo):</label>
+            <div style="position:relative; background:rgba(0,0,0,0.35); border:1px solid var(--glass-border); border-radius:10px; padding:12px; font-family:var(--font-mono); font-size:12px; color:#38bdf8; word-break:break-all;">
+              <code id="pairingCommandText" style="color:inherit;"></code>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="ClusterPage.copyPairingCommand()" style="position:absolute; right:8px; top:8px; padding:4px 8px; font-size:11px;" title="Copy to clipboard">
+                <i class="bi bi-clipboard me-1"></i> Copy
+              </button>
+            </div>
+            <small class="text-muted d-block mt-2" style="font-size:11px;"><i class="bi bi-clock-history me-1"></i> Token expires in 15 minutes.</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-5">
+        <div class="lp-glass-card p-4" style="border-radius:16px;">
+          <h6 style="font-weight:700; color:#fff; font-size:14px; margin-bottom:12px;"><i class="bi bi-check2-circle text-success me-2"></i>Requirements &amp; Architecture</h6>
+          <ul class="text-muted" style="font-size:12.5px; line-height:1.8; padding-left:18px; margin-bottom:0;">
+            <li>Compatible with Ubuntu 20.04+, Debian 11+, CentOS 8+, AlmaLinux, Rocky Linux.</li>
+            <li>Inbound port <code>23456/tcp</code> (or custom domain) accessible from this Master server.</li>
+            <li>Node.js 18+ and UFW firewall rules are automatically provisioned if missing.</li>
+            <li>Communication secured via per-node <code>X-API-Key</code> cryptographic headers.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: Distributed Command Runner -->
+  <div class="tab-pane fade" id="cluster-commands">
+    <div class="row g-4">
+      <!-- Controls -->
+      <div class="col-12 col-lg-5">
+        <div class="lp-glass-card p-4" style="border-radius:16px;">
+          <h5 style="font-weight:700; color:#fff; font-size:15px; margin-bottom:14px;">
+            <i class="bi bi-broadcast text-warning me-2"></i>Target Fleet Nodes
+          </h5>
+
+          <!-- Node Selection -->
+          <div class="mb-3">
+            <label class="lp-label" style="font-size:11.5px; font-weight:600;">Select Nodes to Execute On:</label>
+            <div id="execNodesChecklist" style="display:flex; flex-direction:column; gap:8px; max-height:180px; overflow-y:auto; background:rgba(0,0,0,0.2); padding:10px; border-radius:8px; border:1px solid var(--glass-border);">
+              <div class="text-muted" style="font-size:12px;">Loading nodes...</div>
+            </div>
+          </div>
+
+          <!-- Command Preset -->
+          <div class="mb-3">
+            <label class="lp-label" style="font-size:11.5px; font-weight:600;">Command Presets</label>
+            <select class="lp-input font-mono" style="font-size:12px;" onchange="ClusterPage.applyCommandPreset(this.value)">
+              <option value="">-- Choose Preset Command --</option>
+              <option value="uptime">System Uptime &amp; Load (uptime)</option>
+              <option value="df -h">Disk Usage (df -h)</option>
+              <option value="free -m">Memory Usage (free -m)</option>
+              <option value="docker ps -a">Docker Containers (docker ps -a)</option>
+              <option value="docker system prune -f">Prune Docker Unused (docker system prune -f)</option>
+              <option value="apt update -y && apt upgrade -y">Update System Packages (apt update)</option>
+            </select>
+          </div>
+
+          <!-- Command Input -->
+          <div class="mb-4">
+            <label class="lp-label" style="font-size:11.5px; font-weight:600;">Shell Command</label>
+            <textarea id="execCommandInput" class="lp-input font-mono" rows="3" placeholder="e.g. uname -a && uptime" style="font-size:12px; resize:vertical;"></textarea>
+          </div>
+
+          <button id="execDispatchBtn" class="btn-lp btn-lp-primary w-100" onclick="ClusterPage.dispatchRemoteCommand()">
+            <i class="bi bi-play-fill me-1"></i> Dispatch Command to Fleet
+          </button>
+        </div>
+      </div>
+
+      <!-- Execution Console -->
+      <div class="col-12 col-lg-7">
+        <div class="lp-glass-card p-0" style="border-radius:16px; overflow:hidden; display:flex; flex-direction:column; min-height:450px;">
+          <div class="p-3 border-bottom" style="border-color:var(--glass-border) !important; display:flex; justify-content:space-between; align-items:center;">
+            <h6 style="font-weight:700; font-size:13px; margin:0; color:#fff;"><i class="bi bi-terminal me-2 text-info"></i>Fleet Output Console</h6>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="ClusterPage.clearExecConsole()"><i class="bi bi-trash"></i> Clear</button>
+          </div>
+          <div id="execOutputConsole" style="flex:1; background:rgba(0,0,0,0.35); padding:16px; font-family:var(--font-mono); font-size:11.5px; overflow-y:auto; max-height:480px; color:#cbd5e1; white-space:pre-wrap; word-break:break-all;">
+            <span class="text-muted">Select nodes and dispatch a command to view real-time per-node stdout/stderr here.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: Kubernetes Engine -->
+  <div class="tab-pane fade" id="cluster-k8s">
+    <div class="lp-glass-card p-4 mb-4" style="border-radius:16px;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 style="font-weight:700; color:#fff; font-size:15px; margin:0;"><i class="bi bi-boxes text-info me-2"></i>Kubernetes / K3s Cluster Status</h5>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="ClusterPage.loadK8sSummary()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh K8s</button>
+      </div>
+
+      <div id="k8sContainer">
+        <div class="text-center py-4 text-muted">Scanning host for Kubernetes (K3s / MicroK8s / kubectl)...</div>
+      </div>
+    </div>
   </div>
 </div>
 
 <!-- Add Node Modal -->
 <div class="modal fade" id="addNodeModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content lp-glass-card" style="border: 1px solid rgba(255,255,255,0.1); background: rgba(20,20,25,0.95);">
-      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
-        <h5 class="modal-title font-mono text-white" style="font-size:15px;"><i class="bi bi-diagram-3 me-2 text-primary"></i>Add Agent Node</h5>
+    <div class="modal-content" style="background:#0f172a; border:1px solid var(--glass-border); color:#fff; border-radius:16px;">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title font-mono" style="font-size:14px;"><i class="bi bi-diagram-3 me-2 text-primary"></i>Add Agent Node Manually</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <form id="addNodeForm" onsubmit="ClusterPage.addNode(event)">
-        <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
+        <div class="modal-body pt-3" style="display:flex; flex-direction:column; gap:14px;">
           <div class="lp-form-group" style="margin:0;">
-            <label class="lp-label">Node Identifier / Name</label>
+            <label class="lp-label" style="font-size:11px; font-weight:600;">Node Identifier / Name</label>
             <input type="text" id="nodeName" class="lp-input" placeholder="e.g. Singapore-Edge-01" required>
           </div>
           <div class="lp-form-group" style="margin:0;">
-            <label class="lp-label">IP Address / Domain Name</label>
-            <input type="text" id="nodeIp" class="lp-input" placeholder="e.g. 192.168.1.50 or node.example.com" required>
+            <label class="lp-label" style="font-size:11px; font-weight:600;">IP Address / Domain Name</label>
+            <input type="text" id="nodeIp" class="lp-input font-mono" placeholder="e.g. 192.168.1.50 or node.example.com" required>
           </div>
           <div class="lp-form-group" style="margin:0;">
-            <label class="lp-label">Port <span style="color:var(--text-muted); font-weight:400;">(opsional — kosongkan jika domain sudah mengarah langsung)</span></label>
-            <input type="number" id="nodePort" class="lp-input" value="" placeholder="e.g. 23456 (kosongkan untuk port default 443/HTTPS)">
-            <small style="color:var(--text-muted); font-size:11px; margin-top:4px; display:block;">
-              <i class="bi bi-info-circle me-1"></i>
-              Jika server sudah di-pointing ke domain tanpa port (melalui reverse proxy), kosongkan field ini agar menggunakan HTTPS otomatis.
-            </small>
+            <label class="lp-label" style="font-size:11px; font-weight:600;">Port <span style="color:var(--text-muted); font-weight:400;">(optional — leave empty for default HTTPS)</span></label>
+            <input type="number" id="nodePort" class="lp-input font-mono" value="" placeholder="e.g. 23456">
           </div>
           <div class="lp-form-group" style="margin:0;">
-            <label class="lp-label">API Key / Secret Token</label>
+            <label class="lp-label" style="font-size:11px; font-weight:600;">API Key / Secret Token</label>
             <div style="position:relative;">
-              <input type="password" id="nodeApiKey" class="lp-input" placeholder="Get from Agent → Profile → API Key" required style="padding-right:42px;">
+              <input type="password" id="nodeApiKey" class="lp-input font-mono" placeholder="Node API Key" required style="padding-right:42px;">
               <button type="button" onclick="ClusterPage.toggleApiKeyVis()" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0;" title="Show/Hide">
                 <i class="bi bi-eye" id="apiKeyEyeIcon"></i>
               </button>
             </div>
           </div>
         </div>
-        <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <div class="modal-footer border-0 pt-0">
           <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn-lp btn-lp-primary"><i class="bi bi-plus-lg me-1"></i>Add Node</button>
         </div>
@@ -62,27 +228,26 @@
 <!-- Node Details Modal -->
 <div class="modal fade" id="nodeDetailsModal" tabindex="-1">
   <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content lp-glass-card" style="border: 1px solid rgba(255,255,255,0.1); background: rgba(20,20,25,0.98);">
-      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
-        <h5 class="modal-title font-mono text-white" style="font-size:15px;"><i class="bi bi-info-circle text-primary me-2"></i>Node Details: <span id="detailNodeName">...</span></h5>
+    <div class="modal-content" style="background:#0f172a; border:1px solid var(--glass-border); color:#fff; border-radius:16px;">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title font-mono text-white" style="font-size:14px;"><i class="bi bi-info-circle text-primary me-2"></i>Node Details: <span id="detailNodeName">...</span></h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" style="padding: 24px; max-height: 80vh; overflow-y: auto;">
-        
         <!-- System Details Section -->
-        <h6 class="text-white border-bottom border-secondary pb-2 mb-3" style="font-size: 13px; font-weight: 700; letter-spacing: 0.5px;">SYSTEM INFORMATION</h6>
+        <h6 class="text-white border-bottom border-secondary pb-2 mb-3" style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px;">SYSTEM INFORMATION</h6>
         <div class="row g-3 mb-4" id="detailSystemInfo">
           <div class="col-12 text-center text-muted">No system info fetched yet. Node must be online.</div>
         </div>
 
         <!-- Network Interface Section -->
-        <h6 class="text-white border-bottom border-secondary pb-2 mb-3" style="font-size: 13px; font-weight: 700; letter-spacing: 0.5px;">NETWORK INTERFACES</h6>
+        <h6 class="text-white border-bottom border-secondary pb-2 mb-3" style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px;">NETWORK INTERFACES</h6>
         <div class="row g-3 mb-4" id="detailNetworkInfo">
           <div class="col-12 text-center text-muted">No network interfaces info.</div>
         </div>
 
         <!-- Disk Mounted Section -->
-        <h6 class="text-white border-bottom border-secondary pb-2 mb-3" style="font-size: 13px; font-weight: 700; letter-spacing: 0.5px;">DISK MOUNT PATHS</h6>
+        <h6 class="text-white border-bottom border-secondary pb-2 mb-3" style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px;">DISK MOUNT PATHS</h6>
         <div class="table-responsive">
           <table class="table table-dark table-sm table-borderless" style="background: transparent; font-size: 12px; margin: 0;">
             <thead>
@@ -95,15 +260,12 @@
               </tr>
             </thead>
             <tbody id="detailDisksInfo">
-              <tr>
-                <td colspan="5" class="text-center text-muted">No disk partition information.</td>
-              </tr>
+              <tr><td colspan="5" class="text-center text-muted">No disk partition information.</td></tr>
             </tbody>
           </table>
         </div>
-
       </div>
-      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+      <div class="modal-footer border-0 pt-0">
         <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Close</button>
       </div>
     </div>

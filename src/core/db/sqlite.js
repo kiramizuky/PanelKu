@@ -203,6 +203,19 @@ function initSchema(db) {
       updated_at  TEXT NOT NULL
     );
 
+    -- Honeypot Hits & Traps
+    CREATE TABLE IF NOT EXISTS honeypot_hits (
+      id          TEXT PRIMARY KEY,
+      ip          TEXT NOT NULL,
+      path        TEXT NOT NULL,
+      user_agent  TEXT,
+      payload     TEXT,
+      action      TEXT NOT NULL DEFAULT 'auto_ban',
+      created_at  TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_honeypot_ip ON honeypot_hits(ip);
+    CREATE INDEX IF NOT EXISTS idx_honeypot_created ON honeypot_hits(created_at);
+
     -- Notifications
     CREATE TABLE IF NOT EXISTS notifications (
       id         TEXT PRIMARY KEY,

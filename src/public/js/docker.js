@@ -304,20 +304,852 @@ const DockerPage = (() => {
     LP.toast(`Selected image: ${imageName}`, 'success');
   }
 
-  async function deployCompose(e) {
-    e.preventDefault();
+  // ══════════════════════════════════════════════════════════════
+  //  DOCKER COMPOSE VISUAL STUDIO & STACKS ENGINE
+  // ══════════════════════════════════════════════════════════════
 
-    const projectName = document.getElementById('composeProjectName').value.trim();
-    const yaml = document.getElementById('composeYaml').value;
+  const COMPOSE_TEMPLATES = {
+    wordpress: `version: '3.8'
 
-    LP.toast('Deploying Compose Stack...', 'info');
+services:
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_secret_pass_123
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=wordpress
+      - MYSQL_PASSWORD=wp_secret_pass_123
+    volumes:
+      - ./db_data:/var/lib/mysql
 
-    const res = await LP.post('/docker/compose', { projectName, yaml });
-    if (res?.success) {
-      LP.toast('Compose Stack deployed successfully!', 'success');
-      loadData();
+  wordpress:
+    image: wordpress:latest
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      - WORDPRESS_DB_HOST=db:3306
+      - WORDPRESS_DB_USER=wordpress
+      - WORDPRESS_DB_PASSWORD=wp_secret_pass_123
+      - WORDPRESS_DB_NAME=wordpress
+    volumes:
+      - ./wp_data:/var/www/html
+`,
+    nextcloud: `version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=nextcloud
+      - POSTGRES_PASSWORD=nc_secret_pass_123
+    volumes:
+      - ./db_data:/var/lib/postgresql/data
+
+  app:
+    image: nextcloud:apache
+    restart: unless-stopped
+    ports:
+      - "8085:80"
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=nextcloud
+      - POSTGRES_PASSWORD=nc_secret_pass_123
+    volumes:
+      - ./nextcloud_data:/var/www/html
+`,
+    n8n: `version: '3.8'
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+`,
+    vaultwarden: `version: '3.8'
+
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    environment:
+      - WEBSOCKET_ENABLED=true
+      - SIGNUPS_ALLOWED=true
+    volumes:
+      - ./vw_data:/data
+`,
+    ghost: `version: '3.8'
+
+services:
+  ghost:
+    image: ghost:5-alpine
+    restart: unless-stopped
+    ports:
+      - "2368:2368"
+    environment:
+      - url=http://localhost:2368
+      - NODE_ENV=production
+    volumes:
+      - ./ghost_data:/var/lib/ghost/content
+`
+  };
+
+  let composeStudioServices = [];
+  let activeStudioMode = 'visual';
+  let activeLogsStack = null;
+
+  function parseYamlToServices(yamlStr) {
+    if (!yamlStr || typeof yamlStr !== 'string') return [];
+    const lines = yamlStr.split('\n');
+    const services = [];
+    let inServices = false;
+    let currentService = null;
+    let currentArrayKey = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const rawLine = lines[i];
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+
+      if (/^services:\s*$/.test(line) || (/^services:/.test(rawLine.trimStart()) && !rawLine.startsWith(' '))) {
+        inServices = true;
+        continue;
+      }
+
+      if (inServices && /^[a-zA-Z0-9_-]+:\s*$/.test(rawLine) && !rawLine.startsWith(' ') && !rawLine.startsWith('\t')) {
+        inServices = false;
+        if (currentService) services.push(currentService);
+        currentService = null;
+        continue;
+      }
+
+      if (!inServices) continue;
+
+      const serviceMatch = rawLine.match(/^(\s{2}|\t)([a-zA-Z0-9_-]+):\s*$/);
+      if (serviceMatch) {
+        if (currentService) services.push(currentService);
+        currentService = {
+          name: serviceMatch[2],
+          image: '',
+          containerName: '',
+          restart: 'unless-stopped',
+          command: '',
+          ports: [],
+          environment: [],
+          volumes: [],
+        };
+        currentArrayKey = null;
+        continue;
+      }
+
+      if (!currentService) continue;
+
+      // Array items with - (e.g. "      - '8080:80'")
+      const itemMatch = rawLine.match(/^\s*-\s+(.*)$/);
+      if (itemMatch && currentArrayKey) {
+        const itemVal = itemMatch[1].trim().replace(/^["']|["']$/g, '');
+        if (currentArrayKey === 'ports') {
+          const parts = itemVal.split(':');
+          currentService.ports.push({ host: parts[0] || '', container: parts[1] || '' });
+        } else if (currentArrayKey === 'environment') {
+          const parts = itemVal.split('=');
+          currentService.environment.push({ key: parts[0] || '', value: parts.slice(1).join('=') || '' });
+        } else if (currentArrayKey === 'volumes') {
+          const parts = itemVal.split(':');
+          currentService.volumes.push({ host: parts[0] || '', container: parts[1] || '' });
+        }
+        continue;
+      }
+
+      // Nested key-value with 6+ spaces (e.g. "      POSTGRES_DB: mydb")
+      const envKvMatch = rawLine.match(/^(\s{6,}|\t{3,})([a-zA-Z0-9_.-]+):\s*(.*)$/);
+      if (envKvMatch && currentArrayKey === 'environment') {
+        const k = envKvMatch[2];
+        const v = envKvMatch[3].trim().replace(/^["']|["']$/g, '');
+        currentService.environment.push({ key: k, value: v });
+        continue;
+      }
+
+      // Properties with 4 spaces (e.g. "    image: nginx:alpine")
+      const propMatch = rawLine.match(/^(\s{4}|\t{2})([a-zA-Z0-9_-]+):\s*(.*)$/);
+      if (propMatch) {
+        const key = propMatch[2];
+        const val = propMatch[3].trim().replace(/^["']|["']$/g, '');
+        currentArrayKey = null;
+
+        if (key === 'image') currentService.image = val;
+        else if (key === 'container_name') currentService.containerName = val;
+        else if (key === 'restart') currentService.restart = val;
+        else if (key === 'command') currentService.command = val;
+        else if (key === 'ports') currentArrayKey = 'ports';
+        else if (key === 'environment') currentArrayKey = 'environment';
+        else if (key === 'volumes') currentArrayKey = 'volumes';
+        continue;
+      }
+    }
+
+    if (currentService) services.push(currentService);
+    return services;
+  }
+
+  function generateYamlFromServices(services) {
+    let yaml = "version: '3.8'\n\nservices:\n";
+    for (const s of services) {
+      yaml += `  ${s.name || 'app'}:\n`;
+      if (s.image) yaml += `    image: ${s.image}\n`;
+      if (s.containerName) yaml += `    container_name: ${s.containerName}\n`;
+      if (s.restart) yaml += `    restart: ${s.restart}\n`;
+      if (s.command) yaml += `    command: ${s.command}\n`;
+
+      if (Array.isArray(s.ports) && s.ports.length > 0) {
+        const validPorts = s.ports.filter(p => p.host || p.container);
+        if (validPorts.length > 0) {
+          yaml += `    ports:\n`;
+          for (const p of validPorts) {
+            yaml += `      - "${p.host}:${p.container}"\n`;
+          }
+        }
+      }
+
+      if (Array.isArray(s.environment) && s.environment.length > 0) {
+        const validEnvs = s.environment.filter(e => e.key);
+        if (validEnvs.length > 0) {
+          yaml += `    environment:\n`;
+          for (const e of validEnvs) {
+            yaml += `      - ${e.key}=${e.value}\n`;
+          }
+        }
+      }
+
+      if (Array.isArray(s.volumes) && s.volumes.length > 0) {
+        const validVols = s.volumes.filter(v => v.host || v.container);
+        if (validVols.length > 0) {
+          yaml += `    volumes:\n`;
+          for (const v of validVols) {
+            yaml += `      - ${v.host}:${v.container}\n`;
+          }
+        }
+      }
+      yaml += `\n`;
+    }
+    return yaml.trimEnd() + '\n';
+  }
+
+  async function loadComposeStacks() {
+    const container = document.getElementById('composeStacksContainer');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div class="col-12 text-center py-5">
+        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+        <p class="text-muted small mt-2">Loading Compose stacks...</p>
+      </div>`;
+
+    try {
+      const res = await LP.get('/docker/compose/stacks');
+      if (!res?.success) {
+        container.innerHTML = `<div class="col-12 text-center py-4 text-danger">${LP.escHtml(res?.message || 'Failed to load stacks')}</div>`;
+        return;
+      }
+      renderComposeStacks(res.data?.stacks || []);
+    } catch (err) {
+      container.innerHTML = `<div class="col-12 text-center py-4 text-danger">${LP.escHtml(err.message || 'Error loading stacks')}</div>`;
+    }
+  }
+
+  function renderComposeStacks(stacks) {
+    const container = document.getElementById('composeStacksContainer');
+    if (!container) return;
+
+    if (!stacks || stacks.length === 0) {
+      container.innerHTML = `
+        <div class="col-12">
+          <div class="lp-glass-card text-center py-5">
+            <div style="width:64px; height:64px; border-radius:16px; background:rgba(99,102,241,0.1); color:var(--accent-primary); display:flex; align-items:center; justify-content:center; font-size:30px; margin:0 auto 16px auto;">
+              <i class="bi bi-layers-half"></i>
+            </div>
+            <h4 style="font-size:16px; font-weight:700; margin-bottom:8px;">No Compose Stacks Found</h4>
+            <p class="text-muted small mb-4" style="max-width:400px; margin-left:auto; margin-right:auto;">
+              Compose Studio allows you to visually build, run, and map domains to multi-container applications.
+            </p>
+            <div class="d-flex justify-content-center gap-2">
+              <button class="btn-lp btn-lp-primary" onclick="DockerPage.openNewStudio()"><i class="bi bi-plus-lg me-1"></i> Create First Stack</button>
+              <button class="btn-lp btn-lp-ghost" onclick="DockerPage.newStudioFromTemplate('wordpress')"><i class="bi bi-box-seam me-1"></i> Load Template</button>
+            </div>
+          </div>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = stacks.map(s => {
+      const isRunning = s.status === 'running';
+      const isPartial = s.status === 'partial';
+      const badgeClass = isRunning ? 'lp-badge-success' : isPartial ? 'lp-badge-warning' : 'lp-badge-secondary';
+      const statusText = isRunning ? 'RUNNING' : isPartial ? 'PARTIAL' : 'STOPPED';
+
+      const portsHtml = (s.exposedPorts || []).length > 0 ? (
+        `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;">` +
+        s.exposedPorts.map(ep => `
+          <div class="d-flex align-items-center gap-2 p-1 px-2 rounded" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); font-size:11px;">
+            <span class="font-mono" style="color:var(--accent-info); font-weight:600;"><i class="bi bi-hdd-network me-1"></i>${ep.hostPort} &rarr; ${ep.containerPort}</span>
+            <button class="btn-lp btn-lp-primary btn-lp-sm" style="padding: 1px 6px; font-size:10px; height:20px; line-height:1;" onclick="DockerPage.openAutoProxyModal('${LP.encJsArg(s.name)}', '${LP.encJsArg(ep.service)}', ${ep.hostPort})" title="Map to Domain with SSL">
+              <i class="bi bi-shield-lock me-1"></i>HTTPS Proxy
+            </button>
+          </div>
+        `).join('') +
+        `</div>`
+      ) : `<div class="text-muted" style="font-size:11px; margin-top:8px;">No host port mappings configured</div>`;
+
+      const servicesHtml = (s.services || []).map(svc => `
+        <span class="lp-badge lp-badge-info" style="font-size:10px; margin-right:4px;">
+          ${LP.escHtml(svc.name)} <small style="opacity:0.7">(${LP.escHtml(svc.image || 'custom')})</small>
+        </span>
+      `).join('');
+
+      return `
+        <div class="col-12 col-lg-6">
+          <div class="lp-glass-card p-4 h-100 d-flex flex-column justify-content-between" style="border:1px solid var(--glass-border);">
+            <div>
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                  <h4 class="font-mono" style="font-size:16px; font-weight:700; color:var(--text-primary); margin:0;">
+                    ${LP.escHtml(s.name)}
+                  </h4>
+                  <small class="text-muted">${s.servicesCount || 0} service(s) &bull; ${s.containers?.length || 0} container(s)</small>
+                </div>
+                <span class="lp-badge ${badgeClass}"><span class="lp-badge-dot"></span>${statusText}</span>
+              </div>
+
+              <div class="mb-2 mt-3">
+                <small class="text-muted d-block mb-1" style="font-size:10px; font-weight:600; text-transform:uppercase;">Services</small>
+                <div>${servicesHtml || '<span class="text-muted small">None</span>'}</div>
+              </div>
+
+              <div class="mb-3">
+                <small class="text-muted d-block mb-1" style="font-size:10px; font-weight:600; text-transform:uppercase;">Exposed Ports &amp; Reverse Proxy</small>
+                ${portsHtml}
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center pt-3 mt-2 flex-wrap gap-2" style="border-top:1px solid rgba(255,255,255,0.06);">
+              <div class="d-flex gap-1">
+                ${isRunning
+                  ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.stopStack('${LP.encJsArg(s.name)}')"><i class="bi bi-stop-fill me-1"></i>Stop</button>
+                     <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="DockerPage.restartStack('${LP.encJsArg(s.name)}')"><i class="bi bi-arrow-clockwise me-1"></i>Restart</button>`
+                  : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="DockerPage.startStack('${LP.encJsArg(s.name)}')"><i class="bi bi-play-fill me-1"></i>Start</button>`
+                }
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="DockerPage.openStackLogs('${LP.encJsArg(s.name)}')"><i class="bi bi-terminal me-1"></i>Logs</button>
+              </div>
+              <div class="d-flex gap-1">
+                <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="DockerPage.openEditStudio('${LP.encJsArg(s.name)}')"><i class="bi bi-pencil-square me-1"></i>Edit Studio</button>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.deleteStack('${LP.encJsArg(s.name)}')"><i class="bi bi-trash"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function openNewStudio() {
+    document.getElementById('composeListView').style.display = 'none';
+    document.getElementById('composeStudioView').style.display = 'block';
+    document.getElementById('studioTitle').innerHTML = '<i class="bi bi-sliders2 text-primary me-2"></i>New Compose Stack';
+    document.getElementById('studioProjectName').value = `stack-${Date.now().toString().slice(-4)}`;
+    document.getElementById('studioProjectName').readOnly = false;
+    document.getElementById('studioTemplateSelect').value = '';
+
+    composeStudioServices = [
+      {
+        name: 'web',
+        image: 'nginx:alpine',
+        containerName: '',
+        restart: 'unless-stopped',
+        command: '',
+        ports: [{ host: '8080', container: '80' }],
+        environment: [],
+        volumes: [],
+      }
+    ];
+
+    activeStudioMode = 'visual';
+    setStudioMode('visual');
+    renderVisualServices();
+  }
+
+  async function openEditStudio(projectName) {
+    document.getElementById('composeListView').style.display = 'none';
+    document.getElementById('composeStudioView').style.display = 'block';
+    document.getElementById('studioTitle').innerHTML = `<i class="bi bi-pencil-square text-primary me-2"></i>Edit Stack: <span class="text-white">${LP.escHtml(projectName)}</span>`;
+    document.getElementById('studioProjectName').value = projectName;
+    document.getElementById('studioProjectName').readOnly = true;
+
+    try {
+      const res = await LP.get(`/docker/compose/stacks/${encodeURIComponent(projectName)}`);
+      if (res?.success && res.data?.stack) {
+        const stack = res.data.stack;
+        document.getElementById('studioYaml').value = stack.yaml || '';
+        composeStudioServices = parseYamlToServices(stack.yaml || '');
+        if (composeStudioServices.length === 0) {
+          composeStudioServices = [
+            { name: 'app', image: '', restart: 'unless-stopped', ports: [], environment: [], volumes: [] }
+          ];
+        }
+      } else {
+        LP.toast(res?.message || 'Failed to load stack details', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Error loading stack', 'error');
+    }
+
+    activeStudioMode = 'visual';
+    setStudioMode('visual');
+    renderVisualServices();
+  }
+
+  function closeStudio() {
+    document.getElementById('composeStudioView').style.display = 'none';
+    document.getElementById('composeListView').style.display = 'block';
+    loadComposeStacks();
+  }
+
+  function setStudioMode(mode) {
+    activeStudioMode = mode;
+    const btnVisual = document.getElementById('btnModeVisual');
+    const btnYaml = document.getElementById('btnModeYaml');
+    const visualSec = document.getElementById('studioVisualSection');
+    const yamlSec = document.getElementById('studioYamlSection');
+
+    if (mode === 'visual') {
+      // Sync from YAML to Visual
+      syncVisualFromYaml();
+      btnVisual.className = 'btn-lp btn-lp-primary btn-lp-sm';
+      btnYaml.className = 'btn-lp btn-lp-ghost btn-lp-sm';
+      visualSec.style.display = 'block';
+      yamlSec.style.display = 'none';
+      renderVisualServices();
     } else {
-      LP.toast(res?.message || 'Failed to deploy compose stack', 'error');
+      // Sync from Visual to YAML
+      syncVisualFromForm();
+      const yaml = generateYamlFromServices(composeStudioServices);
+      document.getElementById('studioYaml').value = yaml;
+      btnVisual.className = 'btn-lp btn-lp-ghost btn-lp-sm';
+      btnYaml.className = 'btn-lp btn-lp-primary btn-lp-sm';
+      visualSec.style.display = 'none';
+      yamlSec.style.display = 'block';
+    }
+  }
+
+  function onStudioTemplateChange(templateId) {
+    if (!templateId || !COMPOSE_TEMPLATES[templateId]) return;
+    const yaml = COMPOSE_TEMPLATES[templateId];
+    document.getElementById('studioYaml').value = yaml;
+    composeStudioServices = parseYamlToServices(yaml);
+    document.getElementById('studioProjectName').value = `${templateId}-${Date.now().toString().slice(-4)}`;
+    renderVisualServices();
+    LP.toast(`Template ${templateId} loaded!`, 'info');
+  }
+
+  function newStudioFromTemplate(templateId) {
+    openNewStudio();
+    document.getElementById('studioTemplateSelect').value = templateId;
+    onStudioTemplateChange(templateId);
+  }
+
+  function syncVisualFromForm() {
+    const container = document.getElementById('visualServicesContainer');
+    if (!container) return;
+    const serviceCards = container.querySelectorAll('.studio-service-card');
+
+    composeStudioServices = [];
+    serviceCards.forEach((card, sIdx) => {
+      const name = (card.querySelector('.svc-name')?.value || `service_${sIdx + 1}`).trim();
+      const image = (card.querySelector('.svc-image')?.value || '').trim();
+      const containerName = (card.querySelector('.svc-container-name')?.value || '').trim();
+      const restart = card.querySelector('.svc-restart')?.value || 'unless-stopped';
+      const command = (card.querySelector('.svc-command')?.value || '').trim();
+
+      const ports = [];
+      card.querySelectorAll('.svc-port-row').forEach(row => {
+        const host = (row.querySelector('.port-host')?.value || '').trim();
+        const containerPort = (row.querySelector('.port-container')?.value || '').trim();
+        if (host || containerPort) ports.push({ host, container: containerPort });
+      });
+
+      const environment = [];
+      card.querySelectorAll('.svc-env-row').forEach(row => {
+        const key = (row.querySelector('.env-key')?.value || '').trim();
+        const value = (row.querySelector('.env-value')?.value || '').trim();
+        if (key) environment.push({ key, value });
+      });
+
+      const volumes = [];
+      card.querySelectorAll('.svc-vol-row').forEach(row => {
+        const host = (row.querySelector('.vol-host')?.value || '').trim();
+        const containerPath = (row.querySelector('.vol-container')?.value || '').trim();
+        if (host || containerPath) volumes.push({ host, container: containerPath });
+      });
+
+      composeStudioServices.push({
+        name,
+        image,
+        containerName,
+        restart,
+        command,
+        ports,
+        environment,
+        volumes,
+      });
+    });
+  }
+
+  function syncVisualFromYaml() {
+    const yaml = document.getElementById('studioYaml').value;
+    if (yaml && yaml.trim()) {
+      const parsed = parseYamlToServices(yaml);
+      if (parsed.length > 0) {
+        composeStudioServices = parsed;
+      }
+    }
+  }
+
+  function renderVisualServices() {
+    const container = document.getElementById('visualServicesContainer');
+    const countEl = document.getElementById('serviceCount');
+    if (!container) return;
+
+    if (countEl) countEl.textContent = composeStudioServices.length;
+
+    container.innerHTML = composeStudioServices.map((svc, sIdx) => `
+      <div class="studio-service-card lp-glass-card p-3" style="background:rgba(15,23,42,0.6); border:1px solid var(--glass-border); border-radius:12px;">
+        <div class="d-flex justify-content-between align-items-center mb-3 pb-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div class="d-flex align-items-center gap-2">
+            <span style="width:24px; height:24px; border-radius:6px; background:rgba(99,102,241,0.2); color:var(--accent-primary); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">${sIdx + 1}</span>
+            <strong class="font-mono text-white" style="font-size:13px;">Service: ${LP.escHtml(svc.name || 'unnamed')}</strong>
+          </div>
+          ${composeStudioServices.length > 1 ? `<button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.removeVisualService(${sIdx})" title="Remove Service"><i class="bi bi-trash"></i></button>` : ''}
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-md-4">
+            <label class="lp-label" style="font-size:10px; font-weight:600;">Service Name</label>
+            <input type="text" class="lp-input font-mono svc-name" value="${LP.escHtml(svc.name || '')}" placeholder="e.g. web, api, db" required>
+          </div>
+          <div class="col-md-5">
+            <label class="lp-label" style="font-size:10px; font-weight:600;">Docker Image</label>
+            <input type="text" class="lp-input font-mono svc-image" value="${LP.escHtml(svc.image || '')}" placeholder="e.g. nginx:alpine, redis:7" required>
+          </div>
+          <div class="col-md-3">
+            <label class="lp-label" style="font-size:10px; font-weight:600;">Restart Policy</label>
+            <select class="lp-input svc-restart">
+              <option value="unless-stopped" ${svc.restart === 'unless-stopped' ? 'selected' : ''}>Unless Stopped</option>
+              <option value="always" ${svc.restart === 'always' ? 'selected' : ''}>Always</option>
+              <option value="on-failure" ${svc.restart === 'on-failure' ? 'selected' : ''}>On Failure</option>
+              <option value="no" ${svc.restart === 'no' ? 'selected' : ''}>No</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Port Mappings -->
+        <div class="mb-3 p-2 rounded" style="background:rgba(0,0,0,0.2);">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="lp-label mb-0" style="font-size:10px; font-weight:700;"><i class="bi bi-hdd-network me-1 text-primary"></i>Port Bindings (Host : Container)</label>
+            <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0" style="font-size:10px;" onclick="DockerPage.addVisualPort(${sIdx})">+ Add Port</button>
+          </div>
+          <div class="svc-ports-container">
+            ${(svc.ports || []).map((p, pIdx) => `
+              <div class="d-flex gap-2 align-items-center mb-1 svc-port-row">
+                <input type="number" class="lp-input font-mono port-host" style="height:28px; font-size:11px;" placeholder="Host Port (e.g. 8080)" value="${LP.escHtml(String(p.host || ''))}">
+                <span>:</span>
+                <input type="number" class="lp-input font-mono port-container" style="height:28px; font-size:11px;" placeholder="Container Port (e.g. 80)" value="${LP.escHtml(String(p.container || ''))}">
+                <button type="button" class="btn-lp btn-lp-ghost text-danger py-0 px-2" style="height:28px;" onclick="DockerPage.removeVisualPort(${sIdx}, ${pIdx})">&times;</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Environment Variables -->
+        <div class="mb-3 p-2 rounded" style="background:rgba(0,0,0,0.2);">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="lp-label mb-0" style="font-size:10px; font-weight:700;"><i class="bi bi-key me-1 text-warning"></i>Environment Variables (KEY = VALUE)</label>
+            <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0" style="font-size:10px;" onclick="DockerPage.addVisualEnv(${sIdx})">+ Add Variable</button>
+          </div>
+          <div class="svc-envs-container">
+            ${(svc.environment || []).map((e, eIdx) => `
+              <div class="d-flex gap-2 align-items-center mb-1 svc-env-row">
+                <input type="text" class="lp-input font-mono env-key" style="height:28px; font-size:11px;" placeholder="KEY (e.g. NODE_ENV)" value="${LP.escHtml(e.key || '')}">
+                <span>=</span>
+                <input type="text" class="lp-input font-mono env-value" style="height:28px; font-size:11px;" placeholder="VALUE (e.g. production)" value="${LP.escHtml(e.value || '')}">
+                <button type="button" class="btn-lp btn-lp-ghost text-danger py-0 px-2" style="height:28px;" onclick="DockerPage.removeVisualEnv(${sIdx}, ${eIdx})">&times;</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Volumes -->
+        <div class="p-2 rounded" style="background:rgba(0,0,0,0.2);">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="lp-label mb-0" style="font-size:10px; font-weight:700;"><i class="bi bi-folder2-open me-1 text-success"></i>Volume Mounts (Host Path : Container Path)</label>
+            <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0" style="font-size:10px;" onclick="DockerPage.addVisualVolume(${sIdx})">+ Add Volume</button>
+          </div>
+          <div class="svc-vols-container">
+            ${(svc.volumes || []).map((v, vIdx) => `
+              <div class="d-flex gap-2 align-items-center mb-1 svc-vol-row">
+                <input type="text" class="lp-input font-mono vol-host" style="height:28px; font-size:11px;" placeholder="./data or /var/storage" value="${LP.escHtml(v.host || '')}">
+                <span>:</span>
+                <input type="text" class="lp-input font-mono vol-container" style="height:28px; font-size:11px;" placeholder="/app/data or /var/lib/mysql" value="${LP.escHtml(v.container || '')}">
+                <button type="button" class="btn-lp btn-lp-ghost text-danger py-0 px-2" style="height:28px;" onclick="DockerPage.removeVisualVolume(${sIdx}, ${vIdx})">&times;</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function addVisualService() {
+    syncVisualFromForm();
+    composeStudioServices.push({
+      name: `service_${composeStudioServices.length + 1}`,
+      image: '',
+      containerName: '',
+      restart: 'unless-stopped',
+      command: '',
+      ports: [],
+      environment: [],
+      volumes: [],
+    });
+    renderVisualServices();
+  }
+
+  function removeVisualService(sIdx) {
+    syncVisualFromForm();
+    composeStudioServices.splice(sIdx, 1);
+    renderVisualServices();
+  }
+
+  function addVisualPort(sIdx) {
+    syncVisualFromForm();
+    if (composeStudioServices[sIdx]) {
+      if (!composeStudioServices[sIdx].ports) composeStudioServices[sIdx].ports = [];
+      composeStudioServices[sIdx].ports.push({ host: '', container: '' });
+      renderVisualServices();
+    }
+  }
+
+  function removeVisualPort(sIdx, pIdx) {
+    syncVisualFromForm();
+    if (composeStudioServices[sIdx]?.ports) {
+      composeStudioServices[sIdx].ports.splice(pIdx, 1);
+      renderVisualServices();
+    }
+  }
+
+  function addVisualEnv(sIdx) {
+    syncVisualFromForm();
+    if (composeStudioServices[sIdx]) {
+      if (!composeStudioServices[sIdx].environment) composeStudioServices[sIdx].environment = [];
+      composeStudioServices[sIdx].environment.push({ key: '', value: '' });
+      renderVisualServices();
+    }
+  }
+
+  function removeVisualEnv(sIdx, eIdx) {
+    syncVisualFromForm();
+    if (composeStudioServices[sIdx]?.environment) {
+      composeStudioServices[sIdx].environment.splice(eIdx, 1);
+      renderVisualServices();
+    }
+  }
+
+  function addVisualVolume(sIdx) {
+    syncVisualFromForm();
+    if (composeStudioServices[sIdx]) {
+      if (!composeStudioServices[sIdx].volumes) composeStudioServices[sIdx].volumes = [];
+      composeStudioServices[sIdx].volumes.push({ host: '', container: '' });
+      renderVisualServices();
+    }
+  }
+
+  function removeVisualVolume(sIdx, vIdx) {
+    syncVisualFromForm();
+    if (composeStudioServices[sIdx]?.volumes) {
+      composeStudioServices[sIdx].volumes.splice(vIdx, 1);
+      renderVisualServices();
+    }
+  }
+
+  async function submitStudioDeploy() {
+    const projectName = (document.getElementById('studioProjectName').value || '').trim();
+    if (!projectName) {
+      LP.toast('Project Name is required', 'warning');
+      return;
+    }
+
+    let yaml = '';
+    if (activeStudioMode === 'visual') {
+      syncVisualFromForm();
+      yaml = generateYamlFromServices(composeStudioServices);
+    } else {
+      yaml = document.getElementById('studioYaml').value;
+    }
+
+    if (!yaml || !yaml.trim()) {
+      LP.toast('Compose YAML content is empty', 'warning');
+      return;
+    }
+
+    const btn = document.getElementById('btnDeployStudioStack');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Deploying Compose Stack...';
+
+    try {
+      const res = await LP.post('/docker/compose', { projectName, yaml });
+      if (res?.success) {
+        LP.toast(`Stack ${projectName} deployed successfully!`, 'success');
+        closeStudio();
+      } else {
+        LP.toast(res?.message || 'Failed to deploy stack', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Error deploying stack', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-rocket-takeoff me-1"></i> Deploy Stack Now';
+    }
+  }
+
+  async function startStack(name) {
+    LP.toast(`Starting stack ${name}...`, 'info');
+    const res = await LP.post(`/docker/compose/stacks/${encodeURIComponent(name)}/start`, {});
+    if (res?.success) {
+      LP.toast(`Stack ${name} started!`, 'success');
+      loadComposeStacks();
+    } else {
+      LP.toast(res?.message || 'Failed to start stack', 'error');
+    }
+  }
+
+  async function stopStack(name) {
+    LP.toast(`Stopping stack ${name}...`, 'info');
+    const res = await LP.post(`/docker/compose/stacks/${encodeURIComponent(name)}/stop`, {});
+    if (res?.success) {
+      LP.toast(`Stack ${name} stopped!`, 'success');
+      loadComposeStacks();
+    } else {
+      LP.toast(res?.message || 'Failed to stop stack', 'error');
+    }
+  }
+
+  async function restartStack(name) {
+    LP.toast(`Restarting stack ${name}...`, 'info');
+    const res = await LP.post(`/docker/compose/stacks/${encodeURIComponent(name)}/restart`, {});
+    if (res?.success) {
+      LP.toast(`Stack ${name} restarted!`, 'success');
+      loadComposeStacks();
+    } else {
+      LP.toast(res?.message || 'Failed to restart stack', 'error');
+    }
+  }
+
+  async function deleteStack(name) {
+    if (!confirm(`Are you sure you want to delete Compose Stack "${name}"? This will stop all associated containers.`)) return;
+    LP.toast(`Deleting stack ${name}...`, 'info');
+    const res = await LP.delete(`/docker/compose/stacks/${encodeURIComponent(name)}`);
+    if (res?.success) {
+      LP.toast(`Stack ${name} deleted successfully!`, 'success');
+      loadComposeStacks();
+    } else {
+      LP.toast(res?.message || 'Failed to delete stack', 'error');
+    }
+  }
+
+  async function openStackLogs(name) {
+    activeLogsStack = name;
+    document.getElementById('stackLogsTitle').textContent = `Logs: ${name}`;
+    const termEl = document.getElementById('stackLogsTerminal');
+    termEl.textContent = 'Fetching stack logs...';
+
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('composeStackLogsModal'));
+    modal.show();
+
+    await refreshStackLogs();
+  }
+
+  async function refreshStackLogs() {
+    if (!activeLogsStack) return;
+    const termEl = document.getElementById('stackLogsTerminal');
+    try {
+      const res = await LP.get(`/docker/compose/stacks/${encodeURIComponent(activeLogsStack)}/logs?lines=200`);
+      if (res?.success) {
+        termEl.textContent = res.data?.logs || 'No logs available for this stack.';
+        termEl.scrollTop = termEl.scrollHeight;
+      } else {
+        termEl.textContent = `Error loading logs: ${res?.message || 'Unknown error'}`;
+      }
+    } catch (err) {
+      termEl.textContent = `Error loading logs: ${err.message}`;
+    }
+  }
+
+  function openAutoProxyModal(projectName, serviceName, port) {
+    document.getElementById('proxyProjectName').value = projectName || '';
+    document.getElementById('proxyServiceName').value = serviceName || 'web';
+    document.getElementById('proxyTargetPort').value = port || '';
+    document.getElementById('proxyDomain').value = '';
+
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('composeProxyModal'));
+    modal.show();
+  }
+
+  async function submitAutoProxy(e) {
+    e.preventDefault();
+    const projectName = document.getElementById('proxyProjectName').value;
+    const serviceName = document.getElementById('proxyServiceName').value;
+    const port = document.getElementById('proxyTargetPort').value;
+    const domain = (document.getElementById('proxyDomain').value || '').trim();
+
+    if (!domain) {
+      LP.toast('Domain is required', 'warning');
+      return;
+    }
+
+    const btn = document.getElementById('btnSubmitAutoProxy');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Provisioning HTTPS Proxy...';
+
+    try {
+      const res = await LP.post('/docker/compose/proxy', {
+        projectName,
+        serviceName,
+        port: parseInt(port, 10),
+        domain,
+      });
+
+      if (res?.success) {
+        LP.toast(`HTTPS Reverse Proxy created for https://${domain}!`, 'success');
+        bootstrap.Modal.getInstance(document.getElementById('composeProxyModal')).hide();
+      } else {
+        LP.toast(res?.message || 'Failed to create HTTPS proxy', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Error creating reverse proxy', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-shield-lock me-1"></i> Provision HTTPS Proxy';
     }
   }
 
@@ -435,95 +1267,8 @@ const DockerPage = (() => {
     }
   }
 
-  const COMPOSE_TEMPLATES = {
-    wordpress: `version: '3.8'
-services:
-  wordpress:
-    image: wordpress:latest
-    ports:
-      - '8080:80'
-    environment:
-      WORDPRESS_DB_HOST: db
-      WORDPRESS_DB_USER: wordpress
-      WORDPRESS_DB_PASSWORD: wordpress_password
-      WORDPRESS_DB_NAME: wordpress
-    volumes:
-      - wordpress_data:/var/www/html
-    depends_on:
-      - db
-  db:
-    image: mysql:8.0
-    environment:
-      MYSQL_DATABASE: wordpress
-      MYSQL_USER: wordpress
-      MYSQL_PASSWORD: wordpress_password
-      MYSQL_RANDOM_ROOT_PASSWORD: '1'
-    volumes:
-      - db_data:/var/lib/mysql
-volumes:
-  wordpress_data:
-  db_data:`,
-
-    nextcloud: `version: '3.8'
-services:
-  nextcloud:
-    image: nextcloud:latest
-    ports:
-      - '8081:80'
-    environment:
-      POSTGRES_HOST: db
-      POSTGRES_DB: nextcloud
-      POSTGRES_USER: nextcloud
-      POSTGRES_PASSWORD: nextcloud_password
-    volumes:
-      - nextcloud_data:/var/www/html
-    depends_on:
-      - db
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: nextcloud
-      POSTGRES_USER: nextcloud
-      POSTGRES_PASSWORD: nextcloud_password
-    volumes:
-      - db_data:/var/lib/postgresql/data
-volumes:
-  nextcloud_data:
-  db_data:`,
-
-    n8n: `version: '3.8'
-services:
-  n8n:
-    image: n8nio/n8n:latest
-    ports:
-      - '5678:5678'
-    environment:
-      - N8N_HOST=localhost
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-    volumes:
-      - n8n_data:/home/node/.n8n
-volumes:
-  n8n_data:`,
-
-    'uptime-kuma': `version: '3.8'
-services:
-  uptime-kuma:
-    image: louislam/uptime-kuma:1
-    ports:
-      - '3001:3001'
-    volumes:
-      - uptime_kuma_data:/app/data
-volumes:
-  uptime_kuma_data:`
-  };
-
-  function loadComposeTemplate() {
-    const val = document.getElementById('composeTemplateSelect').value;
-    if (val && COMPOSE_TEMPLATES[val]) {
-      document.getElementById('composeProjectName').value = val + '-stack';
-      document.getElementById('composeYaml').value = COMPOSE_TEMPLATES[val];
-    }
+  function loadComposeTemplate(val) {
+    onStudioTemplateChange(val);
   }
 
   async function installPackage(pkgName) {
@@ -788,7 +1533,7 @@ volumes:
     submitContainer,
     searchOnline,
     selectOnlineImage,
-    deployCompose,
+    deployCompose: submitStudioDeploy,
     loadComposeTemplate,
     installPackage,
     loadAppStore,
@@ -798,6 +1543,31 @@ volumes:
     submitAppInstall,
     showResourceModal,
     saveContainerResources,
+    // Compose Studio & Stacks
+    loadComposeStacks,
+    openNewStudio,
+    openEditStudio,
+    closeStudio,
+    setStudioMode,
+    onStudioTemplateChange,
+    newStudioFromTemplate,
+    addVisualService,
+    removeVisualService,
+    addVisualPort,
+    removeVisualPort,
+    addVisualEnv,
+    removeVisualEnv,
+    addVisualVolume,
+    removeVisualVolume,
+    submitStudioDeploy,
+    startStack,
+    stopStack,
+    restartStack,
+    deleteStack,
+    openStackLogs,
+    refreshStackLogs,
+    openAutoProxyModal,
+    submitAutoProxy,
   };
 })();
 

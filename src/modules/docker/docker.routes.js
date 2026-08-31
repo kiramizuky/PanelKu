@@ -29,6 +29,16 @@ router.get('/images', dockerController.listImages);
 router.post('/images/prune', requirePermission('docker_manage', 'delete'), dockerController.pruneImages);
 router.delete('/images/:id', requirePermission('docker_manage', 'delete'), dockerController.removeImage);
 
+// Compose Stacks & Studio
+router.get('/compose/stacks', dockerController.listComposeStacks);
+router.get('/compose/stacks/:name', dockerController.getComposeStack);
+router.post('/compose/stacks/:name/start', requirePermission('docker_manage', 'execute'), dockerController.startComposeStack);
+router.post('/compose/stacks/:name/stop', requirePermission('docker_manage', 'execute'), dockerController.stopComposeStack);
+router.post('/compose/stacks/:name/restart', requirePermission('docker_manage', 'execute'), dockerController.restartComposeStack);
+router.delete('/compose/stacks/:name', requirePermission('docker_manage', 'delete'), dockerController.deleteComposeStack);
+router.get('/compose/stacks/:name/logs', dockerController.getComposeLogs);
+router.post('/compose/proxy', requirePermission('docker_manage', 'execute'), dockerController.createAutoProxy);
+
 router.post('/compose', requirePermission('docker_manage', 'execute'), dockerController.deployCompose);
 
 export default router;

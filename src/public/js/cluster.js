@@ -463,7 +463,7 @@ const ClusterPage = (() => {
       const res = await LP.delete(`/cluster/nodes/${id}`);
       if (res?.success) {
         LP.toast('Agent Node berhasil dihapus', 'success');
-        loadNodes();
+        refreshAll();
       } else {
         LP.toast(res?.message || 'Gagal menghapus node', 'error');
       }
@@ -482,13 +482,12 @@ const ClusterPage = (() => {
       if (res?.success && res.data) {
         const isOnline = res.data.status === 'online';
         LP.toast(`Node ${isOnline ? '🟢 online' : '🔴 offline'}!`, isOnline ? 'success' : 'error');
-        // Update badge in-place
         const badge = document.getElementById(`badge-${id}`);
         if (badge) {
           badge.textContent = res.data.status;
           badge.className = `lp-badge ${isOnline ? 'lp-badge-success' : 'lp-badge-danger'}`;
         }
-        if (isOnline) loadNodes(); // reload to refresh metrics too
+        if (isOnline) refreshAll();
       } else {
         LP.toast(res?.message || 'Ping gagal', 'error');
       }
@@ -509,12 +508,306 @@ const ClusterPage = (() => {
     }
   }
 
-  return { init, showAddModal, toggleApiKeyVis, addNode, deleteNode, pingNode, copyHost, refreshMetrics, showDetails };
+  // ── Fleet Capacity Aggregation ────────────────────────────────
+
+  async function loadFleetSummary() {
+    try {
+      const res = await LP.get('/cluster/fleet-summary');
+      if (res?.success && res.data) {
+        const s = res.data;
+        const nodesCountEl = document.getElementById('fleetNodesCount');
+        const nodesRatioEl = document.getElementById('fleetNodesRatio');
+        const cpusCountEl  = document.getElementById('fleetCpusCount');
+        const ramTotalEl   = document.getElementById('fleetRamTotal');
+        const ramUsedEl    = document.getElementById('fleetRamUsed');
+        const diskTotalEl  = document.getElementById('fleetDiskTotal');
+        const diskUsedEl   = document.getElementById('fleetDiskUsed');
+
+        if (nodesCountEl) nodesCountEl.textContent = s.totalNodes;
+        if (nodesRatioEl) nodesRatioEl.textContent = `${s.onlineNodes} online / ${s.offlineNodes} offline`;
+        if (cpusCountEl)  cpusCountEl.textContent = `${s.totalCores} Cores`;
+        if (ramTotalEl)   ramTotalEl.textContent = fmtBytes(s.totalMemoryBytes);
+        if (ramUsedEl)    ramUsedEl.textContent = `${fmtBytes(s.totalMemoryUsedBytes)} (${s.memoryUsedPercent}%)`;
+        if (diskTotalEl)  diskTotalEl.textContent = fmtBytes(s.totalDiskBytes);
+        if (diskUsedEl)   diskUsedEl.textContent = `${fmtBytes(s.totalDiskUsedBytes)} (${s.diskUsedPercent}%)`;
+
+        // Render checklist for Distributed Command Runner
+        const checklistEl = document.getElementById('execNodesChecklist');
+        if (checklistEl) {
+          const items = [
+            `
+            <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#fff; cursor:pointer;">
+              <input type="checkbox" value="all" id="execCheckAll" onchange="ClusterPage.toggleExecCheckAll(this)">
+              <strong>Select All Fleet Nodes (${s.totalNodes})</strong>
+            </label>
+            `,
+            `
+            <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#38bdf8; cursor:pointer;">
+              <input type="checkbox" name="execNodeTarget" value="master" checked>
+              <span>👑 Master Panel (Local)</span>
+            </label>
+            `,
+          ];
+
+          if (Array.isArray(s.fleetNodes)) {
+            s.fleetNodes.forEach(n => {
+              const isOnline = n.status === 'online';
+              items.push(`
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:${isOnline ? '#cbd5e1' : '#64748b'}; cursor:pointer;">
+                  <input type="checkbox" name="execNodeTarget" value="${LP.escHtml(n.id)}" ${isOnline ? 'checked' : ''}>
+                  <span>${isOnline ? '🟢' : '🔴'} ${LP.escHtml(n.name)} (${LP.escHtml(n.ipAddress)})</span>
+                </label>
+              `);
+            });
+          }
+
+          checklistEl.innerHTML = items.join('');
+        }
+      }
+    } catch {
+      // silently fail
+    }
+  }
+
+  function toggleExecCheckAll(masterCheckbox) {
+    const checkboxes = document.querySelectorAll('input[name="execNodeTarget"]');
+    checkboxes.forEach(cb => { cb.checked = masterCheckbox.checked; });
+  }
+
+  // ── 1-Click Pairing Token Generator ───────────────────────────
+
+  async function generatePairingScript() {
+    const suggestedName = document.getElementById('installerSuggestedName')?.value?.trim() || '';
+    try {
+      const res = await LP.post('/cluster/pairing-token', { suggestedName });
+      if (res?.success && res.data) {
+        const cmdBox = document.getElementById('pairingCommandBox');
+        const cmdText = document.getElementById('pairingCommandText');
+        if (cmdBox && cmdText) {
+          cmdText.textContent = res.data.installScriptCmd;
+          cmdBox.style.display = 'block';
+        }
+        LP.toast('Pairing token generated!', 'success');
+      } else {
+        LP.toast(res?.message || 'Failed to generate token', 'error');
+      }
+    } catch {
+      LP.toast('Error generating pairing token', 'error');
+    }
+  }
+
+  async function copyPairingCommand() {
+    const cmdText = document.getElementById('pairingCommandText')?.textContent;
+    if (!cmdText) return;
+    try {
+      await navigator.clipboard.writeText(cmdText);
+      LP.toast('Installer command copied to clipboard!', 'success');
+    } catch {
+      LP.toast('Failed to copy', 'error');
+    }
+  }
+
+  // ── Distributed Command Runner ────────────────────────────────
+
+  function applyCommandPreset(val) {
+    const inp = document.getElementById('execCommandInput');
+    if (inp && val) inp.value = val;
+  }
+
+  function clearExecConsole() {
+    const consoleEl = document.getElementById('execOutputConsole');
+    if (consoleEl) consoleEl.innerHTML = '<span class="text-muted">Console cleared.</span>';
+  }
+
+  async function dispatchRemoteCommand() {
+    const cmd = document.getElementById('execCommandInput')?.value?.trim();
+    if (!cmd) {
+      LP.toast('Please enter a shell command to execute', 'warning');
+      return;
+    }
+
+    const checkAll = document.getElementById('execCheckAll')?.checked;
+    let nodeIds = [];
+    if (checkAll) {
+      nodeIds = ['all'];
+    } else {
+      const checkboxes = document.querySelectorAll('input[name="execNodeTarget"]:checked');
+      checkboxes.forEach(cb => nodeIds.push(cb.value));
+    }
+
+    if (nodeIds.length === 0) {
+      LP.toast('Please select at least one target node', 'warning');
+      return;
+    }
+
+    const consoleEl = document.getElementById('execOutputConsole');
+    const dispatchBtn = document.getElementById('execDispatchBtn');
+    if (consoleEl) {
+      consoleEl.innerHTML = `
+        <div class="mb-3 text-warning">
+          <span class="spinner-border spinner-border-sm me-1"></span>
+          Dispatching command <code>${LP.escHtml(cmd)}</code> across ${nodeIds.includes('all') ? 'All' : nodeIds.length} node(s)...
+        </div>
+      `;
+    }
+
+    if (dispatchBtn) {
+      dispatchBtn.disabled = true;
+      dispatchBtn.innerHTML = '<i class="spinner-border spinner-border-sm me-1"></i> Running on Fleet...';
+    }
+
+    try {
+      const res = await LP.post('/cluster/exec', { nodeIds, command: cmd });
+      if (res?.success && res.data) {
+        const results = res.data.results || [];
+        if (results.length === 0) {
+          consoleEl.innerHTML = '<span class="text-danger">No results returned from nodes.</span>';
+          return;
+        }
+
+        consoleEl.innerHTML = results.map(r => {
+          const isOk = r.status === 'success' && r.exitCode === 0;
+          const statusBadge = isOk
+            ? '<span class="badge bg-success" style="font-size:10px;">SUCCESS (exit 0)</span>'
+            : `<span class="badge bg-danger" style="font-size:10px;">FAILED (exit ${r.exitCode})</span>`;
+
+          return `
+            <div class="p-3 rounded mb-3" style="background:rgba(0,0,0,0.4); border:1px solid ${isOk ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'};">
+              <div class="d-flex justify-content-between align-items-center mb-2 pb-2" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="font-weight:700; color:#fff; font-size:12.5px;">
+                  <i class="bi bi-hdd-network me-1 ${isOk ? 'text-success' : 'text-danger'}"></i> ${LP.escHtml(r.nodeName)}
+                </span>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="text-muted" style="font-size:10.5px;">${r.durationMs}ms</span>
+                  ${statusBadge}
+                </div>
+              </div>
+              ${r.stdout ? `<div style="color:#a7f3d0; margin-bottom:4px;">${LP.escHtml(r.stdout)}</div>` : ''}
+              ${r.stderr ? `<div style="color:#fca5a5;">${LP.escHtml(r.stderr)}</div>` : ''}
+              ${!r.stdout && !r.stderr ? '<div class="text-muted" style="font-size:11px;">(No output produced)</div>' : ''}
+            </div>
+          `;
+        }).join('');
+      } else {
+        consoleEl.innerHTML = `<span class="text-danger">Execution error: ${LP.escHtml(res?.message || 'Unknown')}</span>`;
+      }
+    } catch (err) {
+      consoleEl.innerHTML = `<span class="text-danger">Connection error: ${LP.escHtml(err.message)}</span>`;
+    } finally {
+      if (dispatchBtn) {
+        dispatchBtn.disabled = false;
+        dispatchBtn.innerHTML = '<i class="bi bi-play-fill me-1"></i> Dispatch Command to Fleet';
+      }
+    }
+  }
+
+  // ── Kubernetes Summary Renderer ───────────────────────────────
+
+  async function loadK8sSummary() {
+    const k8sEl = document.getElementById('k8sContainer');
+    if (!k8sEl) return;
+    k8sEl.innerHTML = '<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2 text-primary"></span> Scanning Kubernetes cluster...</div>';
+
+    try {
+      const res = await LP.get('/cluster/k8s/summary');
+      if (res?.success && res.data) {
+        const k = res.data;
+        if (!k.installed) {
+          k8sEl.innerHTML = `
+            <div class="p-4 rounded text-center" style="background:rgba(255,255,255,0.02); border:1px dashed var(--glass-border);">
+              <i class="bi bi-boxes" style="font-size:36px; color:var(--text-muted); display:block; margin-bottom:10px;"></i>
+              <h6 class="text-white" style="font-weight:600;">No Kubernetes Engine Detected</h6>
+              <p class="text-muted" style="font-size:12px; max-width:480px; margin:0 auto 15px;">${LP.escHtml(k.message || 'K3s or MicroK8s is not installed on this host.')}</p>
+            </div>
+          `;
+          return;
+        }
+
+        k8sEl.innerHTML = `
+          <div class="row g-3 mb-4">
+            <div class="col-4">
+              <div class="p-3 rounded text-center" style="background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);">
+                <small class="text-muted d-block font-mono" style="font-size:10px;">ENGINE</small>
+                <strong class="text-primary font-mono" style="font-size:16px;">${LP.escHtml(k.engine.toUpperCase())}</strong>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-3 rounded text-center" style="background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);">
+                <small class="text-muted d-block font-mono" style="font-size:10px;">NODES</small>
+                <strong class="text-white font-mono" style="font-size:16px;">${k.nodeCount || 0}</strong>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-3 rounded text-center" style="background:rgba(0,0,0,0.25); border:1px solid var(--glass-border);">
+                <small class="text-muted d-block font-mono" style="font-size:10px;">ACTIVE PODS</small>
+                <strong class="text-success font-mono" style="font-size:16px;">${k.podCount || 0}</strong>
+              </div>
+            </div>
+          </div>
+
+          <h6 class="text-white font-mono mb-2" style="font-size:12px; font-weight:700;">Cluster Nodes:</h6>
+          <div class="table-responsive mb-4">
+            <table class="lp-table" style="font-size:12px;">
+              <thead>
+                <tr>
+                  <th>Node Name</th>
+                  <th>Status</th>
+                  <th>Roles</th>
+                  <th>Version</th>
+                  <th>OS</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(k.nodes || []).map(n => `
+                  <tr>
+                    <td class="font-mono text-white font-weight-bold">${LP.escHtml(n.name)}</td>
+                    <td><span class="lp-badge lp-badge-success">${LP.escHtml(n.status)}</span></td>
+                    <td class="font-mono text-muted">${LP.escHtml(n.roles)}</td>
+                    <td class="font-mono">${LP.escHtml(n.kubeletVersion || '-')}</td>
+                    <td class="text-muted">${LP.escHtml(n.osImage || '-')}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    } catch (err) {
+      k8sEl.innerHTML = `<div class="text-danger text-center py-3">Error: ${LP.escHtml(err.message)}</div>`;
+    }
+  }
+
+  async function refreshAll() {
+    await loadFleetSummary();
+    await loadNodes();
+  }
+
+  return {
+    init,
+    showAddModal,
+    toggleApiKeyVis,
+    addNode,
+    deleteNode,
+    pingNode,
+    copyHost,
+    refreshMetrics,
+    showDetails,
+    loadFleetSummary,
+    toggleExecCheckAll,
+    generatePairingScript,
+    copyPairingCommand,
+    applyCommandPreset,
+    clearExecConsole,
+    dispatchRemoteCommand,
+    loadK8sSummary,
+    refreshAll,
+  };
 })();
 
-// [FIX] Expose to window so LP.call() and direct onclick can resolve ClusterPage
+// Expose to window so LP.call() and direct onclick can resolve ClusterPage
 window.ClusterPage = ClusterPage;
 
 document.addEventListener('DOMContentLoaded', () => {
   ClusterPage.init();
+  ClusterPage.loadFleetSummary();
 });

@@ -299,6 +299,210 @@ const WAFPage = {
     } catch {
       LP.toast('Error blocking country', 'error');
     }
+  },
+
+  // ── CrowdSec Community Shield Logic ───────────────────────────
+
+  async loadCrowdSec() {
+    const tbody = document.getElementById('crowdsecDecisionsTableBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Loading CrowdSec decisions...</td></tr>';
+
+    try {
+      const [statusRes, decisionsRes] = await Promise.all([
+        LP.get('/waf/crowdsec/status'),
+        LP.get('/waf/crowdsec/decisions'),
+      ]);
+
+      if (statusRes?.success && statusRes.data) {
+        const s = statusRes.data;
+        const statusBadge = document.getElementById('csStatusBadge');
+        if (statusBadge) {
+          statusBadge.textContent = s.running ? 'ACTIVE' : 'STOPPED';
+          statusBadge.style.color = s.running ? 'var(--accent-success)' : 'var(--accent-danger)';
+        }
+
+        const countEl = document.getElementById('csCommunityCount');
+        if (countEl) countEl.textContent = (s.communityBlocklistCount || 0).toLocaleString();
+
+        const decEl = document.getElementById('csActiveDecisions');
+        if (decEl) decEl.textContent = (s.activeDecisions || 0).toLocaleString();
+
+        const bouncersEl = document.getElementById('csBouncersCount');
+        if (bouncersEl && Array.isArray(s.bouncers)) {
+          bouncersEl.textContent = `${s.bouncers.length} Active`;
+        }
+      }
+
+      if (decisionsRes?.success && tbody) {
+        const decisions = decisionsRes.data?.decisions || [];
+        if (decisions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No active ban decisions</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = decisions.map(d => `
+          <tr>
+            <td class="font-mono" style="font-weight:600; color:var(--text-primary);">${LP.escHtml(d.ip)}</td>
+            <td><span class="lp-badge lp-badge-info" style="font-size:10px;">${LP.escHtml(d.origin)}</span></td>
+            <td class="font-mono" style="font-size:11px;">${LP.escHtml(d.scenario)}</td>
+            <td><span class="lp-badge lp-badge-warning" style="font-size:10px;">${LP.escHtml(d.duration)}</span></td>
+            <td style="font-size:11px; color:var(--text-muted);">${new Date(d.createdAt).toLocaleString()}</td>
+            <td style="text-align:right;">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="WAFPage.deleteCrowdSecDecision('${LP.encJsArg(d.ip)}')" title="Unban IP">
+                <i class="bi bi-trash"></i> Unban
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      }
+    } catch (err) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-danger">${LP.escHtml(err.message || 'Error loading CrowdSec')}</td></tr>`;
+    }
+  },
+
+  showAddCrowdSecModal() {
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addCrowdSecModal'));
+    modal.show();
+  },
+
+  async submitAddCrowdSec(e) {
+    e.preventDefault();
+    const ip = document.getElementById('csBanIp').value.trim();
+    const duration = document.getElementById('csBanDuration').value;
+    const reason = document.getElementById('csBanReason').value.trim();
+
+    if (!ip) {
+      LP.toast('IP is required', 'warning');
+      return;
+    }
+
+    try {
+      const res = await LP.post('/waf/crowdsec/decisions', { ip, duration, reason });
+      if (res?.success) {
+        LP.toast(`IP ${ip} banned via CrowdSec`, 'success');
+        bootstrap.Modal.getInstance(document.getElementById('addCrowdSecModal')).hide();
+        document.getElementById('addCrowdSecForm').reset();
+        this.loadCrowdSec();
+        this.loadRules();
+      } else {
+        LP.toast(res?.message || 'Failed to add CrowdSec ban', 'error');
+      }
+    } catch {
+      LP.toast('Error adding CrowdSec decision', 'error');
+    }
+  },
+
+  async deleteCrowdSecDecision(ip) {
+    if (!(await LP.confirm(`Remove ban for IP ${ip}?`, 'Unban IP'))) return;
+    try {
+      const res = await LP.delete(`/waf/crowdsec/decisions/${encodeURIComponent(ip)}`);
+      if (res?.success) {
+        LP.toast(`IP ${ip} unbanned`, 'success');
+        this.loadCrowdSec();
+        this.loadRules();
+      } else {
+        LP.toast(res?.message || 'Failed to unban IP', 'error');
+      }
+    } catch {
+      LP.toast('Error unbanning IP', 'error');
+    }
+  },
+
+  async syncCrowdSec() {
+    LP.toast('Syncing CrowdSec Hub & Community threat blocklists...', 'info');
+    try {
+      const res = await LP.post('/waf/crowdsec/sync', {});
+      if (res?.success) {
+        LP.toast(res?.message || 'CrowdSec Hub synchronized!', 'success');
+        this.loadCrowdSec();
+      } else {
+        LP.toast(res?.message || 'Sync failed', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Error syncing CrowdSec', 'error');
+    }
+  },
+
+  // ── Honeypot Bot Trap Logic ───────────────────────────────────
+
+  async loadHoneypot() {
+    const tbody = document.getElementById('honeypotHitsTableBody');
+    const pills = document.getElementById('honeypotTrapsPills');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Loading honeypot hits...</td></tr>';
+
+    try {
+      const res = await LP.get('/waf/honeypot/hits');
+      if (res?.success && res.data) {
+        const { hits, traps } = res.data;
+
+        if (pills && Array.isArray(traps)) {
+          pills.innerHTML = traps.map(t => `
+            <span class="badge bg-dark border border-secondary font-mono" style="font-size:10.5px; padding:6px 10px;">
+              <i class="bi bi-shield-lock-fill text-warning me-1"></i>${LP.escHtml(t)}
+            </span>
+          `).join('');
+        }
+
+        if (tbody) {
+          if (!hits || hits.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No bot attacks recorded yet. Traps are active and monitoring.</td></tr>';
+            return;
+          }
+
+          tbody.innerHTML = hits.map(h => `
+            <tr>
+              <td class="font-mono" style="font-weight:600; color:var(--accent-danger);">${LP.escHtml(h.ip)}</td>
+              <td class="font-mono" style="font-weight:600; color:#fff;">${LP.escHtml(h.path)}</td>
+              <td style="font-size:11px; color:var(--text-muted); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${LP.escHtml(h.user_agent || '')}">${LP.escHtml(h.user_agent || 'Unknown')}</td>
+              <td><span class="lp-badge lp-badge-danger"><span class="lp-badge-dot"></span>AUTO-BANNED</span></td>
+              <td style="font-size:11px; color:var(--text-muted);">${new Date(h.created_at).toLocaleString()}</td>
+              <td style="text-align:right;">
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="WAFPage.deleteCrowdSecDecision('${LP.encJsArg(h.ip)}')" title="Unban this IP">
+                  <i class="bi bi-unlock"></i> Unban
+                </button>
+              </td>
+            </tr>
+          `).join('');
+        }
+      }
+    } catch (err) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-danger">${LP.escHtml(err.message || 'Error loading Honeypot data')}</td></tr>`;
+    }
+  },
+
+  async clearHoneypotHits() {
+    if (!(await LP.confirm('Clear all recorded honeypot hits history?', 'Clear Honeypot Logs'))) return;
+    try {
+      const res = await LP.post('/waf/honeypot/clear', {});
+      if (res?.success) {
+        LP.toast('Honeypot hits cleared', 'success');
+        this.loadHoneypot();
+      } else {
+        LP.toast(res?.message || 'Failed to clear hits', 'error');
+      }
+    } catch {
+      LP.toast('Error clearing honeypot hits', 'error');
+    }
+  },
+
+  // ── 1-Click System Hardening ──────────────────────────────────
+
+  async applyAutoHardening() {
+    if (!(await LP.confirm('Apply 1-Click System Hardening? This will enforce UFW firewall defaults, activate Fail2Ban jails, synchronize CrowdSec blocklists, and activate all WAF Core Rule Sets.', '1-Click Auto-Harden'))) return;
+
+    LP.toast('Applying security hardening across firewall, fail2ban, and WAF CRS...', 'info');
+    try {
+      const res = await LP.post('/waf/harden', {});
+      if (res?.success) {
+        LP.toast('System security hardened successfully!', 'success');
+        await this.scanSecurity();
+        await this.loadRules();
+      } else {
+        LP.toast(res?.message || 'Failed to harden system', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Error applying hardening', 'error');
+    }
   }
 };
 

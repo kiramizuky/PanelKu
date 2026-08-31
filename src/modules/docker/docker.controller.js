@@ -192,6 +192,91 @@ class DockerController {
       return errorResponse(res, error.message, 500);
     }
   }
+
+  // ── Compose Stacks & Studio Endpoints ─────────────────────────
+
+  async listComposeStacks(req, res) {
+    try {
+      const stacks = await dockerService.listComposeProjects();
+      return successResponse(res, { stacks }, 'Compose stacks retrieved');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async getComposeStack(req, res) {
+    try {
+      const name = cleanId(req.params.name);
+      const stack = await dockerService.getComposeProject(name);
+      return successResponse(res, { stack }, 'Compose stack details retrieved');
+    } catch (error) {
+      return errorResponse(res, error.message, 404);
+    }
+  }
+
+  async startComposeStack(req, res) {
+    try {
+      const name = cleanId(req.params.name);
+      const result = await dockerService.startComposeProject(name);
+      return successResponse(res, result, `Stack ${name} started successfully`);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async stopComposeStack(req, res) {
+    try {
+      const name = cleanId(req.params.name);
+      const result = await dockerService.stopComposeProject(name);
+      return successResponse(res, result, `Stack ${name} stopped successfully`);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async restartComposeStack(req, res) {
+    try {
+      const name = cleanId(req.params.name);
+      const result = await dockerService.restartComposeProject(name);
+      return successResponse(res, result, `Stack ${name} restarted successfully`);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async deleteComposeStack(req, res) {
+    try {
+      const name = cleanId(req.params.name);
+      const removeVolumes = req.query.removeVolumes === 'true';
+      const result = await dockerService.deleteComposeProject(name, { removeVolumes });
+      return successResponse(res, result, `Stack ${name} deleted successfully`);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async getComposeLogs(req, res) {
+    try {
+      const name = cleanId(req.params.name);
+      const lines = parseInt(req.query.lines, 10) || 200;
+      const service = req.query.service || '';
+      const logs = await dockerService.getComposeLogs(name, { lines, service });
+      return successResponse(res, { logs }, 'Compose logs retrieved');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async createAutoProxy(req, res) {
+    try {
+      const { domain, port } = req.body;
+      const userId = req.user?.id || req.user?._id;
+      const website = await dockerService.createAutoProxy({ domain, port, userId });
+      return successResponse(res, { website }, `Auto HTTPS proxy created for ${domain}`);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
 }
 
 export default new DockerController();
