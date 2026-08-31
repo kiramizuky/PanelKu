@@ -478,8 +478,12 @@
 
     // ── Passkey Authentication Handler ──
     async function loginWithPasskey() {
+      const err = document.getElementById('errorMsg');
       if (!window.PublicKeyCredential) {
-        alert('Passkeys / WebAuthn is not supported by your browser or device.');
+        if (err) {
+          err.textContent = 'Passkeys / WebAuthn is not supported by your browser or device.';
+          err.style.display = 'block';
+        }
         return;
       }
 

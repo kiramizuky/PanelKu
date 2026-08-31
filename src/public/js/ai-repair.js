@@ -309,15 +309,15 @@ const AIRepairPage = {
 
     // Ask for params based on fix type
     if (fixId === 'port.conflict') {
-      const port = prompt('Enter the port number to resolve conflict:', '8080');
+      const port = await LP.prompt('Enter the port number to resolve conflict:', '8080', 'Resolve Port Conflict');
       if (!port) return;
       fixParams.port = port;
     } else if (fixId === 'service.down') {
-      const service = prompt('Enter the service name to restart:', 'nginx');
+      const service = await LP.prompt('Enter the service name to restart:', 'nginx', 'Restart Service');
       if (!service) return;
       fixParams.service = service;
     } else if (fixId === 'permission.denied') {
-      const path = prompt('Enter the directory path to fix permissions:', '/var/www');
+      const path = await LP.prompt('Enter the directory path to fix permissions:', '/var/www', 'Fix Permissions');
       if (!path) return;
       fixParams.path = path;
     }

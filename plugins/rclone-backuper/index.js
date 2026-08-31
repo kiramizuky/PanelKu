@@ -184,7 +184,7 @@ export default {
               }
 
               async function deleteJob(id) {
-                if (!confirm('Are you sure you want to delete this backup job?')) return;
+                if (!(await LP.confirm('Are you sure you want to delete this backup job?', 'Delete Backup Job'))) return;
                 try {
                   const res = await LP.post('/api/plugins/rclone/jobs/delete', { id });
                   if (res?.success) {

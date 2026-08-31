@@ -525,11 +525,19 @@ const LP = {
     });
   },
 
-  prompt(message, type = 'text', title = 'Input Required') {
+  prompt(message, defaultValueOrType = '', title = 'Input Required', inputType = 'text') {
     return new Promise(resolve => {
       const id = 'lp_prompt_' + Date.now();
       const safeTitle = this.escHtml(title);
-      // type is restricted to 'text', 'password', 'email', 'number' — safe
+      let inputVal = '';
+      let type = inputType || 'text';
+      const knownTypes = ['text', 'password', 'email', 'number'];
+      if (knownTypes.includes(defaultValueOrType) && (!inputType || inputType === 'text') && arguments.length <= 3 && defaultValueOrType !== 'text') {
+        type = defaultValueOrType;
+      } else {
+        inputVal = defaultValueOrType || '';
+      }
+
       const modal = document.createElement('div');
       modal.innerHTML = `
         <div class="modal fade" id="${id}" tabindex="-1">
@@ -541,7 +549,7 @@ const LP = {
               </div>
               <div class="modal-body pb-0">
                 <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">${message}</p>
-                <input type="${type}" id="${id}_input" class="lp-input w-100" style="height:38px;">
+                <input type="${type}" id="${id}_input" class="lp-input w-100" style="height:38px;" value="${this.escHtml(String(inputVal))}">
               </div>
               <div class="modal-footer border-0">
                 <button class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
@@ -553,8 +561,16 @@ const LP = {
       document.body.appendChild(modal);
       const bsModal = new bootstrap.Modal(document.getElementById(id));
       bsModal.show();
+      const inputEl = document.getElementById(`${id}_input`);
+      setTimeout(() => { inputEl.focus(); inputEl.select(); }, 150);
+      inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById(`${id}_ok`).click();
+        }
+      });
       document.getElementById(`${id}_ok`).addEventListener('click', () => {
-        const val = document.getElementById(`${id}_input`).value;
+        const val = inputEl.value;
         bsModal.hide();
         resolve(val);
       });

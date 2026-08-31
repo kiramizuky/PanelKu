@@ -265,7 +265,7 @@ export default {
                 }
 
                 async function installPhp(ver) {
-                  if (!confirm(\`Are you sure you want to install PHP \${ver} with common extensions? This might take several minutes.\`)) return;
+                  if (!(await LP.confirm(\`Are you sure you want to install PHP \${ver} with common extensions? This might take several minutes.\`, 'Install PHP'))) return;
                   showLoading(\`Installing PHP \${ver}. Please wait...\`);
                   try {
                     const res = await LP.post('/api/plugins/php-manager/install', { version: ver });

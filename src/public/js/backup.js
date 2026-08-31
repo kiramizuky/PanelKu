@@ -500,8 +500,8 @@ const BackupPage = {
     }
   },
 
-  showRestoreModal(filename) {
-    const target = prompt('Enter target database name or directory path to restore to:', '');
+  async showRestoreModal(filename) {
+    const target = await LP.prompt('Enter target database name or directory path to restore to:', '', 'Restore Backup');
     if (!target) return;
     this.restoreBackup(filename, target);
   },
@@ -975,7 +975,7 @@ const BackupPage = {
   },
 
   async restoreFromRemote(remote, remotePath) {
-    const localTarget = prompt(`Restore "${remote}:${remotePath}" to local path:`, '/tmp/restore');
+    const localTarget = await LP.prompt(`Restore "${remote}:${remotePath}" to local path:`, '/tmp/restore', 'Disaster Recovery Restore');
     if (!localTarget) return;
 
     if (!(await LP.confirm(

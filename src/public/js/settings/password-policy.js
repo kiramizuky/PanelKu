@@ -61,7 +61,7 @@ const PasswordPolicyPage = {
   },
 
   async reset() {
-    if (!confirm('Reset password policy to system defaults? This cannot be undone.')) return;
+    if (!(await LP.confirm('Reset password policy to system defaults? This cannot be undone.', 'Reset Password Policy'))) return;
 
     const resetBtn = document.getElementById('btnResetPolicy');
     resetBtn.disabled = true;
@@ -216,7 +216,7 @@ const PasswordPolicyPage = {
     const d = this._urlImportData;
     const complexity = ['requireUppercase','requireLowercase','requireNumber','requireSpecial'].filter(k => d[k]).join(', ') || 'none';
 
-    if (!confirm(`Import password policy from remote server?\n\nThis will REPLACE the current policy.\nminLength: ${d.minLength}\nexpiryDays: ${d.expiryDays ?? 'N/A'}\nreminderDays: ${d.reminderDays ?? 'N/A'}\nComplexity: ${complexity}\nExpiry: ${d.expiryEnabled ? `${d.expiryDays}d` : 'disabled'}`)) {
+    if (!(await LP.confirm(`Import password policy from remote server?<br><br>This will <strong>REPLACE</strong> the current policy.<br>• Min Length: ${d.minLength}<br>• Expiry Days: ${d.expiryDays ?? 'N/A'}<br>• Reminder Days: ${d.reminderDays ?? 'N/A'}<br>• Complexity: ${complexity}<br>• Expiry: ${d.expiryEnabled ? `${d.expiryDays}d` : 'disabled'}`, 'Import Password Policy'))) {
       return;
     }
 
@@ -301,7 +301,7 @@ const PasswordPolicyPage = {
         // Extract schema version for display
         const schemaVersion = policy._schema?.version || '1 (legacy)';
 
-        if (!confirm(`Import password policy from "${file.name}"?\n\nSchema: v${schemaVersion}\nminLength: ${policy.minLength}\nexpiryDays: ${policy.expiryDays ?? 'N/A'}\nreminderDays: ${policy.reminderDays ?? 'N/A'}\nComplexity: ${['requireUppercase','requireLowercase','requireNumber','requireSpecial'].filter(k => policy[k]).join(', ') || 'none'}\nExpiry: ${policy.expiryEnabled ? `${policy.expiryDays}d` : 'disabled'}\n\nThis will REPLACE the current policy.`)) {
+        if (!(await LP.confirm(`Import password policy from "${LP.escHtml(file.name)}"?<br><br>• Schema: v${schemaVersion}<br>• Min Length: ${policy.minLength}<br>• Expiry Days: ${policy.expiryDays ?? 'N/A'}<br>• Reminder Days: ${policy.reminderDays ?? 'N/A'}<br>• Complexity: ${['requireUppercase','requireLowercase','requireNumber','requireSpecial'].filter(k => policy[k]).join(', ') || 'none'}<br>• Expiry: ${policy.expiryEnabled ? `${policy.expiryDays}d` : 'disabled'}<br><br>This will <strong>REPLACE</strong> the current policy.`, 'Import Password Policy'))) {
           return;
         }
 

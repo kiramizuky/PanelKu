@@ -1066,7 +1066,7 @@ services:
   }
 
   async function deleteStack(name) {
-    if (!confirm(`Are you sure you want to delete Compose Stack "${name}"? This will stop all associated containers.`)) return;
+    if (!(await LP.confirm(`Are you sure you want to delete Compose Stack "${name}"? This will stop all associated containers.`, 'Delete Compose Stack'))) return;
     LP.toast(`Deleting stack ${name}...`, 'info');
     const res = await LP.delete(`/docker/compose/stacks/${encodeURIComponent(name)}`);
     if (res?.success) {

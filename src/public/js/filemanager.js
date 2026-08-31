@@ -254,7 +254,7 @@ const FMPage = (() => {
   async function bulkChmod() {
     const paths = getSelectedPaths();
     if (paths.length === 0) return;
-    const perm = prompt('Enter permissions octal (e.g. 755 or 644):', '644');
+    const perm = await LP.prompt('Enter permissions octal (e.g. 755 or 644):', '644', 'Change Permissions');
     if (!perm || !/^[0-7]{3,4}$/.test(perm)) {
       LP.toast('Invalid permission octal code', 'error');
       return;
@@ -1294,7 +1294,7 @@ const FMPage = (() => {
 
   async function renameSelected() {
     if (!selectedItem) return;
-    const newName = prompt('New name:', selectedItem.name);
+    const newName = await LP.prompt('New name:', selectedItem.name, 'Rename Item');
     if (!newName || newName === selectedItem.name) return;
 
     const res = await LP.post('/filemanager/rename', { path: selectedItem.path, newName });

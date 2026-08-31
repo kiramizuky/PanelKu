@@ -149,7 +149,7 @@ const Profile = (() => {
   }
 
   async function disable2FA() {
-    const code = prompt('Enter your current 2FA code to disable:');
+    const code = await LP.prompt('Enter your current 2FA code to disable:', '', 'Disable 2FA', 'number');
     if (!code) return;
     
     // In a real implementation this would call an endpoint to disable

@@ -1379,7 +1379,7 @@ const LvmPage = (() => {
   }
 
   async function restoreSnapshot(snapName, vg) {
-    if (!confirm('Restore ' + snapName + '? This will overwrite the origin volume!')) return;
+    if (!(await LP.confirm('Restore ' + snapName + '? This will overwrite the origin volume!', 'Restore Snapshot'))) return;
     LP.toast('Restoring…', 'info');
     const res = await apiPost('/api/plugins/lvm-manager/restore-snapshot', { snapName, vg });
     res?.success ? showLog('Restore Output', res.data?.output || 'Done.') : showLog('Error', res?.message || 'Failed', true);
@@ -1519,7 +1519,7 @@ const LvmPage = (() => {
   }
 
   async function stopRaid(mdDevice) {
-    if (!confirm('Stop RAID array ' + mdDevice + '? All data on this array will become inaccessible.')) return;
+    if (!(await LP.confirm('Stop RAID array ' + mdDevice + '? All data on this array will become inaccessible.', 'Stop RAID Array'))) return;
     LP.toast('Stopping ' + mdDevice + '...', 'info');
     const res = await apiPost('/api/plugins/lvm-manager/raid/stop', { mdDevice });
     if (res && res.success) {

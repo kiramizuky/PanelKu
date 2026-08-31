@@ -63,7 +63,7 @@ const ProfilePage = (() => {
       return;
     }
 
-    const deviceName = prompt('Enter a friendly name for this passkey (e.g. MacBook Touch ID, YubiKey 5):', 'Security Key / Device');
+    const deviceName = await LP.prompt('Enter a friendly name for this passkey (e.g. MacBook Touch ID, YubiKey 5):', 'Security Key / Device', 'Register Passkey');
     if (!deviceName) return;
 
     LP.toast('Follow your device prompt to register passkey...', 'info');

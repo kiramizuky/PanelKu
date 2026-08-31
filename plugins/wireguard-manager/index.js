@@ -319,7 +319,7 @@ export default {
               }
 
               async function deletePeer(interfaceName, publicKey) {
-                if (!confirm('Are you sure you want to delete this peer?')) return;
+                if (!(await LP.confirm('Are you sure you want to delete this peer?', 'Delete Peer'))) return;
                 try {
                   const res = await LP.post('/api/plugins/wireguard/peer/delete', { interfaceName, publicKey });
                   if (res?.success) {

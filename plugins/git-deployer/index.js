@@ -209,7 +209,7 @@ export default {
               }
 
               async function deleteHook(id) {
-                if (!confirm('Are you sure you want to delete this webhook?')) return;
+                if (!(await LP.confirm('Are you sure you want to delete this webhook?', 'Delete Webhook'))) return;
                 try {
                   const res = await LP.post('/api/plugins/git-deploy/webhook-configs/delete', { id });
                   if (res?.success) {
