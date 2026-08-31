@@ -125,8 +125,11 @@ const createApp = () => {
   // Audit logging
   app.use(requestLogger);
 
-  // Static assets
-  app.use(express.static(join(__dirname, 'public')));
+  // Static assets (support root, /public prefix, and /img alias)
+  const publicDir = join(__dirname, 'public');
+  app.use(express.static(publicDir));
+  app.use('/public', express.static(publicDir));
+  app.use(['/img', '/public/img'], express.static(join(publicDir, 'images')));
 
   // API rate limiting
   app.use('/api', apiLimiter);

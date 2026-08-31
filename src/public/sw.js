@@ -4,12 +4,17 @@
  */
 /* global self, caches, clients */
 
-const CACHE_NAME = 'panelku-v2.9.0';
+const CACHE_NAME = 'panelku-v2.9.1';
 const STATIC_ASSETS = [
-  '/public/css/panelku.css',
-  '/public/css/fonts.css',
-  '/public/js/app.js',
-  '/public/img/logo.png',
+  '/css/bootstrap.min.css',
+  '/css/bootstrap-icons.css',
+  '/css/app.css',
+  '/css/fonts.css',
+  '/js/bootstrap.bundle.min.js',
+  '/js/app.js',
+  '/images/logo.png',
+  '/favicon.png',
+  '/manifest.json',
   '/public/manifest.json',
 ];
 
@@ -56,7 +61,16 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Static Assets: Cache first with network fallback
-  if (url.pathname.startsWith('/public/')) {
+  const isStatic =
+    url.pathname.startsWith('/public/') ||
+    url.pathname.startsWith('/css/') ||
+    url.pathname.startsWith('/js/') ||
+    url.pathname.startsWith('/images/') ||
+    url.pathname.startsWith('/fonts/') ||
+    url.pathname === '/favicon.png' ||
+    url.pathname === '/manifest.json';
+
+  if (isStatic) {
     event.respondWith(
       caches.match(event.request).then((cached) => {
         if (cached) return cached;
@@ -83,8 +97,8 @@ self.addEventListener('push', (event) => {
   let payload = {
     title: 'Panelku Alert',
     body: 'Notification from your server',
-    icon: '/public/img/logo.png',
-    badge: '/public/img/logo.png',
+    icon: '/public/images/logo.png',
+    badge: '/public/images/logo.png',
     url: '/',
   };
 
@@ -98,8 +112,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: payload.body,
-    icon: payload.icon || '/public/img/logo.png',
-    badge: payload.badge || '/public/img/logo.png',
+    icon: payload.icon || '/public/images/logo.png',
+    badge: payload.badge || '/public/images/logo.png',
     vibrate: [100, 50, 100],
     data: {
       url: payload.url || '/',

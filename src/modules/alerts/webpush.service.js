@@ -117,8 +117,8 @@ class WebPushService {
     const notificationPayload = JSON.stringify({
       title: payload.title || 'Panelku Alert',
       body: payload.body || payload.message || 'Notification from Panelku',
-      icon: payload.icon || '/public/img/logo.png',
-      badge: '/public/img/logo.png',
+      icon: payload.icon || '/public/images/logo.png',
+      badge: '/public/images/logo.png',
       url: payload.url || payload.link || '/',
       timestamp: Date.now(),
       data: payload.data || {},
