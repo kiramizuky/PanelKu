@@ -488,25 +488,70 @@ class AIRepairService {
     };
 
     try {
-      const { getDb } = await import('../../core/db/sqlite.js');
+      const { getDb, fromJson } = await import('../../core/db/sqlite.js');
       const db = getDb();
       const since = new Date(Date.now() - hours * 3600000).toISOString();
 
-      const rows = db.prepare(`
-        SELECT cpu, ram_used, ram_total, disk_used, disk_total, created_at
+      const rawRows = db.prepare(`
+        SELECT id, timestamp, metrics
         FROM monitor_history
-        WHERE created_at >= ? ORDER BY created_at ASC
+        WHERE timestamp >= ? ORDER BY timestamp ASC
       `).all(since);
 
+      const rows = rawRows.map(r => {
+        const m = fromJson(r.metrics, {});
+        const ramUsed = m.ramUsed ?? 0;
+        const ramTotal = m.ramTotal ?? 0;
+        const diskUsed = m.diskUsed ?? 0;
+        const diskTotal = m.diskTotal ?? 0;
+        return {
+          cpu: typeof m.cpu === 'number' ? m.cpu : 0,
+          ram_used: ramUsed,
+          ram_total: ramTotal,
+          ram_percent: typeof m.ramPercent === 'number' ? m.ramPercent : (ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 0),
+          disk_used: diskUsed,
+          disk_total: diskTotal,
+          disk_percent: typeof m.diskPercent === 'number' ? m.diskPercent : (diskTotal > 0 ? (diskUsed / diskTotal) * 100 : 0),
+          created_at: r.timestamp,
+        };
+      });
+
       if (rows.length < 3) {
-        results.warnings.push('Not enough data points for trend analysis. More monitoring data needed.');
+        // Fallback: If not enough historical points in time window, fetch latest available rows
+        try {
+          const { default: MonitorHistoryModel } = await import('../../models/MonitorHistory.js');
+          const allRows = await MonitorHistoryModel.find({}, { limit: 10 });
+          if (allRows.length >= 3) {
+            allRows.forEach(h => {
+              const m = h.metrics || {};
+              const ramUsed = m.ramUsed ?? 0;
+              const ramTotal = m.ramTotal ?? 0;
+              const diskUsed = m.diskUsed ?? 0;
+              const diskTotal = m.diskTotal ?? 0;
+              rows.push({
+                cpu: typeof m.cpu === 'number' ? m.cpu : 0,
+                ram_used: ramUsed,
+                ram_total: ramTotal,
+                ram_percent: typeof m.ramPercent === 'number' ? m.ramPercent : (ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 0),
+                disk_used: diskUsed,
+                disk_total: diskTotal,
+                disk_percent: typeof m.diskPercent === 'number' ? m.diskPercent : (diskTotal > 0 ? (diskUsed / diskTotal) * 100 : 0),
+                created_at: h.timestamp?.toISOString ? h.timestamp.toISOString() : h.timestamp,
+              });
+            });
+          }
+        } catch { /* ignore fallback */ }
+      }
+
+      if (rows.length < 3) {
+        results.warnings.push('Not enough data points for trend analysis. More monitoring data needed (minimum 3 samples).');
         return results;
       }
 
       // Calculate trends
-      const cpuVals = rows.map(r => r.cpu).filter(v => v > 0);
-      const ramVals = rows.map(r => r.ram_total > 0 ? (r.ram_used / r.ram_total) * 100 : 0).filter(v => v > 0);
-      const diskVals = rows.map(r => r.disk_total > 0 ? (r.disk_used / r.disk_total) * 100 : 0).filter(v => v > 0);
+      const cpuVals = rows.map(r => r.cpu).filter(v => typeof v === 'number' && !isNaN(v) && v >= 0);
+      const ramVals = rows.map(r => r.ram_percent).filter(v => typeof v === 'number' && !isNaN(v) && v >= 0);
+      const diskVals = rows.map(r => r.disk_percent).filter(v => typeof v === 'number' && !isNaN(v) && v >= 0);
 
       results.cpu.samples = cpuVals.length;
       results.ram.samples = ramVals.length;
