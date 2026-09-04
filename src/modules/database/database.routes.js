@@ -1,7 +1,22 @@
 import { Router } from 'express';
+import multer from 'multer';
+import os from 'os';
 import databaseController from './database.controller.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/rbac.js';
+
+const upload = multer({
+  dest: os.tmpdir(),
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB max dump size
+  fileFilter: (_req, file, cb) => {
+    const ext = file.originalname.slice(file.originalname.lastIndexOf('.')).toLowerCase();
+    if (['.sql', '.sqlite', '.db', '.dump', '.txt'].includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(Object.assign(new Error('Invalid backup file extension. Only .sql, .sqlite, and .db files are supported'), { statusCode: 400 }));
+    }
+  }
+});
 
 const router = Router();
 router.use(requireAuth);
@@ -10,6 +25,18 @@ router.use(requireAuth);
 router.get('/', requirePermission('database:read'), databaseController.getDatabases);
 router.post('/', requirePermission('database:create'), databaseController.createDatabase.bind(databaseController));
 router.delete('/', requirePermission('database:delete'), databaseController.deleteDatabase.bind(databaseController));
+
+// Database Backup & Restore
+router.post('/backup', requirePermission('database:read'), databaseController.backupDatabase.bind(databaseController));
+router.get('/backup/download/:filename', requirePermission('database:read'), databaseController.downloadBackup.bind(databaseController));
+router.get('/backups', requirePermission('database:read'), databaseController.getBackups.bind(databaseController));
+router.post('/restore', requirePermission('database:write'), upload.single('backupFile'), databaseController.restoreDatabase.bind(databaseController));
+router.delete('/backup/:filename', requirePermission('database:write'), databaseController.deleteBackup.bind(databaseController));
+
+// Database Auto-Backup
+router.get('/autobackup', requirePermission('database:read'), databaseController.getAutoBackupConfig.bind(databaseController));
+router.post('/autobackup', requirePermission('database:write'), databaseController.saveAutoBackupConfig.bind(databaseController));
+router.post('/autobackup/run', requirePermission('database:write'), databaseController.triggerAutoBackupNow.bind(databaseController));
 
 // Table explorer
 router.get('/explore', requirePermission('database:read'), databaseController.getTables.bind(databaseController));

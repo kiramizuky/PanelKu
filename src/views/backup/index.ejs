@@ -582,17 +582,19 @@
       <div class="modal-body">
         <div class="lp-form-group mb-3">
           <label class="lp-label">Backup Type</label>
-          <select id="lbType" class="lp-input">
+          <select id="lbType" class="lp-input" onchange="BackupPage.onLocalBackupTypeChange()">
             <option value="mysql">MySQL Database</option>
             <option value="postgres">PostgreSQL Database</option>
+            <option value="sqlite">SQLite Database</option>
             <option value="files">Website Files</option>
             <option value="panel">Full Panel (DB + Config)</option>
           </select>
         </div>
         <div class="lp-form-group mb-3">
-          <label class="lp-label">Target Name</label>
+          <label class="lp-label" id="lbTargetLabel">Target Name</label>
+          <select id="lbTargetSelect" class="lp-input font-mono" style="display:none;"></select>
           <input type="text" id="lbTarget" class="lp-input font-mono" placeholder="database_name or domain" required>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">For files: folder name inside /var/www. For panel: leave as-is.</div>
+          <div id="lbTargetHint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">For databases: select existing database. For files: folder name inside /var/www.</div>
         </div>
       </div>
       <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">

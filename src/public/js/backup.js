@@ -459,21 +459,76 @@ const BackupPage = {
     }
   },
 
-  showCreateLocalBackupModal() {
+  _dbListCache: null,
+
+  async showCreateLocalBackupModal() {
     document.getElementById('lbType').value = 'mysql';
     document.getElementById('lbTarget').value = '';
+    await this.fetchDatabasesForBackup();
+    this.onLocalBackupTypeChange();
     this.createLocalBsModal.show();
+  },
+
+  async fetchDatabasesForBackup() {
+    try {
+      const res = await LP.get('/database');
+      if (res?.success) {
+        this._dbListCache = res.data;
+      }
+    } catch (_) {}
+  },
+
+  onLocalBackupTypeChange() {
+    const type = document.getElementById('lbType')?.value;
+    const selectEl = document.getElementById('lbTargetSelect');
+    const inputEl = document.getElementById('lbTarget');
+    const hintEl = document.getElementById('lbTargetHint');
+    if (!selectEl || !inputEl) return;
+
+    if (['mysql', 'postgres', 'sqlite'].includes(type)) {
+      selectEl.style.display = 'block';
+      inputEl.style.display = 'none';
+      const dbs = (this._dbListCache && this._dbListCache[type]) || [];
+
+      if (dbs.length === 0) {
+        selectEl.innerHTML = '<option value="">-- No database found --</option>';
+        if (hintEl) hintEl.textContent = `No ${type.toUpperCase()} database found. Create one in the Database page first.`;
+      } else {
+        selectEl.innerHTML = dbs.map(d => `<option value="${LP.escHtml(d)}">${LP.escHtml(d)}</option>`).join('');
+        if (hintEl) hintEl.textContent = `Select ${type.toUpperCase()} database to backup.`;
+      }
+    } else {
+      selectEl.style.display = 'none';
+      inputEl.style.display = 'block';
+      if (type === 'files') {
+        inputEl.placeholder = 'folder name inside /var/www (e.g. html)';
+        if (hintEl) hintEl.textContent = 'Folder name inside /var/www to backup.';
+      } else {
+        inputEl.placeholder = 'panel';
+        inputEl.value = 'panel';
+        if (hintEl) hintEl.textContent = 'Backups panel database and system configs.';
+      }
+    }
   },
 
   async createLocalBackup() {
     const type = document.getElementById('lbType').value;
-    const target = document.getElementById('lbTarget').value.trim();
-    if (!target) { LP.toast('Target is required', 'error'); return; }
+    const selectEl = document.getElementById('lbTargetSelect');
+    const inputEl = document.getElementById('lbTarget');
+
+    let target = '';
+    if (['mysql', 'postgres', 'sqlite'].includes(type) && selectEl.style.display !== 'none') {
+      target = selectEl.value;
+    } else {
+      target = inputEl.value.trim();
+    }
+
+    if (!target) { LP.toast('Please select or specify a backup target', 'error'); return; }
 
     try {
       const res = await LP.post('/backup', { type, target });
       if (res?.success) {
-        LP.toast('Backup created!', 'success');
+        LP.toast('Backup created successfully!', 'success');
         this.createLocalBsModal.hide();
         this.loadLocalBackups();
         this.loadOverview();

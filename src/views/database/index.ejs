@@ -4,6 +4,7 @@
     <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage MySQL, PostgreSQL, SQLite — Browse, Query, Export & Import</p>
   </div>
   <div style="display:flex;gap:10px">
+    <button class="btn-lp btn-lp-ghost" onclick="DB.showAutoBackupModal()"><i class="bi bi-clock-history me-1"></i> Auto-Backup</button>
     <button class="btn-lp btn-lp-ghost" onclick="DB.showCredentialsModal()"><i class="bi bi-gear-fill me-1"></i> DB Credentials</button>
     <button class="btn-lp btn-lp-primary" onclick="DB.showCreateModal()"><i class="bi bi-plus-lg"></i> Create DB</button>
   </div>
@@ -42,7 +43,7 @@
           <tr>
             <th>Database Name</th>
             <th style="width:60px;text-align:center">Tables</th>
-            <th style="width:180px;text-align:right">Actions</th>
+            <th style="width:280px;text-align:right">Actions</th>
           </tr>
         </thead>
         <tbody id="<%= type %>TableBody">
@@ -350,6 +351,134 @@
               </div>
             </form>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Restore Database Modal (Overwrite flow) -->
+<div class="modal fade" id="restoreDbModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;">
+          <i class="bi bi-cloud-arrow-up text-warning me-2"></i> Restore Database: <span id="restoreDbTitle" class="text-info font-mono"></span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;font-size:12.5px;padding:12px;border-radius:8px;">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i> <strong>PERINGATAN OVERWRITE:</strong><br>
+          Proses restore akan <strong>menimpa seluruh isi database</strong> dan menggantikan semua data yang ada dengan data cadangan.
+        </div>
+
+        <ul class="nav nav-tabs mb-3 db-tabs" id="restoreTabs">
+          <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#restoreTabUpload" style="font-size:12px;padding:6px 12px;"><i class="bi bi-upload me-1"></i> Upload File Backup</a></li>
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#restoreTabHistory" style="font-size:12px;padding:6px 12px;"><i class="bi bi-archive me-1"></i> Backup Server</a></li>
+        </ul>
+
+        <div class="tab-content">
+          <!-- Upload Option -->
+          <div class="tab-pane fade show active" id="restoreTabUpload">
+            <div class="lp-form-group mb-3">
+              <label class="lp-label">Pilih File Cadangan (.sql, .sqlite, .db)</label>
+              <input type="file" id="restoreFileInput" class="lp-input" accept=".sql,.sqlite,.db,.dump">
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Mendukung file SQL dump (MySQL/PostgreSQL/SQLite) atau file biner SQLite (.sqlite / .db).</div>
+            </div>
+          </div>
+
+          <!-- Server Backup History Option -->
+          <div class="tab-pane fade" id="restoreTabHistory">
+            <div class="lp-form-group mb-3">
+              <label class="lp-label">Pilih dari Cadangan Server</label>
+              <select id="restoreServerBackupSelect" class="lp-input font-mono">
+                <option value="">Memuat cadangan server...</option>
+              </select>
+              <div id="restoreHistoryInfo" style="font-size:11px;color:var(--text-muted);margin-top:4px;">File cadangan yang tersimpan di server.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" id="confirmOverwriteCheck" onchange="document.getElementById('btnExecuteRestore').disabled = !this.checked">
+          <label class="form-check-label text-warning" for="confirmOverwriteCheck" style="font-size:12px;cursor:pointer;">
+            Saya mengerti dan menyetujui bahwa seluruh database saat ini akan ditimpa secara penuh.
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn-lp btn-lp-danger" id="btnExecuteRestore" disabled onclick="DB.executeRestore()">
+          <i class="bi bi-arrow-counterclockwise me-1"></i> Mulai Restore (Timpa Data)
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Database Auto-Backup Settings Modal -->
+<div class="modal fade" id="dbAutoBackupModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border:1px solid rgba(255,255,255,0.1);background:rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;">
+          <i class="bi bi-clock-history text-info me-2"></i> Database Auto-Backup Settings
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 p-3" style="background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid var(--glass-border);">
+          <div>
+            <strong style="font-size:13px;">Enable Auto-Backup</strong>
+            <p style="font-size:11px;color:var(--text-muted);margin:2px 0 0 0;">Otomatis mencadangkan database sesuai jadwal ke server.</p>
+          </div>
+          <div class="form-check form-switch m-0">
+            <input class="form-check-input" type="checkbox" id="abEnabled" style="width:40px;height:22px;cursor:pointer;">
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="lp-label">Frekuensi</label>
+            <select id="abFrequency" class="lp-input">
+              <option value="daily">Setiap Hari</option>
+              <option value="hourly">Setiap Jam</option>
+              <option value="weekly">Setiap Minggu</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="lp-label">Waktu Eksekusi (Jam:Menit)</label>
+            <input type="time" id="abTime" class="lp-input" value="02:00">
+          </div>
+        </div>
+
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Retensi Cadangan (Hari)</label>
+          <input type="number" id="abRetention" class="lp-input" min="1" max="90" value="7">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">File cadangan yang lebih lama dari jumlah hari ini akan otomatis dibersihkan.</div>
+        </div>
+
+        <div class="lp-form-group mb-3">
+          <label class="lp-label">Target Database Engine</label>
+          <div style="display:flex;gap:15px;margin-top:6px;">
+            <label class="form-check-label" style="font-size:12px;cursor:pointer;">
+              <input type="checkbox" id="abTargetMysql" checked class="form-check-input me-1"> MySQL
+            </label>
+            <label class="form-check-label" style="font-size:12px;cursor:pointer;">
+              <input type="checkbox" id="abTargetPostgres" checked class="form-check-input me-1"> PostgreSQL
+            </label>
+            <label class="form-check-label" style="font-size:12px;cursor:pointer;">
+              <input type="checkbox" id="abTargetSqlite" checked class="form-check-input me-1"> SQLite
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;">
+        <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="DB.runAutoBackupNow()"><i class="bi bi-play-circle me-1"></i> Run Now</button>
+        <div>
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Tutup</button>
+          <button type="button" class="btn-lp btn-lp-primary" onclick="DB.saveAutoBackup()"><i class="bi bi-save me-1"></i> Simpan Pengaturan</button>
         </div>
       </div>
     </div>

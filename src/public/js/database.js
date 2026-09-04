@@ -1,5 +1,7 @@
 const DB = (() => {
   let modal, explorerModal;
+  let restoreModal, autoBackupModal;
+  let currentRestoreTarget = { type: null, name: null };
   let activeType = 'mysql';
   let activeDb = null;
   let activeTable = null;
@@ -39,8 +41,10 @@ const DB = (() => {
         <td class="font-mono"><strong>${LP.escHtml(db)}</strong></td>
         <td style="text-align:center;"><span style="font-size:11px;color:var(--text-muted);">—</span></td>
         <td style="text-align:right">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DB.openExplorer('${LP.escHtml(type)}', '${LP.escHtml(db)}')" title="Explore"><i class="bi bi-eye"></i> Explore</button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DB.deleteDb('${LP.escHtml(type)}', '${LP.escHtml(db)}')"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DB.openExplorer('${LP.escHtml(type)}', '${LP.escHtml(db)}')" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info me-1" onclick="DB.backupDatabase('${LP.escHtml(type)}', '${LP.escHtml(db)}', this)" title="Backup Database (Download & Simpan)"><i class="bi bi-cloud-arrow-down"></i> Backup</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning me-1" onclick="DB.showRestoreModal('${LP.escHtml(type)}', '${LP.escHtml(db)}')" title="Restore Database (Menimpa Seluruh Data)"><i class="bi bi-cloud-arrow-up"></i> Restore</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DB.deleteDb('${LP.escHtml(type)}', '${LP.escHtml(db)}')" title="Delete Database"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No ' + type + ' databases found', 2);
@@ -835,6 +839,210 @@ const DB = (() => {
     }
   }
 
+  // ── Database Backup & Restore ─────────────────────────
+
+  async function backupDatabase(type, name, btnEl) {
+    if (!type || !name) return;
+    const oldHtml = btnEl ? btnEl.innerHTML : '';
+    if (btnEl) {
+      btnEl.disabled = true;
+      btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Backup...';
+    }
+
+    try {
+      const res = await LP.post('/database/backup', { type, name });
+      if (res?.success && res.data) {
+        LP.toast(`Backup database ${name} berhasil dibuat!`, 'success');
+
+        // Auto trigger browser download
+        if (res.data.downloadUrl) {
+          const a = document.createElement('a');
+          a.href = res.data.downloadUrl;
+          a.download = res.data.filename || `${name}_backup.sql`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
+      } else {
+        LP.toast(res?.message || 'Gagal membuat backup database', 'error');
+      }
+    } catch (err) {
+      LP.toast(`Error backup: ${err.message}`, 'error');
+    } finally {
+      if (btnEl) {
+        btnEl.disabled = false;
+        btnEl.innerHTML = oldHtml;
+      }
+    }
+  }
+
+  async function showRestoreModal(type, name) {
+    currentRestoreTarget = { type, name };
+    if (!restoreModal) restoreModal = new bootstrap.Modal(document.getElementById('restoreDbModal'));
+
+    document.getElementById('restoreDbTitle').textContent = `${name} (${type.toUpperCase()})`;
+    document.getElementById('restoreFileInput').value = '';
+    document.getElementById('confirmOverwriteCheck').checked = false;
+    document.getElementById('btnExecuteRestore').disabled = true;
+
+    // Load available server backups for this database
+    const selectEl = document.getElementById('restoreServerBackupSelect');
+    selectEl.innerHTML = '<option value="">Memuat cadangan server...</option>';
+
+    try {
+      const res = await LP.get(`/database/backups?type=${encodeURIComponent(type)}&name=${encodeURIComponent(name)}`);
+      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+        selectEl.innerHTML = res.data.map(b => `
+          <option value="${LP.escHtml(b.filename)}">${LP.escHtml(b.filename)} (${LP.formatBytes(b.size)} - ${new Date(b.created).toLocaleString()})</option>
+        `).join('');
+      } else {
+        selectEl.innerHTML = '<option value="">-- Belum ada file cadangan tersimpan di server --</option>';
+      }
+    } catch (_) {
+      selectEl.innerHTML = '<option value="">-- Gagal mengambil daftar backup server --</option>';
+    }
+
+    restoreModal.show();
+  }
+
+  async function executeRestore() {
+    const checkEl = document.getElementById('confirmOverwriteCheck');
+    if (!checkEl.checked) {
+      LP.toast('Harap centang persetujuan penimpaan database sebelum melanjutkan', 'warning');
+      return;
+    }
+
+    const { type, name } = currentRestoreTarget;
+    if (!type || !name) {
+      LP.toast('Target database tidak valid', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('btnExecuteRestore');
+    const oldHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menimpa database...';
+
+    try {
+      const fileInput = document.getElementById('restoreFileInput');
+      const hasUploadedFile = fileInput.files && fileInput.files.length > 0;
+
+      if (hasUploadedFile) {
+        // Upload FormData
+        const fd = new FormData();
+        fd.append('type', type);
+        fd.append('name', name);
+        fd.append('backupFile', fileInput.files[0]);
+
+        const res = await fetch('/api/database/restore', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + (LP.state.accessToken || localStorage.getItem('lp_token') || '')
+          },
+          body: fd
+        }).then(r => r.json());
+
+        if (res?.success) {
+          LP.toast(`Database ${name} berhasil di-restore dan data lama telah ditimpa!`, 'success');
+          restoreModal.hide();
+          loadData();
+        } else {
+          LP.toast(res?.message || 'Gagal me-restore database', 'error');
+        }
+      } else {
+        // From server backup history
+        const selectEl = document.getElementById('restoreServerBackupSelect');
+        const backupFilename = selectEl.value;
+        if (!backupFilename) {
+          LP.toast('Pilih file backup dari komputer atau daftar server', 'warning');
+          return;
+        }
+
+        const res = await LP.post('/database/restore', {
+          type,
+          name,
+          backupFilename
+        });
+
+        if (res?.success) {
+          LP.toast(`Database ${name} berhasil di-restore dan data lama telah ditimpa!`, 'success');
+          restoreModal.hide();
+          loadData();
+        } else {
+          LP.toast(res?.message || 'Gagal me-restore database', 'error');
+        }
+      }
+    } catch (err) {
+      LP.toast(`Error restore: ${err.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = oldHtml;
+    }
+  }
+
+  // ── Database Auto-Backup ─────────────────────────────
+
+  async function showAutoBackupModal() {
+    if (!autoBackupModal) autoBackupModal = new bootstrap.Modal(document.getElementById('dbAutoBackupModal'));
+
+    try {
+      const res = await LP.get('/database/autobackup');
+      if (res?.success && res.data) {
+        const c = res.data;
+        document.getElementById('abEnabled').checked = !!c.enabled;
+        document.getElementById('abFrequency').value = c.frequency || 'daily';
+        document.getElementById('abTime').value = c.time || '02:00';
+        document.getElementById('abRetention').value = c.retentionDays || 7;
+        document.getElementById('abTargetMysql').checked = c.targets?.mysql !== false;
+        document.getElementById('abTargetPostgres').checked = c.targets?.postgres !== false;
+        document.getElementById('abTargetSqlite').checked = c.targets?.sqlite !== false;
+      }
+    } catch (_) {}
+
+    autoBackupModal.show();
+  }
+
+  async function saveAutoBackup() {
+    const payload = {
+      enabled: document.getElementById('abEnabled').checked,
+      frequency: document.getElementById('abFrequency').value,
+      time: document.getElementById('abTime').value,
+      retentionDays: parseInt(document.getElementById('abRetention').value) || 7,
+      targets: {
+        mysql: document.getElementById('abTargetMysql').checked,
+        postgres: document.getElementById('abTargetPostgres').checked,
+        sqlite: document.getElementById('abTargetSqlite').checked,
+      }
+    };
+
+    try {
+      const res = await LP.post('/database/autobackup', payload);
+      if (res?.success) {
+        LP.toast('Pengaturan auto-backup berhasil disimpan!', 'success');
+        autoBackupModal.hide();
+      } else {
+        LP.toast(res?.message || 'Gagal menyimpan pengaturan auto-backup', 'error');
+      }
+    } catch (err) {
+      LP.toast(`Error: ${err.message}`, 'error');
+    }
+  }
+
+  async function runAutoBackupNow() {
+    try {
+      LP.toast('Menjalankan auto-backup database...', 'info');
+      const res = await LP.post('/database/autobackup/run');
+      if (res?.success) {
+        const count = res.data?.results?.filter(r => r.status === 'success').length || 0;
+        LP.toast(`Auto-backup selesai: ${count} database berhasil dicadangkan!`, 'success');
+      } else {
+        LP.toast(res?.message || 'Auto-backup gagal dijalankan', 'error');
+      }
+    } catch (err) {
+      LP.toast(`Error running auto-backup: ${err.message}`, 'error');
+    }
+  }
+
   // ── Keyboard Shortcut ────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -851,7 +1059,9 @@ const DB = (() => {
     runQuery, explainQuery, loadHistory, clearHistory,
     exportTable, toggleImportFields, importData,
     enablePgRemoteAccess, loadPgConfigFiles, savePgConfigFile,
-    makeCellEditable, deleteRow, showInsertRowModal, submitInsertRow
+    makeCellEditable, deleteRow, showInsertRowModal, submitInsertRow,
+    backupDatabase, showRestoreModal, executeRestore,
+    showAutoBackupModal, saveAutoBackup, runAutoBackupNow
   };
 })();
 

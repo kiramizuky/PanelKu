@@ -49,6 +49,17 @@ export const startBackupJob = () => {
       } catch (err) {
         logger.error(`Automated database backup failed: ${err.message}`);
       }
+
+      // Run automated managed databases backup (MySQL, PostgreSQL, SQLite)
+      try {
+        const { default: databaseService } = await import('../modules/database/database.service.js');
+        const dbAutoRes = await databaseService.runAutoBackup(false);
+        if (dbAutoRes && !dbAutoRes.skipped) {
+          logger.info(`Automated managed database backups completed: ${dbAutoRes.results?.length || 0} targets processed`);
+        }
+      } catch (dbErr) {
+        logger.error(`Automated managed databases backup failed: ${dbErr.message}`);
+      }
     },
     24 * 60 * 60 * 1000, // 24 hours
     false // do not run immediately on startup

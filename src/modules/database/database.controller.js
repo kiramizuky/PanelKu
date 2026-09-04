@@ -1,3 +1,6 @@
+import path from 'path';
+import fs from 'fs/promises';
+import { createReadStream } from 'fs';
 import databaseService from './database.service.js';
 import { success, error } from '../../helpers/response.js';
 
@@ -277,6 +280,130 @@ class DatabaseController {
     try {
       const result = await databaseService.enablePgRemoteAccess();
       return success(res, result, 'PostgreSQL remote & Docker access configured successfully!');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  // ── Database Backup & Restore Endpoints ──────────────────────
+
+  async backupDatabase(req, res) {
+    try {
+      const type = cleanStr(req.body.type);
+      const name = cleanStr(req.body.name);
+      if (!type || !name) return error(res, 'Database type and name are required', 400);
+
+      const result = await databaseService.backupDatabase(type, name);
+      return success(res, {
+        ...result,
+        downloadUrl: `/api/database/backup/download/${encodeURIComponent(result.filename)}`
+      }, `Backup for ${name} created successfully`);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async downloadBackup(req, res) {
+    try {
+      const { filename } = req.params;
+      if (!filename || !/^[a-zA-Z0-9._-]+$/.test(filename) || filename.includes('..')) {
+        return error(res, 'Invalid backup filename', 400);
+      }
+      const filePath = path.resolve('storage', 'backups', 'databases', filename);
+      await fs.access(filePath);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      createReadStream(filePath).pipe(res);
+    } catch (err) {
+      return error(res, 'Backup file not found or inaccessible', 404);
+    }
+  }
+
+  async getBackups(req, res) {
+    try {
+      const type = cleanStr(req.query.type);
+      const name = cleanStr(req.query.name);
+      if (!type || !name) return error(res, 'Type and database name are required', 400);
+
+      const backups = await databaseService.listDatabaseBackups(type, name);
+      return success(res, backups);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async restoreDatabase(req, res) {
+    try {
+      const type = cleanStr(req.body.type);
+      const name = cleanStr(req.body.name);
+      if (!type || !name) return error(res, 'Type and database name are required', 400);
+
+      let filePath = null;
+      let fileContent = null;
+
+      if (req.file) {
+        filePath = req.file.path;
+      } else if (req.body.backupFilename) {
+        const backupFilename = cleanStr(req.body.backupFilename);
+        if (!/^[a-zA-Z0-9._-]+$/.test(backupFilename) || backupFilename.includes('..')) {
+          return error(res, 'Invalid backup filename', 400);
+        }
+        filePath = path.resolve('storage', 'backups', 'databases', backupFilename);
+        await fs.access(filePath).catch(() => {
+          throw new Error(`Backup file "${backupFilename}" not found on server`);
+        });
+      } else if (req.body.sql) {
+        fileContent = req.body.sql;
+      } else {
+        return error(res, 'A backup file, backup filename, or SQL script is required for restore', 400);
+      }
+
+      const result = await databaseService.restoreDatabase(type, name, { filePath, fileContent });
+
+      if (req.file && req.file.path) {
+        await fs.unlink(req.file.path).catch(() => {});
+      }
+
+      return success(res, result, result.message);
+    } catch (err) {
+      if (req.file && req.file.path) {
+        await fs.unlink(req.file.path).catch(() => {});
+      }
+      return error(res, err.message, 500);
+    }
+  }
+
+  async deleteBackup(req, res) {
+    try {
+      const { filename } = req.params;
+      await databaseService.deleteDatabaseBackup(filename);
+      return success(res, null, 'Backup deleted successfully');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async getAutoBackupConfig(req, res) {
+    try {
+      const config = await databaseService.getAutoBackupConfig();
+      return success(res, config);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async saveAutoBackupConfig(req, res) {
+    try {
+      const config = await databaseService.saveAutoBackupConfig(req.body);
+      return success(res, config, 'Auto-backup configuration saved successfully');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async triggerAutoBackupNow(req, res) {
+    try {
+      const result = await databaseService.runAutoBackup(true);
+      return success(res, result, 'Database auto-backup executed successfully');
     } catch (err) {
       return error(res, err.message, 500);
     }

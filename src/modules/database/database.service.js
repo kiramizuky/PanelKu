@@ -3,6 +3,30 @@ import pkg from 'pg';
 const { Pool } = pkg;
 import path from 'path';
 import fs from 'fs/promises';
+import { spawn } from 'child_process';
+
+function runCli(cmd, args, envVars = {}) {
+  return new Promise((resolve, reject) => {
+    const extraPath = process.platform === 'win32'
+      ? ''
+      : ':/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/snap/bin';
+    const env = {
+      ...process.env,
+      PATH: process.env.PATH ? `${process.env.PATH}${extraPath}` : extraPath,
+      ...envVars,
+    };
+    const child = spawn(cmd, args, { env });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', d => { stdout += d.toString(); });
+    child.stderr.on('data', d => { stderr += d.toString(); });
+    child.on('error', err => reject(err));
+    child.on('close', code => {
+      if (code === 0) resolve(stdout);
+      else reject(new Error(stderr || `Process ${cmd} exited with code ${code}`));
+    });
+  });
+}
 
 // SQL keywords that are always restricted via the query UI, regardless of where
 // they appear in the query — comments or multi-statement chains cannot bypass.
@@ -377,7 +401,8 @@ class DatabaseService {
 
   _sanitizeDbName(name) {
     name = this._cleanStr(name);
-    if (!name || !/^[a-zA-Z_][a-zA-Z0-9_$]{0,63}$/.test(name)) {
+    const withoutExt = name.replace(/\.sqlite$|\.db$/, '');
+    if (!name || !/^[a-zA-Z_][a-zA-Z0-9_$.]{0,63}$/.test(name) || !/^[a-zA-Z_][a-zA-Z0-9_$]{0,63}$/.test(withoutExt)) {
       throw new Error(`Invalid database name: "${name}". Use only letters, numbers, and underscores.`);
     }
     return name;
@@ -1166,6 +1191,489 @@ class DatabaseService {
       }
       throw err;
     }
+  }
+
+  // ── Database Backup & Restore (Full Overwrite Flow) ──────────
+
+  async backupDatabase(type, dbName) {
+    const norm = this._normalizeType(type);
+    this._sanitizeDbName(dbName);
+
+    const backupDir = path.resolve('storage', 'backups', 'databases');
+    await fs.mkdir(backupDir, { recursive: true });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const cleanName = dbName.replace(/\.sqlite$|\.db$/, '');
+
+    let filename = '';
+    let filePath = '';
+
+    if (norm === 'mysql') {
+      filename = `mysql_${cleanName}_${timestamp}.sql`;
+      filePath = path.join(backupDir, filename);
+
+      const cfg = await this.loadMysqlConfig();
+      const args = [
+        '-h', cfg.host,
+        '-P', String(cfg.port || 3306),
+        '-u', cfg.user,
+        '--add-drop-table',
+        '--routines',
+        '--triggers',
+        '--single-transaction',
+        cleanName
+      ];
+      const env = {};
+      if (cfg.password) env.MYSQL_PWD = cfg.password;
+
+      try {
+        const sqlData = await runCli('mysqldump', args, env);
+        await fs.writeFile(filePath, sqlData, 'utf8');
+      } catch (cliErr) {
+        // Fallback to programmatic dumper if mysqldump CLI is unavailable
+        await this._programmaticMysqlDump(cleanName, filePath);
+      }
+    } else if (norm === 'postgres') {
+      filename = `postgres_${cleanName}_${timestamp}.sql`;
+      filePath = path.join(backupDir, filename);
+
+      const cfg = await this.loadPgConfig();
+      const args = [
+        '-h', cfg.host,
+        '-p', String(cfg.port || 5432),
+        '-U', cfg.user,
+        '--clean',
+        '--if-exists',
+        '-d', cleanName,
+        '-f', filePath
+      ];
+      const env = {};
+      if (cfg.password) env.PGPASSWORD = String(cfg.password);
+
+      try {
+        await runCli('pg_dump', args, env);
+      } catch (cliErr) {
+        // Fallback to programmatic dumper if pg_dump CLI is unavailable
+        await this._programmaticPgDump(cleanName, filePath);
+      }
+    } else if (norm === 'sqlite') {
+      filename = `sqlite_${cleanName}_${timestamp}.sqlite`;
+      filePath = path.join(backupDir, filename);
+      await this._sqliteBackup(dbName, filePath);
+    } else {
+      throw new Error(`Unsupported database type: ${type}`);
+    }
+
+    const stat = await fs.stat(filePath);
+    return {
+      filename,
+      filePath,
+      size: stat.size,
+      type: norm,
+      dbName,
+      timestamp
+    };
+  }
+
+  async restoreDatabase(type, dbName, { filePath, fileContent }) {
+    const norm = this._normalizeType(type);
+    this._sanitizeDbName(dbName);
+
+    if (!filePath && !fileContent) {
+      throw new Error('Either filePath or fileContent is required for database restore');
+    }
+
+    const cleanName = dbName.replace(/\.sqlite$|\.db$/, '');
+
+    if (norm === 'mysql') {
+      // Ensure database exists
+      await this.createMysqlDatabase(cleanName);
+      const cfg = await this.loadMysqlConfig();
+      const env = {};
+      if (cfg.password) env.MYSQL_PWD = cfg.password;
+
+      let success = false;
+      if (filePath) {
+        try {
+          const sql = await fs.readFile(filePath, 'utf8');
+          await this._programmaticMysqlRestore(cleanName, sql);
+          success = true;
+        } catch (_) {}
+      }
+
+      if (!success && fileContent) {
+        await this._programmaticMysqlRestore(cleanName, fileContent);
+        success = true;
+      }
+
+      if (!success && filePath) {
+        const args = ['-h', cfg.host, '-P', String(cfg.port || 3306), '-u', cfg.user, cleanName];
+        await runCli('mysql', args, env);
+      }
+    } else if (norm === 'postgres') {
+      const dbs = await this.listPgDatabases();
+      if (!dbs.includes(cleanName)) {
+        await this.createPgDatabase(cleanName);
+      }
+
+      let content = fileContent;
+      if (!content && filePath) {
+        content = await fs.readFile(filePath, 'utf8');
+      }
+
+      if (content) {
+        await this._programmaticPgRestore(cleanName, content);
+      } else if (filePath) {
+        const cfg = await this.loadPgConfig();
+        const env = {};
+        if (cfg.password) env.PGPASSWORD = String(cfg.password);
+        const args = ['-h', cfg.host, '-p', String(cfg.port || 5432), '-U', cfg.user, '-d', cleanName, '-f', filePath];
+        await runCli('psql', args, env);
+      }
+    } else if (norm === 'sqlite') {
+      await this._sqliteRestore(dbName, filePath, fileContent);
+    } else {
+      throw new Error(`Unsupported database type: ${type}`);
+    }
+
+    return {
+      success: true,
+      message: `Database "${dbName}" restored successfully (all previous data overwritten).`
+    };
+  }
+
+  async _programmaticMysqlDump(dbName, filePath) {
+    const pool = await this.getMysqlConnection();
+    await pool.query(`USE \`${dbName}\``);
+    const [tables] = await pool.query('SHOW TABLES');
+    const tableNames = tables.map(r => Object.values(r)[0]);
+
+    let dump = `-- PanelKu MySQL Dump: ${dbName}\n-- Created: ${new Date().toISOString()}\n\n`;
+    dump += 'SET FOREIGN_KEY_CHECKS = 0;\n\n';
+
+    for (const tbl of tableNames) {
+      this._sanitizeTableName(tbl);
+      dump += `DROP TABLE IF EXISTS \`${tbl}\`;\n`;
+      const [createRes] = await pool.query(`SHOW CREATE TABLE \`${tbl}\``);
+      const createSql = createRes[0]?.['Create Table'] || '';
+      dump += `${createSql};\n\n`;
+
+      const [rows] = await pool.query(`SELECT * FROM \`${tbl}\``);
+      if (rows.length > 0) {
+        const cols = Object.keys(rows[0]);
+        const colList = cols.map(c => `\`${c}\``).join(', ');
+        const valuesList = rows.map(r => {
+          return '(' + cols.map(c => {
+            const v = r[c];
+            if (v === null || v === undefined) return 'NULL';
+            if (typeof v === 'number') return v;
+            return "'" + String(v).replace(/'/g, "''").replace(/\\/g, '\\\\') + "'";
+          }).join(', ') + ')';
+        }).join(',\n');
+        dump += `INSERT INTO \`${tbl}\` (${colList}) VALUES\n${valuesList};\n\n`;
+      }
+    }
+    dump += 'SET FOREIGN_KEY_CHECKS = 1;\n';
+    await fs.writeFile(filePath, dump, 'utf8');
+  }
+
+  async _programmaticMysqlRestore(dbName, sqlContent) {
+    const pool = await this.getMysqlConnection();
+    await pool.query(`USE \`${dbName}\``);
+
+    const statements = sqlContent
+      .split(/;\s*[\r\n]+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !s.startsWith('--'));
+
+    await pool.query('SET FOREIGN_KEY_CHECKS = 0');
+    for (const stmt of statements) {
+      try {
+        await pool.query(stmt);
+      } catch (err) {
+        if (!stmt.toUpperCase().startsWith('DROP TABLE')) {
+          throw err;
+        }
+      }
+    }
+    await pool.query('SET FOREIGN_KEY_CHECKS = 1');
+  }
+
+  async _programmaticPgDump(dbName, filePath) {
+    const client = await this.getPgClientForDb(dbName);
+    try {
+      const tableRes = await client.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+      `);
+
+      let dump = `-- PanelKu PostgreSQL Dump: ${dbName}\n-- Created: ${new Date().toISOString()}\n\n`;
+      for (const row of tableRes.rows) {
+        const tbl = row.table_name;
+        dump += `DROP TABLE IF EXISTS "${tbl}" CASCADE;\n`;
+
+        const colRes = await client.query(`
+          SELECT column_name, data_type, character_maximum_length, is_nullable, column_default
+          FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = $1
+          ORDER BY ordinal_position
+        `, [tbl]);
+
+        const colDefs = colRes.rows.map(c => {
+          let def = `"${c.column_name}" ${c.data_type}`;
+          if (c.character_maximum_length) def += `(${c.character_maximum_length})`;
+          if (c.is_nullable === 'NO') def += ' NOT NULL';
+          if (c.column_default) def += ` DEFAULT ${c.column_default}`;
+          return def;
+        }).join(', ');
+
+        dump += `CREATE TABLE "${tbl}" (${colDefs});\n`;
+
+        const dataRes = await client.query(`SELECT * FROM "${tbl}"`);
+        if (dataRes.rows.length > 0) {
+          for (const d of dataRes.rows) {
+            const cols = Object.keys(d);
+            const colList = cols.map(c => `"${c}"`).join(', ');
+            const valList = cols.map(c => {
+              const v = d[c];
+              if (v === null || v === undefined) return 'NULL';
+              if (typeof v === 'number') return v;
+              return "'" + String(v).replace(/'/g, "''") + "'";
+            }).join(', ');
+            dump += `INSERT INTO "${tbl}" (${colList}) VALUES (${valList});\n`;
+          }
+        }
+        dump += '\n';
+      }
+      await fs.writeFile(filePath, dump, 'utf8');
+    } finally {
+      await client.end();
+    }
+  }
+
+  async _programmaticPgRestore(dbName, sqlContent) {
+    const client = await this.getPgClientForDb(dbName);
+    try {
+      // Overwrite: Cleanly reset public schema
+      await client.query('DROP SCHEMA public CASCADE');
+      await client.query('CREATE SCHEMA public');
+      await client.query('GRANT ALL ON SCHEMA public TO public');
+
+      const statements = sqlContent
+        .split(/;\s*[\r\n]+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0 && !s.startsWith('--'));
+
+      for (const stmt of statements) {
+        await client.query(stmt);
+      }
+    } finally {
+      await client.end();
+    }
+  }
+
+  async _sqliteBackup(dbName, filePath) {
+    const targetFile = dbName.endsWith('.sqlite') || dbName.endsWith('.db') ? dbName : `${dbName}.sqlite`;
+    const dbPath = path.resolve('storage', 'databases', targetFile);
+    await fs.access(dbPath).catch(() => {
+      throw new Error(`SQLite database "${dbName}" not found at ${dbPath}`);
+    });
+
+    const Database = (await import('better-sqlite3')).default;
+    const db = new Database(dbPath);
+    try {
+      await db.backup(filePath);
+    } finally {
+      db.close();
+    }
+  }
+
+  async _sqliteRestore(dbName, srcFilePath, sqlContent = null) {
+    const targetFile = dbName.endsWith('.sqlite') || dbName.endsWith('.db') ? dbName : `${dbName}.sqlite`;
+    const dbDir = path.resolve('storage', 'databases');
+    await fs.mkdir(dbDir, { recursive: true });
+    const targetPath = path.join(dbDir, targetFile);
+
+    // If source file is a binary SQLite database:
+    if (srcFilePath && (srcFilePath.endsWith('.sqlite') || srcFilePath.endsWith('.db'))) {
+      await fs.copyFile(srcFilePath, targetPath);
+      return;
+    }
+
+    let content = sqlContent;
+    if (!content && srcFilePath) {
+      // Detect binary sqlite format header
+      const buffer = await fs.readFile(srcFilePath);
+      if (buffer.subarray(0, 16).toString('utf8').startsWith('SQLite format 3')) {
+        await fs.writeFile(targetPath, buffer);
+        return;
+      }
+      content = buffer.toString('utf8');
+    }
+
+    if (content) {
+      await fs.unlink(targetPath).catch(() => {});
+      const Database = (await import('better-sqlite3')).default;
+      const db = new Database(targetPath);
+      try {
+        db.exec(content);
+      } finally {
+        db.close();
+      }
+    } else if (srcFilePath) {
+      await fs.copyFile(srcFilePath, targetPath);
+    }
+  }
+
+  async listDatabaseBackups(type, dbName) {
+    const norm = this._normalizeType(type);
+    this._sanitizeDbName(dbName);
+    const cleanName = dbName.replace(/\.sqlite$|\.db$/, '');
+    const prefix = `${norm}_${cleanName}_`;
+
+    const backupDir = path.resolve('storage', 'backups', 'databases');
+    await fs.mkdir(backupDir, { recursive: true });
+
+    const files = await fs.readdir(backupDir);
+    const backups = [];
+
+    for (const file of files) {
+      if (file.startsWith(prefix)) {
+        try {
+          const st = await fs.stat(path.join(backupDir, file));
+          backups.push({
+            filename: file,
+            size: st.size,
+            created: st.mtimeMs,
+            type: norm,
+            dbName: cleanName
+          });
+        } catch (_) {}
+      }
+    }
+
+    return backups.sort((a, b) => b.created - a.created);
+  }
+
+  async deleteDatabaseBackup(filename) {
+    if (!filename || !/^[a-zA-Z0-9._-]+$/.test(filename) || filename.includes('..')) {
+      throw new Error('Invalid backup filename');
+    }
+    const backupDir = path.resolve('storage', 'backups', 'databases');
+    const filePath = path.join(backupDir, filename);
+    await fs.unlink(filePath);
+    return true;
+  }
+
+  // ── Automated Database Backup Management ───────────────────
+
+  async getAutoBackupConfig() {
+    try {
+      const { default: Setting } = await import('../../models/Setting.js');
+      let val = await Setting.get('db_autobackup_config');
+      if (typeof val === 'string') {
+        try { val = JSON.parse(val); } catch (_) {}
+      }
+      if (val && typeof val === 'object') return val;
+    } catch (_) {}
+    return {
+      enabled: false,
+      frequency: 'daily',
+      time: '02:00',
+      retentionDays: 7,
+      targets: { mysql: true, postgres: true, sqlite: true }
+    };
+  }
+
+  async saveAutoBackupConfig(config = {}) {
+    const { default: Setting } = await import('../../models/Setting.js');
+    const payload = {
+      enabled: !!config.enabled,
+      frequency: config.frequency || 'daily',
+      time: config.time || '02:00',
+      retentionDays: Math.max(1, parseInt(config.retentionDays) || 7),
+      targets: {
+        mysql: config.targets?.mysql !== false,
+        postgres: config.targets?.postgres !== false,
+        sqlite: config.targets?.sqlite !== false,
+      }
+    };
+    await Setting.set('db_autobackup_config', payload, 'json');
+    return payload;
+  }
+
+  async runAutoBackup(force = false) {
+    const config = await this.getAutoBackupConfig();
+    if (!config.enabled && !force) {
+      return { skipped: true, reason: 'Auto-backup is disabled in settings' };
+    }
+
+    const results = [];
+
+    // 1. MySQL
+    if (config.targets?.mysql) {
+      const dbs = await this.listMysqlDatabases();
+      for (const d of dbs) {
+        try {
+          const res = await this.backupDatabase('mysql', d);
+          results.push({ type: 'mysql', db: d, file: res.filename, size: res.size, status: 'success' });
+        } catch (err) {
+          results.push({ type: 'mysql', db: d, error: err.message, status: 'failed' });
+        }
+      }
+    }
+
+    // 2. PostgreSQL
+    if (config.targets?.postgres) {
+      const dbs = await this.listPgDatabases();
+      for (const d of dbs) {
+        try {
+          const res = await this.backupDatabase('postgres', d);
+          results.push({ type: 'postgres', db: d, file: res.filename, size: res.size, status: 'success' });
+        } catch (err) {
+          results.push({ type: 'postgres', db: d, error: err.message, status: 'failed' });
+        }
+      }
+    }
+
+    // 3. SQLite
+    if (config.targets?.sqlite) {
+      const dbs = await this.listSqliteDatabases();
+      for (const d of dbs) {
+        try {
+          const res = await this.backupDatabase('sqlite', d);
+          results.push({ type: 'sqlite', db: d, file: res.filename, size: res.size, status: 'success' });
+        } catch (err) {
+          results.push({ type: 'sqlite', db: d, error: err.message, status: 'failed' });
+        }
+      }
+    }
+
+    // 4. Prune old backups past retention threshold
+    const retentionMs = (config.retentionDays || 7) * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    try {
+      const backupDir = path.resolve('storage', 'backups', 'databases');
+      const files = await fs.readdir(backupDir);
+      for (const file of files) {
+        const fp = path.join(backupDir, file);
+        const st = await fs.stat(fp);
+        if (now - st.mtimeMs > retentionMs) {
+          await fs.unlink(fp).catch(() => {});
+          cleanedCount++;
+        }
+      }
+    } catch (_) {}
+
+    return {
+      success: true,
+      timestamp: new Date().toISOString(),
+      results,
+      cleanedCount
+    };
   }
 }
 

@@ -487,32 +487,56 @@ class BackupService {
         filepath = path.join(this.backupDir, filename);
 
         let mysqlConfig = { host: '127.0.0.1', port: 3306, user: 'root', password: '' };
+        let availableDbs = [];
         try {
           const { default: databaseService } = await import('../database/database.service.js');
           mysqlConfig = await databaseService.loadMysqlConfig();
+          availableDbs = await databaseService.listMysqlDatabases();
         } catch (_) {}
+
+        if (availableDbs.length > 0 && !availableDbs.includes(target) && target !== 'all') {
+          throw Object.assign(
+            new Error(`MySQL database "${target}" does not exist. Available databases: ${availableDbs.join(', ')}`),
+            { statusCode: 400 }
+          );
+        }
 
         const mysqlUser = mysqlConfig.user || process.env.MYSQL_BACKUP_USER || 'root';
         const mysqlPass = mysqlConfig.password !== undefined ? mysqlConfig.password : (process.env.MYSQL_BACKUP_PASSWORD || '');
         const mysqlHost = mysqlConfig.host || '127.0.0.1';
         const mysqlPort = String(mysqlConfig.port || 3306);
 
-        const args = ['-h', mysqlHost, '-P', mysqlPort, '-u', mysqlUser, target];
+        const args = ['-h', mysqlHost, '-P', mysqlPort, '-u', mysqlUser, '--add-drop-table', '--routines', '--triggers', target];
         const env = { ...process.env };
         if (mysqlPass) env.MYSQL_PWD = mysqlPass;
 
-        const sqlData = await spawnPromise('mysqldump', args, { env });
-        await fs.writeFile(filepath, sqlData);
+        try {
+          const sqlData = await spawnPromise('mysqldump', args, { env });
+          await fs.writeFile(filepath, sqlData);
+        } catch (cliErr) {
+          const { default: databaseService } = await import('../database/database.service.js');
+          const res = await databaseService.backupDatabase('mysql', target);
+          filepath = res.filePath;
+        }
       } else if (type === 'postgres') {
         validateDbName(target);
         const filename = `postgres_${target}_${timestamp}.sql`;
         filepath = path.join(this.backupDir, filename);
 
         let pgConfig = { host: '127.0.0.1', port: 5432, user: 'postgres', password: '' };
+        let availableDbs = [];
         try {
           const { default: databaseService } = await import('../database/database.service.js');
           pgConfig = await databaseService.loadPgConfig();
+          availableDbs = await databaseService.listPgDatabases();
         } catch (_) {}
+
+        if (availableDbs.length > 0 && !availableDbs.includes(target) && target !== 'all') {
+          throw Object.assign(
+            new Error(`PostgreSQL database "${target}" does not exist. Available databases: ${availableDbs.join(', ')}`),
+            { statusCode: 400 }
+          );
+        }
 
         const pgUser = pgConfig.user || process.env.POSTGRES_BACKUP_USER || 'postgres';
         const pgPass = pgConfig.password !== undefined ? pgConfig.password : (process.env.POSTGRES_BACKUP_PASSWORD || '');
@@ -522,8 +546,19 @@ class BackupService {
         const env = { ...process.env };
         if (pgPass) env.PGPASSWORD = pgPass;
 
-        const args = ['-U', pgUser, '-h', pgHost, '-p', pgPort, '-d', target, '-f', filepath];
-        await spawnPromise('pg_dump', args, { env });
+        const args = ['-U', pgUser, '-h', pgHost, '-p', pgPort, '--clean', '--if-exists', '-d', target, '-f', filepath];
+        try {
+          await spawnPromise('pg_dump', args, { env });
+        } catch (cliErr) {
+          const { default: databaseService } = await import('../database/database.service.js');
+          const res = await databaseService.backupDatabase('postgres', target);
+          filepath = res.filePath;
+        }
+      } else if (type === 'sqlite') {
+        validateDbName(target);
+        const { default: databaseService } = await import('../database/database.service.js');
+        const res = await databaseService.backupDatabase('sqlite', target);
+        filepath = res.filePath;
       } else if (type === 'files') {
         validatePath(target, false);
         const filename = `files_${target.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.tar.gz`;
