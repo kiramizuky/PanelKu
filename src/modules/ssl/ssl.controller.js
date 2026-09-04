@@ -10,9 +10,12 @@ class SSLController {
         .filter(w => w.ssl && w.ssl.enabled)
         .map(w => ({
           id: w._id,
+          websiteId: w._id,
           domain: w.domain,
-          provider: w.ssl.provider,
-          expiresAt: w.ssl.expiresAt
+          provider: w.ssl.provider || 'letsencrypt',
+          expiresAt: w.ssl.expiresAt,
+          certificate: w.ssl.certificate,
+          enabled: w.ssl.enabled
         }));
       return success(res, certs);
     } catch (error) {
@@ -22,11 +25,12 @@ class SSLController {
 
   async issueCertificate(req, res) {
     try {
-      const { websiteId } = req.body;
-      if (!websiteId) return errorResponse(res, new Error('websiteId is required'), 400);
+      const { websiteId, provider = 'letsencrypt', certificate, privateKey } = req.body;
+      if (!websiteId) return errorResponse(res, 'websiteId is required', 400);
 
-      const website = await sslService.configureWebsiteSSL(websiteId);
-      return success(res, website, 'Certificate issued successfully');
+      const customData = provider === 'custom' ? { certificate, privateKey } : null;
+      const website = await sslService.configureWebsiteSSL(websiteId, provider, customData);
+      return success(res, website, 'Certificate issued and Nginx reloaded successfully');
     } catch (error) {
       return errorResponse(res, error, 500);
     }
@@ -35,8 +39,39 @@ class SSLController {
   async renewCertificate(req, res) {
     try {
       const { websiteId } = req.params;
-      const website = await sslService.configureWebsiteSSL(websiteId);
-      return success(res, website, 'Certificate renewed successfully');
+      const website = await Website.findById(websiteId);
+      if (!website) return errorResponse(res, 'Website not found', 404);
+
+      const provider = website.ssl?.provider || 'letsencrypt';
+      const updated = await sslService.configureWebsiteSSL(websiteId, provider);
+      return success(res, updated, 'Certificate renewed and Nginx reloaded successfully');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async disableCertificate(req, res) {
+    try {
+      const websiteId = req.params.websiteId || req.body.websiteId;
+      if (!websiteId) return errorResponse(res, 'websiteId is required', 400);
+
+      const website = await sslService.disableWebsiteSSL(websiteId);
+      return success(res, website, 'SSL disabled and Nginx reverted to HTTP port 80');
+    } catch (error) {
+      return errorResponse(res, error, 500);
+    }
+  }
+
+  async getCertificate(req, res) {
+    try {
+      const { websiteId } = req.params;
+      const website = await Website.findById(websiteId);
+      if (!website) return errorResponse(res, 'Website not found', 404);
+
+      return success(res, {
+        domain: website.domain,
+        ssl: website.ssl || { enabled: false }
+      });
     } catch (error) {
       return errorResponse(res, error, 500);
     }

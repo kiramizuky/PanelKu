@@ -17,13 +17,35 @@ export const created = (res, data = {}, message = 'Created successfully') => {
 };
 
 export const error = (res, message = 'An error occurred', statusCode = HTTP.SERVER_ERROR, errors = null) => {
+  // Support swapped argument order (e.g. error(res, 500, 'Error text') or error(res, 500, new Error('...')))
+  if (typeof message === 'number' && (typeof statusCode === 'string' || statusCode instanceof Error || typeof statusCode === 'object')) {
+    const temp = message;
+    message = statusCode;
+    statusCode = temp;
+  }
+
+  let msgText = 'An error occurred';
+  if (message instanceof Error) {
+    msgText = message.message || 'An error occurred';
+  } else if (typeof message === 'string') {
+    msgText = message;
+  } else if (message && typeof message === 'object') {
+    msgText = message.message || JSON.stringify(message);
+  } else if (message !== undefined && message !== null) {
+    msgText = String(message);
+  }
+
+  const finalStatus = (typeof statusCode === 'number' && statusCode >= 100 && statusCode <= 599)
+    ? statusCode
+    : HTTP.SERVER_ERROR;
+
   const payload = {
     success: false,
-    message,
+    message: msgText,
     timestamp: new Date().toISOString(),
   };
   if (errors) payload.errors = errors;
-  return res.status(statusCode).json(payload);
+  return res.status(finalStatus).json(payload);
 };
 
 export const badRequest = (res, message = 'Bad request', errors = null) => {

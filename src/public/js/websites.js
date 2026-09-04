@@ -5,6 +5,8 @@
 
 const WebsitesPage = (() => {
   let createModal = null;
+  let sslModal = null;
+  let currentSslWebsiteId = null;
 
   async function loadWebsites() {
     try {
@@ -29,12 +31,16 @@ const WebsitesPage = (() => {
       const { websites } = res.data;
       LP.paginate(websites, 10, 'websitesTableBody', 'websitesPagination', w => {
         const isProxy = w.type === 'proxy';
-        const sslStatus = w.ssl?.enabled ? '<i class="bi bi-shield-lock-fill text-success" title="SSL Enabled"></i>' : '<i class="bi bi-shield-lock text-muted" title="No SSL"></i>';
+        const isSsl = Boolean(w.ssl && w.ssl.enabled);
+        const protocol = isSsl ? 'https' : 'http';
+        const sslStatus = isSsl
+          ? `<span style="cursor:pointer" onclick="LP.call('WebsitesPage.configSSL', '${LP.encJsArg(w._id)}')" title="SSL Enabled (${w.ssl.provider || 'Active'}). Click to manage."><i class="bi bi-shield-lock-fill text-success"></i> <span style="font-size:11px;font-weight:600;color:var(--accent-success)">HTTPS</span></span>`
+          : `<span style="cursor:pointer" onclick="LP.call('WebsitesPage.configSSL', '${LP.encJsArg(w._id)}')" title="No SSL configured. Click to setup HTTPS."><i class="bi bi-shield text-muted"></i> <span style="font-size:11px;color:var(--text-muted)">HTTP</span></span>`;
 
         return `
           <tr>
             <td>
-              <div style="font-weight:600;color:var(--text-primary)"><a href="http://${w.domain}" target="_blank" style="color:inherit;text-decoration:none">${w.domain} <i class="bi bi-box-arrow-up-right" style="font-size:10px;color:var(--text-muted)"></i></a></div>
+              <div style="font-weight:600;color:var(--text-primary)"><a href="${protocol}://${w.domain}" target="_blank" style="color:inherit;text-decoration:none">${w.domain} <i class="bi bi-box-arrow-up-right" style="font-size:10px;color:var(--text-muted)"></i></a></div>
               ${w.aliases.length ? `<div style="font-size:11px;color:var(--text-muted)">${w.aliases.join(', ')}</div>` : ''}
             </td>
             <td><span class="lp-badge ${w.status === 'active' ? 'lp-badge-success' : 'lp-badge-warning'}"><span class="lp-badge-dot"></span>${w.status}</span></td>
@@ -42,7 +48,7 @@ const WebsitesPage = (() => {
             <td class="font-mono" style="font-size:12px;color:var(--text-muted)">
               ${isProxy ? `127.0.0.1:${w.port}` : w.rootDirectory}
             </td>
-            <td style="font-size:14px">${sslStatus}</td>
+            <td style="font-size:13px">${sslStatus}</td>
             <td style="text-align:right">
               ${w.gitRepo ? `
                 ${w.autoDeploy ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('WebsitesPage.showWebhook', '${LP.encJsArg(w._id)}', '${LP.encJsArg(w.webhookToken)}')" title="Show Webhook URL"><i class="bi bi-link-45deg"></i></button>` : ''}
@@ -68,6 +74,10 @@ const WebsitesPage = (() => {
       if (!LP.state.accessToken) return;
       
       createModal = new bootstrap.Modal(document.getElementById('createWebsiteModal'));
+      const sslModalEl = document.getElementById('configSslModal');
+      if (sslModalEl) {
+        sslModal = new bootstrap.Modal(sslModalEl);
+      }
       loadWebsites();
     },
 
@@ -167,8 +177,137 @@ const WebsitesPage = (() => {
       window.location.href = `/filemanager?path=${encodeURIComponent(path)}`;
     },
 
-    configSSL(_id) {
-      LP.toast('SSL Configuration module coming soon', 'info');
+    async configSSL(id) {
+      currentSslWebsiteId = id;
+      document.getElementById('sslModalDomain').textContent = '...';
+      document.getElementById('sslStatusText').textContent = 'Checking certificate status...';
+      document.getElementById('sslStatusBadge').innerHTML = '';
+      document.getElementById('sslExpiryInfo').textContent = '';
+      document.getElementById('sslDisableSection').style.display = 'none';
+      document.getElementById('sslCustomCert').value = '';
+      document.getElementById('sslCustomKey').value = '';
+
+      if (sslModal) sslModal.show();
+
+      try {
+        const res = await LP.get(`/websites/${id}`);
+        if (!res?.success) {
+          LP.toast(res?.message || 'Failed to fetch website details', 'error');
+          return;
+        }
+
+        const website = res.data?.website || res.data;
+        document.getElementById('sslModalDomain').textContent = website.domain;
+
+        const isSsl = Boolean(website.ssl && website.ssl.enabled);
+        if (isSsl) {
+          const provider = website.ssl.provider || 'Active';
+          const expiresAt = website.ssl.expiresAt ? new Date(website.ssl.expiresAt) : null;
+          const daysLeft = expiresAt ? Math.ceil((expiresAt - Date.now()) / 86400000) : null;
+
+          document.getElementById('sslStatusText').innerHTML = `<span class="text-success"><i class="bi bi-shield-check"></i> Active (${LP.escHtml(provider)})</span>`;
+          document.getElementById('sslStatusBadge').innerHTML = `<span class="lp-badge lp-badge-success">SSL Enabled</span>`;
+          document.getElementById('sslExpiryInfo').textContent = expiresAt
+            ? `Expires: ${expiresAt.toLocaleDateString()} (${daysLeft} days remaining)`
+            : 'SSL certificate is active';
+          document.getElementById('sslDisableSection').style.display = 'block';
+        } else {
+          document.getElementById('sslStatusText').innerHTML = `<span class="text-muted"><i class="bi bi-shield-slash"></i> Inactive (HTTP Only)</span>`;
+          document.getElementById('sslStatusBadge').innerHTML = `<span class="lp-badge lp-badge-warning">No SSL</span>`;
+          document.getElementById('sslExpiryInfo').textContent = 'This website is currently served over insecure HTTP.';
+          document.getElementById('sslDisableSection').style.display = 'none';
+        }
+      } catch (err) {
+        LP.toast('Failed to load website SSL configuration', 'error');
+      }
+    },
+
+    async applySSL(provider) {
+      if (!currentSslWebsiteId) return;
+
+      const btnId = provider === 'selfsigned' ? 'btnIssueSelfSigned' : 'btnIssueLetsEncrypt';
+      const btn = document.getElementById(btnId);
+      const oldHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing... (please wait)';
+      btn.disabled = true;
+
+      try {
+        const res = await LP.post('/ssl/issue', {
+          websiteId: currentSslWebsiteId,
+          provider
+        });
+
+        if (res?.success) {
+          LP.toast('SSL certificate configured and Nginx reloaded!', 'success');
+          await this.configSSL(currentSslWebsiteId);
+          loadWebsites();
+        } else {
+          LP.toast(res?.message || 'SSL configuration failed', 'error');
+        }
+      } catch (err) {
+        LP.toast(err.message || 'Connection error while configuring SSL', 'error');
+      } finally {
+        btn.innerHTML = oldHtml;
+        btn.disabled = false;
+      }
+    },
+
+    async applyCustomSSL() {
+      if (!currentSslWebsiteId) return;
+
+      const certificate = document.getElementById('sslCustomCert').value.trim();
+      const privateKey = document.getElementById('sslCustomKey').value.trim();
+
+      if (!certificate || !privateKey) {
+        return LP.toast('Both Certificate and Private Key PEM are required', 'warning');
+      }
+
+      const btn = document.getElementById('btnApplyCustomSSL');
+      const oldHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving & Reloading Nginx...';
+      btn.disabled = true;
+
+      try {
+        const res = await LP.post('/ssl/issue', {
+          websiteId: currentSslWebsiteId,
+          provider: 'custom',
+          certificate,
+          privateKey
+        });
+
+        if (res?.success) {
+          LP.toast('Custom SSL installed and Nginx reloaded!', 'success');
+          await this.configSSL(currentSslWebsiteId);
+          loadWebsites();
+        } else {
+          LP.toast(res?.message || 'Failed to install custom SSL', 'error');
+        }
+      } catch (err) {
+        LP.toast(err.message || 'Connection error while installing custom SSL', 'error');
+      } finally {
+        btn.innerHTML = oldHtml;
+        btn.disabled = false;
+      }
+    },
+
+    async disableSSL() {
+      if (!currentSslWebsiteId) return;
+      if (!(await LP.confirm('Are you sure you want to disable SSL? Website traffic will revert to HTTP port 80 only.', 'Disable SSL'))) {
+        return;
+      }
+
+      try {
+        const res = await LP.post(`/ssl/disable/${currentSslWebsiteId}`);
+        if (res?.success) {
+          LP.toast('SSL disabled and Nginx reverted to HTTP', 'success');
+          await this.configSSL(currentSslWebsiteId);
+          loadWebsites();
+        } else {
+          LP.toast(res?.message || 'Failed to disable SSL', 'error');
+        }
+      } catch (err) {
+        LP.toast('Error disabling SSL', 'error');
+      }
     },
 
     async deployGit(id) {

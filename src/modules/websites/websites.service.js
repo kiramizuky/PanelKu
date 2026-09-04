@@ -90,20 +90,133 @@ class WebsiteService {
   }
 
   async generateNginxConfig(website) {
-    let template = NGINX_TEMPLATE_STATIC;
-    if (website.type === 'proxy') template = NGINX_TEMPLATE_PROXY;
-    else if (website.type === 'php') template = NGINX_TEMPLATE_PHP;
-    
-    let conf = template
-      .replace(/{{domain}}/g, website.domain)
-      .replace(/{{aliases}}/g, (website.aliases || []).join(' '))
-      .replace(/{{rootDirectory}}/g, website.rootDirectory)
-      .replace(/{{port}}/g, website.port || 8080)
-      .replace(/{{phpVersion}}/g, website.phpVersion || '8.2');
+    const isSsl = Boolean(
+      website.ssl &&
+      website.ssl.enabled &&
+      website.ssl.certificate &&
+      website.ssl.privateKey
+    );
+
+    let conf = '';
+    const aliases = (website.aliases || []).filter(Boolean).join(' ');
+
+    if (isSsl) {
+      // 1. Port 80 redirect block + ACME challenge pass-through
+      conf += `server {
+    listen 80;
+    server_name ${website.domain}${aliases ? ' ' + aliases : ''};
+
+    location /.well-known/acme-challenge/ {
+        root ${website.rootDirectory || '/var/www/html'};
+        try_files $uri =404;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+`;
+
+      // 2. Port 443 SSL block
+      if (website.type === 'proxy') {
+        conf += `server {
+    listen 443 ssl http2;
+    server_name ${website.domain}${aliases ? ' ' + aliases : ''};
+
+    ssl_certificate ${website.ssl.certificate};
+    ssl_certificate_key ${website.ssl.privateKey};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    access_log /var/log/nginx/${website.domain}.access.log;
+    error_log /var/log/nginx/${website.domain}.error.log;
+
+    location / {
+        proxy_pass http://127.0.0.1:${website.port || 8080};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+`;
+      } else if (website.type === 'php') {
+        conf += `server {
+    listen 443 ssl http2;
+    server_name ${website.domain}${aliases ? ' ' + aliases : ''};
+    root ${website.rootDirectory};
+    index index.php index.html index.htm;
+
+    ssl_certificate ${website.ssl.certificate};
+    ssl_certificate_key ${website.ssl.privateKey};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    access_log /var/log/nginx/${website.domain}.access.log;
+    error_log /var/log/nginx/${website.domain}.error.log;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \\.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php${website.phpVersion || '8.2'}-fpm.sock;
+    }
+}
+`;
+      } else {
+        // Static
+        conf += `server {
+    listen 443 ssl http2;
+    server_name ${website.domain}${aliases ? ' ' + aliases : ''};
+    root ${website.rootDirectory};
+    index index.html index.htm;
+
+    ssl_certificate ${website.ssl.certificate};
+    ssl_certificate_key ${website.ssl.privateKey};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    access_log /var/log/nginx/${website.domain}.access.log;
+    error_log /var/log/nginx/${website.domain}.error.log;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
+`;
+      }
+    } else {
+      let template = NGINX_TEMPLATE_STATIC;
+      if (website.type === 'proxy') template = NGINX_TEMPLATE_PROXY;
+      else if (website.type === 'php') template = NGINX_TEMPLATE_PHP;
+      
+      conf = template
+        .replace(/{{domain}}/g, website.domain)
+        .replace(/{{aliases}}/g, aliases)
+        .replace(/{{rootDirectory}}/g, website.rootDirectory || `/var/www/${website.domain}`)
+        .replace(/{{port}}/g, website.port || 8080)
+        .replace(/{{phpVersion}}/g, website.phpVersion || '8.2');
+    }
 
     const confPath = path.join(this.nginxConfDir, `${website.domain}.conf`);
     
     try {
+      await fs.mkdir(this.nginxConfDir, { recursive: true });
       await fs.writeFile(confPath, conf, 'utf8');
       await this.reloadNginx();
     } catch (error) {

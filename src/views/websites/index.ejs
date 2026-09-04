@@ -89,4 +89,95 @@
   </div>
 </div>
 
+<!-- SSL Configuration Modal -->
+<div class="modal fade" id="configSslModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border-color);color:var(--text-primary);">
+      <div class="modal-header">
+        <h5 class="modal-title font-mono" style="font-size:15px"><i class="bi bi-shield-lock"></i> SSL / HTTPS Settings - <span id="sslModalDomain" class="text-info"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Current Status Banner -->
+        <div id="sslCurrentStatusBanner" style="padding:12px;border-radius:6px;margin-bottom:15px;background:rgba(255,255,255,0.04);border:1px solid var(--border-color);">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:12px;color:var(--text-muted)">Current SSL Status:</div>
+              <div id="sslStatusText" style="font-weight:600;font-size:14px;margin-top:2px;">Loading...</div>
+            </div>
+            <div id="sslStatusBadge"></div>
+          </div>
+          <div id="sslExpiryInfo" style="font-size:11px;color:var(--text-muted);margin-top:6px;"></div>
+        </div>
+
+        <!-- Mode Tabs -->
+        <ul class="nav nav-pills mb-3" id="sslModalTabs" role="tablist" style="gap:5px;">
+          <li class="nav-item">
+            <button class="nav-link active btn-lp-sm" id="tab-letsencrypt-btn" data-bs-toggle="pill" data-bs-target="#tab-letsencrypt" type="button" style="font-size:12px">Let's Encrypt</button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link btn-lp-sm" id="tab-selfsigned-btn" data-bs-toggle="pill" data-bs-target="#tab-selfsigned" type="button" style="font-size:12px">Self-Signed (Instant)</button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link btn-lp-sm" id="tab-custom-btn" data-bs-toggle="pill" data-bs-target="#tab-custom" type="button" style="font-size:12px">Custom PEM</button>
+          </li>
+        </ul>
+
+        <div class="tab-content" id="sslTabContent">
+          <!-- Let's Encrypt Tab -->
+          <div class="tab-pane fade show active" id="tab-letsencrypt" role="tabpanel">
+            <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:15px;">
+              <p>Generates a free, trusted SSL certificate via Let's Encrypt / acme.sh.</p>
+              <div class="alert alert-info" style="font-size:11px;padding:8px 12px;background:rgba(13,110,253,0.1);border-color:rgba(13,110,253,0.3);color:inherit;">
+                <i class="bi bi-info-circle"></i> <strong>Requirement:</strong> The domain must resolve to this server's public IP address, and port 80 must be open to the internet.
+              </div>
+            </div>
+            <button type="button" class="btn-lp btn-lp-primary w-100" id="btnIssueLetsEncrypt" onclick="WebsitesPage.applySSL('letsencrypt')">
+              <i class="bi bi-shield-check"></i> Issue Let's Encrypt SSL
+            </button>
+          </div>
+
+          <!-- Self-Signed Tab -->
+          <div class="tab-pane fade" id="tab-selfsigned" role="tabpanel">
+            <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:15px;">
+              <p>Generates an instant self-signed certificate using OpenSSL directly on the server.</p>
+              <div class="alert alert-warning" style="font-size:11px;padding:8px 12px;background:rgba(255,193,7,0.1);border-color:rgba(255,193,7,0.3);color:inherit;">
+                <i class="bi bi-lightning-charge"></i> <strong>Best for:</strong> Local IP, intranet, staging, or domains without public DNS setup yet. Works instantly with HTTPS (browser will show a security notice).
+              </div>
+            </div>
+            <button type="button" class="btn-lp btn-lp-primary w-100" id="btnIssueSelfSigned" onclick="WebsitesPage.applySSL('selfsigned')">
+              <i class="bi bi-file-earmark-lock"></i> Generate Self-Signed SSL
+            </button>
+          </div>
+
+          <!-- Custom SSL Tab -->
+          <div class="tab-pane fade" id="tab-custom" role="tabpanel">
+            <div class="lp-form-group">
+              <label class="lp-label" style="font-size:11px">Certificate (fullchain.pem / crt)</label>
+              <textarea id="sslCustomCert" class="lp-input font-mono" rows="4" style="font-size:11px" placeholder="-----BEGIN CERTIFICATE-----..."></textarea>
+            </div>
+            <div class="lp-form-group">
+              <label class="lp-label" style="font-size:11px">Private Key (privkey.pem / key)</label>
+              <textarea id="sslCustomKey" class="lp-input font-mono" rows="4" style="font-size:11px" placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>
+            </div>
+            <button type="button" class="btn-lp btn-lp-primary w-100" id="btnApplyCustomSSL" onclick="WebsitesPage.applyCustomSSL()">
+              <i class="bi bi-check2-circle"></i> Save & Enable Custom SSL
+            </button>
+          </div>
+        </div>
+
+        <!-- Disable SSL Option -->
+        <div id="sslDisableSection" style="margin-top:20px;padding-top:15px;border-top:1px solid var(--border-color);display:none;">
+          <button type="button" class="btn-lp btn-lp-ghost text-danger w-100 btn-lp-sm" onclick="WebsitesPage.disableSSL()">
+            <i class="bi bi-shield-x"></i> Disable SSL (Revert to HTTP Port 80)
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/js/websites.js"></script>

@@ -1,9 +1,15 @@
 import { execFile } from 'child_process';
 import util from 'util';
 import fs from 'fs/promises';
+import path from 'path';
 import Website from '../../models/Website.js';
+import websiteService from '../websites/websites.service.js';
 
 const execFileAsync = util.promisify(execFile);
+
+const SSL_BASE_DIR = process.platform === 'win32'
+  ? path.join(process.cwd(), 'data', 'ssl')
+  : '/etc/nginx/ssl';
 
 /**
  * Validate a domain name — prevents shell injection.
@@ -23,7 +29,7 @@ function validateDomain(domain) {
 function validatePath(p) {
   if (!p || typeof p !== 'string') throw new Error('Path is required');
   // Only allow safe path characters
-  if (!/^[a-zA-Z0-9_\-./\/]+$/.test(p)) {
+  if (!/^[a-zA-Z0-9_\-./\\:]+$/.test(p)) {
     throw new Error('Invalid path: contains unsafe characters');
   }
   return p;
@@ -34,91 +40,234 @@ class SSLService {
     this.acmeShPath = '/root/.acme.sh/acme.sh';
   }
 
-  async installAcmeSh() {
-    try {
-      await fs.access(this.acmeShPath);
-      return true; // Already installed
-    } catch {
+  /**
+   * Find available acme.sh binary path
+   */
+  async getAcmeShPath() {
+    if (process.env.ACME_SH_PATH) {
       try {
-        // [FIX] Clean up partial acme.sh directory that may block reinstall
-        // acme.sh installer refuses if ~/.acme.sh directory already exists
-        const acmeDir = '/root/.acme.sh';
-        try {
-          await fs.access(acmeDir);
-          // Dir exists but acme.sh confirmed missing above — remove it
-          await fs.rm(acmeDir, { recursive: true, force: true });
-        } catch {
-          // Dir doesn't exist — no cleanup needed
-        }
+        await fs.access(process.env.ACME_SH_PATH);
+        return process.env.ACME_SH_PATH;
+      } catch {}
+    }
 
-        // [FIX] Use execFile with args array — no shell interpreter
-        await execFileAsync('curl', ['-fsSL', 'https://get.acme.sh'], { timeout: 30000 });
-        // Pipe via shell is still needed for | sh, but we verify the URL is hardcoded
-        const { exec } = await import('child_process');
-        const util = await import('util');
-        const execAsync = util.promisify(exec);
-        await execAsync('curl -fsSL https://get.acme.sh | sh', { timeout: 60000 });
-        return true;
-      } catch (error) {
-        console.error('Failed to install acme.sh:', error);
-        return false;
+    const homeAcme = process.env.HOME ? path.join(process.env.HOME, '.acme.sh', 'acme.sh') : null;
+    const candidates = [
+      homeAcme,
+      '/root/.acme.sh/acme.sh',
+      '/usr/local/bin/acme.sh',
+      '/usr/bin/acme.sh'
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+      try {
+        await fs.access(candidate);
+        this.acmeShPath = candidate;
+        return candidate;
+      } catch {}
+    }
+
+    return null;
+  }
+
+  async installAcmeSh() {
+    const existing = await this.getAcmeShPath();
+    if (existing) return existing;
+
+    try {
+      // Clean up empty or broken acme dir if exists
+      const targetHome = process.env.HOME || '/root';
+      const acmeDir = path.join(targetHome, '.acme.sh');
+      try {
+        await fs.access(acmeDir);
+        await fs.rm(acmeDir, { recursive: true, force: true });
+      } catch {}
+
+      // Install acme.sh with an admin email account
+      const { exec } = await import('child_process');
+      const execAsync = util.promisify(exec);
+      await execAsync('curl -fsSL https://get.acme.sh | sh -s email=admin@panelku.local', { timeout: 60000 });
+
+      const resolved = await this.getAcmeShPath();
+      if (resolved) {
+        // Set default CA to Let's Encrypt
+        try {
+          await execFileAsync(resolved, ['--set-default-ca', '--server', 'letsencrypt'], { timeout: 15000 });
+        } catch {}
+        return resolved;
       }
+      return null;
+    } catch (error) {
+      console.error('Failed to install acme.sh:', error.message || error);
+      return null;
     }
   }
 
-  async issueCertificate(domain, rootDirectory) {
-    const installed = await this.installAcmeSh();
-    if (!installed) throw new Error('Cannot install acme.sh');
+  /**
+   * Generate an instant Self-Signed SSL Certificate using OpenSSL
+   */
+  async issueSelfSignedCertificate(domain) {
+    validateDomain(domain);
 
-    // [FIX] Validate inputs before using them in any shell command
+    const certDir = path.join(SSL_BASE_DIR, domain);
+    await fs.mkdir(certDir, { recursive: true });
+
+    const keyPath = path.join(certDir, 'privkey.pem');
+    const certPath = path.join(certDir, 'fullchain.pem');
+
+    const args = [
+      'req', '-x509', '-nodes',
+      '-days', '365',
+      '-newkey', 'rsa:2048',
+      '-keyout', keyPath,
+      '-out', certPath,
+      '-subj', `/CN=${domain}`
+    ];
+
+    try {
+      await execFileAsync('openssl', args, { timeout: 30000 });
+      return {
+        certificate: certPath,
+        privateKey: keyPath,
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+      };
+    } catch (error) {
+      throw new Error(`Self-Signed SSL generation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Issue certificate via Let's Encrypt (acme.sh webroot mode)
+   */
+  async issueCertificate(domain, rootDirectory) {
     validateDomain(domain);
     validatePath(rootDirectory);
 
+    const acmeSh = await this.installAcmeSh();
+    if (!acmeSh) {
+      throw new Error('acme.sh is not installed and auto-installation failed. Ensure curl and bash are available.');
+    }
+
     try {
-      // [FIX] Use execFile with args array — prevents shell injection via domain/rootDirectory
+      // Run webroot challenge
       const issueArgs = [
         '--issue', '-d', domain,
         '-w', rootDirectory,
         '--server', 'letsencrypt'
       ];
-      await execFileAsync(this.acmeShPath, issueArgs, { timeout: 120000 });
+      await execFileAsync(acmeSh, issueArgs, { timeout: 120000 });
 
       // Install certificate to Nginx path
-      const certPath = `/etc/nginx/ssl/${domain}`;
+      const certPath = path.join(SSL_BASE_DIR, domain);
       await fs.mkdir(certPath, { recursive: true });
+
+      const fullchainFile = path.join(certPath, 'fullchain.pem');
+      const privkeyFile = path.join(certPath, 'privkey.pem');
 
       const installArgs = [
         '--install-cert', '-d', domain,
-        '--key-file', `${certPath}/privkey.pem`,
-        '--fullchain-file', `${certPath}/fullchain.pem`,
+        '--key-file', privkeyFile,
+        '--fullchain-file', fullchainFile,
         '--reloadcmd', 'systemctl reload nginx'
       ];
-      await execFileAsync(this.acmeShPath, installArgs, { timeout: 60000 });
+      await execFileAsync(acmeSh, installArgs, { timeout: 60000 });
 
       return {
-        certificate: `${certPath}/fullchain.pem`,
-        privateKey: `${certPath}/privkey.pem`
+        certificate: fullchainFile,
+        privateKey: privkeyFile,
+        expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
       };
     } catch (error) {
-      throw new Error(`SSL Issuance failed: ${error.message}`);
+      const detail = error.stderr || error.stdout || error.message;
+      throw new Error(`Let's Encrypt validation failed: ${detail}. Ensure domain "${domain}" points to this server's IP address and port 80 is publicly reachable.`);
     }
   }
 
-  async configureWebsiteSSL(websiteId) {
+  /**
+   * Save custom SSL Certificate provided by user
+   */
+  async saveCustomCertificate(domain, certificateContent, privateKeyContent) {
+    validateDomain(domain);
+
+    if (!certificateContent || !privateKeyContent) {
+      throw new Error('Both Certificate and Private Key content are required');
+    }
+
+    const certDir = path.join(SSL_BASE_DIR, domain);
+    await fs.mkdir(certDir, { recursive: true });
+
+    const certPath = path.join(certDir, 'fullchain.pem');
+    const keyPath = path.join(certDir, 'privkey.pem');
+
+    await fs.writeFile(certPath, certificateContent.trim(), 'utf8');
+    await fs.writeFile(keyPath, privateKeyContent.trim(), 'utf8');
+
+    return {
+      certificate: certPath,
+      privateKey: keyPath,
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+    };
+  }
+
+  /**
+   * Configure SSL for a website (Let's Encrypt, Self-Signed, or Custom)
+   */
+  async configureWebsiteSSL(websiteId, provider = 'letsencrypt', customData = null) {
     const website = await Website.findById(websiteId);
     if (!website) throw new Error('Website not found');
 
-    const sslData = await this.issueCertificate(website.domain, website.rootDirectory);
+    let sslData;
+    let effectiveProvider = provider;
+
+    if (provider === 'selfsigned') {
+      sslData = await this.issueSelfSignedCertificate(website.domain);
+    } else if (provider === 'custom') {
+      if (!customData || !customData.certificate || !customData.privateKey) {
+        throw new Error('Certificate and private key are required for custom SSL');
+      }
+      sslData = await this.saveCustomCertificate(website.domain, customData.certificate, customData.privateKey);
+    } else {
+      // Default: letsencrypt
+      effectiveProvider = 'letsencrypt';
+      sslData = await this.issueCertificate(website.domain, website.rootDirectory || `/var/www/${website.domain}`);
+    }
 
     const updatedSsl = {
       enabled:     true,
-      provider:    'letsencrypt',
+      provider:    effectiveProvider,
       certificate: sslData.certificate,
       privateKey:  sslData.privateKey,
-      expiresAt:   new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      expiresAt:   sslData.expiresAt || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
     };
 
-    return Website.findByIdAndUpdate(websiteId, { ssl: updatedSsl });
+    await Website.findByIdAndUpdate(websiteId, { ssl: updatedSsl });
+    const updatedWebsite = await Website.findById(websiteId);
+
+    // Immediately regenerate Nginx vhost with HTTPS & reload Nginx
+    await websiteService.generateNginxConfig(updatedWebsite);
+
+    return updatedWebsite;
+  }
+
+  /**
+   * Disable SSL for a website and revert vhost back to HTTP port 80
+   */
+  async disableWebsiteSSL(websiteId) {
+    const website = await Website.findById(websiteId);
+    if (!website) throw new Error('Website not found');
+
+    const updatedSsl = {
+      ...(website.ssl || {}),
+      enabled: false
+    };
+
+    await Website.findByIdAndUpdate(websiteId, { ssl: updatedSsl });
+    const updatedWebsite = await Website.findById(websiteId);
+
+    // Immediately regenerate Nginx vhost with HTTP only & reload Nginx
+    await websiteService.generateNginxConfig(updatedWebsite);
+
+    return updatedWebsite;
   }
 }
 
