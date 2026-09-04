@@ -85,6 +85,9 @@ describe('1-Click Pairing Token & Registration', () => {
     expect(script).toContain('#!/usr/bin/env bash');
     expect(script).toContain('MASTER_URL="http://192.168.1.234:23456"');
     expect(script).toContain('PAIRING_TOKEN="tok-abc"');
+    expect(script).toContain('/opt/panelku');
+    expect(script).toContain('panelku.service');
+    expect(script).toContain('setup-agent-node.js');
     expect(script).toContain('/api/cluster/register-token');
   });
 });

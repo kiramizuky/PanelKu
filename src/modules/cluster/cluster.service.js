@@ -172,53 +172,209 @@ class ClusterService {
   }
 
   getAgentInstallScript(token, masterUrl) {
+    const resolvedMasterUrl = masterUrl || ('http://' + (process.env.APP_HOST || '127.0.0.1') + ':23456');
+    const resolvedToken = token || '';
+
     return `#!/usr/bin/env bash
 # ==============================================================================
-# Panelku Distributed Agent Node 1-Click Bootstrap Installer
+# Panelku Standalone Node & Distributed Cluster Agent 1-Click Installer
 # ==============================================================================
 set -e
 
-MASTER_URL="${masterUrl || 'http://' + (process.env.APP_HOST || '127.0.0.1') + ':23456'}"
-PAIRING_TOKEN="${token}"
+MASTER_URL="${resolvedMasterUrl}"
+PAIRING_TOKEN="${resolvedToken}"
 AGENT_PORT="23456"
+PANEL_DIR="/opt/panelku"
+REPO_URL="https://github.com/kiramizuky/PanelKu.git"
+NODE_VERSION="22"
 NODE_NAME="$(hostname)"
-IP_ADDR="$(curl -s -4 https://ifconfig.me 2>/dev/null || ip route get 1.1.1.1 | awk '{print $7}')"
-API_KEY="$(openssl rand -hex 24 2>/dev/null || head -c 24 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
+IP_ADDR="$(curl -s -4 https://ifconfig.me 2>/dev/null || ip route get 1.1.1.1 2>/dev/null | awk '{print $7}' || hostname -I | awk '{print $1}')"
+API_KEY="lp_$(openssl rand -hex 24 2>/dev/null || head -c 24 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')"
 
 echo "========================================================"
-echo "  🚀 Installing Panelku Distributed Agent Node"
-echo "  Master Server: $MASTER_URL"
-echo "  Node Name    : $NODE_NAME"
-echo "  Public IP    : $IP_ADDR"
+echo "  🚀 Installing Panelku Standalone Node & Cluster Agent"
+echo "  Master Server : $MASTER_URL"
+echo "  Node Name     : $NODE_NAME"
+echo "  Public IP     : $IP_ADDR"
+echo "  Panel Port    : $AGENT_PORT"
+echo "  Install Dir   : $PANEL_DIR"
 echo "========================================================"
 
-# Check root
+# Check root privilege
 if [ "$EUID" -ne 0 ]; then
   echo "❌ Error: Please run this script with sudo or as root."
   exit 1
 fi
 
-# Install dependencies if missing
-if ! command -v curl &> /dev/null || ! command -v node &> /dev/null; then
-  echo "📦 Updating packages and installing Node.js runtime..."
-  apt-get update -y && apt-get install -y curl git ufw
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-  apt-get install -y nodejs
+# Detect package manager
+PM="apt"
+if command -v apt-get &>/dev/null; then
+  PM="apt"
+elif command -v pacman &>/dev/null; then
+  PM="pacman"
+elif command -v dnf &>/dev/null; then
+  PM="dnf"
+elif command -v yum &>/dev/null; then
+  PM="yum"
+elif command -v zypper &>/dev/null; then
+  PM="zypper"
 fi
 
-# Allow agent port in firewall if ufw exists
-if command -v ufw &> /dev/null; then
-  ufw allow $AGENT_PORT/tcp 2>/dev/null || true
+echo "📦 Installing system dependencies..."
+case "$PM" in
+  apt)
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git build-essential python3 make g++ ufw tar xz-utils 2>/dev/null || true
+    ;;
+  dnf|yum)
+    $PM makecache || true
+    $PM install -y curl git python3 make gcc-c++ ufw tar xz 2>/dev/null || true
+    ;;
+  pacman)
+    pacman -Sy --noconfirm curl git base-devel python make gcc ufw tar xz 2>/dev/null || true
+    ;;
+  *)
+    echo "⚠️ Proceeding with existing system tools..."
+    ;;
+esac
+
+# Ensure Node.js >= 20 is installed
+NEED_NODE=true
+if command -v node &>/dev/null; then
+  CURR_NODE_VER=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+  if [ "$CURR_NODE_VER" -ge 20 ]; then
+    NEED_NODE=false
+    echo "✓ Node.js $(node -v) is already installed."
+  fi
+fi
+
+if [ "$NEED_NODE" = true ]; then
+  echo "📦 Installing Node.js $NODE_VERSION LTS..."
+  if [ "$PM" = "apt" ]; then
+    curl -fsSL "https://deb.nodesource.com/setup_$NODE_VERSION.x" | bash -
+    apt-get install -y nodejs
+  elif [ "$PM" = "dnf" ] || [ "$PM" = "yum" ]; then
+    curl -fsSL "https://rpm.nodesource.com/setup_$NODE_VERSION.x" | bash -
+    $PM install -y nodejs
+  fi
+fi
+
+# Clone or update Panelku in $PANEL_DIR
+echo "📥 Setting up Panelku in $PANEL_DIR..."
+mkdir -p "$PANEL_DIR"
+
+if [ -d "$PANEL_DIR/.git" ]; then
+  echo "✓ Existing git repository found. Updating codebase..."
+  cd "$PANEL_DIR"
+  git fetch --all 2>/dev/null || true
+  git reset --hard origin/main 2>/dev/null || git pull 2>/dev/null || true
+elif [ -f "$PANEL_DIR/package.json" ]; then
+  echo "✓ Panelku files found in $PANEL_DIR."
+  cd "$PANEL_DIR"
+else
+  echo "✓ Cloning Panelku repository..."
+  git clone "$REPO_URL" "$PANEL_DIR"
+  cd "$PANEL_DIR"
+fi
+
+# Setup directories and environment
+echo "⚙️ Configuring environment and storage..."
+mkdir -p storage/logs storage/backups storage/websites storage/uploads storage/temp storage/snapshots
+chmod -R 750 storage 2>/dev/null || true
+
+if [ ! -f .env ]; then
+  if [ -f .env.example ]; then
+    cp .env.example .env
+  else
+    touch .env
+  fi
+  APP_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
+  JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
+  JWT_REFRESH_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9')
+
+  sed -i "s/change_this_to_a_very_long_random_secret_string/$APP_SECRET/g" .env 2>/dev/null || true
+  sed -i "s/change_this_jwt_secret_very_long_random_string/$JWT_SECRET/g" .env 2>/dev/null || true
+  sed -i "s/change_this_refresh_secret_very_long_random/$JWT_REFRESH_SECRET/g" .env 2>/dev/null || true
+fi
+
+# Install dependencies
+echo "📦 Installing npm dependencies (production)..."
+npm install --production --no-audit --no-fund -q
+npm rebuild better-sqlite3 2>/dev/null || true
+npm rebuild node-pty 2>/dev/null || true
+
+# Initialize database and bind Agent API key
+echo "🔑 Initializing database & configuring Agent API Key..."
+node scripts/setup-agent-node.js "$API_KEY"
+
+# Setup and start systemd service
+echo "🚀 Configuring systemd service (panelku.service)..."
+NODE_BIN=$(which node)
+cat > /etc/systemd/system/panelku.service << EOF
+[Unit]
+Description=Panelku Linux Control Panel
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$PANEL_DIR
+ExecStart=$NODE_BIN --max-old-space-size=512 src/server.js
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable panelku 2>/dev/null || true
+systemctl restart panelku 2>/dev/null || systemctl start panelku
+
+# Open port in firewall if ufw exists
+if command -v ufw &>/dev/null; then
+  ufw allow "$AGENT_PORT"/tcp comment 'Panelku' >/dev/null 2>&1 || true
+fi
+
+# Local health probe check
+echo "⏳ Waiting for Panelku service to become healthy..."
+MAX_TRIES=15
+HEALTH_OK=false
+for i in $(seq 1 $MAX_TRIES); do
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "X-API-Key: $API_KEY" "http://127.0.0.1:$AGENT_PORT/api/agent/health" 2>/dev/null || true)
+  if [ "$HTTP_CODE" = "200" ]; then
+    HEALTH_OK=true
+    break
+  fi
+  sleep 2
+done
+
+if [ "$HEALTH_OK" = true ]; then
+  echo "✓ Local Panelku service verified (HTTP 200 OK)."
+else
+  echo "⚠️ Warning: Service is taking longer to start on port $AGENT_PORT."
 fi
 
 # Register with Master Panel
-echo "🔗 Registering with Master Panel via Pairing Token..."
+echo "🔗 Registering node to Master Panel ($MASTER_URL)..."
 REG_STATUS=$(curl -s -X POST "$MASTER_URL/api/cluster/register-token" \\
   -H "Content-Type: application/json" \\
   -d "{\\"token\\":\\"$PAIRING_TOKEN\\",\\"name\\":\\"$NODE_NAME\\",\\"ipAddress\\":\\"$IP_ADDR\\",\\"port\\":$AGENT_PORT,\\"apiKey\\":\\"$API_KEY\\"}")
 
 echo "Registration Response: $REG_STATUS"
-echo "✅ Agent Node successfully registered to Master Cluster!"
+
+echo "========================================================"
+echo "  🎉 Panelku Node & Agent Installation Complete!"
+echo "  ------------------------------------------------------"
+echo "  🌐 Standalone Web UI : http://$IP_ADDR:$AGENT_PORT"
+echo "  👤 Default Username  : admin"
+echo "  🔑 Default Password  : Admin@123456"
+echo "  ⚡ Master Cluster     : Paired to $MASTER_URL"
+echo "========================================================"
 `;
   }
 
