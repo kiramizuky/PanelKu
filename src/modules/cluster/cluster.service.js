@@ -267,10 +267,19 @@ if [ -d "$PANEL_DIR/.git" ]; then
   echo "✓ Existing git repository found. Updating codebase..."
   cd "$PANEL_DIR"
   git fetch --all 2>/dev/null || true
-  git reset --hard origin/main 2>/dev/null || git pull 2>/dev/null || true
+  git checkout master 2>/dev/null || git checkout main 2>/dev/null || true
+  git reset --hard origin/master 2>/dev/null || git reset --hard origin/main 2>/dev/null || git pull origin master 2>/dev/null || git pull 2>/dev/null || true
 elif [ -f "$PANEL_DIR/package.json" ]; then
   echo "✓ Panelku files found in $PANEL_DIR."
   cd "$PANEL_DIR"
+  if [ ! -d "$PANEL_DIR/.git" ]; then
+    echo "📥 Syncing latest scripts and components..."
+    git clone "$REPO_URL" /tmp/panelku_sync 2>/dev/null || true
+    if [ -d "/tmp/panelku_sync" ]; then
+      cp -r /tmp/panelku_sync/scripts "$PANEL_DIR"/ 2>/dev/null || true
+      rm -rf /tmp/panelku_sync
+    fi
+  fi
 else
   echo "✓ Cloning Panelku repository..."
   git clone "$REPO_URL" "$PANEL_DIR"
@@ -279,7 +288,7 @@ fi
 
 # Setup directories and environment
 echo "⚙️ Configuring environment and storage..."
-mkdir -p storage/logs storage/backups storage/websites storage/uploads storage/temp storage/snapshots
+mkdir -p storage/logs storage/backups storage/websites storage/uploads storage/temp storage/snapshots scripts
 chmod -R 750 storage 2>/dev/null || true
 
 if [ ! -f .env ]; then
@@ -302,6 +311,80 @@ echo "📦 Installing npm dependencies (production)..."
 npm install --production --no-audit --no-fund -q
 npm rebuild better-sqlite3 2>/dev/null || true
 npm rebuild node-pty 2>/dev/null || true
+
+# Ensure setup-agent-node.js is present
+if [ ! -f scripts/setup-agent-node.js ]; then
+  echo "⚙️ Writing agent initialization script..."
+  cat > scripts/setup-agent-node.js << 'AGENT_INIT_EOF'
+import fs from 'fs';
+import path from 'path';
+import bcrypt from 'bcryptjs';
+import { getDb, generateId, now } from '../src/core/db/sqlite.js';
+
+const targetApiKey = process.argv[2]?.trim();
+
+if (!targetApiKey) {
+  console.error('[✗] Error: API key argument is required. Usage: node scripts/setup-agent-node.js <API_KEY>');
+  process.exit(1);
+}
+
+const db = getDb();
+const existingRoles = db.prepare('SELECT COUNT(*) as c FROM roles').get();
+if (!existingRoles || existingRoles.c === 0) {
+  const roles = [
+    { id: generateId(), name: 'Super Admin', slug: 'super_admin', desc: 'Full system control', system: 1, perms: '["*"]', color: '#ef4444' },
+    { id: generateId(), name: 'Admin', slug: 'admin', desc: 'Server management privileges', system: 1, perms: '[]', color: '#3b82f6' },
+    { id: generateId(), name: 'Operator', slug: 'operator', desc: 'Basic operations and monitoring', system: 1, perms: '[]', color: '#10b981' },
+    { id: generateId(), name: 'Read Only', slug: 'read_only', desc: 'View-only access', system: 1, perms: '[]', color: '#6c757d' }
+  ];
+  const ts = now();
+  const insertRole = db.prepare(\`
+    INSERT OR REPLACE INTO roles (id, name, slug, description, permissions, is_system, is_active, color, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+  \`);
+  for (const r of roles) {
+    insertRole.run(r.id, r.name, r.slug, r.desc, r.perms, r.system, r.color, ts, ts);
+  }
+}
+
+const superAdminRole = db.prepare('SELECT id FROM roles WHERE slug = ?').get('super_admin');
+const roleId = superAdminRole ? superAdminRole.id : null;
+const adminUser = db.prepare('SELECT * FROM users WHERE is_super_admin = 1 OR username = ?').get('admin');
+
+if (!adminUser) {
+  const salt = bcrypt.genSaltSync(10);
+  const passwordHash = bcrypt.hashSync('Admin@123456', salt);
+  const ts = now();
+  db.prepare(\`
+    INSERT INTO users (
+      id, username, email, password, role_id, first_name, last_name,
+      api_key, api_key_enabled, is_active, is_super_admin, must_change_password,
+      created_at, updated_at
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?,
+      ?, 1, 1, 1, 1,
+      ?, ?
+    )
+  \`).run(generateId(), 'admin', 'admin@panelku.local', passwordHash, roleId, 'Super', 'Admin', targetApiKey, ts, ts);
+} else {
+  const ts = now();
+  db.prepare(\`
+    UPDATE users
+    SET api_key = ?, api_key_enabled = 1, is_active = 1, updated_at = ?
+    WHERE id = ?
+  \`).run(targetApiKey, ts, adminUser.id);
+}
+
+try {
+  const storageDir = path.resolve(process.cwd(), 'storage');
+  if (fs.existsSync(storageDir)) {
+    fs.chmodSync(storageDir, 0o750);
+  }
+} catch (_) {}
+
+console.log('[✓] Agent node environment setup completed successfully.');
+AGENT_INIT_EOF
+fi
 
 # Initialize database and bind Agent API key
 echo "🔑 Initializing database & configuring Agent API Key..."
