@@ -123,7 +123,7 @@ const WebsitesPage = (() => {
     });
 
     if (!editDrawer) {
-      editDrawer = new bootstrap.Offcanvas(document.getElementById('editWebsiteDrawer'));
+      editDrawer = new bootstrap.Modal(document.getElementById('editWebsiteModal'));
     }
     editDrawer.show();
 

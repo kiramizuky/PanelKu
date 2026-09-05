@@ -101,6 +101,93 @@ class WebsiteService {
     this.nginxConfDir = '/etc/nginx/conf.d';
   }
 
+  /**
+   * Auto-detect and bridge Nginx environment:
+   * Works on both standard Ubuntu/Debian (/etc/nginx/) and aaPanel legacy (/www/server/nginx/)
+   */
+  async ensureNginxIntegration() {
+    if (process.platform === 'win32') return;
+
+    try {
+      // 1. Ensure all standard and legacy log / conf directories exist
+      await fs.mkdir('/var/log/nginx', { recursive: true }).catch(() => {});
+      await fs.mkdir('/www/wwwlogs', { recursive: true }).catch(() => {});
+      await fs.mkdir(this.nginxConfDir, { recursive: true }).catch(() => {});
+
+      // 2. Check if aaPanel Nginx is active
+      const aapanelConf = '/www/server/nginx/conf/nginx.conf';
+      try {
+        await fs.access(aapanelConf);
+        const aapanelRaw = await fs.readFile(aapanelConf, 'utf8');
+        if (!aapanelRaw.includes('/etc/nginx/conf.d/*.conf')) {
+          // Inject our vhost include into aaPanel http block
+          const injected = aapanelRaw.replace(
+            /(http\s*\{)/,
+            '$1\n    include /etc/nginx/conf.d/*.conf;'
+          );
+          await fs.writeFile(aapanelConf, injected, 'utf8');
+          console.log('[WebsiteService] Integrated /etc/nginx/conf.d/*.conf into aaPanel Nginx configuration.');
+        }
+      } catch (_) {
+        // Not aaPanel, proceed with standard check
+      }
+
+      // 3. Check if standard OS Nginx is active
+      const standardConf = '/etc/nginx/nginx.conf';
+      try {
+        await fs.access(standardConf);
+        const standardRaw = await fs.readFile(standardConf, 'utf8');
+        if (!standardRaw.includes('/etc/nginx/conf.d/*.conf') && !standardRaw.includes('conf.d/*.conf')) {
+          const injected = standardRaw.replace(
+            /(http\s*\{)/,
+            '$1\n    include /etc/nginx/conf.d/*.conf;'
+          );
+          await fs.writeFile(standardConf, injected, 'utf8');
+          console.log('[WebsiteService] Ensured /etc/nginx/conf.d/*.conf in standard Nginx configuration.');
+        }
+      } catch (_) {}
+    } catch (e) {
+      console.warn('[WebsiteService] ensureNginxIntegration warning:', e.message);
+    }
+  }
+
+  /**
+   * Adaptively get FastCGI location block for PHP based on server environment
+   */
+  async getPhpFastcgiDirective(phpVersion = '8.2') {
+    if (process.platform === 'win32') {
+      return `location ~ \\.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php${phpVersion}-fpm.sock;
+    }`;
+    }
+
+    const cleanVer = (phpVersion || '8.2').replace('.', '');
+    const aapanelSock = `/tmp/php-cgi-${cleanVer}.sock`;
+    const standardSock = `/var/run/php/php${phpVersion || '8.2'}-fpm.sock`;
+
+    let sock = standardSock;
+    let includeFile = 'include snippets/fastcgi-php.conf;';
+
+    // Check if aaPanel PHP socket exists
+    try {
+      await fs.access(aapanelSock);
+      sock = aapanelSock;
+      includeFile = 'include fastcgi.conf;';
+    } catch {
+      // Check standard Ubuntu PHP socket
+      try {
+        await fs.access(standardSock);
+        sock = standardSock;
+      } catch {}
+    }
+
+    return `location ~ \\.php$ {
+        ${includeFile}
+        fastcgi_pass unix:${sock};
+    }`;
+  }
+
   async reloadNginx() {
     try {
       // Use restart instead of reload so new listen ports (like port 5000) are cleanly bound
@@ -113,6 +200,7 @@ class WebsiteService {
   }
 
   async generateNginxConfig(website) {
+    await this.ensureNginxIntegration();
     const isSsl = Boolean(
       website.ssl &&
       website.ssl.enabled &&
@@ -545,7 +633,8 @@ class WebsiteService {
     const confPath = path.join(this.nginxConfDir, `${website.domain}.conf`);
     const backupPath = `${confPath}.bak`;
 
-    // Ensure directory exists
+    // Ensure environment is bridged & directories exist
+    await this.ensureNginxIntegration();
     await fs.mkdir(this.nginxConfDir, { recursive: true });
     await fs.mkdir('/var/log/nginx', { recursive: true }).catch(() => {});
     await fs.mkdir('/www/wwwlogs', { recursive: true }).catch(() => {});

@@ -98,46 +98,48 @@
 
 
 <!-- ============================================================
-     EDIT WEBSITE OFFCANVAS DRAWER
+     EDIT WEBSITE MODAL (CENTERED & SOLID)
      ============================================================ -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="editWebsiteDrawer" style="width:600px;max-width:100vw;background:var(--bg-card);border-left:1px solid var(--border-color);">
-  <div class="offcanvas-header" style="border-bottom:1px solid var(--border-color);padding:18px 22px;">
-    <div>
-      <h5 class="offcanvas-title" style="font-weight:700;font-size:16px;margin:0;">
-        <i class="bi bi-pencil-square text-primary me-2"></i> Edit Website
-      </h5>
-      <div id="editDrawerDomain" style="font-size:12px;color:var(--text-muted);margin-top:2px;font-family:var(--font-mono,monospace)"></div>
-    </div>
-    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
-  </div>
+<div class="modal fade" id="editWebsiteModal" tabindex="-1" aria-labelledby="editWebsiteModalLabel" aria-modal="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width:920px;width:95%;">
+    <div class="modal-content" style="background:#151824;border:1px solid rgba(255,255,255,0.14);border-radius:12px;box-shadow:0 25px 70px rgba(0,0,0,0.85);color:var(--text-primary);overflow:hidden;">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);padding:18px 24px;background:#11131c;">
+        <div>
+          <h5 class="modal-title font-mono" id="editWebsiteModalLabel" style="font-weight:700;font-size:16px;margin:0;display:flex;align-items:center;gap:8px;">
+            <i class="bi bi-pencil-square text-primary"></i> Edit Website
+          </h5>
+          <div id="editDrawerDomain" style="font-size:12px;color:var(--text-muted);margin-top:3px;font-family:var(--font-mono,monospace)"></div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
 
-  <!-- Tab Bar -->
-  <div style="padding:0 22px;border-bottom:1px solid var(--border-color);background:rgba(0,0,0,0.15);">
-    <ul class="nav" id="editDrawerTabs" style="gap:0;flex-wrap:nowrap;overflow-x:auto;">
-      <li class="nav-item">
-        <button class="ew-tab-btn active" data-target="etab-general" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:13px 16px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
-          <i class="bi bi-gear me-1"></i> General
-        </button>
-      </li>
-      <li class="nav-item">
-        <button class="ew-tab-btn" data-target="etab-nginx" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:13px 16px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
-          <i class="bi bi-file-earmark-code me-1"></i> Nginx Config
-        </button>
-      </li>
-      <li class="nav-item">
-        <button class="ew-tab-btn" data-target="etab-ssl" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:13px 16px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
-          <i class="bi bi-shield-lock me-1"></i> SSL / HTTPS
-        </button>
-      </li>
-      <li class="nav-item">
-        <button class="ew-tab-btn" data-target="etab-git" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:13px 16px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
-          <i class="bi bi-git me-1"></i> Git / Deploy
-        </button>
-      </li>
-    </ul>
-  </div>
+      <!-- Tab Bar -->
+      <div style="padding:0 24px;border-bottom:1px solid rgba(255,255,255,0.08);background:#131620;">
+        <ul class="nav" id="editDrawerTabs" style="gap:4px;flex-wrap:nowrap;overflow-x:auto;">
+          <li class="nav-item">
+            <button class="ew-tab-btn active" data-target="etab-general" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:12px 18px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
+              <i class="bi bi-gear me-1"></i> General
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="ew-tab-btn" data-target="etab-nginx" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:12px 18px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
+              <i class="bi bi-file-earmark-code me-1"></i> Nginx Config
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="ew-tab-btn" data-target="etab-ssl" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:12px 18px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
+              <i class="bi bi-shield-lock me-1"></i> SSL / HTTPS
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="ew-tab-btn" data-target="etab-git" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:12px 18px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
+              <i class="bi bi-git me-1"></i> Git / Deploy
+            </button>
+          </li>
+        </ul>
+      </div>
 
-  <div class="offcanvas-body" style="padding:22px;overflow-y:auto;">
+      <div class="modal-body" style="padding:24px 28px;max-height:75vh;overflow-y:auto;background:#151824;">
 
     <!-- ---- TAB: General ---- -->
     <div id="etab-general" class="ew-tab-pane">
@@ -311,6 +313,8 @@
       </div>
     </div>
 
+      </div>
+    </div>
   </div>
 </div>
 
