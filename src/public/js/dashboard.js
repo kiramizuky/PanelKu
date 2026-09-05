@@ -169,9 +169,23 @@ const Dashboard = (() => {
     if (ramBar) ramBar.style.width = ramPct + '%';
 
     // Disk
-    const diskPct = Math.round(metrics.diskPercent || 0);
+    let diskPct = Math.round(metrics.diskPercent || 0);
+    let diskUsed = metrics.diskUsed || 0;
+    let diskTotal = metrics.diskTotal || 0;
+
+    if (Array.isArray(metrics.disk) && metrics.disk.length > 0) {
+      const primary = metrics.disk.find(d => d.mount === '/' || d.mount === 'C:') 
+        || metrics.disk.filter(d => !d.fs?.startsWith('/dev/loop') && d.mount !== '/boot/efi').sort((a, b) => (b.total || 0) - (a.total || 0))[0] 
+        || metrics.disk[0];
+      if (primary && (primary.total || primary.size)) {
+        diskTotal = primary.total || primary.size;
+        diskUsed = primary.used || 0;
+        diskPct = primary.usedPercent !== undefined ? Math.round(primary.usedPercent) : Math.round((diskUsed / diskTotal) * 100);
+      }
+    }
+
     setElText('diskPct', diskPct + '%');
-    setElText('diskUsed', LP.formatBytes(metrics.diskUsed) + ' / ' + LP.formatBytes(metrics.diskTotal));
+    setElText('diskUsed', LP.formatBytes(diskUsed) + ' / ' + LP.formatBytes(diskTotal));
     const dBar = document.getElementById('diskBar');
     if (dBar) {
       dBar.style.width = diskPct + '%';

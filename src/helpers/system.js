@@ -76,3 +76,55 @@ export const sanitizePath = (base, userPath) => {
   }
   return resolved;
 };
+
+/**
+ * Normalize and sort filesystem list so that:
+ * 1. The primary OS root partition (mount: '/' or 'C:') is ALWAYS at index 0.
+ * 2. Virtual/pseudo/snap loop mounts (/dev/loop*, squashfs, tmpfs) are filtered out.
+ * 3. Remaining physical/logical volumes (such as LVM root volumes) are sorted by largest capacity first.
+ */
+export const normalizeDisks = (disks = []) => {
+  if (!Array.isArray(disks) || disks.length === 0) return [];
+
+  // Filter out dummy/virtual filesystem types and snap loop mounts if real disks exist
+  const realDisks = disks.filter((d) => {
+    if (!d || (!d.size && !d.total)) return false;
+    const fs = String(d.fs || '');
+    const type = String(d.type || '');
+    if (fs.startsWith('/dev/loop') || fs === 'overlay' || fs === 'tmpfs' || fs === 'none' || fs === 'udev') return false;
+    if (type === 'squashfs' || type === 'tmpfs' || type === 'devtmpfs' || type === 'overlay') return false;
+    return true;
+  });
+
+  const list = realDisks.length > 0 ? [...realDisks] : [...disks];
+
+  return list.sort((a, b) => {
+    const aMount = String(a.mount || '');
+    const bMount = String(b.mount || '');
+    const aSize = a.size || a.total || 0;
+    const bSize = b.size || b.total || 0;
+
+    // Root mount '/' has highest priority
+    if (aMount === '/' && bMount !== '/') return -1;
+    if (bMount === '/' && aMount !== '/') return 1;
+
+    // Windows root 'C:'
+    if (aMount.toUpperCase().startsWith('C:') && !bMount.toUpperCase().startsWith('C:')) return -1;
+    if (bMount.toUpperCase().startsWith('C:') && !aMount.toUpperCase().startsWith('C:')) return 1;
+
+    // Avoid EFI or small boot mounts being first if larger drives exist
+    if ((aMount === '/boot/efi' || aMount === '/boot') && (bMount !== '/boot/efi' && bMount !== '/boot')) return 1;
+    if ((bMount === '/boot/efi' || bMount === '/boot') && (aMount !== '/boot/efi' && aMount !== '/boot')) return -1;
+
+    // Sort by largest disk size
+    return bSize - aSize;
+  });
+};
+
+/**
+ * Get primary OS disk object from a disk list.
+ */
+export const getPrimaryDisk = (disks = []) => {
+  const sorted = normalizeDisks(disks);
+  return sorted[0] || {};
+};

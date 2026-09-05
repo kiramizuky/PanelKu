@@ -643,7 +643,7 @@ const WebsitesPage = (() => {
         if (btn) switchEditTab(btn);
       }, 350);
     },
-    async configNginx(id, domain) {
+    async configNginx(id, _domain) {
       await openEditDrawer(id);
       setTimeout(() => {
         const btn = document.querySelector('.ew-tab-btn[data-target="etab-nginx"]');

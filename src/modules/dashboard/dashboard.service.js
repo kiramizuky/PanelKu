@@ -2,6 +2,7 @@ import si from 'systeminformation';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import logger from '../../config/logger.js';
+import { normalizeDisks } from '../../helpers/system.js';
 
 const execAsync = promisify(exec);
 
@@ -25,7 +26,8 @@ class DashboardService {
 
       const cpuData = cpu.value || {};
       const memData = mem.value || {};
-      const diskData = disk.value || [];
+      const rawDiskData = disk.value || [];
+      const diskData = normalizeDisks(rawDiskData);
       const osData = osInfo.value || {};
       const timeData = time.value || {};
       const netStats = network.value || [];

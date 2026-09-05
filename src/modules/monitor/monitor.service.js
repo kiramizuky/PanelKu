@@ -1,6 +1,7 @@
 import si from 'systeminformation';
 import MonitorHistory from '../../models/MonitorHistory.js';
 import logger from '../../config/logger.js';
+import { getPrimaryDisk } from '../../helpers/system.js';
 
 class MonitorService {
   /**
@@ -26,7 +27,7 @@ class MonitorService {
    * Build a normalized metrics object.
    */
   _buildMetrics(cpu, mem, disk, net, temp, diskIO) {
-    const primaryDisk = (disk || [])[0] || {};
+    const primaryDisk = getPrimaryDisk(disk || []);
     const primaryNet = (net || [])[0] || {};
     const loadData = cpu || {};
 

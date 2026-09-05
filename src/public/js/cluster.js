@@ -56,11 +56,20 @@ const ClusterPage = (() => {
     if (isOnline && metrics) {
       const cpuPct   = metrics.cpu?.usage ?? null;
       const ramPct   = metrics.memory ? Math.round((metrics.memory.used / metrics.memory.total) * 100) : null;
-      const diskPct  = metrics.disk?.length ? Math.round((metrics.disk[0].used / metrics.disk[0].total) * 100) : null;
+      const diskList = metrics.disk || [];
+      const primaryDisk = diskList.find(d => d.mount === '/' || d.mount === 'C:') 
+        || diskList.filter(d => !d.fs?.startsWith('/dev/loop') && d.mount !== '/boot/efi').sort((a, b) => (b.total || b.size || 0) - (a.total || a.size || 0))[0] 
+        || diskList[0] 
+        || {};
+      const diskTotalBytes = primaryDisk.total || primaryDisk.size || 0;
+      const diskUsedBytes = primaryDisk.used || 0;
+      const diskPct  = diskTotalBytes > 0 
+        ? Math.round((diskUsedBytes / diskTotalBytes) * 100) 
+        : (primaryDisk.usedPercent ? Math.round(primaryDisk.usedPercent) : null);
       const ramUsed  = metrics.memory ? fmtBytes(metrics.memory.used) : null;
       const ramTotal = metrics.memory ? fmtBytes(metrics.memory.total) : null;
-      const diskUsed = metrics.disk?.length ? fmtBytes(metrics.disk[0].used) : null;
-      const diskTotal= metrics.disk?.length ? fmtBytes(metrics.disk[0].total) : null;
+      const diskUsed = diskTotalBytes > 0 ? fmtBytes(diskUsedBytes) : null;
+      const diskTotal= diskTotalBytes > 0 ? fmtBytes(diskTotalBytes) : null;
 
       const rows = [];
 
@@ -249,11 +258,20 @@ const ClusterPage = (() => {
       // Extract variables properly from metrics object
       const cpuPct   = metrics?.cpu?.usage ?? null;
       const ramPct   = metrics?.memory ? Math.round((metrics.memory.used / metrics.memory.total) * 100) : null;
-      const diskPct  = metrics?.disk?.length ? Math.round((metrics.disk[0].used / metrics.disk[0].total) * 100) : null;
+      const diskList = metrics?.disk || [];
+      const primaryDisk = diskList.find(d => d.mount === '/' || d.mount === 'C:') 
+        || diskList.filter(d => !d.fs?.startsWith('/dev/loop') && d.mount !== '/boot/efi').sort((a, b) => (b.total || b.size || 0) - (a.total || a.size || 0))[0] 
+        || diskList[0] 
+        || {};
+      const diskTotalBytes = primaryDisk.total || primaryDisk.size || 0;
+      const diskUsedBytes = primaryDisk.used || 0;
+      const diskPct  = diskTotalBytes > 0 
+        ? Math.round((diskUsedBytes / diskTotalBytes) * 100) 
+        : (primaryDisk.usedPercent ? Math.round(primaryDisk.usedPercent) : null);
       const ramUsed  = metrics?.memory ? fmtBytes(metrics.memory.used) : null;
       const ramTotal = metrics?.memory ? fmtBytes(metrics.memory.total) : null;
-      const diskUsed = metrics?.disk?.length ? fmtBytes(metrics.disk[0].used) : null;
-      const diskTotal= metrics?.disk?.length ? fmtBytes(metrics.disk[0].total) : null;
+      const diskUsed = diskTotalBytes > 0 ? fmtBytes(diskUsedBytes) : null;
+      const diskTotal= diskTotalBytes > 0 ? fmtBytes(diskTotalBytes) : null;
 
       // Re-build metrics section (Grid 2 columns)
       el.style.display = 'grid';

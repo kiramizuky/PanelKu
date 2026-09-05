@@ -5,6 +5,7 @@ import Notification from '../../models/Notification.js';
 import Setting from '../../models/Setting.js';
 import alertsService from '../alerts/alerts.service.js';
 import logger from '../../config/logger.js';
+import { getPrimaryDisk } from '../../helpers/system.js';
 
 const execAsync = promisify(exec);
 
@@ -307,8 +308,8 @@ class AutoHealService {
 
       const cpuPct = Math.round(load.currentLoad || 0);
       const ramPct = mem.total ? Math.round((mem.used / mem.total) * 100) : 0;
-      const primaryDisk = (disk || [])[0] || {};
-      const diskPct = primaryDisk.use || 0;
+      const primaryDisk = getPrimaryDisk(disk || []);
+      const diskPct = primaryDisk.use || (primaryDisk.size ? Math.round((primaryDisk.used / primaryDisk.size) * 100) : 0);
 
       if (cpuPct > config.cpuThreshold) {
         const key = 'resource:cpu';

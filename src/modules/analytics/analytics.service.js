@@ -5,6 +5,7 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import logger from '../../config/logger.js';
+import { normalizeDisks } from '../../helpers/system.js';
 
 const execAsync = promisify(exec);
 
@@ -105,7 +106,8 @@ class AnalyticsService {
 
     const cpuData = cpu.value || {};
     const memData = mem.value || {};
-    const diskData = disk.value || [];
+    const rawDiskData = disk.value || [];
+    const diskData = normalizeDisks(rawDiskData);
     const netData = (net.value || [])[0] || {};
     const tempData = temp.value || {};
     const loadData = load.value || {};

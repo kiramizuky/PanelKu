@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { getDb, generateId, now } from '../../core/db/sqlite.js';
 import logger from '../../config/logger.js';
 import dashboardService from '../dashboard/dashboard.service.js';
+import { getPrimaryDisk } from '../../helpers/system.js';
 
 class ClusterService {
   constructor() {
@@ -477,12 +478,12 @@ echo "========================================================"
       const masterMetrics = await dashboardService.getMetrics();
       const cpu = masterMetrics.cpu || {};
       const mem = masterMetrics.memory || {};
-      const disk = masterMetrics.disk?.[0] || {};
+      const disk = getPrimaryDisk(masterMetrics.disk || []);
 
       totalCores += parseInt(cpu.cores, 10) || 4;
       totalMemoryBytes += mem.total || 0;
       totalMemoryUsedBytes += mem.used || 0;
-      totalDiskBytes += disk.total || 0;
+      totalDiskBytes += disk.total || disk.size || 0;
       totalDiskUsedBytes += disk.used || 0;
     } catch {
       totalCores += 4;
@@ -499,12 +500,12 @@ echo "========================================================"
         if (metrics) {
           const cpu = metrics.cpu || {};
           const mem = metrics.memory || {};
-          const disk = metrics.disk?.[0] || {};
+          const disk = getPrimaryDisk(metrics.disk || []);
 
           totalCores += parseInt(cpu.cores, 10) || 2;
           totalMemoryBytes += mem.total || 0;
           totalMemoryUsedBytes += mem.used || 0;
-          totalDiskBytes += disk.total || 0;
+          totalDiskBytes += disk.total || disk.size || 0;
           totalDiskUsedBytes += disk.used || 0;
 
           fleetNodes.push({

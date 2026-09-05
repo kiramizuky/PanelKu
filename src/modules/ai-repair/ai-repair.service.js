@@ -18,6 +18,7 @@ import fs from 'fs/promises';
 import logger from '../../config/logger.js';
 import Setting from '../../models/Setting.js';
 import Notification from '../../models/Notification.js';
+import { getPrimaryDisk } from '../../helpers/system.js';
 
 const execAsync = promisify(exec);
 
@@ -424,14 +425,15 @@ class AIRepairService {
       const [load, mem, disk] = await Promise.all([
         si.currentLoad(), si.mem(), si.fsSize(),
       ]);
+      const primaryDisk = getPrimaryDisk(disk || []);
       results.resources = {
         cpu: Math.round(load.currentLoad || 0),
         ram: mem.total ? Math.round((mem.used / mem.total) * 100) : 0,
-        disk: (disk[0]?.use || 0),
+        disk: primaryDisk.use || (primaryDisk.size ? Math.round((primaryDisk.used / primaryDisk.size) * 100) : 0),
         ramTotal: mem.total,
         ramUsed: mem.used,
-        diskTotal: disk[0]?.size || 0,
-        diskUsed: disk[0]?.used || 0,
+        diskTotal: primaryDisk.size || primaryDisk.total || 0,
+        diskUsed: primaryDisk.used || 0,
       };
 
       if (results.resources.cpu > 90) results.issues.push({ type: 'resource', name: 'CPU', value: results.resources.cpu, severity: 'high' });

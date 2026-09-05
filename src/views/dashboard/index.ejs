@@ -498,9 +498,12 @@
         document.getElementById('ramText').textContent = `${ram}%`;
         
         // Storage
-        const disk = res.data.disk[0];
+        const diskList = res.data.disk || [];
+        const disk = diskList.find(d => d.mount === '/' || d.mount === 'C:')
+          || diskList.filter(d => !d.fs?.startsWith('/dev/loop') && d.mount !== '/boot/efi').sort((a, b) => (b.total || 0) - (a.total || 0))[0]
+          || diskList[0];
         if (disk) {
-          const usedPct = disk.usedPercent || ((disk.used / disk.total) * 100);
+          const usedPct = disk.usedPercent !== undefined ? Math.round(disk.usedPercent) : Math.round(((disk.used / disk.total) * 100));
           document.getElementById('storageBar').style.width = `${usedPct}%`;
           document.getElementById('storageText').textContent = `${LP.formatBytes(disk.used)} / ${LP.formatBytes(disk.total)}`;
         }
