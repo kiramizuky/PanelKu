@@ -65,6 +65,10 @@ server {
         proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding on;
     }
 }
 `;
@@ -280,6 +284,9 @@ class WebsiteService {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding on;
     }
 }
 `;

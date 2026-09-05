@@ -146,7 +146,7 @@ class SSLService {
   /**
    * Issue certificate via Let's Encrypt (acme.sh webroot mode)
    */
-  async issueCertificate(domain, rootDirectory = ACME_CHALLENGE_DIR) {
+  async issueCertificate(domain, rootDirectory = ACME_CHALLENGE_DIR, force = false) {
     validateDomain(domain);
     const challengeDir = rootDirectory || ACME_CHALLENGE_DIR;
     validatePath(challengeDir);
@@ -166,7 +166,20 @@ class SSLService {
         '-w', challengeDir,
         '--server', 'letsencrypt'
       ];
-      await execFileAsync(acmeSh, issueArgs, { timeout: 120000, env: cleanEnv });
+      if (force) {
+        issueArgs.push('--force');
+      }
+
+      try {
+        await execFileAsync(acmeSh, issueArgs, { timeout: 120000, env: cleanEnv });
+      } catch (issueErr) {
+        const out = `${issueErr.stdout || ''}\n${issueErr.stderr || ''}\n${issueErr.message || ''}`;
+        // If domain cert is already issued and not due for renewal, acme.sh exits with code 2 ("Domains not changed. Skipping...")
+        const isAlreadyIssued = out.includes('Domains not changed') || out.includes('Skipping') || out.includes('already exists');
+        if (!isAlreadyIssued) {
+          throw issueErr;
+        }
+      }
 
       // Install certificate to Nginx path
       const certPath = path.join(SSL_BASE_DIR, domain);
@@ -179,14 +192,26 @@ class SSLService {
         '--install-cert', '-d', domain,
         '--key-file', privkeyFile,
         '--fullchain-file', fullchainFile,
-        '--reloadcmd', 'systemctl reload nginx'
+        '--reloadcmd', 'systemctl reload nginx 2>/dev/null || nginx -s reload 2>/dev/null || true'
       ];
       await execFileAsync(acmeSh, installArgs, { timeout: 60000, env: cleanEnv });
+
+      let expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+      try {
+        const { stdout } = await execFileAsync('openssl', ['x509', '-enddate', '-noout', '-in', fullchainFile]);
+        const match = stdout.match(/notAfter=(.+)/i);
+        if (match && match[1]) {
+          const parsedDate = new Date(match[1].trim());
+          if (!isNaN(parsedDate.getTime())) {
+            expiresAt = parsedDate.toISOString();
+          }
+        }
+      } catch {}
 
       return {
         certificate: fullchainFile,
         privateKey: privkeyFile,
-        expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+        expiresAt
       };
     } catch (error) {
       const rawDetail = error.stderr || error.stdout || error.message || '';
@@ -229,7 +254,7 @@ class SSLService {
   /**
    * Configure SSL for a website (Let's Encrypt, Self-Signed, or Custom)
    */
-  async configureWebsiteSSL(websiteId, provider = 'letsencrypt', customData = null) {
+  async configureWebsiteSSL(websiteId, provider = 'letsencrypt', customData = null, force = false) {
     const website = await Website.findById(websiteId);
     if (!website) throw new Error('Website not found');
 
@@ -251,7 +276,7 @@ class SSLService {
     } else {
       // Default: letsencrypt
       effectiveProvider = 'letsencrypt';
-      sslData = await this.issueCertificate(website.domain, ACME_CHALLENGE_DIR);
+      sslData = await this.issueCertificate(website.domain, ACME_CHALLENGE_DIR, force);
     }
 
     const updatedSsl = {

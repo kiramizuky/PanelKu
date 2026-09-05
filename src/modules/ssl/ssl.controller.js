@@ -25,11 +25,11 @@ class SSLController {
 
   async issueCertificate(req, res) {
     try {
-      const { websiteId, provider = 'letsencrypt', certificate, privateKey } = req.body;
+      const { websiteId, provider = 'letsencrypt', certificate, privateKey, force = false } = req.body;
       if (!websiteId) return errorResponse(res, 'websiteId is required', 400);
 
       const customData = provider === 'custom' ? { certificate, privateKey } : null;
-      const website = await sslService.configureWebsiteSSL(websiteId, provider, customData);
+      const website = await sslService.configureWebsiteSSL(websiteId, provider, customData, Boolean(force));
       return success(res, website, 'Certificate issued and Nginx reloaded successfully');
     } catch (error) {
       return errorResponse(res, error, 500);
@@ -43,7 +43,7 @@ class SSLController {
       if (!website) return errorResponse(res, 'Website not found', 404);
 
       const provider = website.ssl?.provider || 'letsencrypt';
-      const updated = await sslService.configureWebsiteSSL(websiteId, provider);
+      const updated = await sslService.configureWebsiteSSL(websiteId, provider, null, true);
       return success(res, updated, 'Certificate renewed and Nginx reloaded successfully');
     } catch (error) {
       return errorResponse(res, error, 500);

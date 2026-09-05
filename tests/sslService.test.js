@@ -132,4 +132,31 @@ describe('WebsiteService — Nginx SSL Config Generator', () => {
     // Clean up
     await fs.rm(confFile, { force: true });
   });
+
+  test('includes WebSocket and proxy buffering optimizations for proxy vhosts', async () => {
+    const proxyWebsite = {
+      domain: 'n8n.test.local',
+      type: 'proxy',
+      port: 8080,
+      ssl: {
+        enabled: true,
+        certificate: '/etc/nginx/ssl/n8n.test.local/fullchain.pem',
+        privateKey: '/etc/nginx/ssl/n8n.test.local/privkey.pem'
+      }
+    };
+
+    await websiteService.generateNginxConfig(proxyWebsite);
+
+    const confFile = path.join(websiteService.nginxConfDir, 'n8n.test.local.conf');
+    const content = await fs.readFile(confFile, 'utf8');
+
+    expect(content).toContain('proxy_buffering off;');
+    expect(content).toContain('chunked_transfer_encoding on;');
+    expect(content).toContain("proxy_set_header Upgrade $http_upgrade;");
+    expect(content).toContain("proxy_set_header Connection 'upgrade';");
+
+    // Clean up
+    await fs.rm(confFile, { force: true });
+  });
 });
+
