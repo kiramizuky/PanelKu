@@ -256,7 +256,8 @@ const WebsitesPage = (() => {
         if (badgeEl) {
           badgeEl.innerHTML = '<span class="badge bg-warning text-dark" style="font-size:10px;"><i class="bi bi-lock-fill me-1"></i>Custom (Protected)</span>';
         }
-        LP.toast('Nginx configuration saved & reloaded!', 'success');
+        const msg = res?.data?.message || res?.message || 'Nginx configuration saved & reloaded!';
+        LP.toast(msg, 'success');
       } else {
         LP.toast(`Failed: ${res?.message || 'Unknown error'}`, 'error');
       }

@@ -188,14 +188,38 @@ class WebsiteService {
     }`;
   }
 
-  async reloadNginx() {
+  async reloadNginx(portToCheck = null) {
+    if (process.platform === 'win32') return { success: true, portListening: false };
+
     try {
-      // Use restart instead of reload so new listen ports (like port 5000) are cleanly bound
-      await execAsync('systemctl restart nginx');
-      return true;
+      // 1. Syntax test
+      await execAsync('sudo nginx -t 2>/dev/null || nginx -t');
+
+      // 2. Restart using comprehensive fallbacks:
+      // Works for both aaPanel (/etc/init.d/nginx) and standard Ubuntu (systemctl)
+      const restartCmd = [
+        '([ -x /etc/init.d/nginx ] && sudo /etc/init.d/nginx restart 2>/dev/null)',
+        'sudo systemctl restart nginx 2>/dev/null',
+        'sudo service nginx restart 2>/dev/null',
+        '([ -x /www/server/nginx/sbin/nginx ] && sudo /www/server/nginx/sbin/nginx -s reload 2>/dev/null)',
+        'sudo nginx -s reload 2>/dev/null'
+      ].join(' || ');
+
+      await execAsync(restartCmd);
+
+      // 3. Verify listening port if specified
+      let portListening = false;
+      if (portToCheck) {
+        try {
+          const { stdout } = await execAsync(`sudo ss -tulpn | grep -E '(:${portToCheck}\\b|LISTEN.*${portToCheck})' || true`);
+          portListening = stdout.includes(String(portToCheck));
+        } catch (_) {}
+      }
+
+      return { success: true, portListening };
     } catch (error) {
       console.error('Failed to restart nginx:', error.message);
-      return false;
+      return { success: false, error: error.message };
     }
   }
 
@@ -679,8 +703,21 @@ class WebsiteService {
       const settings = { ...(website.settings || {}), customNginx: true, customNginxContent: content };
       await Website.findByIdAndUpdate(id, { settings });
 
-      await this.reloadNginx();
-      return { success: true, message: 'Nginx configuration saved and reloaded successfully' };
+      // Extract listen port to verify after restart
+      const listenMatch = content.match(/listen\s+(\d+)/);
+      const portToCheck = listenMatch ? parseInt(listenMatch[1], 10) : (website.port || 80);
+
+      const reloadResult = await this.reloadNginx(portToCheck);
+      let message = 'Nginx configuration saved and reloaded successfully';
+      if (reloadResult?.portListening) {
+        message += ` (Port ${portToCheck} is active & listening)`;
+      }
+
+      return {
+        success: true,
+        message,
+        portListening: Boolean(reloadResult?.portListening),
+      };
     } catch (err) {
       throw err;
     }
