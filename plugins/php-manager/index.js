@@ -273,7 +273,10 @@ export default {
                     const res = await LP.post('/api/plugins/php-manager/install', { version: ver });
                     if (res?.success) {
                       LP.toast(res.message, 'success');
-                      setTimeout(() => location.reload(), 2000);
+                      if (res.data?.warning) {
+                        setTimeout(() => LP.toast('⚠️ ' + res.data.warning, 'warning'), 2500);
+                      }
+                      setTimeout(() => location.reload(), res.data?.warning ? 4000 : 2000);
                     } else {
                       LP.toast(res?.message || 'Installation failed', 'error');
                     }
@@ -475,6 +478,51 @@ export default {
       }
     }
 
+    // Helper: get Ubuntu major version number
+    async function getUbuntuMajorVersion() {
+      try {
+        const osRel = await fs.readFile('/etc/os-release', 'utf8').catch(() => '');
+        const v = osRel.match(/^VERSION_ID="?(\d+)/m);
+        if (v && v[1]) return parseInt(v[1], 10);
+      } catch (_) {}
+      return 0;
+    }
+
+    // Helper: get compatible package list for a given PHP version on the current OS
+    async function getPhpPackages(version) {
+      // Base packages for all versions
+      const basePkgs = [
+        `php${version}-fpm`,
+        `php${version}-cli`,
+        `php${version}-mysql`,
+        `php${version}-curl`,
+        `php${version}-xml`,
+        `php${version}-mbstring`,
+        `php${version}-gd`
+      ];
+
+      // php-sqlite3 is available for most versions
+      basePkgs.push(`php${version}-sqlite3`);
+
+      // php-zip: has libzip4 dependency conflicts on Ubuntu 24.04+ for PHP < 8.0
+      const [major, minor] = version.split('.').map(Number);
+      const isLegacyPhp = major < 8;
+
+      if (isLegacyPhp) {
+        const ubuntuMajor = await getUbuntuMajorVersion();
+        if (ubuntuMajor >= 24) {
+          // php-zip is known to be broken on Ubuntu 24+ for PHP 7.x due to libzip4 vs libzip4t64 conflict
+          logger.warn(`PHP Manager: Skipping php${version}-zip on Ubuntu ${ubuntuMajor}+ due to known libzip4 dependency conflict.`);
+        } else {
+          basePkgs.push(`php${version}-zip`);
+        }
+      } else {
+        basePkgs.push(`php${version}-zip`);
+      }
+
+      return basePkgs;
+    }
+
     // 3. Route: Install PHP Version
     app.post('/api/plugins/php-manager/install', async (req, res) => {
       const { version } = req.body;
@@ -487,6 +535,7 @@ export default {
         const isWindows = process.platform === 'win32';
         
         let installCmd = '';
+        let pkgList = [];
         if (packageManager.pmType === 'apt') {
           if (!isWindows) {
             // First cleanup any corrupted repo state
@@ -506,32 +555,64 @@ export default {
             }
           }
 
-          const pkgs = `php${version}-fpm php${version}-cli php${version}-sqlite3 php${version}-mysql php${version}-curl php${version}-zip php${version}-xml php${version}-mbstring php${version}-gd`;
+          pkgList = await getPhpPackages(version);
+          const pkgs = pkgList.join(' ');
           installCmd = `sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ${pkgs}`;
         } else if (packageManager.pmType === 'dnf') {
           if (!isWindows) {
             await ensurePhpRepo(packageManager.pmType, packageManager.distro);
           }
-          installCmd = `sudo dnf install -y php${version.replace('.', '')}-php-fpm php${version.replace('.', '')}-php-cli php${version.replace('.', '')}-php-mysqlnd php${version.replace('.', '')}-php-gd php${version.replace('.', '')}-php-xml php${version.replace('.', '')}-php-mbstring`;
+          const ver = version.replace('.', '');
+          installCmd = `sudo dnf install -y php${ver}-php-fpm php${ver}-php-cli php${ver}-php-mysqlnd php${ver}-php-gd php${ver}-php-xml php${ver}-php-mbstring php${ver}-php-zip`;
         } else {
           // Generic
           installCmd = `echo "Installer fallback for ${packageManager.pmType}"`;
         }
 
+        let installWarning = null;
         try {
           logger.info(`PHP Manager: Installing PHP ${version} with command: ${installCmd}`);
           await runCommand(installCmd);
         } catch (firstErr) {
-          if (!isWindows && (
-            firstErr.message.includes('Conflicting values') ||
-            firstErr.message.includes('no installation candidate') ||
-            firstErr.message.includes('Unable to locate package') ||
-            firstErr.message.includes('The list of sources could not be read')
-          )) {
-            logger.warn(`PHP Manager: Install encountered repository issue (${firstErr.message}), running auto-repair...`);
+          const errMsg = firstErr.message;
+          const isRepoIssue = !isWindows && (
+            errMsg.includes('Conflicting values') ||
+            errMsg.includes('no installation candidate') ||
+            errMsg.includes('Unable to locate package') ||
+            errMsg.includes('The list of sources could not be read')
+          );
+          const isDepsIssue = !isWindows && (
+            errMsg.includes('Unable to satisfy dependencies') ||
+            errMsg.includes('but none of the choices are installable') ||
+            errMsg.includes('held packages') ||
+            errMsg.includes('unresolvable')
+          );
+
+          if (isRepoIssue) {
+            logger.warn(`PHP Manager: Install encountered repository issue, running auto-repair...`);
             await ensurePhpRepo(packageManager.pmType, packageManager.distro);
             logger.info(`PHP Manager: Retrying installation of PHP ${version}...`);
-            await runCommand(installCmd);
+            try {
+              await runCommand(installCmd);
+            } catch (retryErr) {
+              // If retry still fails with deps issue, try minimal package set
+              if (retryErr.message.includes('Unable to satisfy dependencies') || retryErr.message.includes('but none of the choices are installable')) {
+                logger.warn(`PHP Manager: Dependency conflict detected, falling back to minimal package set for PHP ${version}...`);
+                const minimalPkgs = pkgList.filter(p => !p.endsWith('-zip') && !p.endsWith('-sqlite3'));
+                const minimalCmd = `sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ${minimalPkgs.join(' ')}`;
+                await runCommand(minimalCmd);
+                installWarning = `PHP ${version} installed without php-zip and php-sqlite3 due to dependency conflicts on this OS version.`;
+              } else {
+                throw retryErr;
+              }
+            }
+          } else if (isDepsIssue && packageManager.pmType === 'apt') {
+            // Try installing without the conflicting packages
+            logger.warn(`PHP Manager: Dependency conflict on first try, attempting minimal install for PHP ${version}...`);
+            const minimalPkgs = pkgList.filter(p => !p.endsWith('-zip') && !p.endsWith('-sqlite3'));
+            const minimalCmd = `sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ${minimalPkgs.join(' ')}`;
+            await runCommand(minimalCmd);
+            installWarning = `PHP ${version} installed without php-zip and php-sqlite3 due to dependency conflicts on this OS version (Ubuntu 24.04+).`;
           } else {
             throw firstErr;
           }
@@ -541,8 +622,12 @@ export default {
         if (!isWindows) {
           await runCommand(`sudo systemctl enable php${version}-fpm && sudo systemctl start php${version}-fpm`).catch(() => {});
         }
+
+        const msg = installWarning
+          ? `PHP ${version} installed with limited extensions. ${installWarning}`
+          : `PHP ${version} and extensions installed successfully`;
         
-        return successResponse(res, null, `PHP ${version} and extensions installed successfully`);
+        return successResponse(res, { warning: installWarning }, msg);
       } catch (err) {
         logger.error(`PHP Manager: Install failed for PHP ${version}: ${err.message}`);
         return errorResponse(res, err.message, 500);
