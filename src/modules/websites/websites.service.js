@@ -103,10 +103,11 @@ class WebsiteService {
 
   async reloadNginx() {
     try {
-      await execAsync('systemctl reload nginx');
+      // Use restart instead of reload so new listen ports (like port 5000) are cleanly bound
+      await execAsync('systemctl restart nginx');
       return true;
     } catch (error) {
-      console.error('Failed to reload nginx:', error.message);
+      console.error('Failed to restart nginx:', error.message);
       return false;
     }
   }
