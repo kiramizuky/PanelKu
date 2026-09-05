@@ -1,15 +1,15 @@
-/**
- * Linux Panel — websites.js
- * Website management frontend
+﻿/**
+ * Linux Panel - websites.js
+ * Website management frontend — with Edit Drawer
  */
 
 const WebsitesPage = (() => {
   let createModal = null;
-  let sslModal = null;
-  let nginxModal = null;
-  let currentSslWebsiteId = null;
-  let currentNginxWebsiteId = null;
+  let editDrawer = null;
+  let currentEditId = null;
+  let currentEditWebsite = null;
 
+  // ─── Load Websites Table ───────────────────────────────────────────────────
   async function loadWebsites() {
     try {
       const statusRes = await LP.get('/system/check-install');
@@ -35,31 +35,33 @@ const WebsitesPage = (() => {
         const isProxy = w.type === 'proxy';
         const isSsl = Boolean(w.ssl && w.ssl.enabled);
         const protocol = isSsl ? 'https' : 'http';
-        const sslStatus = isSsl
-          ? `<span style="cursor:pointer" onclick="LP.call('WebsitesPage.configSSL', '${LP.encJsArg(w._id)}')" title="SSL Enabled (${w.ssl.provider || 'Active'}). Click to manage."><i class="bi bi-shield-lock-fill text-success"></i> <span style="font-size:11px;font-weight:600;color:var(--accent-success)">HTTPS</span></span>`
-          : `<span style="cursor:pointer" onclick="LP.call('WebsitesPage.configSSL', '${LP.encJsArg(w._id)}')" title="No SSL configured. Click to setup HTTPS."><i class="bi bi-shield text-muted"></i> <span style="font-size:11px;color:var(--text-muted)">HTTP</span></span>`;
+        const sslBadge = isSsl
+          ? `<span class="lp-badge lp-badge-success" style="font-size:10px;"><span class="lp-badge-dot"></span>HTTPS</span>`
+          : `<span class="lp-badge lp-badge-ghost" style="font-size:10px;"><span class="lp-badge-dot"></span>HTTP</span>`;
 
         return `
           <tr>
             <td>
-              <div style="font-weight:600;color:var(--text-primary)"><a href="${protocol}://${w.domain}" target="_blank" style="color:inherit;text-decoration:none">${w.domain} <i class="bi bi-box-arrow-up-right" style="font-size:10px;color:var(--text-muted)"></i></a></div>
-              ${w.aliases.length ? `<div style="font-size:11px;color:var(--text-muted)">${w.aliases.join(', ')}</div>` : ''}
+              <div style="font-weight:600;color:var(--text-primary)">
+                <a href="${protocol}://${w.domain}" target="_blank" style="color:inherit;text-decoration:none">
+                  ${LP.escHtml(w.domain)} <i class="bi bi-box-arrow-up-right" style="font-size:10px;color:var(--text-muted)"></i>
+                </a>
+              </div>
+              ${w.aliases && w.aliases.length ? `<div style="font-size:11px;color:var(--text-muted)">${LP.escHtml(w.aliases.join(', '))}</div>` : ''}
             </td>
             <td><span class="lp-badge ${w.status === 'active' ? 'lp-badge-success' : 'lp-badge-warning'}"><span class="lp-badge-dot"></span>${w.status}</span></td>
             <td><span class="lp-badge" style="background:var(--bg-secondary);border:1px solid var(--border-color);text-transform:uppercase">${w.type}</span></td>
             <td class="font-mono" style="font-size:12px;color:var(--text-muted)">
-              ${isProxy ? `127.0.0.1:${w.port}` : w.rootDirectory}
+              ${isProxy ? `127.0.0.1:${w.port}` : LP.escHtml(w.rootDirectory || '')}
             </td>
-            <td style="font-size:13px">${sslStatus}</td>
-            <td style="text-align:right">
-              ${w.gitRepo ? `
-                ${w.autoDeploy ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('WebsitesPage.showWebhook', '${LP.encJsArg(w._id)}', '${LP.encJsArg(w.webhookToken)}')" title="Show Webhook URL"><i class="bi bi-link-45deg"></i></button>` : ''}
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="LP.call('WebsitesPage.deployGit', '${LP.encJsArg(w._id)}')" title="Deploy from Git"><i class="bi bi-cloud-arrow-down"></i></button>
-              ` : ''}
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WebsitesPage.configNginx', '${LP.encJsArg(w._id)}', '${LP.encJsArg(w.domain)}')" title="Nginx Configuration"><i class="bi bi-file-earmark-code"></i></button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WebsitesPage.configSSL', '${LP.encJsArg(w._id)}')" title="SSL Settings"><i class="bi bi-shield"></i></button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WebsitesPage.openFolder', '${LP.encJsArg(w.rootDirectory)}')" title="File Manager"><i class="bi bi-folder"></i></button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('WebsitesPage.deleteWebsite', '${LP.encJsArg(w._id)}', '${LP.encJsArg(w.domain)}')" title="Delete"><i class="bi bi-trash"></i></button>
+            <td style="font-size:13px;">${sslBadge}</td>
+            <td style="text-align:right;">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('WebsitesPage.openFolder', '${LP.encJsArg(w.rootDirectory || '')}')" title="File Manager">
+                <i class="bi bi-folder"></i>
+              </button>
+              <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LP.call('WebsitesPage.openEditDrawer', '${LP.encJsArg(w._id)}')" title="Edit Website">
+                <i class="bi bi-pencil-square me-1"></i> Edit
+              </button>
             </td>
           </tr>
         `;
@@ -71,20 +73,373 @@ const WebsitesPage = (() => {
     }
   }
 
+  // ─── Tab Switching ─────────────────────────────────────────────────────────
+  function switchEditTab(btn) {
+    document.querySelectorAll('.ew-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.ew-tab-pane').forEach(p => p.style.display = 'none');
+    btn.classList.add('active');
+    const target = document.getElementById(btn.dataset.target);
+    if (target) target.style.display = 'block';
+
+    // Lazy-load data when switching tabs
+    if (btn.dataset.target === 'etab-nginx' && currentEditId) {
+      loadNginxForDrawer();
+    }
+    if (btn.dataset.target === 'etab-ssl' && currentEditId && currentEditWebsite) {
+      renderSslStatus(currentEditWebsite);
+    }
+  }
+
+  function switchSslSubTab(tab) {
+    ['Le', 'Self', 'Custom'].forEach(t => {
+      const lower = t.toLowerCase();
+      const key = lower === 'le' ? 'letsencrypt' : lower === 'self' ? 'selfsigned' : 'custom';
+      const btn = document.getElementById('editSslTab' + t);
+      const pane = document.getElementById('editSslPane' + t);
+      if (btn && pane) {
+        btn.className = `btn-lp btn-lp-sm ssl-sub-btn ${key === tab ? 'btn-lp-primary' : 'btn-lp-ghost'}`;
+        pane.style.display = key === tab ? 'block' : 'none';
+      }
+    });
+  }
+
+  // ─── Open Drawer ───────────────────────────────────────────────────────────
+  async function openEditDrawer(id) {
+    currentEditId = id;
+    currentEditWebsite = null;
+
+    // Reset to General tab
+    document.querySelectorAll('.ew-tab-btn').forEach((b, i) => {
+      b.classList.toggle('active', i === 0);
+    });
+    document.querySelectorAll('.ew-tab-pane').forEach((p, i) => {
+      p.style.display = i === 0 ? 'block' : 'none';
+    });
+
+    if (!editDrawer) {
+      editDrawer = new bootstrap.Offcanvas(document.getElementById('editWebsiteDrawer'));
+    }
+    editDrawer.show();
+
+    // Show loading state
+    document.getElementById('editDrawerDomain').textContent = 'Loading...';
+
+    try {
+      const res = await LP.get(`/websites/${id}`);
+      if (!res?.success) {
+        LP.toast(res?.message || 'Failed to load website', 'error');
+        editDrawer.hide();
+        return;
+      }
+
+      const w = res.data?.website || res.data;
+      currentEditWebsite = w;
+      populateDrawer(w);
+    } catch (err) {
+      LP.toast('Failed to load website: ' + err.message, 'error');
+      editDrawer.hide();
+    }
+  }
+
+  function populateDrawer(w) {
+    document.getElementById('editDrawerDomain').textContent = w.domain;
+    document.getElementById('editDomain').value = w.domain || '';
+    document.getElementById('editAliases').value = (w.aliases || []).join(', ');
+    document.getElementById('editRoot').value = w.rootDirectory || '';
+    document.getElementById('editPort').value = w.port || '';
+    document.getElementById('editGitRepo').value = w.gitRepo || '';
+    document.getElementById('editGitBranch').value = w.gitBranch || '';
+    document.getElementById('editAutoDeploy').checked = Boolean(w.autoDeploy);
+
+    // Type
+    const typeSelect = document.getElementById('editType');
+    typeSelect.value = w.type || 'static';
+    toggleEditTypeFields();
+
+    if (w.type === 'php' && w.phpVersion) {
+      document.getElementById('editPhpVersion').value = w.phpVersion;
+    }
+
+    // Status badge
+    const isActive = w.status === 'active';
+    document.getElementById('editStatusBadge').innerHTML = `
+      <span class="lp-badge ${isActive ? 'lp-badge-success' : 'lp-badge-warning'}">
+        <span class="lp-badge-dot"></span> ${isActive ? 'Active' : 'Inactive'}
+      </span>`;
+    const toggleBtn = document.getElementById('editToggleStatusBtn');
+    toggleBtn.innerHTML = isActive
+      ? '<i class="bi bi-pause-circle me-1"></i> Disable'
+      : '<i class="bi bi-play-circle me-1"></i> Enable';
+    toggleBtn.className = `btn-lp btn-lp-ghost btn-lp-sm ${isActive ? 'text-warning' : 'text-success'}`;
+
+    // Webhook
+    const webhookSection = document.getElementById('editWebhookSection');
+    const deployBtn = document.getElementById('editDeployNowBtn');
+    if (w.gitRepo) {
+      deployBtn.style.display = 'inline-flex';
+      if (w.autoDeploy && w.webhookToken) {
+        webhookSection.style.display = 'block';
+        document.getElementById('editWebhookUrl').value = `${window.location.origin}/api/websites/${w._id}/deploy/${w.webhookToken}`;
+      } else {
+        webhookSection.style.display = 'none';
+      }
+    } else {
+      deployBtn.style.display = 'none';
+      webhookSection.style.display = 'none';
+    }
+
+    // Listen for auto-deploy checkbox change
+    document.getElementById('editAutoDeploy').onchange = () => {
+      webhookSection.style.display = (document.getElementById('editAutoDeploy').checked && w.webhookToken) ? 'block' : 'none';
+    };
+  }
+
+  function toggleEditTypeFields() {
+    const type = document.getElementById('editType').value;
+    document.getElementById('editPortGroup').style.display = (type === 'proxy' || type === 'node') ? 'block' : 'none';
+    document.getElementById('editPhpGroup').style.display = type === 'php' ? 'block' : 'none';
+  }
+
+  // ─── Nginx Tab ─────────────────────────────────────────────────────────────
+  async function loadNginxForDrawer() {
+    if (!currentEditId) return;
+    const editor = document.getElementById('editNginxEditor');
+    const saveBtn = document.getElementById('editSaveNginxBtn');
+    editor.value = '# Loading...';
+    editor.disabled = true;
+    saveBtn.disabled = true;
+
+    try {
+      const res = await LP.get(`/websites/${currentEditId}/nginx-config`);
+      if (res?.success) {
+        editor.value = res.data.content || '';
+        if (res.data.confPath) {
+          document.getElementById('editNginxFilePath').textContent = res.data.confPath;
+        }
+        editor.disabled = false;
+        saveBtn.disabled = false;
+      } else {
+        editor.value = `# Error: ${res?.message || 'Failed to load'}`;
+        LP.toast(res?.message || 'Failed to load Nginx config', 'error');
+      }
+    } catch (err) {
+      editor.value = `# Error: ${err.message}`;
+      LP.toast('Error loading Nginx config', 'error');
+    }
+  }
+
+  async function saveDrawerNginxConfig() {
+    if (!currentEditId) return;
+    const editor = document.getElementById('editNginxEditor');
+    const saveBtn = document.getElementById('editSaveNginxBtn');
+    const content = editor.value;
+    const orig = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Validating & Saving...';
+
+    try {
+      const res = await LP.put(`/websites/${currentEditId}/nginx-config`, { content });
+      if (res?.success) {
+        LP.toast('Nginx configuration saved & reloaded!', 'success');
+      } else {
+        LP.toast(`Failed: ${res?.message || 'Unknown error'}`, 'error');
+      }
+    } catch (err) {
+      LP.toast(`Error: ${err.message}`, 'error');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = orig;
+    }
+  }
+
+  // ─── SSL Tab ───────────────────────────────────────────────────────────────
+  function renderSslStatus(w) {
+    const isSsl = Boolean(w.ssl && w.ssl.enabled);
+    if (isSsl) {
+      const provider = w.ssl.provider || 'Active';
+      const expiresAt = w.ssl.expiresAt ? new Date(w.ssl.expiresAt) : null;
+      const daysLeft = expiresAt ? Math.ceil((expiresAt - Date.now()) / 86400000) : null;
+      document.getElementById('editSslStatusText').innerHTML = `<span class="text-success"><i class="bi bi-shield-check"></i> Active (${LP.escHtml(provider)})</span>`;
+      document.getElementById('editSslStatusBadge').innerHTML = `<span class="lp-badge lp-badge-success">SSL On</span>`;
+      document.getElementById('editSslExpiryInfo').textContent = expiresAt
+        ? `Expires: ${expiresAt.toLocaleDateString()} (${daysLeft} days remaining)`
+        : 'SSL certificate is active';
+      document.getElementById('editSslDisable').style.display = 'block';
+    } else {
+      document.getElementById('editSslStatusText').innerHTML = `<span class="text-muted"><i class="bi bi-shield-slash"></i> Inactive (HTTP Only)</span>`;
+      document.getElementById('editSslStatusBadge').innerHTML = `<span class="lp-badge lp-badge-warning">No SSL</span>`;
+      document.getElementById('editSslExpiryInfo').textContent = 'This website is currently served over insecure HTTP.';
+      document.getElementById('editSslDisable').style.display = 'none';
+    }
+  }
+
+  async function issueEditSSL(provider) {
+    if (!currentEditId) return;
+    const btnMap = { letsencrypt: 'editBtnLe', selfsigned: 'editBtnSelf', custom: 'editBtnCustom' };
+    const btn = document.getElementById(btnMap[provider]);
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Processing...';
+    btn.disabled = true;
+
+    const payload = { websiteId: currentEditId, provider };
+    if (provider === 'custom') {
+      payload.certificate = document.getElementById('editSslCert').value.trim();
+      payload.privateKey = document.getElementById('editSslKey').value.trim();
+      if (!payload.certificate || !payload.privateKey) {
+        LP.toast('Both Certificate and Private Key are required', 'warning');
+        btn.innerHTML = orig; btn.disabled = false;
+        return;
+      }
+    }
+
+    try {
+      const res = await LP.post('/ssl/issue', payload);
+      if (res?.success) {
+        LP.toast('SSL configured and Nginx reloaded!', 'success');
+        // Refresh website data in drawer
+        const fresh = await LP.get(`/websites/${currentEditId}`);
+        if (fresh?.success) {
+          currentEditWebsite = fresh.data?.website || fresh.data;
+          renderSslStatus(currentEditWebsite);
+        }
+        loadWebsites();
+      } else {
+        LP.toast(res?.message || 'SSL configuration failed', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Connection error', 'error');
+    } finally {
+      btn.innerHTML = orig; btn.disabled = false;
+    }
+  }
+
+  async function disableEditSSL() {
+    if (!currentEditId) return;
+    if (!(await LP.confirm('Disable SSL? The website will revert to HTTP port 80 only.', 'Disable SSL'))) return;
+    try {
+      const res = await LP.post(`/ssl/disable/${currentEditId}`);
+      if (res?.success) {
+        LP.toast('SSL disabled', 'success');
+        const fresh = await LP.get(`/websites/${currentEditId}`);
+        if (fresh?.success) {
+          currentEditWebsite = fresh.data?.website || fresh.data;
+          renderSslStatus(currentEditWebsite);
+        }
+        loadWebsites();
+      } else {
+        LP.toast(res?.message || 'Failed', 'error');
+      }
+    } catch (err) {
+      LP.toast('Error disabling SSL', 'error');
+    }
+  }
+
+  // ─── General Save ──────────────────────────────────────────────────────────
+  async function saveGeneralSettings() {
+    if (!currentEditId) return;
+    const domain = document.getElementById('editDomain').value.trim();
+    const aliasesRaw = document.getElementById('editAliases').value;
+    const aliases = aliasesRaw ? aliasesRaw.split(',').map(a => a.trim()).filter(Boolean) : [];
+    const type = document.getElementById('editType').value;
+    const rootDirectory = document.getElementById('editRoot').value.trim();
+    const port = document.getElementById('editPort').value;
+    const phpVersion = document.getElementById('editPhpVersion').value;
+    const gitRepo = document.getElementById('editGitRepo').value.trim();
+    const gitBranch = document.getElementById('editGitBranch').value.trim();
+    const autoDeploy = document.getElementById('editAutoDeploy').checked;
+
+    if (!domain) return LP.toast('Domain name is required', 'warning');
+
+    try {
+      const res = await LP.put(`/websites/${currentEditId}`, {
+        domain, aliases, type, rootDirectory, port: port ? Number(port) : undefined,
+        phpVersion, gitRepo, gitBranch, autoDeploy
+      });
+      if (res?.success) {
+        LP.toast('Website settings saved!', 'success');
+        // Update drawer header
+        document.getElementById('editDrawerDomain').textContent = domain;
+        loadWebsites();
+      } else {
+        LP.toast(res?.message || 'Failed to save', 'error');
+      }
+    } catch (err) {
+      LP.toast('Error saving: ' + err.message, 'error');
+    }
+  }
+
+  async function toggleWebsiteStatus() {
+    if (!currentEditId || !currentEditWebsite) return;
+    const newStatus = currentEditWebsite.status === 'active' ? 'inactive' : 'active';
+    try {
+      const res = await LP.put(`/websites/${currentEditId}`, { status: newStatus });
+      if (res?.success) {
+        LP.toast(`Website ${newStatus === 'active' ? 'enabled' : 'disabled'}`, 'success');
+        currentEditWebsite.status = newStatus;
+        populateDrawer(currentEditWebsite);
+        loadWebsites();
+      } else {
+        LP.toast(res?.message || 'Failed', 'error');
+      }
+    } catch (err) {
+      LP.toast('Error toggling status', 'error');
+    }
+  }
+
+  async function deleteCurrentWebsite() {
+    if (!currentEditId || !currentEditWebsite) return;
+    const confirmed = await LP.confirm(
+      `Delete website <strong>${LP.escHtml(currentEditWebsite.domain)}</strong>?<br><small class="text-danger">Nginx config will be removed. Files in document root will be kept.</small>`,
+      'Delete Website'
+    );
+    if (!confirmed) return;
+    try {
+      const res = await LP.del(`/websites/${currentEditId}`);
+      if (res?.success) {
+        LP.toast('Website deleted', 'success');
+        editDrawer.hide();
+        loadWebsites();
+      } else {
+        LP.toast(res?.message || 'Failed', 'error');
+      }
+    } catch (err) {
+      LP.toast('Error deleting website', 'error');
+    }
+  }
+
+  async function deployFromDrawer() {
+    if (!currentEditId) return;
+    const btn = document.getElementById('editDeployNowBtn');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    btn.disabled = true;
+    try {
+      const res = await LP.post(`/websites/${currentEditId}/deploy`);
+      LP.toast(res?.success ? 'Git deployment successful!' : (res?.message || 'Deployment failed'), res?.success ? 'success' : 'error');
+    } catch (err) {
+      LP.toast('Deployment error', 'error');
+    } finally {
+      btn.innerHTML = orig; btn.disabled = false;
+    }
+  }
+
+  function copyWebhookUrl() {
+    const url = document.getElementById('editWebhookUrl').value;
+    navigator.clipboard.writeText(url).then(() => LP.toast('Webhook URL copied!', 'success'));
+  }
+
+  function editOpenFolder() {
+    const path = document.getElementById('editRoot').value;
+    if (path) window.location.href = `/filemanager?path=${encodeURIComponent(path)}`;
+    else LP.toast('No document root set', 'warning');
+  }
+
+  // ─── Public API ────────────────────────────────────────────────────────────
   return {
     async init() {
       await LP.init();
       if (!LP.state.accessToken) return;
-      
       createModal = new bootstrap.Modal(document.getElementById('createWebsiteModal'));
-      const sslModalEl = document.getElementById('configSslModal');
-      if (sslModalEl) {
-        sslModal = new bootstrap.Modal(sslModalEl);
-      }
-      const nginxModalEl = document.getElementById('nginxConfigModal');
-      if (nginxModalEl) {
-        nginxModal = new bootstrap.Modal(nginxModalEl);
-      }
       loadWebsites();
     },
 
@@ -99,7 +454,7 @@ const WebsitesPage = (() => {
       const portGroup = document.getElementById('cwPortGroup');
       const phpGroup = document.getElementById('cwPhpGroup');
       const dockerGroup = document.getElementById('cwDockerGroup');
-      
+
       if (type === 'proxy' || type === 'node') {
         portGroup.style.display = 'block';
         dockerGroup.style.display = 'block';
@@ -122,33 +477,23 @@ const WebsitesPage = (() => {
               }
             });
           }
-        } catch (e) {
-          console.warn('Could not load Docker containers for mapping', e);
-        }
+        } catch (e) { console.warn('Could not load Docker containers', e); }
       } else {
         portGroup.style.display = 'none';
         dockerGroup.style.display = 'none';
         document.getElementById('cwPort').required = false;
       }
-      
-      if (type === 'php') {
-        phpGroup.style.display = 'block';
-      } else {
-        phpGroup.style.display = 'none';
-      }
+      if (type === 'php') phpGroup.style.display = 'block';
+      else phpGroup.style.display = 'none';
     },
 
     onDockerSelected() {
       const select = document.getElementById('cwDockerContainer');
-      const portInput = document.getElementById('cwPort');
-      if (select.value) {
-        portInput.value = select.value;
-      }
+      if (select.value) document.getElementById('cwPort').value = select.value;
     },
 
     async createWebsite(e) {
       e.preventDefault();
-      
       const domain = document.getElementById('cwDomain').value;
       const type = document.getElementById('cwType').value;
       const rootDirectory = document.getElementById('cwRoot').value || undefined;
@@ -159,7 +504,7 @@ const WebsitesPage = (() => {
 
       const res = await LP.post('/websites', { domain, type, rootDirectory, port, gitRepo, autoDeploy, phpVersion });
       if (res?.success) {
-        LP.toast('Website created and nginx reloaded', 'success');
+        LP.toast('Website created and Nginx reloaded', 'success');
         createModal.hide();
         loadWebsites();
       } else {
@@ -167,304 +512,56 @@ const WebsitesPage = (() => {
       }
     },
 
-    async deleteWebsite(id, domain) {
-      const confirmed = await LP.confirm(`Delete website <strong>${domain}</strong>?<br><small class="text-danger">This will remove the nginx configuration, but files in document root will be kept.</small>`, 'Delete Website');
-      if (!confirmed) return;
-
-      const res = await LP.del(`/websites/${id}`);
-      if (res?.success) {
-        LP.toast('Website deleted', 'success');
-        loadWebsites();
-      } else {
-        LP.toast(res?.message || 'Failed to delete website', 'error');
-      }
-    },
-
     openFolder(path) {
       window.location.href = `/filemanager?path=${encodeURIComponent(path)}`;
     },
 
-    async configSSL(id) {
-      currentSslWebsiteId = id;
-      document.getElementById('sslModalDomain').textContent = '...';
-      document.getElementById('sslStatusText').textContent = 'Checking certificate status...';
-      document.getElementById('sslStatusBadge').innerHTML = '';
-      document.getElementById('sslExpiryInfo').textContent = '';
-      document.getElementById('sslDisableSection').style.display = 'none';
-      document.getElementById('sslCustomCert').value = '';
-      document.getElementById('sslCustomKey').value = '';
-
-      if (sslModal) sslModal.show();
-
-      try {
-        const res = await LP.get(`/websites/${id}`);
-        if (!res?.success) {
-          LP.toast(res?.message || 'Failed to fetch website details', 'error');
-          return;
-        }
-
-        const website = res.data?.website || res.data;
-        document.getElementById('sslModalDomain').textContent = website.domain;
-
-        const isSsl = Boolean(website.ssl && website.ssl.enabled);
-        if (isSsl) {
-          const provider = website.ssl.provider || 'Active';
-          const expiresAt = website.ssl.expiresAt ? new Date(website.ssl.expiresAt) : null;
-          const daysLeft = expiresAt ? Math.ceil((expiresAt - Date.now()) / 86400000) : null;
-
-          document.getElementById('sslStatusText').innerHTML = `<span class="text-success"><i class="bi bi-shield-check"></i> Active (${LP.escHtml(provider)})</span>`;
-          document.getElementById('sslStatusBadge').innerHTML = `<span class="lp-badge lp-badge-success">SSL Enabled</span>`;
-          document.getElementById('sslExpiryInfo').textContent = expiresAt
-            ? `Expires: ${expiresAt.toLocaleDateString()} (${daysLeft} days remaining)`
-            : 'SSL certificate is active';
-          document.getElementById('sslDisableSection').style.display = 'block';
-        } else {
-          document.getElementById('sslStatusText').innerHTML = `<span class="text-muted"><i class="bi bi-shield-slash"></i> Inactive (HTTP Only)</span>`;
-          document.getElementById('sslStatusBadge').innerHTML = `<span class="lp-badge lp-badge-warning">No SSL</span>`;
-          document.getElementById('sslExpiryInfo').textContent = 'This website is currently served over insecure HTTP.';
-          document.getElementById('sslDisableSection').style.display = 'none';
-        }
-      } catch (err) {
-        LP.toast('Failed to load website SSL configuration', 'error');
-      }
-    },
-
-    async applySSL(provider) {
-      if (!currentSslWebsiteId) return;
-
-      const btnId = provider === 'selfsigned' ? 'btnIssueSelfSigned' : 'btnIssueLetsEncrypt';
-      const btn = document.getElementById(btnId);
-      const oldHtml = btn.innerHTML;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing... (please wait)';
-      btn.disabled = true;
-
-      try {
-        const res = await LP.post('/ssl/issue', {
-          websiteId: currentSslWebsiteId,
-          provider
-        });
-
-        if (res?.success) {
-          LP.toast('SSL certificate configured and Nginx reloaded!', 'success');
-          await this.configSSL(currentSslWebsiteId);
-          loadWebsites();
-        } else {
-          LP.toast(res?.message || 'SSL configuration failed', 'error');
-        }
-      } catch (err) {
-        LP.toast(err.message || 'Connection error while configuring SSL', 'error');
-      } finally {
-        btn.innerHTML = oldHtml;
-        btn.disabled = false;
-      }
-    },
-
-    async applyCustomSSL() {
-      if (!currentSslWebsiteId) return;
-
-      const certificate = document.getElementById('sslCustomCert').value.trim();
-      const privateKey = document.getElementById('sslCustomKey').value.trim();
-
-      if (!certificate || !privateKey) {
-        return LP.toast('Both Certificate and Private Key PEM are required', 'warning');
-      }
-
-      const btn = document.getElementById('btnApplyCustomSSL');
-      const oldHtml = btn.innerHTML;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving & Reloading Nginx...';
-      btn.disabled = true;
-
-      try {
-        const res = await LP.post('/ssl/issue', {
-          websiteId: currentSslWebsiteId,
-          provider: 'custom',
-          certificate,
-          privateKey
-        });
-
-        if (res?.success) {
-          LP.toast('Custom SSL installed and Nginx reloaded!', 'success');
-          await this.configSSL(currentSslWebsiteId);
-          loadWebsites();
-        } else {
-          LP.toast(res?.message || 'Failed to install custom SSL', 'error');
-        }
-      } catch (err) {
-        LP.toast(err.message || 'Connection error while installing custom SSL', 'error');
-      } finally {
-        btn.innerHTML = oldHtml;
-        btn.disabled = false;
-      }
-    },
-
-    async disableSSL() {
-      if (!currentSslWebsiteId) return;
-      if (!(await LP.confirm('Are you sure you want to disable SSL? Website traffic will revert to HTTP port 80 only.', 'Disable SSL'))) {
-        return;
-      }
-
-      try {
-        const res = await LP.post(`/ssl/disable/${currentSslWebsiteId}`);
-        if (res?.success) {
-          LP.toast('SSL disabled and Nginx reverted to HTTP', 'success');
-          await this.configSSL(currentSslWebsiteId);
-          loadWebsites();
-        } else {
-          LP.toast(res?.message || 'Failed to disable SSL', 'error');
-        }
-      } catch (err) {
-        LP.toast('Error disabling SSL', 'error');
-      }
-    },
-
-    async deployGit(id) {
-      const btn = event.currentTarget;
-      const icon = btn.innerHTML;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-      btn.disabled = true;
-
-      try {
-        const res = await LP.post(`/websites/${id}/deploy`);
-        if (res?.success) {
-          LP.toast('Git deployment successful', 'success');
-        } else {
-          LP.toast(res?.message || 'Deployment failed', 'error');
-        }
-      } catch (err) {
-        LP.toast('Deployment error', 'error');
-      } finally {
-        btn.innerHTML = icon;
-        btn.disabled = false;
-      }
-    },
-
-    async showWebhook(id, token) {
-      const url = `${window.location.origin}/api/websites/${id}/deploy/${token}`;
-
-      // Build modal with DOM methods to avoid innerHTML injection
-      const modalEl = document.createElement('div');
-      modalEl.innerHTML = `
-        <div class="modal fade" tabindex="-1">
-          <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content" style="background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
-              <div class="modal-header border-0">
-                <h5 class="modal-title">Webhook URL</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-              </div>
-              <div class="modal-body">
-                <p style="font-size:13px;">Configure this URL in your Git repository's Webhook settings (e.g. GitHub, GitLab). Set the content type to <code>application/json</code>.</p>
-                <div class="input-group mt-2">
-                  <input type="text" class="form-control font-mono" style="font-size:12px; background:rgba(0,0,0,0.2); color:#fff; border-color:var(--glass-border);" readonly>
-                  <button class="btn btn-outline-secondary" style="font-size:12px;">Copy</button>
-                </div>
-              </div>
-              <div class="modal-footer border-0">
-                <button class="btn-lp btn-lp-primary" data-bs-dismiss="modal">OK</button>
-              </div>
-            </div>
-          </div>
-        </div>`;
-
-      // Set URL with textContent (safe, no innerHTML)
-      const input = modalEl.querySelector('input');
-      input.value = url;
-      document.body.appendChild(modalEl);
-
-      // Copy button
-      const copyBtn = modalEl.querySelector('.btn-outline-secondary');
-      copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(url).then(() => {
-          LP.toast('Copied to clipboard', 'success');
-        });
-      });
-
-      const bsModal = new bootstrap.Modal(modalEl.querySelector('.modal'));
-      bsModal.show();
-      modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
-    },
-
     async installPackage(pkgName) {
-      if (!(await LP.confirm(`Do you want to install ${pkgName}? This may take a few minutes.`, 'Install Nginx'))) return;
-      
+      if (!(await LP.confirm(`Install ${pkgName}? This may take a few minutes.`, 'Install Nginx'))) return;
       const spinner = document.createElement('div');
       spinner.id = 'installSpinner';
-      spinner.innerHTML = `
-        <div style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-          <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-          <h4 style="color:#fff; margin-top:20px;">Installing ${pkgName}... Please wait.</h4>
-        </div>
-      `;
+      spinner.innerHTML = `<div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.8);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+        <div class="spinner-border text-primary" style="width:3rem;height:3rem;"></div>
+        <h4 style="color:#fff;margin-top:20px;">Installing ${pkgName}...</h4></div>`;
       document.body.appendChild(spinner);
-
       try {
         const res = await LP.post('/system/install', { package: pkgName });
-        if (res?.success) {
-          LP.toast(`${pkgName} installed successfully!`, 'success');
-          loadWebsites();
-        } else {
-          LP.toast(`Failed to install ${pkgName}: ${res?.message}`, 'error');
-        }
-      } catch (e) {
-        LP.toast(`Error installing ${pkgName}`, 'error');
-      } finally {
-        document.getElementById('installSpinner')?.remove();
-      }
+        if (res?.success) { LP.toast(`${pkgName} installed!`, 'success'); loadWebsites(); }
+        else LP.toast(`Failed: ${res?.message}`, 'error');
+      } catch (e) { LP.toast('Error installing', 'error'); }
+      finally { document.getElementById('installSpinner')?.remove(); }
     },
 
-    async configNginx(websiteId, domain) {
-      currentNginxWebsiteId = websiteId;
-      document.getElementById('nginxModalDomain').textContent = domain;
-      document.getElementById('nginxModalFilePath').textContent = `/etc/nginx/conf.d/${domain}.conf`;
-      const editor = document.getElementById('nginxConfigEditor');
-      editor.value = '# Loading configuration...';
-      editor.disabled = true;
-      document.getElementById('btnSaveNginxConfig').disabled = true;
+    // Edit Drawer methods exposed
+    openEditDrawer,
+    switchEditTab,
+    switchSslSubTab,
+    toggleEditTypeFields,
+    saveGeneralSettings,
+    toggleWebsiteStatus,
+    deleteCurrentWebsite,
+    saveDrawerNginxConfig,
+    issueEditSSL,
+    disableEditSSL,
+    deployFromDrawer,
+    copyWebhookUrl,
+    editOpenFolder,
 
-      if (nginxModal) nginxModal.show();
-
-      try {
-        const res = await LP.get(`/websites/${websiteId}/nginx-config`);
-        if (res?.success) {
-          editor.value = res.data.content || '';
-          editor.disabled = false;
-          document.getElementById('btnSaveNginxConfig').disabled = false;
-          if (res.data.confPath) {
-            document.getElementById('nginxModalFilePath').textContent = res.data.confPath;
-          }
-        } else {
-          editor.value = `# Error: ${res?.message || 'Failed to load configuration'}`;
-          LP.toast(res?.message || 'Failed to load configuration', 'error');
-        }
-      } catch (err) {
-        editor.value = `# Error: ${err.message}`;
-        LP.toast('Error loading Nginx configuration', 'error');
-      }
+    // Legacy compat (old table buttons may still call these)
+    async configSSL(id) { await openEditDrawer(id); switchEditTab(document.querySelector('[data-target="etab-ssl"]')); },
+    async configNginx(id, domain) { await openEditDrawer(id); switchEditTab(document.querySelector('[data-target="etab-nginx"]')); },
+    async deleteWebsite(id, domain) {
+      currentEditId = id;
+      currentEditWebsite = { domain };
+      await deleteCurrentWebsite();
     },
-
-    async saveNginxConfig() {
-      if (!currentNginxWebsiteId) return;
-      const editor = document.getElementById('nginxConfigEditor');
-      const saveBtn = document.getElementById('btnSaveNginxConfig');
-      const content = editor.value;
-
-      const originalHtml = saveBtn.innerHTML;
-      saveBtn.disabled = true;
-      saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Validating & Saving...';
-
-      try {
-        const res = await LP.put(`/websites/${currentNginxWebsiteId}/nginx-config`, { content });
-        if (res?.success) {
-          LP.toast('Nginx configuration saved & reloaded successfully!', 'success');
-          if (nginxModal) nginxModal.hide();
-        } else {
-          LP.toast(`Failed to save: ${res?.message || 'Unknown error'}`, 'error');
-        }
-      } catch (err) {
-        LP.toast(`Error saving configuration: ${err.message}`, 'error');
-      } finally {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = originalHtml;
-      }
+    async deployGit(id) {
+      currentEditId = id;
+      await deployFromDrawer();
+    },
+    async showWebhook(id, token) {
+      const url = `${window.location.origin}/api/websites/${id}/deploy/${token}`;
+      LP.toast('Webhook: ' + url, 'info');
     }
   };
 })();

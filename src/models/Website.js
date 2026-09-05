@@ -13,6 +13,7 @@ function rowToWebsite(row) {
     type:          row.type,
     rootDirectory: row.root_directory,
     gitRepo:       row.git_repo,
+    gitBranch:     row.git_branch || '',
     webhookToken:  row.webhook_token,
     autoDeploy:    Boolean(row.auto_deploy),
     phpVersion:    row.php_version,
@@ -97,7 +98,7 @@ const Website = {
     const data = update.$set || update;
     db.prepare(`
       UPDATE websites SET
-        domain = ?, aliases = ?, type = ?, root_directory = ?, git_repo = ?,
+        domain = ?, aliases = ?, type = ?, root_directory = ?, git_repo = ?, git_branch = ?,
         webhook_token = ?, auto_deploy = ?, php_version = ?, port = ?,
         status = ?, ssl = ?, settings = ?, owner_id = ?, updated_at = ?
       WHERE id = ?
@@ -107,6 +108,7 @@ const Website = {
       data.type ?? existing.type,
       data.rootDirectory ?? existing.rootDirectory,
       data.gitRepo ?? existing.gitRepo,
+      data.gitBranch ?? existing.gitBranch ?? '',
       data.webhookToken ?? existing.webhookToken,
       data.autoDeploy !== undefined ? (data.autoDeploy ? 1 : 0) : (existing.autoDeploy ? 1 : 0),
       data.phpVersion ?? existing.phpVersion,

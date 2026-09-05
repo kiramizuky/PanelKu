@@ -378,21 +378,31 @@ class WebsiteService {
       safeGitRepo = this._validateGitRepo(data.gitRepo);
     }
 
+    const oldDomain = website.domain;
+    const newDomain = data.domain && data.domain !== oldDomain ? data.domain : oldDomain;
+
     const updated = await Website.findByIdAndUpdate(id, {
+      domain:        newDomain,
       aliases:       data.aliases       ?? website.aliases,
       type:          data.type          ?? website.type,
       rootDirectory: data.rootDirectory ?? website.rootDirectory,
       port:          data.port          ?? website.port,
       status:        data.status        ?? website.status,
       gitRepo:       safeGitRepo,
+      gitBranch:     data.gitBranch     ?? website.gitBranch,
       autoDeploy:    data.autoDeploy    !== undefined ? data.autoDeploy    : website.autoDeploy,
       phpVersion:    data.phpVersion    ?? website.phpVersion,
       webhookToken:  website.webhookToken || secureToken(),
-    });
+    }, { new: true });
+
+    // If domain changed, remove old nginx config
+    if (newDomain !== oldDomain) {
+      await this.removeNginxConfig(oldDomain);
+    }
 
     if (updated.status === 'active') {
       await this.generateNginxConfig(updated);
-    } else {
+    } else if (newDomain === oldDomain) {
       await this.removeNginxConfig(updated.domain);
     }
 

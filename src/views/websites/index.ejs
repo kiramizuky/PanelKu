@@ -1,4 +1,4 @@
-<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+﻿<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
   <div>
     <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Website Management</h1>
     <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage domains, vhosts, and runtimes</p>
@@ -94,125 +94,219 @@
   </div>
 </div>
 
-<!-- SSL Configuration Modal -->
-<div class="modal fade" id="configSslModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border-color);color:var(--text-primary);">
-      <div class="modal-header">
-        <h5 class="modal-title font-mono" style="font-size:15px"><i class="bi bi-shield-lock"></i> SSL / HTTPS Settings - <span id="sslModalDomain" class="text-info"></span></h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <!-- Current Status Banner -->
-        <div id="sslCurrentStatusBanner" style="padding:12px;border-radius:6px;margin-bottom:15px;background:rgba(255,255,255,0.04);border:1px solid var(--border-color);">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <div style="font-size:12px;color:var(--text-muted)">Current SSL Status:</div>
-              <div id="sslStatusText" style="font-weight:600;font-size:14px;margin-top:2px;">Loading...</div>
-            </div>
-            <div id="sslStatusBadge"></div>
-          </div>
-          <div id="sslExpiryInfo" style="font-size:11px;color:var(--text-muted);margin-top:6px;"></div>
-        </div>
-
-        <!-- Mode Tabs -->
-        <ul class="nav nav-pills mb-3" id="sslModalTabs" role="tablist" style="gap:5px;">
-          <li class="nav-item">
-            <button class="nav-link active btn-lp-sm" id="tab-letsencrypt-btn" data-bs-toggle="pill" data-bs-target="#tab-letsencrypt" type="button" style="font-size:12px">Let's Encrypt</button>
-          </li>
-          <li class="nav-item">
-            <button class="nav-link btn-lp-sm" id="tab-selfsigned-btn" data-bs-toggle="pill" data-bs-target="#tab-selfsigned" type="button" style="font-size:12px">Self-Signed (Instant)</button>
-          </li>
-          <li class="nav-item">
-            <button class="nav-link btn-lp-sm" id="tab-custom-btn" data-bs-toggle="pill" data-bs-target="#tab-custom" type="button" style="font-size:12px">Custom PEM</button>
-          </li>
-        </ul>
-
-        <div class="tab-content" id="sslTabContent">
-          <!-- Let's Encrypt Tab -->
-          <div class="tab-pane fade show active" id="tab-letsencrypt" role="tabpanel">
-            <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:15px;">
-              <p>Generates a free, trusted SSL certificate via Let's Encrypt / acme.sh.</p>
-              <div class="alert alert-info" style="font-size:11px;padding:8px 12px;background:rgba(13,110,253,0.1);border-color:rgba(13,110,253,0.3);color:inherit;">
-                <i class="bi bi-info-circle"></i> <strong>Requirement:</strong> The domain must resolve to this server's public IP address, and port 80 must be open to the internet.
-              </div>
-            </div>
-            <button type="button" class="btn-lp btn-lp-primary w-100" id="btnIssueLetsEncrypt" onclick="WebsitesPage.applySSL('letsencrypt')">
-              <i class="bi bi-shield-check"></i> Issue Let's Encrypt SSL
-            </button>
-          </div>
-
-          <!-- Self-Signed Tab -->
-          <div class="tab-pane fade" id="tab-selfsigned" role="tabpanel">
-            <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:15px;">
-              <p>Generates an instant self-signed certificate using OpenSSL directly on the server.</p>
-              <div class="alert alert-warning" style="font-size:11px;padding:8px 12px;background:rgba(255,193,7,0.1);border-color:rgba(255,193,7,0.3);color:inherit;">
-                <i class="bi bi-lightning-charge"></i> <strong>Best for:</strong> Local IP, intranet, staging, or domains without public DNS setup yet. Works instantly with HTTPS (browser will show a security notice).
-              </div>
-            </div>
-            <button type="button" class="btn-lp btn-lp-primary w-100" id="btnIssueSelfSigned" onclick="WebsitesPage.applySSL('selfsigned')">
-              <i class="bi bi-file-earmark-lock"></i> Generate Self-Signed SSL
-            </button>
-          </div>
-
-          <!-- Custom SSL Tab -->
-          <div class="tab-pane fade" id="tab-custom" role="tabpanel">
-            <div class="lp-form-group">
-              <label class="lp-label" style="font-size:11px">Certificate (fullchain.pem / crt)</label>
-              <textarea id="sslCustomCert" class="lp-input font-mono" rows="4" style="font-size:11px" placeholder="-----BEGIN CERTIFICATE-----..."></textarea>
-            </div>
-            <div class="lp-form-group">
-              <label class="lp-label" style="font-size:11px">Private Key (privkey.pem / key)</label>
-              <textarea id="sslCustomKey" class="lp-input font-mono" rows="4" style="font-size:11px" placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>
-            </div>
-            <button type="button" class="btn-lp btn-lp-primary w-100" id="btnApplyCustomSSL" onclick="WebsitesPage.applyCustomSSL()">
-              <i class="bi bi-check2-circle"></i> Save & Enable Custom SSL
-            </button>
-          </div>
-        </div>
-
-        <!-- Disable SSL Option -->
-        <div id="sslDisableSection" style="margin-top:20px;padding-top:15px;border-top:1px solid var(--border-color);display:none;">
-          <button type="button" class="btn-lp btn-lp-ghost text-danger w-100 btn-lp-sm" onclick="WebsitesPage.disableSSL()">
-            <i class="bi bi-shield-x"></i> Disable SSL (Revert to HTTP Port 80)
-          </button>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Close</button>
-      </div>
+<!-- ============================================================
+     EDIT WEBSITE OFFCANVAS DRAWER
+     ============================================================ -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="editWebsiteDrawer" style="width:600px;max-width:100vw;background:var(--bg-card);border-left:1px solid var(--border-color);">
+  <div class="offcanvas-header" style="border-bottom:1px solid var(--border-color);padding:18px 22px;">
+    <div>
+      <h5 class="offcanvas-title" style="font-weight:700;font-size:16px;margin:0;">
+        <i class="bi bi-pencil-square text-primary me-2"></i> Edit Website
+      </h5>
+      <div id="editDrawerDomain" style="font-size:12px;color:var(--text-muted);margin-top:2px;font-family:var(--font-mono,monospace)"></div>
     </div>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
   </div>
-</div>
 
-<!-- Nginx Configuration Editor Modal -->
-<div class="modal fade" id="nginxConfigModal" tabindex="-1">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border-color);color:var(--text-primary);">
-      <div class="modal-header">
-        <h5 class="modal-title font-mono" style="font-size:15px"><i class="bi bi-file-earmark-code text-primary"></i> Nginx Configuration - <span id="nginxModalDomain" class="text-info"></span></h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+  <!-- Tab Bar -->
+  <div style="padding:0 22px;border-bottom:1px solid var(--border-color);background:rgba(0,0,0,0.15);">
+    <ul class="nav" id="editDrawerTabs" style="gap:0;flex-wrap:nowrap;overflow-x:auto;">
+      <li class="nav-item">
+        <button class="ew-tab-btn active" data-target="etab-general" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:13px 16px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
+          <i class="bi bi-gear me-1"></i> General
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="ew-tab-btn" data-target="etab-nginx" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:13px 16px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
+          <i class="bi bi-file-earmark-code me-1"></i> Nginx Config
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="ew-tab-btn" data-target="etab-ssl" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:13px 16px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
+          <i class="bi bi-shield-lock me-1"></i> SSL / HTTPS
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="ew-tab-btn" data-target="etab-git" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:13px 16px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
+          <i class="bi bi-git me-1"></i> Git / Deploy
+        </button>
+      </li>
+    </ul>
+  </div>
+
+  <div class="offcanvas-body" style="padding:22px;overflow-y:auto;">
+
+    <!-- ---- TAB: General ---- -->
+    <div id="etab-general" class="ew-tab-pane">
+      <div class="lp-form-group">
+        <label class="lp-label">Domain Name</label>
+        <input type="text" id="editDomain" class="lp-input" placeholder="example.com">
       </div>
-      <div class="modal-body">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="text-muted font-mono" style="font-size:12px;" id="nginxModalFilePath">/etc/nginx/conf.d/...</span>
-          <span class="badge bg-secondary" style="font-size:11px;">vhost config</span>
-        </div>
-        <div class="lp-form-group mb-0">
-          <textarea id="nginxConfigEditor" class="form-control font-mono" rows="18" style="font-size:12px; background:#0d1117; color:#e6edf3; border:1px solid rgba(255,255,255,0.15); line-height:1.5; resize:vertical; font-family:var(--font-mono, monospace);" spellcheck="false"></textarea>
-        </div>
-        <div class="text-muted mt-2" style="font-size:11px;">
-          <i class="bi bi-info-circle text-info"></i> Changes are syntax-checked with <code>nginx -t</code> before reloading Nginx.
+      <div class="lp-form-group">
+        <label class="lp-label">Alias Domains <span style="font-size:11px;color:var(--text-muted)">(comma separated)</span></label>
+        <input type="text" id="editAliases" class="lp-input" placeholder="www.example.com, alias.example.com">
+      </div>
+      <div class="lp-form-group">
+        <label class="lp-label">Website Type</label>
+        <select id="editType" class="lp-input" onchange="WebsitesPage.toggleEditTypeFields()">
+          <option value="static">Static HTML</option>
+          <option value="proxy">Reverse Proxy / Node.js</option>
+          <option value="php">PHP</option>
+        </select>
+      </div>
+      <div class="lp-form-group">
+        <label class="lp-label">Document Root</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="editRoot" class="lp-input" placeholder="/var/www/example.com" style="flex:1;">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WebsitesPage.editOpenFolder()" title="Open in File Manager" style="padding:0 12px;"><i class="bi bi-folder2-open"></i></button>
         </div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn-lp btn-lp-primary" id="btnSaveNginxConfig" onclick="WebsitesPage.saveNginxConfig()">
-          <i class="bi bi-check2-circle"></i> Save & Reload Nginx
+      <div class="lp-form-group" id="editPortGroup" style="display:none;">
+        <label class="lp-label">Proxy Target Port</label>
+        <input type="number" id="editPort" class="lp-input" placeholder="8080">
+      </div>
+      <div class="lp-form-group" id="editPhpGroup" style="display:none;">
+        <label class="lp-label">PHP Version</label>
+        <select id="editPhpVersion" class="lp-input">
+          <option value="7.2">PHP 7.2</option><option value="7.3">PHP 7.3</option><option value="7.4">PHP 7.4</option>
+          <option value="8.0">PHP 8.0</option><option value="8.1">PHP 8.1</option><option value="8.2">PHP 8.2</option>
+          <option value="8.3">PHP 8.3</option><option value="8.4">PHP 8.4</option><option value="8.5">PHP 8.5</option>
+        </select>
+      </div>
+
+      <div style="padding:14px 16px;background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid var(--border-color);margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;">
+        <div id="editStatusBadge"></div>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" id="editToggleStatusBtn" onclick="WebsitesPage.toggleWebsiteStatus()" style="font-size:12px;"></button>
+      </div>
+
+      <div style="display:flex;gap:10px;">
+        <button class="btn-lp btn-lp-primary" style="flex:1;" onclick="WebsitesPage.saveGeneralSettings()">
+          <i class="bi bi-check2-circle me-1"></i> Save Changes
+        </button>
+        <button class="btn-lp btn-lp-ghost text-danger btn-lp-sm" onclick="WebsitesPage.deleteCurrentWebsite()" title="Delete Website">
+          <i class="bi bi-trash"></i>
         </button>
       </div>
     </div>
+
+    <!-- ---- TAB: Nginx Config ---- -->
+    <div id="etab-nginx" class="ew-tab-pane" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span class="text-muted font-mono" style="font-size:11px;" id="editNginxFilePath">/etc/nginx/conf.d/...</span>
+        <span class="badge bg-secondary" style="font-size:10px;">vhost config</span>
+      </div>
+      <textarea id="editNginxEditor" class="form-control font-mono" rows="22"
+        style="font-size:12px;background:#0d1117;color:#e6edf3;border:1px solid rgba(255,255,255,0.15);line-height:1.6;resize:vertical;font-family:'Fira Mono','Courier New',monospace;"
+        spellcheck="false" placeholder="# Loading..."></textarea>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+        <i class="bi bi-info-circle text-info"></i> Changes are syntax-checked with <code>nginx -t</code> before reloading.
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn-lp btn-lp-primary w-100" id="editSaveNginxBtn" onclick="WebsitesPage.saveDrawerNginxConfig()">
+          <i class="bi bi-check2-circle me-1"></i> Save &amp; Reload Nginx
+        </button>
+      </div>
+    </div>
+
+    <!-- ---- TAB: SSL ---- -->
+    <div id="etab-ssl" class="ew-tab-pane" style="display:none;">
+      <div id="editSslStatusBanner" style="padding:14px 16px;border-radius:8px;margin-bottom:18px;background:rgba(255,255,255,0.04);border:1px solid var(--border-color);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:11px;color:var(--text-muted)">Current SSL Status:</div>
+            <div id="editSslStatusText" style="font-weight:600;font-size:14px;margin-top:2px;">Loading...</div>
+          </div>
+          <div id="editSslStatusBadge"></div>
+        </div>
+        <div id="editSslExpiryInfo" style="font-size:11px;color:var(--text-muted);margin-top:6px;"></div>
+      </div>
+
+      <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="btn-lp btn-lp-primary btn-lp-sm ssl-sub-btn" id="editSslTabLe" onclick="WebsitesPage.switchSslSubTab('letsencrypt')" style="font-size:12px;"><i class="bi bi-lock me-1"></i>Let's Encrypt</button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm ssl-sub-btn" id="editSslTabSelf" onclick="WebsitesPage.switchSslSubTab('selfsigned')" style="font-size:12px;"><i class="bi bi-file-earmark-lock me-1"></i>Self-Signed</button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm ssl-sub-btn" id="editSslTabCustom" onclick="WebsitesPage.switchSslSubTab('custom')" style="font-size:12px;"><i class="bi bi-upload me-1"></i>Custom PEM</button>
+      </div>
+
+      <div id="editSslPaneLe">
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:12px;padding:10px 14px;background:rgba(13,110,253,0.07);border-radius:6px;border:1px solid rgba(13,110,253,0.2);">
+          <i class="bi bi-info-circle text-info"></i> <strong>Requirement:</strong> Domain must resolve to this server's public IP and port 80 must be publicly reachable.
+        </div>
+        <button class="btn-lp btn-lp-primary w-100" id="editBtnLe" onclick="WebsitesPage.issueEditSSL('letsencrypt')">
+          <i class="bi bi-shield-check me-1"></i> Issue Let's Encrypt SSL
+        </button>
+      </div>
+
+      <div id="editSslPaneSelf" style="display:none;">
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:12px;padding:10px 14px;background:rgba(255,193,7,0.07);border-radius:6px;border:1px solid rgba(255,193,7,0.2);">
+          <i class="bi bi-lightning-charge text-warning"></i> <strong>Best for:</strong> Local IP, intranet, staging, or domains without public DNS. Browser will show a security notice.
+        </div>
+        <button class="btn-lp btn-lp-primary w-100" id="editBtnSelf" onclick="WebsitesPage.issueEditSSL('selfsigned')">
+          <i class="bi bi-file-earmark-lock me-1"></i> Generate Self-Signed SSL
+        </button>
+      </div>
+
+      <div id="editSslPaneCustom" style="display:none;">
+        <div class="lp-form-group">
+          <label class="lp-label" style="font-size:11px;">Certificate (fullchain.pem / crt)</label>
+          <textarea id="editSslCert" class="lp-input font-mono" rows="4" style="font-size:11px;" placeholder="-----BEGIN CERTIFICATE-----..."></textarea>
+        </div>
+        <div class="lp-form-group">
+          <label class="lp-label" style="font-size:11px;">Private Key (privkey.pem / key)</label>
+          <textarea id="editSslKey" class="lp-input font-mono" rows="4" style="font-size:11px;" placeholder="-----BEGIN PRIVATE KEY-----..."></textarea>
+        </div>
+        <button class="btn-lp btn-lp-primary w-100" id="editBtnCustom" onclick="WebsitesPage.issueEditSSL('custom')">
+          <i class="bi bi-check2-circle me-1"></i> Save &amp; Enable Custom SSL
+        </button>
+      </div>
+
+      <div id="editSslDisable" style="margin-top:18px;padding-top:15px;border-top:1px solid var(--border-color);display:none;">
+        <button class="btn-lp btn-lp-ghost text-danger w-100 btn-lp-sm" onclick="WebsitesPage.disableEditSSL()">
+          <i class="bi bi-shield-x me-1"></i> Disable SSL (Revert to HTTP only)
+        </button>
+      </div>
+    </div>
+
+    <!-- ---- TAB: Git / Deploy ---- -->
+    <div id="etab-git" class="ew-tab-pane" style="display:none;">
+      <div class="lp-form-group">
+        <label class="lp-label">Git Repository URL</label>
+        <input type="text" id="editGitRepo" class="lp-input" placeholder="https://github.com/user/repo.git">
+      </div>
+      <div class="lp-form-group">
+        <label class="lp-label">Deploy Branch</label>
+        <input type="text" id="editGitBranch" class="lp-input" placeholder="main">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Leave empty to use default branch</div>
+      </div>
+      <div class="lp-form-group" style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="editAutoDeploy" style="accent-color:var(--primary-color);width:16px;height:16px;">
+        <label class="lp-label" style="margin:0;cursor:pointer;" for="editAutoDeploy">Enable Auto Deploy via Webhook</label>
+      </div>
+
+      <div id="editWebhookSection" style="display:none;margin-top:16px;padding:14px 16px;background:rgba(0,0,0,0.2);border-radius:8px;border:1px solid var(--border-color);">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Webhook URL</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="editWebhookUrl" class="lp-input font-mono" style="font-size:11px;flex:1;" readonly>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WebsitesPage.copyWebhookUrl()" title="Copy"><i class="bi bi-clipboard"></i></button>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:6px;">Set content type to <code>application/json</code> in your Git provider webhook settings.</div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:8px;">
+        <button class="btn-lp btn-lp-primary" style="flex:1;" onclick="WebsitesPage.saveGeneralSettings()">
+          <i class="bi bi-check2-circle me-1"></i> Save Git Settings
+        </button>
+        <button class="btn-lp btn-lp-ghost text-info btn-lp-sm" id="editDeployNowBtn" onclick="WebsitesPage.deployFromDrawer()" title="Deploy Now" style="display:none;">
+          <i class="bi bi-cloud-arrow-down me-1"></i> Deploy Now
+        </button>
+      </div>
+    </div>
+
   </div>
 </div>
+
+<style>
+  .ew-tab-btn.active { color: var(--primary-color) !important; border-bottom-color: var(--primary-color) !important; }
+  .ew-tab-btn:hover:not(.active) { color: var(--text-primary) !important; background: rgba(255,255,255,0.05); }
+</style>
 
 <script src="/js/websites.js"></script>

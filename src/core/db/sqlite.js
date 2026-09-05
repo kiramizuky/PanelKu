@@ -125,6 +125,7 @@ function initSchema(db) {
       type            TEXT NOT NULL DEFAULT 'static',
       root_directory  TEXT NOT NULL,
       git_repo        TEXT NOT NULL DEFAULT '',
+      git_branch      TEXT NOT NULL DEFAULT '',
       webhook_token   TEXT NOT NULL DEFAULT '',
       auto_deploy     INTEGER NOT NULL DEFAULT 0,
       php_version     TEXT NOT NULL DEFAULT '8.2',
@@ -365,6 +366,14 @@ function initSchema(db) {
   } catch (e) {
     if (!e.message.includes('duplicate column')) {
       logger.warn(`Migration users.password_changed_at failed: ${e.message}`);
+    }
+  }
+  // Add git_branch to websites table
+  try {
+    db.exec("ALTER TABLE websites ADD COLUMN git_branch TEXT NOT NULL DEFAULT ''");
+  } catch (e) {
+    if (!e.message.includes('duplicate column')) {
+      logger.warn(`Migration websites.git_branch failed: ${e.message}`);
     }
   }
 }
