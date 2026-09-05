@@ -243,6 +243,11 @@ class WebsiteService {
     try {
       await fs.mkdir(ACME_CHALLENGE_DIR, { recursive: true });
       await fs.mkdir(this.nginxConfDir, { recursive: true });
+      await fs.mkdir('/var/log/nginx', { recursive: true }).catch(() => {});
+      await fs.mkdir('/www/wwwlogs', { recursive: true }).catch(() => {});
+      if (process.platform !== 'win32') {
+        await execAsync('mkdir -p /var/log/nginx /www/wwwlogs 2>/dev/null || true').catch(() => {});
+      }
       await fs.writeFile(confPath, conf, 'utf8');
       await this.reloadNginx();
     } catch (error) {
@@ -542,6 +547,11 @@ class WebsiteService {
 
     // Ensure directory exists
     await fs.mkdir(this.nginxConfDir, { recursive: true });
+    await fs.mkdir('/var/log/nginx', { recursive: true }).catch(() => {});
+    await fs.mkdir('/www/wwwlogs', { recursive: true }).catch(() => {});
+    if (process.platform !== 'win32') {
+      await execAsync('mkdir -p /var/log/nginx /www/wwwlogs 2>/dev/null || true').catch(() => {});
+    }
 
     let existing = null;
     try {

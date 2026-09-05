@@ -55,12 +55,18 @@ const WebsitesPage = (() => {
               ${isProxy ? `127.0.0.1:${w.port}` : LP.escHtml(w.rootDirectory || '')}
             </td>
             <td style="font-size:13px;">${sslBadge}</td>
-            <td style="text-align:right;">
+            <td style="text-align:right;white-space:nowrap;">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm ${w.status === 'active' ? 'text-warning' : 'text-success'}" onclick="LP.call('WebsitesPage.toggleStatusRow', '${LP.encJsArg(w._id)}', '${w.status === 'active' ? 'inactive' : 'active'}')" title="${w.status === 'active' ? 'Stop / Disable Website' : 'Start / Enable Website'}">
+                <i class="bi ${w.status === 'active' ? 'bi-pause-circle' : 'bi-play-circle'}"></i>
+              </button>
               <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('WebsitesPage.openFolder', '${LP.encJsArg(w.rootDirectory || '')}')" title="File Manager">
                 <i class="bi bi-folder"></i>
               </button>
               <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LP.call('WebsitesPage.openEditDrawer', '${LP.encJsArg(w._id)}')" title="Edit Website">
                 <i class="bi bi-pencil-square me-1"></i> Edit
+              </button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('WebsitesPage.deleteWebsiteRow', '${LP.encJsArg(w._id)}', '${LP.encJsArg(w.domain)}')" title="Delete Website">
+                <i class="bi bi-trash"></i>
               </button>
             </td>
           </tr>
@@ -428,6 +434,39 @@ const WebsitesPage = (() => {
     }
   }
 
+  async function toggleStatusRow(id, targetStatus) {
+    try {
+      const res = await LP.put(`/websites/${id}`, { status: targetStatus });
+      if (res?.success) {
+        LP.toast(`Website ${targetStatus === 'active' ? 'started' : 'stopped'}!`, 'success');
+        loadWebsites();
+      } else {
+        LP.toast(res?.message || 'Failed to update status', 'error');
+      }
+    } catch (err) {
+      LP.toast('Error: ' + err.message, 'error');
+    }
+  }
+
+  async function deleteWebsiteRow(id, domain) {
+    const confirmed = await LP.confirm(
+      `Delete website <strong>${LP.escHtml(domain)}</strong>?<br><small class="text-danger">Nginx configuration will be removed. Files in document root will be preserved.</small>`,
+      'Delete Website'
+    );
+    if (!confirmed) return;
+    try {
+      const res = await LP.del(`/websites/${id}`);
+      if (res?.success) {
+        LP.toast(`Website ${domain} deleted`, 'success');
+        loadWebsites();
+      } else {
+        LP.toast(res?.message || 'Failed to delete website', 'error');
+      }
+    } catch (err) {
+      LP.toast('Error deleting website: ' + err.message, 'error');
+    }
+  }
+
   async function deleteCurrentWebsite() {
     if (!currentEditId || !currentEditWebsite) return;
     const confirmed = await LP.confirm(
@@ -573,6 +612,10 @@ const WebsitesPage = (() => {
       } catch (e) { LP.toast('Error installing', 'error'); }
       finally { document.getElementById('installSpinner')?.remove(); }
     },
+
+    // Table actions
+    toggleStatusRow,
+    deleteWebsiteRow,
 
     // Edit Drawer methods exposed
     openEditDrawer,
