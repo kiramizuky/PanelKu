@@ -360,11 +360,58 @@ export default {
       }
     });
 
+    // Helper: determine valid Ubuntu codename (handles derivatives like Linux Mint 'resolute' -> 'noble')
+    async function getValidUbuntuCodename() {
+      // 1. Check UBUNTU_CODENAME in /etc/os-release
+      try {
+        const osRel = await fs.readFile('/etc/os-release', 'utf8').catch(() => '');
+        const m = osRel.match(/^UBUNTU_CODENAME=([a-z0-9]+)/m);
+        if (m && m[1] && m[1].toLowerCase() !== 'resolute') {
+          return m[1].toLowerCase();
+        }
+      } catch (_) {}
+
+      // 2. Check VERSION_ID to map to Ubuntu LTS codename
+      try {
+        const osRel = await fs.readFile('/etc/os-release', 'utf8').catch(() => '');
+        const v = osRel.match(/^VERSION_ID="?(\d+)/m);
+        if (v && v[1]) {
+          const major = parseInt(v[1], 10);
+          if (major >= 24) return 'noble';
+          if (major >= 22) return 'jammy';
+          if (major >= 20) return 'focal';
+        }
+      } catch (_) {}
+
+      // 3. Check lsb_release -sc only if it is a known official Ubuntu codename
+      try {
+        const lsb = (await runCommand('lsb_release -sc 2>/dev/null || true')).trim().toLowerCase();
+        if (['noble', 'jammy', 'focal', 'mantic', 'oracular', 'bionic'].includes(lsb)) {
+          return lsb;
+        }
+      } catch (_) {}
+
+      return 'noble';
+    }
+
+    // Helper: clean conflicting repository files that cause "Conflicting values set for option Signed-By"
+    async function cleanupConflictingPhpRepos() {
+      if (process.platform === 'win32') return;
+      try {
+        await runCommand('sudo rm -f /etc/apt/sources.list.d/ondrej-php.list /etc/apt/trusted.gpg.d/ondrej-php.gpg /etc/apt/trusted.gpg.d/ondrej* /etc/apt/sources.list.d/sury-php.list');
+        const validCodename = await getValidUbuntuCodename();
+        await runCommand(`sudo sed -i "s/resolute/${validCodename}/g" /etc/apt/sources.list.d/*ondrej* 2>/dev/null || true`);
+      } catch (_) {}
+    }
+
     // Helper: ensure multi-version PHP repositories are configured (Debian Sury / Ubuntu Ondrej / DNF Remi)
     async function ensurePhpRepo(pmType, distro) {
       if (process.platform === 'win32') return;
 
       if (pmType === 'apt') {
+        // Always clean conflicting entries first
+        await cleanupConflictingPhpRepos();
+
         let isDebian = false;
         try {
           const osRel = await fs.readFile('/etc/os-release', 'utf8').catch(() => '');
@@ -388,25 +435,34 @@ export default {
           }
         } else {
           logger.info('PHP Manager: Ensuring Ondrej PPA for Ubuntu...');
+          const ubuntuCodename = await getValidUbuntuCodename();
+
+          // Wipe existing ondrej files to eliminate any Signed-By or codename conflicts
+          await runCommand('sudo rm -f /etc/apt/sources.list.d/*ondrej* /etc/apt/trusted.gpg.d/ondrej* /etc/apt/keyrings/ondrej*');
+          
           let ppaSuccess = false;
           try {
             await runCommand('sudo DEBIAN_FRONTEND=noninteractive apt-get update -y').catch(() => {});
             await runCommand('sudo DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common ca-certificates lsb-release gnupg curl');
             await runCommand('sudo LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php');
+            // If add-apt-repository wrote derivative codename like "resolute", sanitize to valid Ubuntu codename
+            await runCommand(`sudo sed -i "s/resolute/${ubuntuCodename}/g" /etc/apt/sources.list.d/*ondrej* 2>/dev/null || true`);
             await runCommand('sudo apt-get update -y');
             ppaSuccess = true;
             logger.info('PHP Manager: Ondrej PPA added via add-apt-repository.');
           } catch (ppaErr) {
-            logger.warn(`PHP Manager: add-apt-repository failed (${ppaErr.message}), trying direct Launchpad PPA setup...`);
+            logger.warn(`PHP Manager: add-apt-repository had issues (${ppaErr.message}), configuring single direct PPA source...`);
           }
 
           if (!ppaSuccess) {
             try {
-              const codename = (await runCommand('lsb_release -sc 2>/dev/null || (grep UBUNTU_CODENAME /etc/os-release | cut -d= -f2)')).trim() || 'jammy';
-              await runCommand('sudo curl -sSLo /etc/apt/trusted.gpg.d/ondrej-php.gpg "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14AA40EC0831756756D7F66C4F4EA0AAE5267A6C"');
-              await runCommand(`echo "deb [signed-by=/etc/apt/trusted.gpg.d/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu ${codename} main" | sudo tee /etc/apt/sources.list.d/ondrej-php.list`);
+              // Ensure clean state before direct setup
+              await runCommand('sudo rm -f /etc/apt/sources.list.d/*ondrej* /etc/apt/trusted.gpg.d/ondrej* /etc/apt/keyrings/ondrej*');
+              await runCommand('sudo mkdir -p /etc/apt/keyrings');
+              await runCommand('sudo curl -sSLo /etc/apt/keyrings/ondrej-php.gpg "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14AA40EC0831756756D7F66C4F4EA0AAE5267A6C"');
+              await runCommand(`echo "deb [signed-by=/etc/apt/keyrings/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu ${ubuntuCodename} main" | sudo tee /etc/apt/sources.list.d/ondrej-php.list`);
               await runCommand('sudo apt-get update -y');
-              logger.info('PHP Manager: Ondrej PPA added directly.');
+              logger.info(`PHP Manager: Ondrej PPA configured directly with codename ${ubuntuCodename}.`);
             } catch (directErr) {
               logger.error(`PHP Manager: Direct Ondrej PPA setup failed: ${directErr.message}`);
             }
@@ -433,6 +489,9 @@ export default {
         let installCmd = '';
         if (packageManager.pmType === 'apt') {
           if (!isWindows) {
+            // First cleanup any corrupted repo state
+            await cleanupConflictingPhpRepos();
+
             // Check if package candidate exists; if not, ensure repo is added
             let hasCandidate = false;
             try {
@@ -459,8 +518,24 @@ export default {
           installCmd = `echo "Installer fallback for ${packageManager.pmType}"`;
         }
 
-        logger.info(`PHP Manager: Installing PHP ${version} with command: ${installCmd}`);
-        await runCommand(installCmd);
+        try {
+          logger.info(`PHP Manager: Installing PHP ${version} with command: ${installCmd}`);
+          await runCommand(installCmd);
+        } catch (firstErr) {
+          if (!isWindows && (
+            firstErr.message.includes('Conflicting values') ||
+            firstErr.message.includes('no installation candidate') ||
+            firstErr.message.includes('Unable to locate package') ||
+            firstErr.message.includes('The list of sources could not be read')
+          )) {
+            logger.warn(`PHP Manager: Install encountered repository issue (${firstErr.message}), running auto-repair...`);
+            await ensurePhpRepo(packageManager.pmType, packageManager.distro);
+            logger.info(`PHP Manager: Retrying installation of PHP ${version}...`);
+            await runCommand(installCmd);
+          } else {
+            throw firstErr;
+          }
+        }
 
         // Start and enable service after install
         if (!isWindows) {
