@@ -3,9 +3,16 @@ import util from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import Website from '../../models/Website.js';
-import websiteService from '../websites/websites.service.js';
+import websiteService, { ACME_CHALLENGE_DIR } from '../websites/websites.service.js';
 
 const execFileAsync = util.promisify(execFile);
+
+function getCleanEnv() {
+  const env = { ...process.env };
+  // Remove LOG_LEVEL because acme.sh expects integer (0, 1, 2, 3), not string ('info', 'debug')
+  delete env.LOG_LEVEL;
+  return env;
+}
 
 const SSL_BASE_DIR = process.platform === 'win32'
   ? path.join(process.cwd(), 'data', 'ssl')
@@ -92,7 +99,7 @@ class SSLService {
       if (resolved) {
         // Set default CA to Let's Encrypt
         try {
-          await execFileAsync(resolved, ['--set-default-ca', '--server', 'letsencrypt'], { timeout: 15000 });
+          await execFileAsync(resolved, ['--set-default-ca', '--server', 'letsencrypt'], { timeout: 15000, env: getCleanEnv() });
         } catch {}
         return resolved;
       }
@@ -139,23 +146,27 @@ class SSLService {
   /**
    * Issue certificate via Let's Encrypt (acme.sh webroot mode)
    */
-  async issueCertificate(domain, rootDirectory) {
+  async issueCertificate(domain, rootDirectory = ACME_CHALLENGE_DIR) {
     validateDomain(domain);
-    validatePath(rootDirectory);
+    const challengeDir = rootDirectory || ACME_CHALLENGE_DIR;
+    validatePath(challengeDir);
+    await fs.mkdir(challengeDir, { recursive: true });
 
     const acmeSh = await this.installAcmeSh();
     if (!acmeSh) {
       throw new Error('acme.sh is not installed and auto-installation failed. Ensure curl and bash are available.');
     }
 
+    const cleanEnv = getCleanEnv();
+
     try {
-      // Run webroot challenge
+      // Run webroot challenge using dedicated ACME challenge webroot
       const issueArgs = [
         '--issue', '-d', domain,
-        '-w', rootDirectory,
+        '-w', challengeDir,
         '--server', 'letsencrypt'
       ];
-      await execFileAsync(acmeSh, issueArgs, { timeout: 120000 });
+      await execFileAsync(acmeSh, issueArgs, { timeout: 120000, env: cleanEnv });
 
       // Install certificate to Nginx path
       const certPath = path.join(SSL_BASE_DIR, domain);
@@ -170,7 +181,7 @@ class SSLService {
         '--fullchain-file', fullchainFile,
         '--reloadcmd', 'systemctl reload nginx'
       ];
-      await execFileAsync(acmeSh, installArgs, { timeout: 60000 });
+      await execFileAsync(acmeSh, installArgs, { timeout: 60000, env: cleanEnv });
 
       return {
         certificate: fullchainFile,
@@ -178,8 +189,14 @@ class SSLService {
         expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
       };
     } catch (error) {
-      const detail = error.stderr || error.stdout || error.message;
-      throw new Error(`Let's Encrypt validation failed: ${detail}. Ensure domain "${domain}" points to this server's IP address and port 80 is publicly reachable.`);
+      const rawDetail = error.stderr || error.stdout || error.message || '';
+      // Filter out noisy bash warnings (e.g. '[: info: integer expected')
+      const cleanDetail = rawDetail
+        .split('\n')
+        .filter(line => !line.includes('integer expected') && line.trim().length > 0)
+        .join('\n')
+        .trim();
+      throw new Error(`Let's Encrypt validation failed: ${cleanDetail || rawDetail}. Ensure domain "${domain}" points to this server's IP address and port 80 is publicly reachable.`);
     }
   }
 
@@ -216,6 +233,11 @@ class SSLService {
     const website = await Website.findById(websiteId);
     if (!website) throw new Error('Website not found');
 
+    // Ensure Nginx vhost is generated and loaded with ACME challenge location block BEFORE running acme.sh
+    if (provider === 'letsencrypt') {
+      await websiteService.generateNginxConfig(website);
+    }
+
     let sslData;
     let effectiveProvider = provider;
 
@@ -229,7 +251,7 @@ class SSLService {
     } else {
       // Default: letsencrypt
       effectiveProvider = 'letsencrypt';
-      sslData = await this.issueCertificate(website.domain, website.rootDirectory || `/var/www/${website.domain}`);
+      sslData = await this.issueCertificate(website.domain, ACME_CHALLENGE_DIR);
     }
 
     const updatedSsl = {

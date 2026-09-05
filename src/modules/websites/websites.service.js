@@ -15,6 +15,10 @@ function secureToken(bytes = 24) {
   return crypto.randomBytes(bytes).toString('hex');
 }
 
+export const ACME_CHALLENGE_DIR = process.platform === 'win32'
+  ? path.join(process.cwd(), 'data', 'acme-challenge')
+  : '/var/www/acme-challenge';
+
 // Vhost templates
 const NGINX_TEMPLATE_STATIC = `
 server {
@@ -25,6 +29,12 @@ server {
 
     access_log /var/log/nginx/{{domain}}.access.log;
     error_log /var/log/nginx/{{domain}}.error.log;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root {{acmeRoot}};
+        default_type "text/plain";
+        try_files $uri =404;
+    }
 
     location / {
         try_files $uri $uri/ =404;
@@ -39,6 +49,12 @@ server {
 
     access_log /var/log/nginx/{{domain}}.access.log;
     error_log /var/log/nginx/{{domain}}.error.log;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root {{acmeRoot}};
+        default_type "text/plain";
+        try_files $uri =404;
+    }
 
     location / {
         proxy_pass http://127.0.0.1:{{port}};
@@ -62,6 +78,12 @@ server {
 
     access_log /var/log/nginx/{{domain}}.access.log;
     error_log /var/log/nginx/{{domain}}.error.log;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root {{acmeRoot}};
+        default_type "text/plain";
+        try_files $uri =404;
+    }
 
     location / {
         try_files $uri $uri/ /index.php?$query_string;
@@ -106,8 +128,9 @@ class WebsiteService {
     listen 80;
     server_name ${website.domain}${aliases ? ' ' + aliases : ''};
 
-    location /.well-known/acme-challenge/ {
-        root ${website.rootDirectory || '/var/www/html'};
+    location ^~ /.well-known/acme-challenge/ {
+        root ${ACME_CHALLENGE_DIR};
+        default_type "text/plain";
         try_files $uri =404;
     }
 
@@ -209,6 +232,7 @@ class WebsiteService {
         .replace(/{{domain}}/g, website.domain)
         .replace(/{{aliases}}/g, aliases)
         .replace(/{{rootDirectory}}/g, website.rootDirectory || `/var/www/${website.domain}`)
+        .replace(/{{acmeRoot}}/g, ACME_CHALLENGE_DIR)
         .replace(/{{port}}/g, website.port || 8080)
         .replace(/{{phpVersion}}/g, website.phpVersion || '8.2');
     }
@@ -216,6 +240,7 @@ class WebsiteService {
     const confPath = path.join(this.nginxConfDir, `${website.domain}.conf`);
     
     try {
+      await fs.mkdir(ACME_CHALLENGE_DIR, { recursive: true });
       await fs.mkdir(this.nginxConfDir, { recursive: true });
       await fs.writeFile(confPath, conf, 'utf8');
       await this.reloadNginx();

@@ -112,4 +112,24 @@ describe('WebsiteService — Nginx SSL Config Generator', () => {
     // Clean up
     await fs.rm(confFile, { force: true });
   });
+
+  test('includes high-priority ACME challenge block on proxy vhosts to avoid 404', async () => {
+    const proxyWebsite = {
+      domain: 'proxytest.local',
+      type: 'proxy',
+      port: 5678,
+      ssl: { enabled: false }
+    };
+
+    await websiteService.generateNginxConfig(proxyWebsite);
+
+    const confFile = path.join(websiteService.nginxConfDir, 'proxytest.local.conf');
+    const content = await fs.readFile(confFile, 'utf8');
+
+    expect(content).toContain('location ^~ /.well-known/acme-challenge/');
+    expect(content).toContain('proxy_pass http://127.0.0.1:5678;');
+
+    // Clean up
+    await fs.rm(confFile, { force: true });
+  });
 });
