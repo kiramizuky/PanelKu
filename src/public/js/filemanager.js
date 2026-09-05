@@ -54,22 +54,39 @@ const FMPage = (() => {
   }
 
   // ── Navigation ────────────────────────────────────
-  async function navigate(path) {
+  async function navigate(path, updateUrl = true) {
+    if (!path || typeof path !== 'string') path = '/';
     try {
       const res = await LP.get(`/filemanager/list?path=${encodeURIComponent(path)}`);
       if (!res?.success) {
-        LP.toast(res?.message || 'Failed to list directory', 'error');
+        LP.toast(res?.message || 'Failed to list directory: ' + path, 'error');
+        if (path !== '/') {
+          navigate('/', updateUrl);
+        }
         return;
       }
 
-      currentPath = path;
-      document.getElementById('currentPath').value = path;
-      document.getElementById('upBtn').disabled = path === '/';
+      currentPath = res.data?.path || path;
+      const pathInput = document.getElementById('currentPath');
+      if (pathInput) pathInput.value = currentPath;
+      const upBtn = document.getElementById('upBtn');
+      if (upBtn) upBtn.disabled = (currentPath === '/' || currentPath === '');
       selectedItem = null;
+
+      if (updateUrl) {
+        const newUrl = `/filemanager?path=${encodeURIComponent(currentPath)}`;
+        const currentUrl = window.location.pathname + window.location.search;
+        if (currentUrl !== newUrl) {
+          window.history.pushState({ path: currentPath }, '', newUrl);
+        }
+      }
 
       renderItems(res.data.items || []);
     } catch (err) {
       LP.toast('Navigation failed: ' + err.message, 'error');
+      if (path !== '/') {
+        navigate('/', updateUrl);
+      }
     }
   }
 
@@ -1729,7 +1746,25 @@ const FMPage = (() => {
       initCodeMirror();
       initSplitDivider();
       applyEditorTheme();
-      navigate('/');
+
+      // Read target path from URL query parameters (e.g. /filemanager?path=%2Fvar%2Fwww%2Fn8n.pcstudio.my.id)
+      const urlParams = new URLSearchParams(window.location.search);
+      let targetPath = urlParams.get('path');
+      if (targetPath) {
+        try {
+          targetPath = decodeURIComponent(targetPath);
+        } catch {}
+      }
+      targetPath = targetPath || '/';
+
+      // Support browser back/forward buttons
+      window.addEventListener('popstate', (e) => {
+        const params = new URLSearchParams(window.location.search);
+        const p = e.state?.path || params.get('path') || '/';
+        navigate(p, false);
+      });
+
+      navigate(targetPath, false);
     },
 
     navigate,
