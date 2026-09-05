@@ -147,7 +147,7 @@ const User = {
       params.push(filter.role);
     }
 
-    sql += ' ORDER BY created_at ASC';
+    sql += ' ORDER BY is_super_admin DESC, created_at DESC';
     const rows = db.prepare(sql).all(...params);
     return rows.map(r => populateRole(rowToUser(r)));
   },

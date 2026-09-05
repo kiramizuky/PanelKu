@@ -11,7 +11,7 @@ function cleanId(id) {
 class UsersController {
   async list(req, res) {
     try {
-      const { page = 1, limit = 20, search = '' } = req.query;
+      const { page = 1, limit = 100, search = '' } = req.query;
       const result = await usersService.list(page, limit, search);
       return paginated(res, result);
     } catch (err) {

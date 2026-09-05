@@ -29,16 +29,24 @@ class UsersService {
     }
   }
 
-  async list(page = 1, limit = 20, search = '') {
+  async list(page = 1, limit = 50, search = '') {
     // SQLite doesn't support $or, do filtering manually
     const all = await userRepository.findWithRole({});
     let filtered = all;
     if (search) {
       const q = search.toLowerCase();
       filtered = all.filter(u =>
-        u.username.includes(q) || (u.email || '').includes(q)
+        (u.username || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
       );
     }
+
+    // Prioritize super admin, then sort newest users first
+    filtered.sort((a, b) => {
+      if (a.isSuperAdmin && !b.isSuperAdmin) return -1;
+      if (!a.isSuperAdmin && b.isSuperAdmin) return 1;
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+
     const total = filtered.length;
     page  = parseInt(page);
     limit = parseInt(limit);
@@ -69,11 +77,23 @@ class UsersService {
       throw Object.assign(new Error('Username or email already exists'), { statusCode: 409 });
     }
 
-    const role = await roleRepository.findBySlug(data.role || 'read_only');
+    let role = await roleRepository.findBySlug(data.role || 'read_only');
+    if (!role) {
+      role = await roleRepository.findById(data.role);
+    }
     if (!role) throw Object.assign(new Error('Role not found'), { statusCode: 400 });
 
+    const isActive = data.isActive !== undefined 
+      ? Boolean(data.isActive) 
+      : (data.status !== undefined ? (data.status === 'active') : true);
+
     // [PASSWORD EXPIRY] Start the expiry clock from creation time
-    const user = await userRepository.create({ ...data, role: role._id, passwordChangedAt: new Date().toISOString() });
+    const user = await userRepository.create({
+      ...data,
+      isActive,
+      role: role._id,
+      passwordChangedAt: new Date().toISOString()
+    });
     eventBus.publish(EVENTS.USER_CREATED, { userId: user._id, username: user.username });
     return userRepository._populateRole(user);
   }
@@ -128,7 +148,10 @@ class UsersService {
     }
 
     if (roleName) {
-      const role = await roleRepository.findBySlug(roleName);
+      let role = await roleRepository.findBySlug(roleName);
+      if (!role) {
+        role = await roleRepository.findById(roleName);
+      }
       if (role) rest.role = role._id;
     }
 
