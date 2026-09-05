@@ -97,6 +97,15 @@ class WebsitesController {
       return errorResponse(res, 400, error.message);
     }
   }
+
+  async resetNginxConfig(req, res) {
+    try {
+      const result = await websiteService.resetNginxConfig(req.params.id);
+      return successResponse(res, result, 'Nginx configuration reset to default template');
+    } catch (error) {
+      return errorResponse(res, 400, error.message);
+    }
+  }
 }
 
 export default new WebsitesController();

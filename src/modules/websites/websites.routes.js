@@ -19,5 +19,6 @@ router.delete('/:id', requirePermission('websites_manage', 'delete'), websitesCo
 router.post('/:id/deploy', requirePermission('websites_manage', 'execute'), websitesController.deployGit);
 router.get('/:id/nginx-config', requirePermission('websites_manage', 'read'), websitesController.getNginxConfig);
 router.put('/:id/nginx-config', requirePermission('websites_manage', 'update'), websitesController.saveNginxConfig);
+router.post('/:id/nginx-config/reset', requirePermission('websites_manage', 'update'), websitesController.resetNginxConfig);
 
 export default router;

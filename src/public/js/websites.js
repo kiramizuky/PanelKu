@@ -216,6 +216,12 @@ const WebsitesPage = (() => {
         if (res.data.confPath) {
           document.getElementById('editNginxFilePath').textContent = res.data.confPath;
         }
+        const badgeEl = document.getElementById('editNginxBadge');
+        if (badgeEl) {
+          badgeEl.innerHTML = res.data.isCustom
+            ? '<span class="badge bg-warning text-dark" style="font-size:10px;"><i class="bi bi-lock-fill me-1"></i>Custom (Protected)</span>'
+            : '<span class="badge bg-secondary" style="font-size:10px;">Default Template</span>';
+        }
         editor.disabled = false;
         saveBtn.disabled = false;
       } else {
@@ -240,6 +246,10 @@ const WebsitesPage = (() => {
     try {
       const res = await LP.put(`/websites/${currentEditId}/nginx-config`, { content });
       if (res?.success) {
+        const badgeEl = document.getElementById('editNginxBadge');
+        if (badgeEl) {
+          badgeEl.innerHTML = '<span class="badge bg-warning text-dark" style="font-size:10px;"><i class="bi bi-lock-fill me-1"></i>Custom (Protected)</span>';
+        }
         LP.toast('Nginx configuration saved & reloaded!', 'success');
       } else {
         LP.toast(`Failed: ${res?.message || 'Unknown error'}`, 'error');
@@ -249,6 +259,38 @@ const WebsitesPage = (() => {
     } finally {
       saveBtn.disabled = false;
       saveBtn.innerHTML = orig;
+    }
+  }
+
+  async function resetDrawerNginxConfig() {
+    if (!currentEditId) return;
+    const confirmed = await LP.confirm(
+      'Reset Nginx configuration to default generated template?<br><small class="text-danger">Any custom edits in this configuration will be lost.</small>',
+      'Reset Nginx Config'
+    );
+    if (!confirmed) return;
+    const editor = document.getElementById('editNginxEditor');
+    const resetBtn = document.getElementById('editResetNginxBtn');
+    const orig = resetBtn.innerHTML;
+    resetBtn.disabled = true;
+    resetBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    try {
+      const res = await LP.post(`/websites/${currentEditId}/nginx-config/reset`);
+      if (res?.success) {
+        editor.value = res.data.content || '';
+        const badgeEl = document.getElementById('editNginxBadge');
+        if (badgeEl) {
+          badgeEl.innerHTML = '<span class="badge bg-secondary" style="font-size:10px;">Default Template</span>';
+        }
+        LP.toast('Nginx configuration reset to default template', 'success');
+      } else {
+        LP.toast(`Failed: ${res?.message || 'Error'}`, 'error');
+      }
+    } catch (err) {
+      LP.toast('Error resetting config: ' + err.message, 'error');
+    } finally {
+      resetBtn.disabled = false;
+      resetBtn.innerHTML = orig;
     }
   }
 
@@ -541,6 +583,7 @@ const WebsitesPage = (() => {
     toggleWebsiteStatus,
     deleteCurrentWebsite,
     saveDrawerNginxConfig,
+    resetDrawerNginxConfig,
     issueEditSSL,
     disableEditSSL,
     deployFromDrawer,

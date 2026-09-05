@@ -395,15 +395,22 @@ class WebsiteService {
       webhookToken:  website.webhookToken || secureToken(),
     }, { new: true });
 
-    // If domain changed, remove old nginx config
+    // If domain changed, remove old nginx config and regenerate
     if (newDomain !== oldDomain) {
       await this.removeNginxConfig(oldDomain);
-    }
-
-    if (updated.status === 'active') {
-      await this.generateNginxConfig(updated);
-    } else if (newDomain === oldDomain) {
-      await this.removeNginxConfig(updated.domain);
+      if (updated.status === 'active') {
+        await this.generateNginxConfig(updated);
+      }
+    } else {
+      const isCustomNginx = Boolean(updated.settings && updated.settings.customNginx);
+      if (updated.status === 'active') {
+        // Do NOT overwrite user's custom Nginx edits when updating general settings
+        if (!isCustomNginx) {
+          await this.generateNginxConfig(updated);
+        }
+      } else {
+        await this.removeNginxConfig(updated.domain);
+      }
     }
 
     return updated;
@@ -500,8 +507,13 @@ class WebsiteService {
     try {
       await fs.access(confPath);
     } catch {
-      // If config doesn't exist yet on disk, generate it first
-      await this.generateNginxConfig(website);
+      // If config doesn't exist yet on disk, write from saved custom content or generate
+      if (website.settings?.customNginx && website.settings?.customNginxContent) {
+        await fs.mkdir(this.nginxConfDir, { recursive: true });
+        await fs.writeFile(confPath, website.settings.customNginxContent, 'utf8');
+      } else {
+        await this.generateNginxConfig(website);
+      }
     }
 
     let content = '';
@@ -515,6 +527,7 @@ class WebsiteService {
       domain: website.domain,
       confPath,
       content,
+      isCustom: Boolean(website.settings?.customNginx),
     };
   }
 
@@ -562,11 +575,29 @@ class WebsiteService {
         await fs.unlink(backupPath).catch(() => {});
       }
 
+      // Save custom status & content in DB settings so updates don't overwrite it
+      const settings = { ...(website.settings || {}), customNginx: true, customNginxContent: content };
+      await Website.findByIdAndUpdate(id, { settings });
+
       await this.reloadNginx();
       return { success: true, message: 'Nginx configuration saved and reloaded successfully' };
     } catch (err) {
       throw err;
     }
+  }
+
+  async resetNginxConfig(id) {
+    const website = await Website.findById(id);
+    if (!website) throw new Error('Website not found');
+
+    const settings = { ...(website.settings || {}) };
+    delete settings.customNginx;
+    delete settings.customNginxContent;
+    await Website.findByIdAndUpdate(id, { settings });
+
+    // Regenerate from default template
+    await this.generateNginxConfig(website);
+    return this.getNginxConfig(id);
   }
 }
 

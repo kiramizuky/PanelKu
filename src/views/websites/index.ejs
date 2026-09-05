@@ -195,18 +195,25 @@
     <!-- ---- TAB: Nginx Config ---- -->
     <div id="etab-nginx" class="ew-tab-pane" style="display:none;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <span class="text-muted font-mono" style="font-size:11px;" id="editNginxFilePath">/etc/nginx/conf.d/...</span>
-        <span class="badge bg-secondary" style="font-size:10px;">vhost config</span>
+        <div>
+          <span class="text-muted font-mono" style="font-size:11px;" id="editNginxFilePath">/etc/nginx/conf.d/...</span>
+        </div>
+        <div id="editNginxBadge">
+          <span class="badge bg-secondary" style="font-size:10px;">vhost config</span>
+        </div>
       </div>
       <textarea id="editNginxEditor" class="form-control font-mono" rows="22"
         style="font-size:12px;background:#0d1117;color:#e6edf3;border:1px solid rgba(255,255,255,0.15);line-height:1.6;resize:vertical;font-family:'Fira Mono','Courier New',monospace;"
         spellcheck="false" placeholder="# Loading..."></textarea>
       <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
-        <i class="bi bi-info-circle text-info"></i> Changes are syntax-checked with <code>nginx -t</code> before reloading.
+        <i class="bi bi-info-circle text-info"></i> Changes are syntax-checked with <code>nginx -t</code> before reloading. Custom configs are protected from auto-overwrite.
       </div>
-      <div style="margin-top:14px;">
-        <button class="btn-lp btn-lp-primary w-100" id="editSaveNginxBtn" onclick="WebsitesPage.saveDrawerNginxConfig()">
+      <div style="margin-top:14px;display:flex;gap:10px;">
+        <button class="btn-lp btn-lp-primary" style="flex:1;" id="editSaveNginxBtn" onclick="WebsitesPage.saveDrawerNginxConfig()">
           <i class="bi bi-check2-circle me-1"></i> Save &amp; Reload Nginx
+        </button>
+        <button class="btn-lp btn-lp-ghost text-warning btn-lp-sm" id="editResetNginxBtn" onclick="WebsitesPage.resetDrawerNginxConfig()" title="Reset to default generated template">
+          <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Default
         </button>
       </div>
     </div>
