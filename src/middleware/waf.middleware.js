@@ -175,7 +175,8 @@ export const wafMiddleware = async (req, res, next) => {
   }
 
   // Skip body inspection for endpoints that handle arbitrary text/log content
-  const skipBodyScan = SKIP_BODY_SCAN_PATHS.some(p => req.path.startsWith(p));
+  const isNginxConfigPath = req.path.startsWith('/api/websites/') && req.path.endsWith('/nginx-config');
+  const skipBodyScan = isNginxConfigPath || SKIP_BODY_SCAN_PATHS.some(p => req.path.startsWith(p));
   if (!skipBodyScan) {
     const bodyThreat = inspectPayload(req.body);
     if (bodyThreat) {

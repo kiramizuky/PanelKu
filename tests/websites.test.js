@@ -142,3 +142,20 @@ describe('WebsiteService.updateWebsite — rejects malicious gitRepo at write po
     expect(result.gitRepo).toBe('https://github.com/user/repo.git');
   });
 });
+
+describe('WebsiteService Nginx Configuration Editor', () => {
+  test('getNginxConfig throws error if website not found', async () => {
+    Website.findById.mockResolvedValue(null);
+    await expect(websiteService.getNginxConfig('nonexistent')).rejects.toThrow('Website not found');
+  });
+
+  test('saveNginxConfig throws error if website not found', async () => {
+    Website.findById.mockResolvedValue(null);
+    await expect(websiteService.saveNginxConfig('nonexistent', 'server {}')).rejects.toThrow('Website not found');
+  });
+
+  test('saveNginxConfig throws error if content is not string', async () => {
+    Website.findById.mockResolvedValue({ id: 'w-1', domain: 'test.com' });
+    await expect(websiteService.saveNginxConfig('w-1', 12345)).rejects.toThrow('Configuration content must be a string');
+  });
+});

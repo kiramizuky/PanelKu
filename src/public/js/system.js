@@ -271,7 +271,9 @@ const SystemPage = {
 
   async loadPHPConfig() {
     try {
-      const res = await LP.get('/system/php-config');
+      const versionEl = document.getElementById('systemPhpVersion');
+      const version = versionEl ? versionEl.value : '8.2';
+      const res = await LP.get(`/system/php-config?version=${encodeURIComponent(version)}`);
       if (res?.success) {
         document.getElementById('phpMaxChildren').value = res.data.max_children;
         document.getElementById('phpStartServers').value = res.data.start_servers;
@@ -284,6 +286,8 @@ const SystemPage = {
   },
 
   async savePHPConfig() {
+    const versionEl = document.getElementById('systemPhpVersion');
+    const version = versionEl ? versionEl.value : '8.2';
     const max_children = parseInt(document.getElementById('phpMaxChildren').value);
     const start_servers = parseInt(document.getElementById('phpStartServers').value);
     const min_spare_servers = parseInt(document.getElementById('phpMinSpare').value);
@@ -295,9 +299,9 @@ const SystemPage = {
     }
 
     try {
-      const res = await LP.post('/system/php-config', { max_children, start_servers, min_spare_servers, max_spare_servers });
+      const res = await LP.post('/system/php-config', { version, max_children, start_servers, min_spare_servers, max_spare_servers });
       if (res?.success) {
-        LP.toast('PHP-FPM pool configuration saved and reloaded.', 'success');
+        LP.toast(`PHP ${version}-FPM pool configuration saved and reloaded.`, 'success');
         this.loadPHPConfig();
       } else {
         LP.toast(res?.message || 'Failed to save config', 'error');

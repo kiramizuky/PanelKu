@@ -242,7 +242,8 @@ class SystemController {
 
   async getPHPConfig(req, res) {
     try {
-      const config = await phpService.getConfig();
+      const version = req.query.version || '8.2';
+      const config = await phpService.getConfig(version);
       return success(res, config);
     } catch (error) {
       return errorResponse(res, error.message || 'Failed to get PHP config', 500);
@@ -251,8 +252,9 @@ class SystemController {
 
   async updatePHPConfig(req, res) {
     try {
-      await phpService.updateConfig(req.body);
-      return success(res, null, 'PHP-FPM configuration updated successfully');
+      const version = req.body.version || req.query.version || '8.2';
+      await phpService.updateConfig(req.body, version);
+      return success(res, null, `PHP ${version}-FPM configuration updated successfully`);
     } catch (error) {
       return errorResponse(res, error.message || 'Failed to update PHP config', 500);
     }

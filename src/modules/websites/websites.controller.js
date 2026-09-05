@@ -75,6 +75,28 @@ class WebsitesController {
       return errorResponse(res, 500, error.message);
     }
   }
+
+  async getNginxConfig(req, res) {
+    try {
+      const result = await websiteService.getNginxConfig(req.params.id);
+      return successResponse(res, result, 'Nginx configuration retrieved');
+    } catch (error) {
+      return errorResponse(res, 400, error.message);
+    }
+  }
+
+  async saveNginxConfig(req, res) {
+    try {
+      const { content } = req.body;
+      if (typeof content !== 'string') {
+        return errorResponse(res, 400, 'Configuration content is required and must be a string');
+      }
+      const result = await websiteService.saveNginxConfig(req.params.id, content);
+      return successResponse(res, result, 'Nginx configuration saved and reloaded');
+    } catch (error) {
+      return errorResponse(res, 400, error.message);
+    }
+  }
 }
 
 export default new WebsitesController();

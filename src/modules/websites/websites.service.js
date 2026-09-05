@@ -481,6 +481,83 @@ class WebsiteService {
     await Website.findByIdAndDelete(id);
     return true;
   }
+
+  async getNginxConfig(id) {
+    const website = await Website.findById(id);
+    if (!website) throw new Error('Website not found');
+
+    const confPath = path.join(this.nginxConfDir, `${website.domain}.conf`);
+    try {
+      await fs.access(confPath);
+    } catch {
+      // If config doesn't exist yet on disk, generate it first
+      await this.generateNginxConfig(website);
+    }
+
+    let content = '';
+    try {
+      content = await fs.readFile(confPath, 'utf8');
+    } catch (err) {
+      throw new Error(`Failed to read Nginx configuration file: ${err.message}`);
+    }
+
+    return {
+      domain: website.domain,
+      confPath,
+      content,
+    };
+  }
+
+  async saveNginxConfig(id, content) {
+    const website = await Website.findById(id);
+    if (!website) throw new Error('Website not found');
+    if (typeof content !== 'string') throw new Error('Configuration content must be a string');
+
+    const confPath = path.join(this.nginxConfDir, `${website.domain}.conf`);
+    const backupPath = `${confPath}.bak`;
+
+    // Ensure directory exists
+    await fs.mkdir(this.nginxConfDir, { recursive: true });
+
+    let existing = null;
+    try {
+      existing = await fs.readFile(confPath, 'utf8');
+      await fs.writeFile(backupPath, existing, 'utf8');
+    } catch {
+      // File didn't exist before, no backup needed
+    }
+
+    try {
+      await fs.writeFile(confPath, content, 'utf8');
+
+      // Test nginx syntax if on Linux
+      if (process.platform !== 'win32') {
+        try {
+          await execAsync('nginx -t');
+        } catch (testErr) {
+          // Revert to backup if nginx -t fails
+          if (existing !== null) {
+            await fs.writeFile(confPath, existing, 'utf8');
+            await fs.unlink(backupPath).catch(() => {});
+          } else {
+            await fs.unlink(confPath).catch(() => {});
+          }
+          const stderr = testErr.stderr || testErr.message;
+          throw new Error(`Nginx syntax test failed (reverted): ${stderr}`);
+        }
+      }
+
+      // Cleanup backup
+      if (existing !== null) {
+        await fs.unlink(backupPath).catch(() => {});
+      }
+
+      await this.reloadNginx();
+      return { success: true, message: 'Nginx configuration saved and reloaded successfully' };
+    } catch (err) {
+      throw err;
+    }
+  }
 }
 
 export default new WebsiteService();

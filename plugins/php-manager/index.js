@@ -8,6 +8,8 @@ import { successResponse, errorResponse } from '../../src/helpers/response.js';
 
 const execAsync = promisify(exec);
 
+const SUPPORTED_PHP_VERSIONS = ['7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5'];
+
 export default {
   register(app, io) {
     // Helper: run commands
@@ -30,7 +32,7 @@ export default {
       const systemInfo = await getSystemInfo();
       const isWindows = process.platform === 'win32';
       
-      const versions = ['8.1', '8.2', '8.3', '8.4'];
+      const versions = SUPPORTED_PHP_VERSIONS;
       const result = {
         system: systemInfo,
         phpCli: 'Not Found',
@@ -186,7 +188,7 @@ export default {
                 <div class="lp-glass-card p-4">
                   <h5 style="font-weight:700; margin-bottom:15px;"><i class="bi bi-shield-check text-primary me-2"></i> Professional PHP Setup</h5>
                   <p class="text-slate-300" style="font-size:13px; line-height:1.6; margin-bottom:15px;">
-                    Having multiple PHP versions active allows hosting legacy projects (PHP 8.1) alongside cutting-edge sites running PHP 8.3 or 8.4. PHP-FPM works seamlessly behind Nginx for highly optimized speed.
+                    Having multiple PHP versions active allows hosting legacy projects (PHP 7.2 - 7.4) alongside modern and cutting-edge sites running PHP 8.0 - 8.5. PHP-FPM works seamlessly behind Nginx for highly optimized speed.
                   </p>
                   <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
                     <h6 style="font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:10px;">Common Extensions Installed:</h6>
@@ -340,7 +342,7 @@ export default {
     // 2. Route: Manage Service (Start/Stop/Restart)
     app.post('/api/plugins/php-manager/service', async (req, res) => {
       const { version, action } = req.body;
-      if (!['8.1', '8.2', '8.3', '8.4'].includes(version)) {
+      if (!SUPPORTED_PHP_VERSIONS.includes(version)) {
         return errorResponse(res, 'Invalid PHP Version', 400);
       }
       if (!['start', 'stop', 'restart'].includes(action)) {
@@ -361,7 +363,7 @@ export default {
     // 3. Route: Install PHP Version
     app.post('/api/plugins/php-manager/install', async (req, res) => {
       const { version } = req.body;
-      if (!['8.1', '8.2', '8.3', '8.4'].includes(version)) {
+      if (!SUPPORTED_PHP_VERSIONS.includes(version)) {
         return errorResponse(res, 'Invalid PHP Version', 400);
       }
 
@@ -404,7 +406,7 @@ export default {
     // 4. Route: Update Config (php.ini)
     app.post('/api/plugins/php-manager/config', async (req, res) => {
       const { version, memory_limit, upload_max_filesize, post_max_size, max_execution_time } = req.body;
-      if (!['8.1', '8.2', '8.3', '8.4'].includes(version)) {
+      if (!SUPPORTED_PHP_VERSIONS.includes(version)) {
         return errorResponse(res, 'Invalid PHP Version', 400);
       }
 

@@ -6,7 +6,9 @@
 const WebsitesPage = (() => {
   let createModal = null;
   let sslModal = null;
+  let nginxModal = null;
   let currentSslWebsiteId = null;
+  let currentNginxWebsiteId = null;
 
   async function loadWebsites() {
     try {
@@ -54,6 +56,7 @@ const WebsitesPage = (() => {
                 ${w.autoDeploy ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('WebsitesPage.showWebhook', '${LP.encJsArg(w._id)}', '${LP.encJsArg(w.webhookToken)}')" title="Show Webhook URL"><i class="bi bi-link-45deg"></i></button>` : ''}
                 <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="LP.call('WebsitesPage.deployGit', '${LP.encJsArg(w._id)}')" title="Deploy from Git"><i class="bi bi-cloud-arrow-down"></i></button>
               ` : ''}
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WebsitesPage.configNginx', '${LP.encJsArg(w._id)}', '${LP.encJsArg(w.domain)}')" title="Nginx Configuration"><i class="bi bi-file-earmark-code"></i></button>
               <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WebsitesPage.configSSL', '${LP.encJsArg(w._id)}')" title="SSL Settings"><i class="bi bi-shield"></i></button>
               <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WebsitesPage.openFolder', '${LP.encJsArg(w.rootDirectory)}')" title="File Manager"><i class="bi bi-folder"></i></button>
               <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('WebsitesPage.deleteWebsite', '${LP.encJsArg(w._id)}', '${LP.encJsArg(w.domain)}')" title="Delete"><i class="bi bi-trash"></i></button>
@@ -77,6 +80,10 @@ const WebsitesPage = (() => {
       const sslModalEl = document.getElementById('configSslModal');
       if (sslModalEl) {
         sslModal = new bootstrap.Modal(sslModalEl);
+      }
+      const nginxModalEl = document.getElementById('nginxConfigModal');
+      if (nginxModalEl) {
+        nginxModal = new bootstrap.Modal(nginxModalEl);
       }
       loadWebsites();
     },
@@ -401,6 +408,62 @@ const WebsitesPage = (() => {
         LP.toast(`Error installing ${pkgName}`, 'error');
       } finally {
         document.getElementById('installSpinner')?.remove();
+      }
+    },
+
+    async configNginx(websiteId, domain) {
+      currentNginxWebsiteId = websiteId;
+      document.getElementById('nginxModalDomain').textContent = domain;
+      document.getElementById('nginxModalFilePath').textContent = `/etc/nginx/conf.d/${domain}.conf`;
+      const editor = document.getElementById('nginxConfigEditor');
+      editor.value = '# Loading configuration...';
+      editor.disabled = true;
+      document.getElementById('btnSaveNginxConfig').disabled = true;
+
+      if (nginxModal) nginxModal.show();
+
+      try {
+        const res = await LP.get(`/websites/${websiteId}/nginx-config`);
+        if (res?.success) {
+          editor.value = res.data.content || '';
+          editor.disabled = false;
+          document.getElementById('btnSaveNginxConfig').disabled = false;
+          if (res.data.confPath) {
+            document.getElementById('nginxModalFilePath').textContent = res.data.confPath;
+          }
+        } else {
+          editor.value = `# Error: ${res?.message || 'Failed to load configuration'}`;
+          LP.toast(res?.message || 'Failed to load configuration', 'error');
+        }
+      } catch (err) {
+        editor.value = `# Error: ${err.message}`;
+        LP.toast('Error loading Nginx configuration', 'error');
+      }
+    },
+
+    async saveNginxConfig() {
+      if (!currentNginxWebsiteId) return;
+      const editor = document.getElementById('nginxConfigEditor');
+      const saveBtn = document.getElementById('btnSaveNginxConfig');
+      const content = editor.value;
+
+      const originalHtml = saveBtn.innerHTML;
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Validating & Saving...';
+
+      try {
+        const res = await LP.put(`/websites/${currentNginxWebsiteId}/nginx-config`, { content });
+        if (res?.success) {
+          LP.toast('Nginx configuration saved & reloaded successfully!', 'success');
+          if (nginxModal) nginxModal.hide();
+        } else {
+          LP.toast(`Failed to save: ${res?.message || 'Unknown error'}`, 'error');
+        }
+      } catch (err) {
+        LP.toast(`Error saving configuration: ${err.message}`, 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalHtml;
       }
     }
   };

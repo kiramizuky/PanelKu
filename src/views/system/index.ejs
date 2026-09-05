@@ -73,8 +73,21 @@
 
     <!-- PHP-FPM Pool Manager -->
     <div class="lp-glass-card system-php-card">
-      <div class="system-card-header">
-        <h5 class="system-card-title"><i class="bi bi-gear-wide-connected me-2 text-primary"></i>PHP-FPM Pool Manager</h5>
+      <div class="system-card-header d-flex justify-content-between align-items-center">
+        <h5 class="system-card-title m-0"><i class="bi bi-gear-wide-connected me-2 text-primary"></i>PHP-FPM Pool Manager</h5>
+        <div style="width:130px;">
+          <select id="systemPhpVersion" class="lp-input py-1" style="font-size:12px;" onchange="SystemPage.loadPHPConfig()">
+            <option value="7.2">PHP 7.2</option>
+            <option value="7.3">PHP 7.3</option>
+            <option value="7.4">PHP 7.4</option>
+            <option value="8.0">PHP 8.0</option>
+            <option value="8.1">PHP 8.1</option>
+            <option value="8.2" selected>PHP 8.2</option>
+            <option value="8.3">PHP 8.3</option>
+            <option value="8.4">PHP 8.4</option>
+            <option value="8.5">PHP 8.5</option>
+          </select>
+        </div>
       </div>
       <div class="row g-3">
         <div class="col-6 col-md-3">

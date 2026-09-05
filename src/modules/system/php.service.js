@@ -5,46 +5,56 @@ import util from 'util';
 
 const execAsync = util.promisify(exec);
 
+const VALID_PHP_VERSIONS = ['7.2', '7.3', '7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5'];
+
 class PHPService {
   constructor() {
-    this.phpVersion = '8.2';
-    this.systemConfPath = `/etc/php/${this.phpVersion}/fpm/pool.d/www.conf`;
-    this.fallbackConfPath = path.resolve('storage', 'configs', 'php-fpm-www.conf');
+    this.defaultVersion = '8.2';
   }
 
-  async getConfPath() {
+  sanitizeVersion(version) {
+    return VALID_PHP_VERSIONS.includes(version) ? version : this.defaultVersion;
+  }
+
+  async getConfPath(version = this.defaultVersion) {
+    const ver = this.sanitizeVersion(version);
+    const systemConfPath = `/etc/php/${ver}/fpm/pool.d/www.conf`;
+    const fallbackConfPath = path.resolve('storage', 'configs', `php-fpm-www-${ver}.conf`);
+
     try {
-      await fs.access(this.systemConfPath);
-      return this.systemConfPath;
+      await fs.access(systemConfPath);
+      return systemConfPath;
     } catch {
       // Ensure fallback directory exists
-      await fs.mkdir(path.dirname(this.fallbackConfPath), { recursive: true });
+      await fs.mkdir(path.dirname(fallbackConfPath), { recursive: true });
       try {
-        await fs.access(this.fallbackConfPath);
+        await fs.access(fallbackConfPath);
       } catch {
         // Initialize default configuration content
-        const defaultContent = `; PHP-FPM pool configuration
+        const defaultContent = `; PHP-FPM pool configuration for PHP ${ver}
 [www]
 user = www-data
 group = www-data
-listen = /run/php/php8.2-fpm.sock
+listen = /run/php/php${ver}-fpm.sock
 pm = dynamic
 pm.max_children = 5
 pm.start_servers = 2
 pm.min_spare_servers = 1
 pm.max_spare_servers = 3
 `;
-        await fs.writeFile(this.fallbackConfPath, defaultContent, 'utf8');
+        await fs.writeFile(fallbackConfPath, defaultContent, 'utf8');
       }
-      return this.fallbackConfPath;
+      return fallbackConfPath;
     }
   }
 
-  async getConfig() {
-    const confPath = await this.getConfPath();
+  async getConfig(version = this.defaultVersion) {
+    const ver = this.sanitizeVersion(version);
+    const confPath = await this.getConfPath(ver);
     const content = await fs.readFile(confPath, 'utf8');
     
     return {
+      version: ver,
       max_children: parseInt(content.match(/^\s*pm\.max_children\s*=\s*(\d+)/m)?.[1] || '5'),
       start_servers: parseInt(content.match(/^\s*pm\.start_servers\s*=\s*(\d+)/m)?.[1] || '2'),
       min_spare_servers: parseInt(content.match(/^\s*pm\.min_spare_servers\s*=\s*(\d+)/m)?.[1] || '1'),
@@ -53,8 +63,9 @@ pm.max_spare_servers = 3
     };
   }
 
-  async updateConfig(params) {
-    const confPath = await this.getConfPath();
+  async updateConfig(params, version = this.defaultVersion) {
+    const ver = this.sanitizeVersion(version);
+    const confPath = await this.getConfPath(ver);
     let content = await fs.readFile(confPath, 'utf8');
 
     const mappings = {
@@ -79,7 +90,7 @@ pm.max_spare_servers = 3
 
     // Reload PHP-FPM if systemctl is available
     try {
-      await execAsync(`systemctl reload php${this.phpVersion}-fpm`);
+      await execAsync(`systemctl reload php${ver}-fpm`);
     } catch {
       // Ignore if not on Linux or systemctl reload fails
     }
