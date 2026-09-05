@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Linux Panel - websites.js
  * Website management frontend — with Edit Drawer
  */
@@ -547,9 +547,22 @@ const WebsitesPage = (() => {
     copyWebhookUrl,
     editOpenFolder,
 
-    // Legacy compat (old table buttons may still call these)
-    async configSSL(id) { await openEditDrawer(id); switchEditTab(document.querySelector('[data-target="etab-ssl"]')); },
-    async configNginx(id, domain) { await openEditDrawer(id); switchEditTab(document.querySelector('[data-target="etab-nginx"]')); },
+    // Legacy compat — safely open drawer then switch to target tab
+    async configSSL(id) {
+      await openEditDrawer(id);
+      // Wait for drawer animation then switch tab
+      setTimeout(() => {
+        const btn = document.querySelector('.ew-tab-btn[data-target="etab-ssl"]');
+        if (btn) switchEditTab(btn);
+      }, 350);
+    },
+    async configNginx(id, domain) {
+      await openEditDrawer(id);
+      setTimeout(() => {
+        const btn = document.querySelector('.ew-tab-btn[data-target="etab-nginx"]');
+        if (btn) switchEditTab(btn);
+      }, 350);
+    },
     async deleteWebsite(id, domain) {
       currentEditId = id;
       currentEditWebsite = { domain };
