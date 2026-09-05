@@ -244,8 +244,8 @@
 
     <div class="row g-4">
       <!-- Left: Top Attacking Countries List -->
-      <div class="col-12 col-lg-5">
-        <div class="lp-glass-card p-3" style="border-radius:14px;">
+      <div class="col-12 col-lg-4">
+        <div class="lp-glass-card p-3" style="border-radius:14px; height:100%;">
           <h6 style="font-weight:700; font-size:13px; margin-bottom:15px; color:#fff;"><i class="bi bi-bar-chart-fill me-2 text-primary"></i>Top Attack Origins (by Country)</h6>
           <div id="tmCountryBars" style="display:flex; flex-direction:column; gap:12px;">
             <p class="text-muted" style="font-size:12px;">Loading country statistics...</p>
@@ -253,29 +253,44 @@
         </div>
       </div>
 
-      <!-- Right: Threat Activity Feed -->
-      <div class="col-12 col-lg-7">
+      <!-- Right: Threat Activity Feed with Search, Detail Collapse, and Pagination -->
+      <div class="col-12 col-lg-8">
         <div class="lp-glass-card p-0" style="border-radius:14px; overflow:hidden;">
-          <div class="p-3 border-bottom" style="border-color:var(--glass-border) !important; display:flex; justify-content:space-between; align-items:center;">
-            <h6 style="font-weight:700; font-size:13px; margin:0; color:#fff;"><i class="bi bi-radar me-2 text-danger"></i>Recent Blocked Attack Feed</h6>
-            <span class="lp-badge lp-badge-danger" style="font-size:10px;">LIVE MONITOR</span>
+          <div class="p-3 border-bottom" style="border-color:var(--glass-border) !important; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <h6 style="font-weight:700; font-size:13px; margin:0; color:#fff;"><i class="bi bi-radar me-2 text-danger"></i>Recent Blocked Attack Feed</h6>
+              <span id="tmThreatCountBadge" class="lp-badge lp-badge-danger" style="font-size:10px;">LIVE MONITOR</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="position:relative; width:180px;">
+                <input type="text" id="tmThreatSearchInput" class="lp-input" placeholder="Filter IP, path..." onkeyup="WAFPage.filterThreats(this.value)" style="font-size:11px; padding:4px 10px; height:28px;">
+              </div>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WAFPage.loadThreatMap()" title="Refresh Feed" style="padding:4px 8px; font-size:11px;">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+            </div>
           </div>
-          <div style="max-height:360px; overflow-y:auto;">
-            <table class="lp-table mb-0" style="font-size:12px;">
+          <div style="overflow-x:auto;">
+            <table class="lp-table mb-0" style="font-size:12px; width:100%;">
               <thead>
                 <tr>
+                  <th style="width:32px;"></th>
                   <th>Attacker IP</th>
                   <th>Country</th>
+                  <th>Target / Type</th>
+                  <th>Time</th>
                   <th>Hits</th>
                   <th>Status</th>
-                  <th style="text-align:right">Action</th>
+                  <th style="text-align:right;">Action</th>
                 </tr>
               </thead>
               <tbody id="tmThreatsTableBody">
-                <tr><td colspan="5" class="text-center text-muted py-3">Loading threat events...</td></tr>
+                <tr><td colspan="8" class="text-center text-muted py-3">Loading threat events...</td></tr>
               </tbody>
             </table>
           </div>
+          <!-- Pagination Container -->
+          <div id="tmThreatsPagination" style="padding:10px 16px; border-top:1px solid var(--glass-border);"></div>
         </div>
       </div>
     </div>
@@ -362,4 +377,11 @@
   </div>
 </div>
 
-<script src="/js/waf.js"></script>
+<style>
+  .threat-main-row:hover { background: rgba(255, 255, 255, 0.04) !important; }
+  .threat-detail-row td { border-top: none !important; }
+  .threat-detail-row { animation: fadeIn .2s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+
+<script src="/js/waf.js?v=<%= Date.now() %>"></script>

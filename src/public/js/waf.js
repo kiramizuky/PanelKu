@@ -228,28 +228,214 @@ const WAFPage = {
       }
     }
 
-    // Render Threat Feed Table
+    // Store threat list for pagination & filtering
+    this._allThreats = data.threats || [];
+    this._filteredThreats = [...this._allThreats];
+    this._threatsPage = 1;
+    this.renderThreatFeed();
+  },
+
+  _formatThreatTime(ts) {
+    if (!ts) return 'Just now';
+    try {
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return ts;
+      const now = new Date();
+      const diffSec = Math.floor((now - d) / 1000);
+      if (diffSec < 60) return `${Math.max(1, diffSec)}s ago`;
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return ts;
+    }
+  },
+
+  _formatFullTimestamp(ts) {
+    if (!ts) return '-';
+    try {
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return ts;
+      return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch {
+      return ts;
+    }
+  },
+
+  filterThreats(keyword) {
+    const q = (keyword || '').trim().toLowerCase();
+    if (!q) {
+      this._filteredThreats = [...this._allThreats];
+    } else {
+      this._filteredThreats = this._allThreats.filter(t => 
+        (t.ip && t.ip.toLowerCase().includes(q)) ||
+        (t.countryName && t.countryName.toLowerCase().includes(q)) ||
+        (t.countryCode && t.countryCode.toLowerCase().includes(q)) ||
+        (t.target && t.target.toLowerCase().includes(q)) ||
+        (t.category && t.category.toLowerCase().includes(q)) ||
+        (t.reason && t.reason.toLowerCase().includes(q))
+      );
+    }
+    this._threatsPage = 1;
+    this.renderThreatFeed();
+  },
+
+  changeThreatsPage(newPage) {
+    const totalPages = Math.ceil(this._filteredThreats.length / (this._threatsPerPage || 10)) || 1;
+    if (newPage < 1 || newPage > totalPages) return;
+    this._threatsPage = newPage;
+    this.renderThreatFeed();
+  },
+
+  toggleThreatDetail(id) {
+    if (!this._openThreatIds) this._openThreatIds = new Set();
+    const detailRow = document.getElementById(`threatDetail-${id}`);
+    const chevron = document.getElementById(`threatChevron-${id}`);
+    if (!detailRow) return;
+
+    if (this._openThreatIds.has(id)) {
+      this._openThreatIds.delete(id);
+      detailRow.style.display = 'none';
+      if (chevron) chevron.className = 'bi bi-chevron-right text-muted';
+    } else {
+      this._openThreatIds.add(id);
+      detailRow.style.display = 'table-row';
+      if (chevron) chevron.className = 'bi bi-chevron-down text-primary';
+    }
+  },
+
+  renderThreatFeed() {
     const tbody = document.getElementById('tmThreatsTableBody');
-    if (tbody) {
-      if (!data.threats || data.threats.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No recent blocked attacks</td></tr>';
-      } else {
-        tbody.innerHTML = data.threats.map(t => `
-          <tr>
-            <td class="font-mono" style="font-weight:600; color:var(--text-primary);">${LP.escHtml(t.ip)}</td>
-            <td>
-              <span class="badge bg-dark border border-secondary" style="font-size:9.5px; margin-right:4px;">${LP.escHtml(t.countryCode)}</span>
-              ${LP.escHtml(t.countryName)}
-            </td>
-            <td class="font-mono">${t.count}</td>
-            <td><span class="lp-badge lp-badge-danger"><span class="lp-badge-dot"></span>BLOCKED</span></td>
-            <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="WAFPage.quickBlockIp('${LP.escHtml(t.ip)}')" style="font-size:11px; padding:2px 8px;" title="Add permanent WAF IP Block">
-                <i class="bi bi-slash-circle"></i> Permanent
+    const pagContainer = document.getElementById('tmThreatsPagination');
+    const countBadge = document.getElementById('tmThreatCountBadge');
+
+    if (!this._openThreatIds) this._openThreatIds = new Set();
+    const perPage = this._threatsPerPage || 10;
+
+    if (countBadge) {
+      countBadge.textContent = `${this._allThreats.length} THREATS`;
+    }
+
+    if (!tbody) return;
+
+    if (!this._filteredThreats || this._filteredThreats.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4"><i class="bi bi-shield-check text-success me-2"></i>No recent blocked attacks matching filter</td></tr>';
+      if (pagContainer) pagContainer.innerHTML = '';
+      return;
+    }
+
+    const totalPages = Math.ceil(this._filteredThreats.length / perPage) || 1;
+    if (this._threatsPage > totalPages) this._threatsPage = totalPages;
+
+    const start = (this._threatsPage - 1) * perPage;
+    const end = start + perPage;
+    const pageItems = this._filteredThreats.slice(start, end);
+
+    tbody.innerHTML = pageItems.map(t => {
+      const isOpen = this._openThreatIds.has(t.id);
+      const chevronClass = isOpen ? 'bi bi-chevron-down text-primary' : 'bi bi-chevron-right text-muted';
+      const detailDisplay = isOpen ? 'table-row' : 'none';
+
+      return `
+        <tr class="threat-main-row" onclick="WAFPage.toggleThreatDetail('${t.id}')" style="cursor:pointer; transition: background .15s;">
+          <td style="text-align:center; padding-left:12px; width:32px;">
+            <i class="bi ${chevronClass}" id="threatChevron-${t.id}" style="font-size:12px;"></i>
+          </td>
+          <td class="font-mono" style="font-weight:600; color:var(--text-primary); white-space:nowrap;">
+            ${LP.escHtml(t.ip)}
+          </td>
+          <td style="white-space:nowrap;">
+            <span class="badge bg-dark border border-secondary" style="font-size:9.5px; margin-right:4px;">${LP.escHtml(t.countryCode)}</span>
+            ${LP.escHtml(t.countryName)}
+          </td>
+          <td>
+            <span class="badge" style="background:rgba(255,255,255,0.08); font-size:10.5px; max-width:140px; text-overflow:ellipsis; overflow:hidden; display:inline-block; vertical-align:middle;" title="${LP.escHtml(t.target || '')}">
+              ${LP.escHtml(t.target || t.category || 'Intrusion')}
+            </span>
+          </td>
+          <td style="font-size:11px; color:var(--text-muted); white-space:nowrap;" title="${LP.escHtml(t.timestamp || '')}">
+            ${this._formatThreatTime(t.timestamp || t.lastSeen)}
+          </td>
+          <td class="font-mono" style="font-weight:700;">${t.count}</td>
+          <td>
+            <span class="lp-badge lp-badge-danger" style="font-size:10px;"><span class="lp-badge-dot"></span>${LP.escHtml(t.action || 'BLOCKED')}</span>
+          </td>
+          <td style="text-align:right; white-space:nowrap;" onclick="event.stopPropagation()">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="WAFPage.quickBlockIp('${LP.escHtml(t.ip)}')" style="font-size:11px; padding:2px 8px;" title="Permanent IP Block">
+              <i class="bi bi-slash-circle me-1"></i> Block
+            </button>
+          </td>
+        </tr>
+        <tr id="threatDetail-${t.id}" class="threat-detail-row" style="display:${detailDisplay}; background:rgba(15,23,42,0.65); border-left:3px solid var(--danger-color, #ef4444);">
+          <td colspan="8" style="padding:16px 20px;">
+            <div class="row g-3" style="font-size:11.5px;">
+              <div class="col-12 col-md-4">
+                <div class="text-muted mb-1" style="font-size:10.5px; text-transform:uppercase; font-weight:600;"><i class="bi bi-clock me-1 text-info"></i> Timestamp</div>
+                <div class="font-mono text-white">${this._formatFullTimestamp(t.timestamp || t.lastSeen)}</div>
+                <div class="text-muted" style="font-size:10.5px;">Relative: ${this._formatThreatTime(t.timestamp || t.lastSeen)}</div>
+              </div>
+              <div class="col-12 col-md-4">
+                <div class="text-muted mb-1" style="font-size:10.5px; text-transform:uppercase; font-weight:600;"><i class="bi bi-crosshair me-1 text-warning"></i> Target / Probe Path</div>
+                <div class="font-mono text-warning" style="word-break:break-all;">${LP.escHtml(t.target || '/')}</div>
+                <div class="text-muted" style="font-size:10.5px;">Category: ${LP.escHtml(t.category || 'Intrusion')}</div>
+              </div>
+              <div class="col-12 col-md-4">
+                <div class="text-muted mb-1" style="font-size:10.5px; text-transform:uppercase; font-weight:600;"><i class="bi bi-geo-alt me-1 text-danger"></i> Geo Origin &amp; Location</div>
+                <div class="text-white">${LP.escHtml(t.countryName)} (${LP.escHtml(t.countryCode)})</div>
+                <div class="text-muted font-mono" style="font-size:10.5px;">Lat/Lng: ${t.lat}, ${t.lng}</div>
+              </div>
+              <div class="col-12 col-md-8">
+                <div class="text-muted mb-1" style="font-size:10.5px; text-transform:uppercase; font-weight:600;"><i class="bi bi-laptop me-1 text-secondary"></i> Client User-Agent</div>
+                <div class="font-mono" style="background:#090d16; padding:6px 10px; border-radius:6px; font-size:10.5px; color:#cbd5e1; border:1px solid rgba(255,255,255,0.08); word-break:break-all;">
+                  ${LP.escHtml(t.userAgent || 'Unknown')}
+                </div>
+              </div>
+              <div class="col-12 col-md-4">
+                <div class="text-muted mb-1" style="font-size:10.5px; text-transform:uppercase; font-weight:600;"><i class="bi bi-shield-exclamation me-1 text-danger"></i> Block Reason</div>
+                <div class="text-danger" style="font-weight:600;">${LP.escHtml(t.reason || 'Automated Intrusion Block')}</div>
+                <div class="mt-2 d-flex gap-2">
+                  <button class="btn-lp btn-lp-sm btn-lp-ghost text-info" onclick="navigator.clipboard.writeText('${LP.encJsArg(t.ip)}'); LP.toast('IP Copied to clipboard!', 'info');" style="font-size:11px; padding:3px 8px;">
+                    <i class="bi bi-clipboard me-1"></i> Copy IP
+                  </button>
+                </div>
+              </div>
+              ${t.payload ? `
+              <div class="col-12">
+                <div class="text-muted mb-1" style="font-size:10.5px; text-transform:uppercase; font-weight:600;"><i class="bi bi-file-earmark-code me-1 text-info"></i> Payload / Request Fragment</div>
+                <pre class="font-mono mb-0" style="background:#090d16; padding:8px 12px; border-radius:6px; font-size:11px; color:#f87171; border:1px solid rgba(255,255,255,0.08); overflow-x:auto;">${LP.escHtml(t.payload)}</pre>
+              </div>` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (pagContainer) {
+      if (totalPages > 1) {
+        pagContainer.innerHTML = `
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="text-muted" style="font-size:11.5px;">
+              Showing <strong>${start + 1}</strong> to <strong>${Math.min(end, this._filteredThreats.length)}</strong> of <strong>${this._filteredThreats.length}</strong> attacks
+            </span>
+            <div class="btn-group" style="gap:4px;">
+              <button class="btn-lp btn-lp-sm btn-lp-ghost" ${this._threatsPage === 1 ? 'disabled' : ''} onclick="WAFPage.changeThreatsPage(${this._threatsPage - 1})">
+                <i class="bi bi-chevron-left me-1"></i> Prev
               </button>
-            </td>
-          </tr>
-        `).join('');
+              <span class="btn-lp btn-lp-sm btn-lp-ghost" style="pointer-events:none; font-weight:600;">
+                Page ${this._threatsPage} / ${totalPages}
+              </span>
+              <button class="btn-lp btn-lp-sm btn-lp-ghost" ${this._threatsPage === totalPages ? 'disabled' : ''} onclick="WAFPage.changeThreatsPage(${this._threatsPage + 1})">
+                Next <i class="bi bi-chevron-right ms-1"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        pagContainer.innerHTML = `
+          <div class="text-muted" style="font-size:11px;">
+            Showing all <strong>${this._filteredThreats.length}</strong> recorded attack events
+          </div>
+        `;
       }
     }
   },

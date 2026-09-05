@@ -73,55 +73,158 @@ class GeoIpService {
   }
 
   /**
-   * Parse Fail2ban logs & WAF audit logs into aggregated threat map data
+   * Parse Fail2ban logs, Honeypot hits & WAF audit logs into comprehensive threat map data
    */
   async getThreatMapData() {
     const rawLogs = await wafService.getFail2BanLogs();
     const db = getDb();
 
-    // Also fetch blocked IPs from waf_rules
-    const wafRules = db.prepare("SELECT * FROM waf_rules WHERE type = 'ip' AND action = 'block'").all();
+    // Fetch blocked IPs & countries from waf_rules
+    const wafRules = db.prepare("SELECT * FROM waf_rules WHERE type = 'ip' AND action = 'block' ORDER BY created_at DESC").all();
     const blockedCountries = db.prepare("SELECT * FROM waf_rules WHERE type = 'country' AND action = 'block'").all();
 
-    const threats = [];
-    const ipCounts = new Map();
+    // Fetch Honeypot Hits from DB
+    let honeypotHits = [];
+    try {
+      honeypotHits = db.prepare("SELECT * FROM honeypot_hits ORDER BY created_at DESC LIMIT 300").all();
+    } catch (_) {}
+
+    const threatMap = new Map();
     const countryCounts = new Map();
 
-    // 1. Extract from Fail2Ban logs (e.g. "Ban 192.168.1.50" or "[sshd] Ban 45.33.32.156")
-    const banRegex = /Ban\s+([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/g;
-    for (const line of rawLogs) {
-      let match;
-      while ((match = banRegex.exec(line)) !== null) {
-        const ip = match[1];
-        ipCounts.set(ip, (ipCounts.get(ip) || 0) + 1);
+    // 1. Process Honeypot Hits (detailed attack records)
+    for (const hit of honeypotHits) {
+      if (!threatMap.has(hit.ip)) {
+        threatMap.set(hit.ip, {
+          id: hit.id || generateId(),
+          ip: hit.ip,
+          count: 1,
+          target: hit.path || '/.env',
+          category: 'Honeypot Trap',
+          reason: `Probed decoy path (${hit.path || 'sensitive file'})`,
+          userAgent: hit.user_agent || 'Automated Web Vulnerability Scanner',
+          payload: hit.payload || '',
+          action: 'BLOCKED',
+          timestamp: hit.created_at || now(),
+          lastSeen: hit.created_at || now(),
+        });
+      } else {
+        const item = threatMap.get(hit.ip);
+        item.count += 1;
+        if (new Date(hit.created_at) > new Date(item.lastSeen)) {
+          item.lastSeen = hit.created_at;
+          item.timestamp = hit.created_at;
+        }
       }
     }
 
-    // 2. Add WAF rule blocked IPs
-    for (const rule of wafRules) {
-      ipCounts.set(rule.value, (ipCounts.get(rule.value) || 0) + 5);
+    // 2. Extract from Fail2Ban logs (e.g. "2026-07-08 21:05:12 ... [sshd] Ban 45.33.32.156")
+    const banRegex = /([0-9]{4}-[0-9]{2}-[0-9]{2}\s+[0-9]{2}:[0-9]{2}:[0-9]{2}).*?\[([a-zA-Z0-9_-]+)\]\s+Ban\s+([0-9]{1,3}(?:\.[0-9]{1,3}){3})/;
+    const fallbackRegex = /Ban\s+([0-9]{1,3}(?:\.[0-9]{1,3}){3})/;
+
+    for (const line of rawLogs) {
+      const match = banRegex.exec(line);
+      if (match) {
+        const [, timeStr, jail, ip] = match;
+        if (!threatMap.has(ip)) {
+          threatMap.set(ip, {
+            id: generateId(),
+            ip,
+            count: 1,
+            target: `Service [${jail}] (Port ${jail === 'sshd' ? '22' : '80/443'})`,
+            category: 'Fail2Ban Jail',
+            reason: `Brute force threshold exceeded on jail: ${jail}`,
+            userAgent: 'CLI / Automated Network Exploit',
+            payload: `Auth failure limit exceeded in jail ${jail}`,
+            action: 'BANNED',
+            timestamp: timeStr,
+            lastSeen: timeStr,
+          });
+        } else {
+          threatMap.get(ip).count += 1;
+        }
+      } else {
+        const fbMatch = fallbackRegex.exec(line);
+        if (fbMatch) {
+          const ip = fbMatch[1];
+          if (!threatMap.has(ip)) {
+            threatMap.set(ip, {
+              id: generateId(),
+              ip,
+              count: 1,
+              target: 'Network Service Ban',
+              category: 'Fail2Ban',
+              reason: 'Repeated authentication failures',
+              userAgent: 'Automated Bot / Brute Forcer',
+              payload: '',
+              action: 'BANNED',
+              timestamp: now(),
+              lastSeen: now(),
+            });
+          } else {
+            threatMap.get(ip).count += 1;
+          }
+        }
+      }
     }
 
-    // If no real intrusions logged yet, include baseline simulated events for UI readiness
-    if (ipCounts.size === 0) {
-      const demoIps = ['45.33.32.156', '185.220.101.5', '114.119.130.88', '91.240.118.242', '103.245.236.1'];
-      for (const ip of demoIps) ipCounts.set(ip, 3);
+    // 3. Add WAF rule blocked IPs
+    for (const rule of wafRules) {
+      if (!threatMap.has(rule.value)) {
+        threatMap.set(rule.value, {
+          id: rule.id || generateId(),
+          ip: rule.value,
+          count: 5,
+          target: 'Global HTTP(S)',
+          category: 'WAF Rule Block',
+          reason: rule.description || 'Permanently blacklisted in WAF rules',
+          userAgent: 'N/A (IP-level Filter)',
+          payload: '',
+          action: 'BLOCKED',
+          timestamp: rule.created_at || now(),
+          lastSeen: rule.updated_at || rule.created_at || now(),
+        });
+      }
+    }
+
+    // Baseline fallback if completely empty
+    if (threatMap.size === 0) {
+      const demoEvents = [
+        { ip: '45.33.32.156', target: '/wp-login.php', count: 7, category: 'Honeypot Trap', reason: 'WordPress admin brute force attack', userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) BotScanner/2.1', payload: 'log=admin&pwd=password123' },
+        { ip: '185.220.101.5', target: '/.env', count: 12, category: 'Malicious Probe', reason: 'Attempted environment file exfiltration', userAgent: 'curl/7.81.0-DEV', payload: 'GET /.env HTTP/1.1' },
+        { ip: '114.119.130.88', target: '/phpmyadmin/index.php', count: 4, category: 'Honeypot Trap', reason: 'Database panel unauthorized scanner', userAgent: 'sqlmap/1.6#stable', payload: 'pma_username=root' },
+        { ip: '91.240.118.242', target: 'Service [sshd] (Port 22)', count: 9, category: 'Fail2Ban Jail', reason: 'SSH repeated login failure', userAgent: 'libssh2/1.9.0', payload: 'Invalid user admin from 91.240.118.242' },
+        { ip: '103.245.236.1', target: '/actuator/health', count: 3, category: 'Vulnerability Scanner', reason: 'Spring Boot actuator exposure probe', userAgent: 'Nikto/2.1.6', payload: 'GET /actuator/health' },
+      ];
+      for (const d of demoEvents) {
+        threatMap.set(d.ip, {
+          id: generateId(),
+          ip: d.ip,
+          count: d.count,
+          target: d.target,
+          category: d.category,
+          reason: d.reason,
+          userAgent: d.userAgent,
+          payload: d.payload,
+          action: 'BLOCKED',
+          timestamp: new Date(Date.now() - Math.floor(Math.random() * 86400000)).toISOString(),
+          lastSeen: now(),
+        });
+      }
     }
 
     let totalThreats = 0;
-    for (const [ip, count] of ipCounts.entries()) {
-      const geo = await this.resolveIp(ip);
-      totalThreats += count;
+    const threats = [];
 
-      threats.push({
-        ip,
-        count,
-        countryCode: geo.countryCode,
-        countryName: geo.countryName,
-        lat: geo.lat,
-        lng: geo.lng,
-        lastSeen: now(),
-      });
+    for (const [ip, threat] of threatMap.entries()) {
+      const geo = await this.resolveIp(ip);
+      totalThreats += threat.count;
+
+      threat.countryCode = geo.countryCode;
+      threat.countryName = geo.countryName;
+      threat.lat = geo.lat;
+      threat.lng = geo.lng;
+      threats.push(threat);
 
       const curr = countryCounts.get(geo.countryCode) || {
         countryCode: geo.countryCode,
@@ -131,9 +234,12 @@ class GeoIpService {
         count: 0,
         isBlocked: blockedCountries.some(b => b.value.toUpperCase() === geo.countryCode),
       };
-      curr.count += count;
+      curr.count += threat.count;
       countryCounts.set(geo.countryCode, curr);
     }
+
+    // Sort threats by timestamp (newest first)
+    threats.sort((a, b) => new Date(b.timestamp || b.lastSeen) - new Date(a.timestamp || a.lastSeen));
 
     const countries = Array.from(countryCounts.values())
       .map(c => ({
@@ -144,10 +250,10 @@ class GeoIpService {
 
     return {
       totalThreats,
-      uniqueIps: ipCounts.size,
+      uniqueIps: threatMap.size,
       topAttackingCountries: countries.slice(0, 10),
       countries,
-      threats: threats.slice(0, 50),
+      threats, // Return ALL aggregated threats
       blockedCountriesList: blockedCountries.map(b => ({
         id: b.id,
         countryCode: b.value.toUpperCase(),
