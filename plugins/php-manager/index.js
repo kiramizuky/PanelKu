@@ -17,7 +17,7 @@ export default {
       if (process.platform === 'win32') {
         return 'Mock output for command: ' + cmd;
       }
-      const { stdout } = await execAsync(cmd);
+      const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 });
       return stdout.trim();
     }
 
@@ -360,6 +360,65 @@ export default {
       }
     });
 
+    // Helper: ensure multi-version PHP repositories are configured (Debian Sury / Ubuntu Ondrej / DNF Remi)
+    async function ensurePhpRepo(pmType, distro) {
+      if (process.platform === 'win32') return;
+
+      if (pmType === 'apt') {
+        let isDebian = false;
+        try {
+          const osRel = await fs.readFile('/etc/os-release', 'utf8').catch(() => '');
+          if (osRel.includes('ID=debian') || (osRel.includes('ID_LIKE=debian') && !osRel.includes('ubuntu'))) {
+            isDebian = true;
+          }
+        } catch (_) {}
+
+        if (isDebian || distro === 'debian') {
+          logger.info('PHP Manager: Ensuring Sury repository for Debian...');
+          try {
+            await runCommand('sudo DEBIAN_FRONTEND=noninteractive apt-get update -y').catch(() => {});
+            await runCommand('sudo DEBIAN_FRONTEND=noninteractive apt-get install -y lsb-release ca-certificates apt-transport-https curl gnupg software-properties-common');
+            await runCommand('sudo curl -sSLo /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg');
+            const codename = (await runCommand('lsb_release -sc 2>/dev/null || (grep VERSION_CODENAME /etc/os-release | cut -d= -f2)')).trim() || 'bookworm';
+            await runCommand(`echo "deb https://packages.sury.org/php/ ${codename} main" | sudo tee /etc/apt/sources.list.d/sury-php.list`);
+            await runCommand('sudo apt-get update -y');
+            logger.info('PHP Manager: Sury repository for Debian successfully added.');
+          } catch (repoErr) {
+            logger.error(`PHP Manager: Failed to configure Sury Debian repository: ${repoErr.message}`);
+          }
+        } else {
+          logger.info('PHP Manager: Ensuring Ondrej PPA for Ubuntu...');
+          let ppaSuccess = false;
+          try {
+            await runCommand('sudo DEBIAN_FRONTEND=noninteractive apt-get update -y').catch(() => {});
+            await runCommand('sudo DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common ca-certificates lsb-release gnupg curl');
+            await runCommand('sudo LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php');
+            await runCommand('sudo apt-get update -y');
+            ppaSuccess = true;
+            logger.info('PHP Manager: Ondrej PPA added via add-apt-repository.');
+          } catch (ppaErr) {
+            logger.warn(`PHP Manager: add-apt-repository failed (${ppaErr.message}), trying direct Launchpad PPA setup...`);
+          }
+
+          if (!ppaSuccess) {
+            try {
+              const codename = (await runCommand('lsb_release -sc 2>/dev/null || (grep UBUNTU_CODENAME /etc/os-release | cut -d= -f2)')).trim() || 'jammy';
+              await runCommand('sudo curl -sSLo /etc/apt/trusted.gpg.d/ondrej-php.gpg "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14AA40EC0831756756D7F66C4F4EA0AAE5267A6C"');
+              await runCommand(`echo "deb [signed-by=/etc/apt/trusted.gpg.d/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu ${codename} main" | sudo tee /etc/apt/sources.list.d/ondrej-php.list`);
+              await runCommand('sudo apt-get update -y');
+              logger.info('PHP Manager: Ondrej PPA added directly.');
+            } catch (directErr) {
+              logger.error(`PHP Manager: Direct Ondrej PPA setup failed: ${directErr.message}`);
+            }
+          }
+        }
+      } else if (pmType === 'dnf') {
+        try {
+          await runCommand('sudo dnf install -y epel-release https://rpms.remirepo.net/enterprise/remi-release-$(rpm -E %rhel).rpm || true');
+        } catch (_) {}
+      }
+    }
+
     // 3. Route: Install PHP Version
     app.post('/api/plugins/php-manager/install', async (req, res) => {
       const { version } = req.body;
@@ -373,22 +432,28 @@ export default {
         
         let installCmd = '';
         if (packageManager.pmType === 'apt') {
-          // Check if ppa:ondrej/php repository is available to get multiple versions
           if (!isWindows) {
+            // Check if package candidate exists; if not, ensure repo is added
+            let hasCandidate = false;
             try {
-              // Add repository if not present
-              await runCommand('sudo apt-get install -y software-properties-common');
-              await runCommand('sudo add-apt-repository -y ppa:ondrej/php');
-              await runCommand('sudo apt-get update');
-            } catch (_) {
-              // Failback/continue if PPA add fails or is already there
+              const checkOutput = await runCommand(`apt-cache show php${version}-fpm 2>/dev/null || true`);
+              if (checkOutput && checkOutput.includes(`Package: php${version}-fpm`)) {
+                hasCandidate = true;
+              }
+            } catch (_) {}
+
+            if (!hasCandidate) {
+              await ensurePhpRepo(packageManager.pmType, packageManager.distro);
             }
           }
+
           const pkgs = `php${version}-fpm php${version}-cli php${version}-sqlite3 php${version}-mysql php${version}-curl php${version}-zip php${version}-xml php${version}-mbstring php${version}-gd`;
           installCmd = `sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ${pkgs}`;
         } else if (packageManager.pmType === 'dnf') {
-          // Fedora remi repository
-          installCmd = `sudo dnf install -y php${version.replace('.', '')}-php-fpm php${version.replace('.', '')}-php-cli`;
+          if (!isWindows) {
+            await ensurePhpRepo(packageManager.pmType, packageManager.distro);
+          }
+          installCmd = `sudo dnf install -y php${version.replace('.', '')}-php-fpm php${version.replace('.', '')}-php-cli php${version.replace('.', '')}-php-mysqlnd php${version.replace('.', '')}-php-gd php${version.replace('.', '')}-php-xml php${version.replace('.', '')}-php-mbstring`;
         } else {
           // Generic
           installCmd = `echo "Installer fallback for ${packageManager.pmType}"`;
@@ -396,9 +461,15 @@ export default {
 
         logger.info(`PHP Manager: Installing PHP ${version} with command: ${installCmd}`);
         await runCommand(installCmd);
+
+        // Start and enable service after install
+        if (!isWindows) {
+          await runCommand(`sudo systemctl enable php${version}-fpm && sudo systemctl start php${version}-fpm`).catch(() => {});
+        }
         
         return successResponse(res, null, `PHP ${version} and extensions installed successfully`);
       } catch (err) {
+        logger.error(`PHP Manager: Install failed for PHP ${version}: ${err.message}`);
         return errorResponse(res, err.message, 500);
       }
     });
