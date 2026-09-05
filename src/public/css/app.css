@@ -1352,3 +1352,62 @@ html.light-mode body {
   .settings-sidebar { margin-bottom: 0; }
   .settings-nav-item { padding: 11px 16px; }
 }
+
+/* ── Global Modal Fixes ───────────────────────────────────── */
+/* Solid, readable background for all modals */
+.modal-content {
+  background: #1a1d2e !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65) !important;
+  border-radius: 12px !important;
+}
+
+.modal-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 18px 22px !important;
+}
+
+.modal-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 14px 22px !important;
+}
+
+.modal-body {
+  padding: 22px !important;
+}
+
+/* Centered by default, scroll on small screens */
+.modal-dialog {
+  margin: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  min-height: calc(100% - 2rem) !important;
+}
+
+.modal.fade .modal-dialog {
+  transform: scale(0.95) translateY(-10px);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.modal.show .modal-dialog {
+  transform: scale(1) translateY(0);
+}
+
+/* Darker backdrop */
+.modal-backdrop.show {
+  opacity: 0.7 !important;
+}
+
+/* Light mode modal override */
+:root.light-mode .modal-content {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  color: #111827 !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2) !important;
+}
+
+:root.light-mode .modal-header,
+:root.light-mode .modal-footer {
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
