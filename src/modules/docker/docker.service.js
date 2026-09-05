@@ -212,6 +212,27 @@ class DockerService {
       await container.stop();
       return true;
     } catch (error) {
+      // 304 means container is already stopped
+      if (error.statusCode === 304) return true;
+
+      // Handle AppArmor / containerd signal permission denied on Linux
+      if (error.message && error.message.toLowerCase().includes('permission denied')) {
+        try {
+          const container = this.docker.getContainer(id);
+          await container.kill();
+          return true;
+        } catch (killErr) {
+          if (killErr.statusCode === 304 || killErr.statusCode === 404) return true;
+          try {
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
+            await execAsync(`sudo docker stop -t 1 ${id} 2>/dev/null || sudo docker kill ${id} 2>/dev/null`);
+            return true;
+          } catch (_) {}
+        }
+      }
+
       throw new Error(`Failed to stop container: ${error.message}`);
     }
   }
@@ -232,6 +253,16 @@ class DockerService {
       await container.kill();
       return true;
     } catch (error) {
+      if (error.statusCode === 304 || error.statusCode === 404) return true;
+      if (error.message && error.message.toLowerCase().includes('permission denied')) {
+        try {
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          await execAsync(`sudo docker kill ${id} 2>/dev/null`);
+          return true;
+        } catch (_) {}
+      }
       throw new Error(`Failed to kill container: ${error.message}`);
     }
   }
