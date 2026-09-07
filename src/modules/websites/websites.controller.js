@@ -106,6 +106,29 @@ class WebsitesController {
       return errorResponse(res, 400, error.message);
     }
   }
+
+  async getWebsiteLogs(req, res) {
+    try {
+      const { id } = req.params;
+      const { type = 'access', lines = 100 } = req.query;
+      const result = await websiteService.getWebsiteLogs(id, type, lines);
+      return successResponse(res, result, 'Website logs retrieved');
+    } catch (error) {
+      return errorResponse(res, 400, error.message);
+    }
+  }
+
+  async clearWebsiteLogs(req, res) {
+    try {
+      const { id } = req.params;
+      const { type = 'access' } = req.body;
+      const result = await websiteService.clearWebsiteLogs(id, type);
+      return successResponse(res, result, result.message || 'Logs cleared');
+    } catch (error) {
+      return errorResponse(res, 400, error.message);
+    }
+  }
 }
 
 export default new WebsitesController();
+

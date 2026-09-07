@@ -607,10 +607,24 @@ class WebsiteService {
       }
 
       logs.push('Deployment completed successfully.');
+      await Website.findByIdAndUpdate(id, {
+        settings: {
+          ...(website.settings || {}),
+          lastDeployLogs: logs,
+          lastDeployTime: new Date().toISOString(),
+        },
+      }).catch(() => {});
       return { success: true, message: 'Deployment successful', logs };
     } catch (error) {
       console.error('Git deploy error:', error);
       logs.push(`Deployment failed: ${error.message}`);
+      await Website.findByIdAndUpdate(id, {
+        settings: {
+          ...(website.settings || {}),
+          lastDeployLogs: logs,
+          lastDeployTime: new Date().toISOString(),
+        },
+      }).catch(() => {});
       throw new Error(`Failed to deploy from Git: ${error.message}\nLogs:\n${logs.join('\n')}`);
     }
   }
@@ -743,6 +757,114 @@ class WebsiteService {
     await this.generateNginxConfig(website);
     return this.getNginxConfig(id);
   }
+
+  // ── Website Logs Viewer ───────────────────────────────────────────────
+
+  async getWebsiteLogs(id, type = 'access', lines = 100) {
+    const website = await Website.findById(id);
+    if (!website) throw new Error('Website not found');
+
+    const safeLines = Math.min(Math.max(parseInt(lines, 10) || 100, 10), 1000);
+    const safeDomain = (website.domain || '').replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    // Deploy history
+    if (type === 'deploy') {
+      const deployLogs = website.settings?.lastDeployLogs || [];
+      return {
+        logFile: 'Git Deployment History',
+        type: 'deploy',
+        lines: deployLogs.length ? deployLogs : ['No deployment history recorded yet.'],
+        timestamp: website.settings?.lastDeployTime || null,
+        empty: deployLogs.length === 0,
+      };
+    }
+
+    const logType = type === 'error' ? 'error' : 'access';
+    let logFile = `/var/log/nginx/${safeDomain}.${logType}.log`;
+
+    // Support Windows local/test fallback if /var/log/nginx is not accessible
+    if (process.platform === 'win32') {
+      try {
+        await fs.access(logFile);
+      } catch {
+        const localLogFile = path.join(process.cwd(), 'data', 'nginx-logs', `${safeDomain}.${logType}.log`);
+        try {
+          await fs.access(localLogFile);
+          logFile = localLogFile;
+        } catch {}
+      }
+    }
+
+    try {
+      await fs.access(logFile);
+      if (process.platform !== 'win32') {
+        const { stdout } = await execAsync(`tail -n ${safeLines} "${logFile}" 2>&1`, { timeout: 10000 });
+        const rawLines = stdout.split('\n');
+        const isEmpty = rawLines.length === 1 && rawLines[0] === '';
+        return {
+          logFile,
+          type: logType,
+          lines: isEmpty ? ['(Log file is currently empty)'] : rawLines,
+          empty: isEmpty,
+        };
+      } else {
+        const content = await fs.readFile(logFile, 'utf8');
+        const allLines = content.split(/\r?\n/).filter(l => l.length > 0);
+        return {
+          logFile,
+          type: logType,
+          lines: allLines.length ? allLines.slice(-safeLines) : ['(Log file is currently empty)'],
+          empty: allLines.length === 0,
+        };
+      }
+    } catch {
+      return {
+        logFile,
+        type: logType,
+        lines: [`Log file ${logFile} does not exist yet (no requests or errors have been recorded).`],
+        empty: true,
+      };
+    }
+  }
+
+  async clearWebsiteLogs(id, type = 'access') {
+    const website = await Website.findById(id);
+    if (!website) throw new Error('Website not found');
+
+    const safeDomain = (website.domain || '').replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    if (type === 'deploy') {
+      const settings = { ...(website.settings || {}) };
+      delete settings.lastDeployLogs;
+      delete settings.lastDeployTime;
+      await Website.findByIdAndUpdate(id, { settings });
+      return { success: true, message: 'Deployment logs cleared' };
+    }
+
+    const logType = type === 'error' ? 'error' : 'access';
+    let logFile = `/var/log/nginx/${safeDomain}.${logType}.log`;
+
+    if (process.platform === 'win32') {
+      try {
+        await fs.access(logFile);
+      } catch {
+        const localLogFile = path.join(process.cwd(), 'data', 'nginx-logs', `${safeDomain}.${logType}.log`);
+        try {
+          await fs.access(localLogFile);
+          logFile = localLogFile;
+        } catch {}
+      }
+    }
+
+    try {
+      await fs.access(logFile);
+      await fs.writeFile(logFile, '');
+      return { success: true, message: `${logType.toUpperCase()} log cleared for ${website.domain}` };
+    } catch {
+      return { success: true, message: `Log file ${logFile} does not exist or is already empty` };
+    }
+  }
 }
 
 export default new WebsiteService();
+

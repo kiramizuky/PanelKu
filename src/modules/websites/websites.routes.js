@@ -20,5 +20,8 @@ router.post('/:id/deploy', requirePermission('websites_manage', 'execute'), webs
 router.get('/:id/nginx-config', requirePermission('websites_manage', 'read'), websitesController.getNginxConfig);
 router.put('/:id/nginx-config', requirePermission('websites_manage', 'update'), websitesController.saveNginxConfig);
 router.post('/:id/nginx-config/reset', requirePermission('websites_manage', 'update'), websitesController.resetNginxConfig);
+router.get('/:id/logs', requirePermission('websites_manage', 'read'), websitesController.getWebsiteLogs);
+router.post('/:id/logs/clear', requirePermission('websites_manage', 'update'), websitesController.clearWebsiteLogs);
 
 export default router;
+

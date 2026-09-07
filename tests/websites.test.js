@@ -159,3 +159,82 @@ describe('WebsiteService Nginx Configuration Editor', () => {
     await expect(websiteService.saveNginxConfig('w-1', 12345)).rejects.toThrow('Configuration content must be a string');
   });
 });
+
+describe('WebsiteService Logs Viewer', () => {
+  test('getWebsiteLogs throws error if website not found', async () => {
+    Website.findById.mockResolvedValue(null);
+    await expect(websiteService.getWebsiteLogs('nonexistent')).rejects.toThrow('Website not found');
+  });
+
+  test('getWebsiteLogs returns deploy history when type is deploy', async () => {
+    Website.findById.mockResolvedValue({
+      id: 'w-1',
+      domain: 'example.com',
+      settings: {
+        lastDeployLogs: ['Cloning repo...', 'npm install', 'Build finished'],
+        lastDeployTime: '2026-09-07T00:00:00.000Z',
+      },
+    });
+
+    const res = await websiteService.getWebsiteLogs('w-1', 'deploy');
+    expect(res.type).toBe('deploy');
+    expect(res.lines).toEqual(['Cloning repo...', 'npm install', 'Build finished']);
+    expect(res.timestamp).toBe('2026-09-07T00:00:00.000Z');
+    expect(res.empty).toBe(false);
+  });
+
+  test('getWebsiteLogs handles empty deploy history gracefully', async () => {
+    Website.findById.mockResolvedValue({
+      id: 'w-2',
+      domain: 'example.com',
+      settings: {},
+    });
+
+    const res = await websiteService.getWebsiteLogs('w-2', 'deploy');
+    expect(res.type).toBe('deploy');
+    expect(res.empty).toBe(true);
+    expect(res.lines[0]).toMatch(/no deployment history/i);
+  });
+
+  test('getWebsiteLogs returns empty message if log file does not exist', async () => {
+    Website.findById.mockResolvedValue({
+      id: 'w-3',
+      domain: 'no-log-domain-test.local',
+    });
+
+    const res = await websiteService.getWebsiteLogs('w-3', 'access', 50);
+    expect(res.type).toBe('access');
+    expect(res.empty).toBe(true);
+    expect(res.lines[0]).toMatch(/does not exist/i);
+  });
+
+  test('clearWebsiteLogs throws error if website not found', async () => {
+    Website.findById.mockResolvedValue(null);
+    await expect(websiteService.clearWebsiteLogs('nonexistent')).rejects.toThrow('Website not found');
+  });
+
+  test('clearWebsiteLogs clears deploy history', async () => {
+    Website.findById.mockResolvedValue({
+      id: 'w-4',
+      domain: 'deploy-clean.local',
+      settings: { lastDeployLogs: ['log 1'] },
+    });
+    Website.findByIdAndUpdate = jest.fn().mockResolvedValue({});
+
+    const res = await websiteService.clearWebsiteLogs('w-4', 'deploy');
+    expect(res.success).toBe(true);
+    expect(res.message).toBe('Deployment logs cleared');
+  });
+
+  test('clearWebsiteLogs handles non-existent log file gracefully', async () => {
+    Website.findById.mockResolvedValue({
+      id: 'w-5',
+      domain: 'no-file-clear.local',
+    });
+
+    const res = await websiteService.clearWebsiteLogs('w-5', 'error');
+    expect(res.success).toBe(true);
+    expect(res.message).toMatch(/does not exist or is already empty/i);
+  });
+});
+

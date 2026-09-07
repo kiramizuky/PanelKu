@@ -62,6 +62,9 @@ const WebsitesPage = (() => {
               <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('WebsitesPage.openFolder', '${LP.encJsArg(w.rootDirectory || '')}')" title="File Manager">
                 <i class="bi bi-folder"></i>
               </button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-secondary" onclick="LP.call('WebsitesPage.openWebsiteLogs', '${LP.encJsArg(w._id)}')" title="View Logs">
+                <i class="bi bi-journal-text"></i>
+              </button>
               <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LP.call('WebsitesPage.openEditDrawer', '${LP.encJsArg(w._id)}')" title="Edit Website">
                 <i class="bi bi-pencil-square me-1"></i> Edit
               </button>
@@ -93,6 +96,11 @@ const WebsitesPage = (() => {
     }
     if (btn.dataset.target === 'etab-ssl' && currentEditId && currentEditWebsite) {
       renderSslStatus(currentEditWebsite);
+    }
+    if (btn.dataset.target === 'etab-logs' && currentEditId) {
+      loadLogsForDrawer();
+    } else {
+      stopAutoRefreshLogs();
     }
   }
 
@@ -516,14 +524,145 @@ const WebsitesPage = (() => {
     else LP.toast('No document root set', 'warning');
   }
 
+  // ─── Website Logs Tab ──────────────────────────────────────────────────────
+  let logRefreshInterval = null;
+
+  async function loadLogsForDrawer() {
+    if (!currentEditId) return;
+    const typeSelect = document.getElementById('wlLogType');
+    const linesSelect = document.getElementById('wlLogLines');
+    const contentEl = document.getElementById('wlLogContent');
+    const pathEl = document.getElementById('wlFilePath');
+    const timeEl = document.getElementById('wlLogTimestamp');
+
+    const type = typeSelect ? typeSelect.value : 'access';
+    const lines = linesSelect ? linesSelect.value : '100';
+
+    try {
+      const res = await LP.get(`/websites/${currentEditId}/logs?type=${encodeURIComponent(type)}&lines=${encodeURIComponent(lines)}`);
+      if (res?.success && res.data) {
+        if (pathEl) pathEl.textContent = res.data.logFile || '--';
+        if (timeEl) {
+          timeEl.textContent = res.data.timestamp
+            ? `Last updated: ${new Date(res.data.timestamp).toLocaleString()}`
+            : `Retrieved: ${new Date().toLocaleTimeString()}`;
+        }
+        if (contentEl) {
+          const rawLines = res.data.lines || [];
+          if (rawLines.length === 0 || res.data.empty) {
+            contentEl.textContent = rawLines[0] || '(Log file is currently empty)';
+            contentEl.style.color = '#94a3b8';
+          } else {
+            contentEl.textContent = rawLines.join('\n');
+            contentEl.style.color = type === 'error' ? '#fca5a5' : '#e2e8f0';
+            contentEl.scrollTop = contentEl.scrollHeight;
+          }
+        }
+      } else {
+        if (contentEl) contentEl.textContent = `Error: ${res?.message || 'Failed to fetch logs'}`;
+      }
+    } catch (err) {
+      if (contentEl) contentEl.textContent = `Error loading logs: ${err.message}`;
+    }
+  }
+
+  async function clearLogs() {
+    if (!currentEditId) return;
+    const typeSelect = document.getElementById('wlLogType');
+    const type = typeSelect ? typeSelect.value : 'access';
+    const label = type === 'deploy' ? 'Git Deployment History' : `Nginx ${type.toUpperCase()} Log`;
+
+    if (!(await LP.confirm(`Are you sure you want to clear ${label}?`, 'Clear Log File'))) return;
+
+    try {
+      const res = await LP.post(`/websites/${currentEditId}/logs/clear`, { type });
+      if (res?.success) {
+        LP.toast(res.data?.message || res.message || 'Log cleared successfully', 'success');
+        await loadLogsForDrawer();
+      } else {
+        LP.toast(`Failed to clear log: ${res?.message || 'Unknown error'}`, 'error');
+      }
+    } catch (err) {
+      LP.toast(`Error clearing log: ${err.message}`, 'error');
+    }
+  }
+
+  function toggleAutoRefreshLogs(checkbox) {
+    if (checkbox && checkbox.checked) {
+      startAutoRefreshLogs();
+    } else {
+      stopAutoRefreshLogs();
+    }
+  }
+
+  function startAutoRefreshLogs() {
+    stopAutoRefreshLogs();
+    const chk = document.getElementById('wlAutoRefresh');
+    if (chk) chk.checked = true;
+    logRefreshInterval = setInterval(() => {
+      const logsPane = document.getElementById('etab-logs');
+      if (logsPane && logsPane.style.display !== 'none' && currentEditId) {
+        loadLogsForDrawer();
+      } else {
+        stopAutoRefreshLogs();
+      }
+    }, 5000);
+  }
+
+  function stopAutoRefreshLogs() {
+    if (logRefreshInterval) {
+      clearInterval(logRefreshInterval);
+      logRefreshInterval = null;
+    }
+    const chk = document.getElementById('wlAutoRefresh');
+    if (chk) chk.checked = false;
+  }
+
+  function askAILog() {
+    const contentEl = document.getElementById('wlLogContent');
+    const typeSelect = document.getElementById('wlLogType');
+    const type = typeSelect ? typeSelect.value : 'website log';
+    const logs = contentEl ? contentEl.textContent : '';
+
+    if (!logs || logs.includes('does not exist') || logs.includes('currently empty')) {
+      LP.toast('No meaningful logs available to analyze.', 'info');
+      return;
+    }
+
+    if (window.askAI) {
+      window.askAI(`Tolong analisis log website (${type}) berikut, jelaskan masalah yang terjadi dan rekomendasi solusinya:\n\n${logs.substring(0, 4000)}`, {
+        logType: `website-${type}`,
+        websiteId: currentEditId,
+        domain: currentEditWebsite?.domain,
+      });
+    } else {
+      LP.toast('AI Assistant is not available.', 'warning');
+    }
+  }
+
+  async function openWebsiteLogs(id) {
+    await openEditDrawer(id);
+    const logsBtn = document.querySelector('.ew-tab-btn[data-target="etab-logs"]');
+    if (logsBtn) {
+      switchEditTab(logsBtn);
+    }
+  }
+
   // ─── Public API ────────────────────────────────────────────────────────────
   return {
     async init() {
       await LP.init();
       if (!LP.state.accessToken) return;
       createModal = new bootstrap.Modal(document.getElementById('createWebsiteModal'));
+      const editModalEl = document.getElementById('editWebsiteModal');
+      if (editModalEl) {
+        editModalEl.addEventListener('hidden.bs.modal', () => {
+          stopAutoRefreshLogs();
+        });
+      }
       loadWebsites();
     },
+
 
     showCreateModal() {
       document.getElementById('createWebsiteForm').reset();
@@ -634,7 +773,15 @@ const WebsitesPage = (() => {
     copyWebhookUrl,
     editOpenFolder,
 
+    // Website Logs Viewer
+    openWebsiteLogs,
+    loadLogsForDrawer,
+    clearLogs,
+    toggleAutoRefreshLogs,
+    askAILog,
+
     // Legacy compat — safely open drawer then switch to target tab
+
     async configSSL(id) {
       await openEditDrawer(id);
       // Wait for drawer animation then switch tab

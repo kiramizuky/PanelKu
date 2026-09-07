@@ -136,8 +136,14 @@
               <i class="bi bi-git me-1"></i> Git / Deploy
             </button>
           </li>
+          <li class="nav-item">
+            <button class="ew-tab-btn" data-target="etab-logs" onclick="WebsitesPage.switchEditTab(this)" style="font-size:13px;padding:12px 18px;border:none;background:none;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s;">
+              <i class="bi bi-journal-text me-1"></i> Logs
+            </button>
+          </li>
         </ul>
       </div>
+
 
       <div class="modal-body" style="padding:24px 28px;max-height:75vh;overflow-y:auto;background:#151824;">
 
@@ -312,6 +318,57 @@
         </button>
       </div>
     </div>
+
+    <!-- ---- TAB: Logs ---- -->
+    <div id="etab-logs" class="ew-tab-pane" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div style="min-width:160px;">
+            <select id="wlLogType" class="lp-input" style="font-size:12px;padding:5px 10px;height:34px;" onchange="WebsitesPage.loadLogsForDrawer()">
+              <option value="access">Nginx Access Log</option>
+              <option value="error">Nginx Error Log</option>
+              <option value="deploy">Git Deploy History</option>
+            </select>
+          </div>
+          <div style="width:110px;">
+            <select id="wlLogLines" class="lp-input" style="font-size:12px;padding:5px 10px;height:34px;" onchange="WebsitesPage.loadLogsForDrawer()">
+              <option value="50">50 lines</option>
+              <option value="100" selected>100 lines</option>
+              <option value="200">200 lines</option>
+              <option value="500">500 lines</option>
+            </select>
+          </div>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WebsitesPage.loadLogsForDrawer()" title="Refresh Logs" style="height:34px;">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+          </button>
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.03);padding:0 10px;height:34px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);">
+            <input type="checkbox" id="wlAutoRefresh" style="accent-color:var(--primary-color);width:14px;height:14px;cursor:pointer;" onchange="WebsitesPage.toggleAutoRefreshLogs(this)">
+            <label for="wlAutoRefresh" style="font-size:11px;color:var(--text-muted);cursor:pointer;margin:0;user-select:none;">Auto-refresh (5s)</label>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="WebsitesPage.askAILog()" title="Analyze with OpenClaw AI" style="height:34px;">
+            <i class="bi bi-stars me-1 text-warning"></i> Tanya AI
+          </button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="WebsitesPage.clearLogs()" title="Clear this log file" style="height:34px;">
+            <i class="bi bi-trash me-1"></i> Clear Log
+          </button>
+        </div>
+      </div>
+
+      <!-- File Path Bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,0.3);padding:6px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);margin-bottom:10px;font-size:11px;">
+        <span class="text-muted"><i class="bi bi-file-earmark-text me-1"></i> File: <span id="wlFilePath" class="font-mono text-light">--</span></span>
+        <span id="wlLogTimestamp" class="text-muted font-mono" style="font-size:10.5px;"></span>
+      </div>
+
+      <!-- Console Output Card -->
+      <div style="position:relative;background:#0d0f18;border:1px solid rgba(255,255,255,0.1);border-radius:8px;overflow:hidden;">
+        <pre id="wlLogContent" class="font-mono" style="margin:0;padding:14px;font-size:11.5px;line-height:1.6;color:#e2e8f0;background:transparent;max-height:450px;min-height:220px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;">Loading website logs...</pre>
+      </div>
+    </div>
+
 
       </div>
     </div>
