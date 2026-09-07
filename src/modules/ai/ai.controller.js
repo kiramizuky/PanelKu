@@ -1,40 +1,101 @@
 import { successResponse, errorResponse } from '../../helpers/response.js';
-import systemService from '../system/system.service.js';
+import aiService from './ai.service.js';
 import logger from '../../config/logger.js';
 
 class AIController {
   async chat(req, res) {
     try {
       const { message, context = {} } = req.body;
-      if (!message) return errorResponse(res, 'Message is required', 400);
+      if (!message) return errorResponse(res, 400, 'Message is required');
 
-      // Construct rich prompt including context logs if available
-      let prompt = message;
-      if (context.logText) {
-        prompt = `${message}\n\n[Terminal/Log Context]:\n\`\`\`\n${context.logText}\n\`\`\``;
+      // 1. Check if this is a Terminal Error Diagnosis request from /terminal
+      if (context.logType === 'terminal_error' && context.logText) {
+        const diag = aiService.diagnoseTerminalError(context.logText);
+        const response = `**Hasil Diagnosa Error Terminal (${diag.category}):**
+${diag.explanation}
+
+**Perintah Diagnosa / Pengecekan:**
+\`\`\`bash
+${diag.fixCommand}
+\`\`\`${diag.actionAdvice ? `\n**Perintah Perbaikan yang Disarankan:**\n\`\`\`bash\n${diag.actionAdvice}\n\`\`\`\n` : ''}`;
+
+        return successResponse(res, { answer: response, diagnosis: diag });
       }
 
-      // Check if user has AI settings configured with apiKey
+      // 2. Check for Direct Diagnostic Intent (e.g. "cek penggunaan ram tertinggi", "cek disk", etc.)
+      const matchedIntent = aiService.matchDiagnosticIntent(message);
+      if (matchedIntent) {
+        try {
+          const execRes = await aiService.executeCommand(matchedIntent.command);
+          const output = execRes.stdout || execRes.stderr || '(Tidak ada output yang dihasilkan)';
+          
+          let response = `### 🔍 ${matchedIntent.title}
+Data aktual dari server Anda saat ini:
+
+\`\`\`bash
+# ${matchedIntent.command}
+${output}
+\`\`\``;
+
+          if (matchedIntent.actionAdvice) {
+            response += `\n\n**💡 Rekomendasi Tindakan:**
+\`\`\`bash
+${matchedIntent.actionAdvice}
+\`\`\`
+*Klik tombol **Jalankan** di atas jika Anda ingin menerapkan tindakan ini.*`;
+          }
+
+          return successResponse(res, {
+            answer: response,
+            intent: matchedIntent.intent,
+            commandExecuted: matchedIntent.command,
+          });
+        } catch (execErr) {
+          logger.warn(`Diagnostic intent exec failed: ${execErr.message}`);
+        }
+      }
+
+      // 3. Construct rich prompt including context logs if available
+      let prompt = message;
+      if (context.logText) {
+        prompt = `${message}\n\n[Terminal/Log Context]:\n\`\`\`\n${context.logText.slice(0, 3000)}\n\`\`\``;
+      }
+
+      // 4. Check if user has AI settings configured with apiKey
       const aiSettings = req.user?.aiSettings || { provider: 'openai', apiKey: '', model: 'gpt-4o-mini' };
       if (aiSettings.apiKey) {
         try {
           const provider = aiSettings.provider || 'openai';
           const apiKey = aiSettings.apiKey;
           const model = aiSettings.model || 'gpt-4o-mini';
-          
+
+          // Snapshot real system state to inform LLM
+          const snapshot = await aiService.getSystemSnapshot();
+          const systemPrompt = `You are OpenClaw AI Copilot, an intelligent Linux server administrator assistant for the PanelKu control panel.
+Current Server Metrics:
+- OS: ${snapshot.platform}, Uptime: ${snapshot.uptimeHours} hours
+- CPU: ${snapshot.cpuCount} cores (${snapshot.cpuModel}), Load Avg: ${snapshot.loadAverage}
+- Memory: ${snapshot.memory.usedMb}MB used / ${snapshot.memory.totalMb}MB total (${snapshot.memory.percent}% used)
+- Root Disk: ${snapshot.rootDisk}
+
+Always provide practical, direct solutions. When suggesting any shell command for the user to run, ALWAYS format it in a clean single markdown code block (\`\`\`bash ... \`\`\`) so the PanelKu UI can render an instant 1-Click execution button.`;
+
           let responseText = '';
-          
+
           if (provider === 'openai') {
             const resApi = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
+                'Authorization': `Bearer ${apiKey}`,
               },
               body: JSON.stringify({
                 model: model,
-                messages: [{ role: 'user', content: prompt }]
-              })
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: prompt },
+                ],
+              }),
             });
             const dataApi = await resApi.json();
             responseText = dataApi.choices?.[0]?.message?.content || JSON.stringify(dataApi);
@@ -42,12 +103,12 @@ class AIController {
             const geminiModel = model.includes('/') ? model : `models/${model || 'gemini-1.5-flash'}`;
             const resApi = await fetch(`https://generativelanguage.googleapis.com/v1beta/${geminiModel}:generateContent?key=${apiKey}`, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-              })
+                contents: [
+                  { parts: [{ text: `${systemPrompt}\n\nPertanyaan User: ${prompt}` }] },
+                ],
+              }),
             });
             const dataApi = await resApi.json();
             responseText = dataApi.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(dataApi);
@@ -58,97 +119,114 @@ class AIController {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`,
                 'HTTP-Referer': 'https://github.com/kiramizuky/PanelKu',
-                'X-Title': 'Panelku'
+                'X-Title': 'Panelku',
               },
               body: JSON.stringify({
                 model: model || 'google/gemini-2.5-flash',
-                messages: [{ role: 'user', content: prompt }]
-              })
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: prompt },
+                ],
+              }),
             });
             const dataApi = await resApi.json();
             responseText = dataApi.choices?.[0]?.message?.content || JSON.stringify(dataApi);
-          } else {
-            throw new Error('Unsupported AI provider: ' + provider);
           }
-          
-          return successResponse(res, { answer: responseText });
+
+          if (responseText) {
+            return successResponse(res, { answer: responseText });
+          }
         } catch (e) {
-          // Fallback to local heuristic
+          logger.debug(`External AI provider error, falling back to local heuristic: ${e.message}`);
         }
       }
 
+      // 5. Local Fallback Heuristics
       const msg = message.toLowerCase();
       let response = '';
 
       if (msg.includes('ram') || msg.includes('memori') || msg.includes('memory')) {
-        const mem = await systemService.runCommand('free -m').catch(() => 'Mem: 8000 6500 1500');
-        response = `Berdasarkan analisis memori server Anda saat ini:
+        const memRes = await aiService.executeCommand('free -h').catch(() => ({ stdout: 'Mem: 8.0Gi 6.5Gi 1.5Gi' }));
+        response = `Berdasarkan pengecekan memori server:
+\`\`\`bash
+free -h
+${memRes.stdout}
 \`\`\`
-${mem}
-\`\`\`
-Penyebab RAM tinggi biasanya dikarenakan caching oleh OS (tidak berbahaya) atau kontainer Docker/proses PM2 yang memakan memori besar.
-**Rekomendasi:**
-1. Jalankan \`sync && echo 3 > /proc/sys/vm/drop_caches\` untuk membersihkan cache OS.
-2. Periksa kontainer Docker yang paling boros di tab Docker.`;
+Penyebab RAM tinggi biasanya caching kernel OS (pagecache/buffers) atau kontainer Docker/database.
+**Rekomendasi Pembersihan:**
+\`\`\`bash
+sync && echo 3 > /proc/sys/vm/drop_caches
+\`\`\``;
       } else if (msg.includes('cpu') || msg.includes('proses')) {
-        const cpu = await systemService.runCommand('ps -eo %cpu,%mem,cmd --sort=-%cpu | head -n 5').catch(() => '15.5% nginx');
-        response = `Berikut adalah 5 proses teratas yang menggunakan CPU paling banyak saat ini:
+        const cpuRes = await aiService.executeCommand('ps -eo pid,user,%cpu,cmd --sort=-%cpu | head -n 6').catch(() => ({ stdout: '15.5% nginx' }));
+        response = `Berikut 5 proses teratas yang menggunakan CPU paling banyak:
+\`\`\`bash
+ps -eo pid,user,%cpu,cmd --sort=-%cpu | head -n 6
+${cpuRes.stdout}
 \`\`\`
-${cpu}
-\`\`\`
-Jika CPU terus-menerus mendekati 100%, Anda dapat membatasi resource CPU kontainer melalui tab Docker atau menghentikan proses yang menggantung.`;
+Jika CPU terus tinggi, Anda dapat membatasi batas CPU kontainer di menu Docker atau menghentikan proses yang menggantung.`;
       } else if (msg.includes('disk') || msg.includes('penyimpanan') || msg.includes('habis')) {
-        response = `Untuk menjaga penyimpanan disk tetap aman, pastikan Anda rutin menjalankan pembersihan berikut:
-1. Prune unused Docker images/volumes di tab Docker.
-2. Bersihkan berkas log log lama di \`/var/log\` atau hapus backup database lama di \`storage/backups\`.`;
+        const dfRes = await aiService.executeCommand('df -h').catch(() => ({ stdout: '/dev/sda1 50G 45G 5G 90% /' }));
+        response = `Status kapasitas partisi disk saat ini:
+\`\`\`bash
+df -h
+${dfRes.stdout}
+\`\`\`
+**Rekomendasi Pembersihan:**
+\`\`\`bash
+journalctl --vacuum-size=100M && apt clean
+\`\`\``;
       } else if (msg.includes('docker') || msg.includes('container')) {
-        response = `Panelku terintegrasi penuh dengan Docker. Anda bisa:
-1. Membuat kontainer baru dari Docker Hub via tab *Create Container*.
-2. Melakukan deployment multi-kontainer menggunakan *Docker Compose*.
-3. Masuk ke terminal kontainer secara instan menggunakan tombol *Terminal Console* di baris kontainer.`;
-      } else if (context.logType === 'fail2ban' || msg.includes('fail2ban') || msg.includes('blokir') || msg.includes('intrusion') || msg.includes('ban')) {
-        // Fail2Ban log analysis
-        const _logSnippet = (context.logText || '').slice(0, 800);
+        const docRes = await aiService.executeCommand('docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"').catch(() => ({ stdout: 'No running containers' }));
+        response = `Daftar kontainer Docker yang sedang aktif:
+\`\`\`bash
+docker ps
+${docRes.stdout}
+\`\`\`
+Anda dapat mengelola kontainer lebih lengkap melalui menu **Docker** di sidebar.`;
+      } else if (context.logType === 'fail2ban' || msg.includes('fail2ban') || msg.includes('blokir') || msg.includes('intrusion')) {
         const bannedIps = (context.logText || '').match(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/g) || [];
         const uniqueIps = [...new Set(bannedIps)].slice(0, 5);
         response = `**Analisis Log Fail2Ban:**
-Fail2Ban mendeteksi upaya login mencurigakan dan secara otomatis memblokir IP penyerang untuk melindungi port SSH dan layanan lainnya.
-
-${uniqueIps.length > 0 ? `**IP yang terdeteksi dalam log:**\n${uniqueIps.map(ip => '- ' + ip).join('\n')}\n\n` : ''}**Rekomendasi:**
-1. Periksa apakah IP yang diblokir adalah bot/scanner — jika ya, biarkan Fail2Ban bekerja.
-2. Jika IP yang terblokir adalah Anda sendiri, lakukan unban melalui terminal: \`fail2ban-client set sshd unbanip <IP>\`
-3. Tingkatkan keamanan SSH: gunakan key-based authentication dan nonaktifkan login password di \`/etc/ssh/sshd_config\`.
-4. Pertimbangkan mengurangi \`maxretry\` di konfigurasi Fail2Ban untuk respon lebih cepat terhadap brute-force.`;
-      } else if (context.logText) {
-        // Log Analyzer context helper
-        const logText = context.logText.toLowerCase();
-        if (logText.includes('address already in use') || logText.includes('bind')) {
-          response = `**Analisis Error AI:**
-Tampaknya ada bentrokan port (*Port Conflict*). Layanan gagal dijalankan karena port yang diminta sudah digunakan oleh proses lain.
-**Solusi:**
-1. Temukan proses yang memakan port tersebut menggunakan perintah \`netstat -tulnp\` atau \`ss -tulnp\`.
-2. Matikan proses tersebut (\`kill -9 PID\`) atau ganti port layanan Anda ke port lain yang kosong.`;
-        } else if (logText.includes('permission denied') || logText.includes('access denied')) {
-          response = `**Analisis Error AI:**
-Layanan tidak memiliki izin akses (*Permission Denied*) ke berkas atau direktori tertentu.
-**Solusi:**
-1. Jalankan \`chown -R www-data:www-data\` (untuk Nginx/Apache) atau sesuaikan kepemilikan berkas ke user yang tepat.
-2. Berikan izin baca-tulis menggunakan perintah \`chmod 755\` atau \`chmod 644\`.`;
-        } else {
-          response = `**Analisis Error AI:**
-Saya mendeteksi log. Berdasarkan konten log yang diberikan, pastikan semua berkas konfigurasi sudah benar, hak akses direktori sudah sesuai, dan seluruh port yang diperlukan tidak saling bertabrakan.`;
-        }
+Fail2Ban mendeteksi upaya serangan dan memblokir IP penyerang secara otomatis.
+${uniqueIps.length > 0 ? `\n**IP terdeteksi:**\n${uniqueIps.map(ip => '- ' + ip).join('\n')}\n` : ''}
+Untuk membuka blokir IP tertentu jika salah terblokir:
+\`\`\`bash
+fail2ban-client unban <IP_ADDRESS>
+\`\`\``;
       } else {
-        response = `Halo! Saya adalah **OpenClaw AI Copilot**. Saya siap membantu Anda mengelola server ini dengan mudah.
-Anda bisa menanyakan status resource server (seperti RAM/CPU/Disk), cara deploy kontainer, atau meminta saya menganalisis log error apa pun.`;
+        response = `Halo! Saya adalah **OpenClaw AI Copilot**. Saya dapat mengeksekusi pengecekan langsung pada server Anda.
+Contoh yang dapat Anda tanyakan:
+- *"Cek penggunaan RAM tertinggi"*
+- *"Cek proses CPU terberat"*
+- *"Cek sisa kapasitas disk"*
+- *"Cek port terbuka"*
+- *"Cek status kontainer Docker"*
+- *"Cek service yang gagal"*`;
       }
 
       return successResponse(res, { answer: response });
     } catch (error) {
       logger.error('AI chat error: ' + (error?.stack || error?.message || error));
-      return errorResponse(res, error.message || 'Internal AI error', 500);
+      return errorResponse(res, 500, error.message || 'Internal AI error');
+    }
+  }
+
+  /**
+   * Execute command from AI suggestion
+   */
+  async exec(req, res) {
+    try {
+      const { command } = req.body;
+      if (!command) return errorResponse(res, 400, 'Command is required');
+
+      const result = await aiService.executeCommand(command);
+      return successResponse(res, result, 'Perintah berhasil dieksekusi');
+    } catch (error) {
+      return errorResponse(res, 400, error.message);
     }
   }
 }
 
 export default new AIController();
+

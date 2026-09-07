@@ -279,21 +279,42 @@ const TerminalPage = (() => {
     }
   }
 
+  function isSystemModifyingCommand(cmd) {
+    if (!cmd) return false;
+    return /\b(?:systemctl|service|apt|apt-get|yum|dnf|pacman|rm|kill|pkill|killall|chown|chmod|sed|docker\s+(?:rm|stop|restart|kill)|ufw|iptables|reboot|shutdown|mkfs|dd|truncate)\b/i.test(cmd);
+  }
+
+  async function confirmAndExecuteInTerminal(cmd, title = 'Konfirmasi Eksekusi Perintah') {
+    if (!cmd) return;
+    const cleanCmd = cmd.trim();
+    const isModifying = isSystemModifyingCommand(cleanCmd);
+
+    const safeCmdHtml = LP.escHtml ? LP.escHtml(cleanCmd) : cleanCmd.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const msg = isModifying
+      ? `<div class="text-warning mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Perhatian:</strong> Perintah ini berhubungan dengan perubahan sistem atau layanan server.</div><code>${safeCmdHtml}</code><br><br>Apakah Anda menyetujui eksekusi perintah ini di terminal?`
+      : `Jalankan perintah berikut di sesi terminal aktif?<br><br><code>${safeCmdHtml}</code>`;
+
+    const confirmed = await LP.confirm(msg, title);
+    if (!confirmed) return;
+
+    if (socket && sessionId) {
+      socket.emit('terminal:input', { sessionId, data: cleanCmd + '\n' });
+      if (copilotModal) copilotModal.hide();
+      LP.toast('Perintah dikirim ke sesi terminal', 'info');
+    } else {
+      LP.toast('Sesi terminal tidak terhubung', 'warning');
+    }
+  }
+
   function copyCopilotCommand() {
     if (!currentGeneratedCommand) return;
     navigator.clipboard.writeText(currentGeneratedCommand);
     LP.toast('Command copied to clipboard', 'success');
   }
 
-  function runCopilotCommand() {
+  async function runCopilotCommand() {
     if (!currentGeneratedCommand) return;
-    if (socket && sessionId) {
-      socket.emit('terminal:input', { sessionId, data: currentGeneratedCommand + '\n' });
-      if (copilotModal) copilotModal.hide();
-      LP.toast('Command sent to terminal', 'info');
-    } else {
-      LP.toast('Terminal session is not connected', 'warning');
-    }
+    await confirmAndExecuteInTerminal(currentGeneratedCommand, 'Konfirmasi Perintah AI Copilot');
   }
 
   async function analyzeTerminalError() {
@@ -327,6 +348,13 @@ const TerminalPage = (() => {
           currentFixCommand = codeMatch[1].trim();
           if (fixCmdContainer) fixCmdContainer.classList.remove('d-none');
           if (fixCommandOutput) fixCommandOutput.textContent = currentFixCommand;
+
+          const fixRiskBadge = document.getElementById('fixRiskBadge');
+          if (fixRiskBadge) {
+            const isMod = isSystemModifyingCommand(currentFixCommand);
+            fixRiskBadge.className = `lp-badge lp-badge-${isMod ? 'warning' : 'success'}`;
+            fixRiskBadge.textContent = isMod ? 'MODIFIES SYSTEM' : 'SAFE / READ-ONLY';
+          }
         } else {
           currentFixCommand = '';
           if (fixCmdContainer) fixCmdContainer.classList.add('d-none');
@@ -354,15 +382,9 @@ const TerminalPage = (() => {
     LP.toast('Perintah solusi berhasil disalin', 'success');
   }
 
-  function runFixCommand() {
+  async function runFixCommand() {
     if (!currentFixCommand) return;
-    if (socket && sessionId) {
-      socket.emit('terminal:input', { sessionId, data: currentFixCommand + '\n' });
-      if (copilotModal) copilotModal.hide();
-      LP.toast('Perintah solusi dikirim ke terminal', 'info');
-    } else {
-      LP.toast('Terminal session is not connected', 'warning');
-    }
+    await confirmAndExecuteInTerminal(currentFixCommand, 'Konfirmasi Perintah Solusi AI');
   }
 
   async function sendModalChatMessage() {
@@ -402,8 +424,20 @@ const TerminalPage = (() => {
         let text = res.data.answer || '';
         text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         text = text.replace(/`{3}(?:bash|sh)?\n?([\s\S]+?)`{3}/g, (match, code) => {
-          const escCode = code.replace(/"/g, '&quot;');
-          return `<div class="position-relative my-2"><pre style="background:#05070d; padding:10px; border-radius:6px; font-family:'JetBrains Mono', monospace; font-size:12.5px; border:1px solid rgba(255,255,255,0.08); white-space:pre-wrap; margin:0;">${code}</pre><button class="btn btn-sm btn-dark position-absolute top-0 end-0 m-1 py-0 px-2" style="font-size:11px;" onclick="TerminalPage.insertCodeToTerminal('${escCode}')"><i class="bi bi-play-fill"></i> Run in Terminal</button></div>`;
+          const cleanCode = code.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+          let b64 = '';
+          try {
+            b64 = btoa(unescape(encodeURIComponent(cleanCode.trim())));
+          } catch (_) {
+            b64 = '';
+          }
+          return `<div class="position-relative my-2">
+            <div class="d-flex justify-content-between align-items-center mb-1 px-1">
+              <span class="text-muted" style="font-size:11px; font-family:monospace;">bash</span>
+              <button class="btn btn-sm btn-primary py-0 px-2" style="font-size:11px;" onclick="TerminalPage.insertCodeFromB64('${b64}')"><i class="bi bi-play-fill"></i> Run in Terminal</button>
+            </div>
+            <pre style="background:#05070d; padding:10px; border-radius:6px; font-family:'JetBrains Mono', monospace; font-size:12.5px; border:1px solid rgba(255,255,255,0.08); white-space:pre-wrap; margin:0;">${code}</pre>
+          </div>`;
         });
         text = text.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:4px; font-family:monospace;">$1</code>');
         text = text.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
@@ -427,14 +461,17 @@ const TerminalPage = (() => {
     container.scrollTop = container.scrollHeight;
   }
 
-  function insertCodeToTerminal(cmd) {
+  async function insertCodeToTerminal(cmd) {
     if (!cmd) return;
-    if (socket && sessionId) {
-      socket.emit('terminal:input', { sessionId, data: cmd.trim() + '\n' });
-      if (copilotModal) copilotModal.hide();
-      LP.toast('Perintah dikirim ke terminal', 'info');
-    } else {
-      LP.toast('Terminal session is not connected', 'warning');
+    await confirmAndExecuteInTerminal(cmd, 'Konfirmasi Jalankan di Terminal');
+  }
+
+  async function insertCodeFromB64(b64) {
+    try {
+      const code = decodeURIComponent(escape(atob(b64)));
+      await confirmAndExecuteInTerminal(code, 'Konfirmasi Jalankan di Terminal');
+    } catch (e) {
+      LP.toast('Format perintah tidak valid', 'error');
     }
   }
 
@@ -452,6 +489,7 @@ const TerminalPage = (() => {
     runFixCommand,
     sendModalChatMessage,
     insertCodeToTerminal,
+    insertCodeFromB64,
   };
 })();
 

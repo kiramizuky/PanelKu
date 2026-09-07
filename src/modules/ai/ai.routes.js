@@ -10,5 +10,7 @@ router.use(authenticate);
 router.use(rbac(RESOURCES.AI, ACTIONS.EXECUTE));
 
 router.post('/chat', aiController.chat.bind(aiController));
+router.post('/exec', aiController.exec.bind(aiController));
 
 export default router;
+

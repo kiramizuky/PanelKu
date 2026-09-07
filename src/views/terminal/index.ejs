@@ -116,13 +116,17 @@
               </div>
               <div id="fixExplanationOutput" class="p-3 rounded mb-3" style="background:rgba(255,255,255,0.04); font-size:13px; line-height:1.5; color:var(--text-secondary); border:1px solid rgba(255,255,255,0.06);"></div>
               <div id="fixCmdContainer" class="d-none">
-                <label class="lp-label" style="font-size:11.5px;">Perintah Solusi yang Disarankan:</label>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="lp-label mb-0" style="font-size:11.5px;">Perintah Solusi yang Disarankan:</label>
+                  <span id="fixRiskBadge" class="lp-badge lp-badge-success" style="font-size:10px;">Safe</span>
+                </div>
                 <pre id="fixCommandOutput" class="p-3 rounded text-info mb-3" style="background:#05070d; font-family:'JetBrains Mono', monospace; font-size:13px; line-height:1.5; white-space:pre-wrap; border:1px solid rgba(255,255,255,0.08);"></pre>
                 <div class="d-flex justify-content-end gap-2">
                   <button class="btn-lp btn-lp-secondary" onclick="TerminalPage.copyFixCommand()"><i class="bi bi-clipboard me-1"></i> Copy Perintah Solusi</button>
                   <button class="btn-lp btn-lp-primary" onclick="TerminalPage.runFixCommand()"><i class="bi bi-play-fill me-1"></i> Jalankan Solusi di Terminal</button>
                 </div>
               </div>
+
             </div>
           </div>
 
