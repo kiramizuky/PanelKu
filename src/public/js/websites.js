@@ -52,7 +52,7 @@ const WebsitesPage = (() => {
             <td><span class="lp-badge ${w.status === 'active' ? 'lp-badge-success' : 'lp-badge-warning'}"><span class="lp-badge-dot"></span>${w.status}</span></td>
             <td><span class="lp-badge" style="background:var(--bg-secondary);border:1px solid var(--border-color);text-transform:uppercase">${w.type}</span></td>
             <td class="font-mono" style="font-size:12px;color:var(--text-muted)">
-              ${isProxy ? `127.0.0.1:${w.port}` : LP.escHtml(w.rootDirectory || '')}
+              ${isProxy ? `${LP.escHtml(w.targetHost || '127.0.0.1')}:${w.port || 8080}` : LP.escHtml(w.rootDirectory || '')}
             </td>
             <td style="font-size:13px;">${sslBadge}</td>
             <td style="text-align:right;white-space:nowrap;">
@@ -160,6 +160,8 @@ const WebsitesPage = (() => {
     document.getElementById('editDomain').value = w.domain || '';
     document.getElementById('editAliases').value = (w.aliases || []).join(', ');
     document.getElementById('editRoot').value = w.rootDirectory || '';
+    const editHostEl = document.getElementById('editTargetHost');
+    if (editHostEl) editHostEl.value = w.targetHost || '127.0.0.1';
     document.getElementById('editPort').value = w.port || '';
     document.getElementById('editGitRepo').value = w.gitRepo || '';
     document.getElementById('editGitBranch').value = w.gitBranch || '';
@@ -399,6 +401,8 @@ const WebsitesPage = (() => {
     const aliases = aliasesRaw ? aliasesRaw.split(',').map(a => a.trim()).filter(Boolean) : [];
     const type = document.getElementById('editType').value;
     const rootDirectory = document.getElementById('editRoot').value.trim();
+    const editHostEl = document.getElementById('editTargetHost');
+    const targetHost = editHostEl ? (editHostEl.value.trim() || '127.0.0.1') : '127.0.0.1';
     const port = document.getElementById('editPort').value;
     const phpVersion = document.getElementById('editPhpVersion').value;
     const gitRepo = document.getElementById('editGitRepo').value.trim();
@@ -409,7 +413,7 @@ const WebsitesPage = (() => {
 
     try {
       const res = await LP.put(`/websites/${currentEditId}`, {
-        domain, aliases, type, rootDirectory, port: port ? Number(port) : undefined,
+        domain, aliases, type, rootDirectory, targetHost, port: port ? Number(port) : undefined,
         phpVersion, gitRepo, gitBranch, autoDeploy
       });
       if (res?.success) {
@@ -666,6 +670,8 @@ const WebsitesPage = (() => {
 
     showCreateModal() {
       document.getElementById('createWebsiteForm').reset();
+      const hostEl = document.getElementById('cwTargetHost');
+      if (hostEl) hostEl.value = '127.0.0.1';
       this.toggleTypeFields();
       createModal.show();
     },
@@ -710,7 +716,11 @@ const WebsitesPage = (() => {
 
     onDockerSelected() {
       const select = document.getElementById('cwDockerContainer');
-      if (select.value) document.getElementById('cwPort').value = select.value;
+      if (select.value) {
+        document.getElementById('cwPort').value = select.value;
+        const hostEl = document.getElementById('cwTargetHost');
+        if (hostEl) hostEl.value = '127.0.0.1';
+      }
     },
 
     async createWebsite(e) {
@@ -718,12 +728,14 @@ const WebsitesPage = (() => {
       const domain = document.getElementById('cwDomain').value;
       const type = document.getElementById('cwType').value;
       const rootDirectory = document.getElementById('cwRoot').value || undefined;
+      const hostEl = document.getElementById('cwTargetHost');
+      const targetHost = hostEl ? (hostEl.value.trim() || '127.0.0.1') : '127.0.0.1';
       const port = document.getElementById('cwPort').value || undefined;
       const gitRepo = document.getElementById('cwGitRepo').value || undefined;
       const autoDeploy = document.getElementById('cwAutoDeploy').checked;
       const phpVersion = document.getElementById('cwPhpVersion').value;
 
-      const res = await LP.post('/websites', { domain, type, rootDirectory, port, gitRepo, autoDeploy, phpVersion });
+      const res = await LP.post('/websites', { domain, type, rootDirectory, targetHost, port, gitRepo, autoDeploy, phpVersion });
       if (res?.success) {
         LP.toast('Website created and Nginx reloaded', 'success');
         createModal.hide();

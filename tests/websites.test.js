@@ -238,3 +238,51 @@ describe('WebsiteService Logs Viewer', () => {
   });
 });
 
+describe('WebsiteService._validateTargetHost & Proxy Configuration', () => {
+  test.each([
+    ['127.0.0.1', '127.0.0.1'],
+    ['192.168.1.100', '192.168.1.100'],
+    ['10.0.0.5', '10.0.0.5'],
+    ['172.16.0.2', '172.16.0.2'],
+    ['[::1]', '[::1]'],
+    ['backend.local', 'backend.local'],
+    ['api-service.internal', 'api-service.internal'],
+    ['', '127.0.0.1'],
+    [null, '127.0.0.1'],
+    [undefined, '127.0.0.1'],
+  ])('accepts valid targetHost: %s -> %s', (input, expected) => {
+    expect(websiteService._validateTargetHost(input)).toBe(expected);
+  });
+
+  test.each([
+    ['semicolon injection', '127.0.0.1; rm -rf /'],
+    ['newline injection', '127.0.0.1\nproxy_set_header X-Pwned 1'],
+    ['space injection', '127.0.0.1 8080'],
+    ['quotes injection', '127.0.0.1"'],
+    ['curly braces injection', '127.0.0.1}'],
+  ])('rejects malicious targetHost: %s', (_, input) => {
+    expect(() => websiteService._validateTargetHost(input)).toThrow('Target host contains invalid characters');
+  });
+
+  test('updateWebsite persists targetHost and validates it', async () => {
+    Website.findById.mockResolvedValue({
+      id: 'w-proxy-1',
+      domain: 'proxy.local',
+      type: 'proxy',
+      port: 3000,
+      targetHost: '127.0.0.1',
+      settings: { customNginx: true },
+    });
+    Website.findByIdAndUpdate = jest.fn().mockImplementation((id, data) => ({
+      id,
+      ...data,
+    }));
+
+    const updated = await websiteService.updateWebsite('w-proxy-1', { targetHost: '192.168.1.50' });
+    expect(updated.targetHost).toBe('192.168.1.50');
+
+    await expect(websiteService.updateWebsite('w-proxy-1', { targetHost: '192.168.1.50; injection' }))
+      .rejects.toThrow('Target host contains invalid characters');
+  });
+});
+

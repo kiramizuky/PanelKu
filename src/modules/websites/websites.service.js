@@ -57,7 +57,7 @@ server {
     }
 
     location / {
-        proxy_pass http://127.0.0.1:{{port}};
+        proxy_pass http://{{targetHost}}:{{port}};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -275,7 +275,7 @@ class WebsiteService {
     error_log /var/log/nginx/${website.domain}.error.log;
 
     location / {
-        proxy_pass http://127.0.0.1:${website.port || 8080};
+        proxy_pass http://${website.targetHost || '127.0.0.1'}:${website.port || 8080};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -353,6 +353,7 @@ class WebsiteService {
         .replace(/{{aliases}}/g, aliases)
         .replace(/{{rootDirectory}}/g, website.rootDirectory || `/var/www/${website.domain}`)
         .replace(/{{acmeRoot}}/g, ACME_CHALLENGE_DIR)
+        .replace(/{{targetHost}}/g, website.targetHost || '127.0.0.1')
         .replace(/{{port}}/g, website.port || 8080)
         .replace(/{{phpVersion}}/g, website.phpVersion || '8.2');
     }
@@ -446,6 +447,21 @@ class WebsiteService {
     return value;
   }
 
+  /**
+   * Validate proxy target host / IP to prevent directive injection
+   */
+  _validateTargetHost(host) {
+    if (host === undefined || host === null || host === '') return '127.0.0.1';
+    if (typeof host !== 'string') throw new Error('Target host must be a string');
+    const value = host.trim();
+    if (value === '') return '127.0.0.1';
+    if (value.length > 255) throw new Error('Target host is too long');
+    if (!/^[a-zA-Z0-9_.:\[\]-]+$/.test(value)) {
+      throw new Error('Target host contains invalid characters');
+    }
+    return value;
+  }
+
   async createWebsite(data, userId) {
     const exists = await Website.findOne({ domain: data.domain });
     if (exists) throw new Error('Domain already configured');
@@ -455,6 +471,7 @@ class WebsiteService {
 
     // [CRIT-4 FIX] Use cryptographically secure token instead of Math.random()
     const webhookToken = secureToken();
+    const targetHost = this._validateTargetHost(data.targetHost);
 
     const website = await Website.create({
       domain:        data.domain,
@@ -462,6 +479,7 @@ class WebsiteService {
       type:          data.type || 'static',
       rootDirectory,
       port:          data.port || null,
+      targetHost,
       phpVersion:    data.phpVersion || '8.2',
       owner:         userId,
       webhookToken,
@@ -503,6 +521,11 @@ class WebsiteService {
       safeGitRepo = this._validateGitRepo(data.gitRepo);
     }
 
+    let safeTargetHost = website.targetHost || '127.0.0.1';
+    if (data.targetHost !== undefined) {
+      safeTargetHost = this._validateTargetHost(data.targetHost);
+    }
+
     const oldDomain = website.domain;
     const newDomain = data.domain && data.domain !== oldDomain ? data.domain : oldDomain;
 
@@ -512,6 +535,7 @@ class WebsiteService {
       type:          data.type          ?? website.type,
       rootDirectory: data.rootDirectory ?? website.rootDirectory,
       port:          data.port          ?? website.port,
+      targetHost:    safeTargetHost,
       status:        data.status        ?? website.status,
       gitRepo:       safeGitRepo,
       gitBranch:     data.gitBranch     ?? website.gitBranch,

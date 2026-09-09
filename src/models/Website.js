@@ -18,6 +18,7 @@ function rowToWebsite(row) {
     autoDeploy:    Boolean(row.auto_deploy),
     phpVersion:    row.php_version,
     port:          row.port,
+    targetHost:    row.target_host || '127.0.0.1',
     status:        row.status,
     ssl:           fromJson(row.ssl, {}),
     settings:      fromJson(row.settings, {}),
@@ -68,8 +69,8 @@ const Website = {
     const ts = now();
     db.prepare(`
       INSERT INTO websites (id, domain, aliases, type, root_directory, git_repo, webhook_token,
-        auto_deploy, php_version, port, status, ssl, settings, owner_id, created_at, updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        auto_deploy, php_version, port, target_host, status, ssl, settings, owner_id, created_at, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(
       id, data.domain.toLowerCase(),
       toJson(data.aliases || []),
@@ -80,6 +81,7 @@ const Website = {
       data.autoDeploy ? 1 : 0,
       data.phpVersion || '8.2',
       data.port || null,
+      data.targetHost || '127.0.0.1',
       data.status || 'active',
       toJson(data.ssl || {}),
       toJson(data.settings || {}),
@@ -99,7 +101,7 @@ const Website = {
     db.prepare(`
       UPDATE websites SET
         domain = ?, aliases = ?, type = ?, root_directory = ?, git_repo = ?, git_branch = ?,
-        webhook_token = ?, auto_deploy = ?, php_version = ?, port = ?,
+        webhook_token = ?, auto_deploy = ?, php_version = ?, port = ?, target_host = ?,
         status = ?, ssl = ?, settings = ?, owner_id = ?, updated_at = ?
       WHERE id = ?
     `).run(
@@ -113,6 +115,7 @@ const Website = {
       data.autoDeploy !== undefined ? (data.autoDeploy ? 1 : 0) : (existing.autoDeploy ? 1 : 0),
       data.phpVersion ?? existing.phpVersion,
       data.port ?? existing.port,
+      data.targetHost ?? existing.targetHost ?? '127.0.0.1',
       data.status ?? existing.status,
       toJson(data.ssl ?? existing.ssl),
       toJson(data.settings ?? existing.settings),

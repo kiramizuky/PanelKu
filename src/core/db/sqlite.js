@@ -130,6 +130,7 @@ function initSchema(db) {
       auto_deploy     INTEGER NOT NULL DEFAULT 0,
       php_version     TEXT NOT NULL DEFAULT '8.2',
       port            INTEGER,
+      target_host     TEXT NOT NULL DEFAULT '127.0.0.1',
       status          TEXT NOT NULL DEFAULT 'active',
       ssl             TEXT NOT NULL DEFAULT '{}',
       settings        TEXT NOT NULL DEFAULT '{}',
@@ -374,6 +375,14 @@ function initSchema(db) {
   } catch (e) {
     if (!e.message.includes('duplicate column')) {
       logger.warn(`Migration websites.git_branch failed: ${e.message}`);
+    }
+  }
+  // Add target_host to websites table
+  try {
+    db.exec("ALTER TABLE websites ADD COLUMN target_host TEXT NOT NULL DEFAULT '127.0.0.1'");
+  } catch (e) {
+    if (!e.message.includes('duplicate column')) {
+      logger.warn(`Migration websites.target_host failed: ${e.message}`);
     }
   }
 }

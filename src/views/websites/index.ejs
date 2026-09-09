@@ -61,8 +61,17 @@
             <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Leave empty to use default (/var/www/domain)</div>
           </div>
           <div class="lp-form-group" id="cwPortGroup" style="display:none">
-            <label class="lp-label">Proxy Target Port</label>
-            <input type="number" id="cwPort" class="lp-input" placeholder="8080">
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
+              <div>
+                <label class="lp-label">Proxy Target Host / IP</label>
+                <input type="text" id="cwTargetHost" class="lp-input font-mono" placeholder="127.0.0.1" value="127.0.0.1">
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Contoh: 127.0.0.1 atau 192.168.1.50</div>
+              </div>
+              <div>
+                <label class="lp-label">Proxy Target Port</label>
+                <input type="number" id="cwPort" class="lp-input font-mono" placeholder="8080">
+              </div>
+            </div>
           </div>
           <div class="lp-form-group" id="cwPhpGroup" style="display:none">
             <label class="lp-label">PHP Version</label>
@@ -173,8 +182,17 @@
         </div>
       </div>
       <div class="lp-form-group" id="editPortGroup" style="display:none;">
-        <label class="lp-label">Proxy Target Port</label>
-        <input type="number" id="editPort" class="lp-input" placeholder="8080">
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
+          <div>
+            <label class="lp-label">Proxy Target Host / IP</label>
+            <input type="text" id="editTargetHost" class="lp-input font-mono" placeholder="127.0.0.1">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Contoh: 127.0.0.1 atau 192.168.1.50</div>
+          </div>
+          <div>
+            <label class="lp-label">Proxy Target Port</label>
+            <input type="number" id="editPort" class="lp-input font-mono" placeholder="8080">
+          </div>
+        </div>
       </div>
       <div class="lp-form-group" id="editPhpGroup" style="display:none;">
         <label class="lp-label">PHP Version</label>
