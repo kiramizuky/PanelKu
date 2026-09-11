@@ -55,24 +55,39 @@ class WebsitesController {
 
   async deployGit(req, res) {
     try {
+      if (req.query.async === 'true' || req.body?.async === true) {
+        const queued = await websiteService.queueDeployGit(req.params.id);
+        return successResponse(res, queued, 'Deployment queued', 202);
+      }
       const result = await websiteService.deployGit(req.params.id);
-      return successResponse(res, result.message, { result });
+      return successResponse(res, { result }, result.message);
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
     }
   }
+
   async webhookDeploy(req, res) {
     try {
       const { id, token } = req.params;
       const website = await websiteService.getWebsite(id);
       if (!website || website.webhookToken !== token) {
-        return errorResponse(res, 401, 'Unauthorized or invalid token');
+        return errorResponse(res, 'Unauthorized or invalid token', 401);
       }
       
-      const result = await websiteService.deployGit(id);
-      return successResponse(res, result.message, { result });
+      const queued = await websiteService.queueDeployGit(id);
+      return successResponse(res, queued, 'Deployment queued via webhook', 202);
     } catch (error) {
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async getDeployJobStatus(req, res) {
+    try {
+      const job = await websiteService.getDeployJobStatus(req.params.jobId);
+      if (!job) return errorResponse(res, 'Job not found', 404);
+      return successResponse(res, job);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
     }
   }
 

@@ -160,4 +160,34 @@ describe('CacheService (EventBus Invalidation)', () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(await cacheInstance.get('docker:list')).toBeNull();
   });
+
+  test('website events trigger websites:* pattern invalidation', async () => {
+    const cacheInstance = new CacheService();
+    cacheInstance.initEventBusInvalidation();
+
+    // 1. Test WEBSITE_CREATED
+    await cacheInstance.set('websites:list', [{ domain: 'example.com' }], 60);
+    expect(await cacheInstance.get('websites:list')).toHaveLength(1);
+    eventBus.publish(EVENTS.WEBSITE_CREATED, { websiteId: '123' });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await cacheInstance.get('websites:list')).toBeNull();
+
+    // 2. Test WEBSITE_UPDATED
+    await cacheInstance.set('websites:list', [{ domain: 'updated.com' }], 60);
+    eventBus.publish(EVENTS.WEBSITE_UPDATED, { websiteId: '123' });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await cacheInstance.get('websites:list')).toBeNull();
+
+    // 3. Test WEBSITE_DELETED
+    await cacheInstance.set('websites:list', [], 60);
+    eventBus.publish(EVENTS.WEBSITE_DELETED, { websiteId: '123' });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await cacheInstance.get('websites:list')).toBeNull();
+
+    // 4. Test DEPLOY_COMPLETE
+    await cacheInstance.set('websites:list', [{ domain: 'deployed.com' }], 60);
+    eventBus.publish(EVENTS.DEPLOY_COMPLETE, { websiteId: '123' });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await cacheInstance.get('websites:list')).toBeNull();
+  });
 });

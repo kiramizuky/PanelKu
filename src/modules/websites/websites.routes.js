@@ -12,6 +12,7 @@ router.post('/:id/deploy/:token', websitesController.webhookDeploy);
 router.use(requireAuth);
 
 router.get('/', requirePermission('websites_manage', 'read'), websitesController.listWebsites);
+router.get('/deploy/queue/:jobId', requirePermission('websites_manage', 'read'), websitesController.getDeployJobStatus);
 router.post('/', requirePermission('websites_manage', 'create'), websitesController.createWebsite);
 router.get('/:id', requirePermission('websites_manage', 'read'), websitesController.getWebsite);
 router.put('/:id', requirePermission('websites_manage', 'update'), websitesController.updateWebsite);

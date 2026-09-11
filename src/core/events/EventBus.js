@@ -75,6 +75,10 @@ export const EVENTS = {
   DEPLOY_COMPLETE: 'deploy.complete',
   DEPLOY_FAILED: 'deploy.failed',
   PASSWORD_POLICY_CHANGED: 'password_policy.changed',
+  WEBSITE_CREATED: 'website.created',
+  WEBSITE_UPDATED: 'website.updated',
+  WEBSITE_DELETED: 'website.deleted',
+  WEBSITE_DEPLOY_STARTED: 'website.deploy_started',
 };
 
 export default eventBus;

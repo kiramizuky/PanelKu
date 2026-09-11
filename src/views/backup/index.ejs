@@ -43,7 +43,10 @@
       Scheduled backups, Rclone cloud sync, S3 offsite storage, and disaster recovery
     </p>
   </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <span id="bkpQueueBadge" class="lp-badge lp-badge-info" style="display:none;font-size:11px;padding:5px 10px;align-items:center;gap:6px;">
+      <i class="bi bi-arrow-repeat spin"></i> <span id="bkpQueueText">0 job(s) in queue</span>
+    </span>
     <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="BackupPage.refresh()" title="Refresh">
       <i class="bi bi-arrow-clockwise"></i> Refresh
     </button>

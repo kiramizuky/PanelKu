@@ -50,6 +50,38 @@ const BackupPage = {
     }
   },
 
+  pollJobUntilDone(jobId, successMessage = 'Task completed successfully', onComplete = null) {
+    const pollInterval = 1000;
+    const maxAttempts = 300; // 5 minutes max
+    let attempts = 0;
+
+    const timer = setInterval(async () => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        clearInterval(timer);
+        LP.toast('Background job taking longer than expected. Check panel logs.', 'warning');
+        this.loadOverview();
+        return;
+      }
+      try {
+        const res = await LP.get(`/backup/queue/${jobId}`);
+        if (res?.success && res.data) {
+          const job = res.data;
+          if (job.status === 'completed') {
+            clearInterval(timer);
+            LP.toast(successMessage, 'success');
+            if (onComplete) onComplete(job.returnvalue);
+            this.loadOverview();
+          } else if (job.status === 'failed') {
+            clearInterval(timer);
+            LP.toast(`Task failed: ${job.failedReason || 'Unknown error'}`, 'error');
+            this.loadOverview();
+          }
+        }
+      } catch (_) {}
+    }, pollInterval);
+  },
+
   showS3Modal() {
     this.switchTab('s3');
   },
@@ -60,12 +92,28 @@ const BackupPage = {
 
   async loadOverview() {
     try {
-      const [rcloneRes, jobsRes, localRes, s3Res] = await Promise.all([
+      const [rcloneRes, jobsRes, localRes, s3Res, queueRes] = await Promise.all([
         LP.get('/backup/rclone'),
         LP.get('/backup/jobs'),
         LP.get('/backup'),
         LP.get('/backup/s3'),
+        LP.get('/backup/queue/metrics').catch(() => null),
       ]);
+
+      if (queueRes?.success) {
+        const qData = queueRes.data;
+        const activeCount = (qData?.waiting || 0) + (qData?.active || 0);
+        const badge = document.getElementById('bkpQueueBadge');
+        const text = document.getElementById('bkpQueueText');
+        if (badge && text) {
+          if (activeCount > 0) {
+            badge.style.display = 'inline-flex';
+            text.textContent = `${activeCount} job(s) in queue`;
+          } else {
+            badge.style.display = 'none';
+          }
+        }
+      }
 
       // Status cards
       if (rcloneRes?.success) {
@@ -386,10 +434,17 @@ const BackupPage = {
 
   async runJob(id) {
     try {
-      const res = await LP.post(`/backup/jobs/${id}/run`);
+      const res = await LP.post(`/backup/jobs/${id}/run?async=true`);
       if (res?.success) {
-        LP.toast(res.message || 'Backup completed!', 'success');
-        this.loadJobs();
+        if (res.data?.id) {
+          LP.toast(`Backup job #${id} queued. Processing in background...`, 'info');
+          this.pollJobUntilDone(res.data.id, `Backup job #${id} completed!`, () => {
+            this.loadJobs();
+          });
+        } else {
+          LP.toast(res.message || 'Backup completed!', 'success');
+          this.loadJobs();
+        }
         this.loadOverview();
       } else {
         LP.toast(res?.message || 'Backup failed', 'error');
@@ -526,11 +581,18 @@ const BackupPage = {
     if (!target) { LP.toast('Please select or specify a backup target', 'error'); return; }
 
     try {
-      const res = await LP.post('/backup', { type, target });
+      const res = await LP.post('/backup?async=true', { type, target, async: true });
       if (res?.success) {
-        LP.toast('Backup created successfully!', 'success');
         this.createLocalBsModal.hide();
-        this.loadLocalBackups();
+        if (res.data?.id) {
+          LP.toast(`Backup task queued for "${target}". Creating...`, 'info');
+          this.pollJobUntilDone(res.data.id, `Backup for "${target}" created successfully!`, () => {
+            this.loadLocalBackups();
+          });
+        } else {
+          LP.toast('Backup created successfully!', 'success');
+          this.loadLocalBackups();
+        }
         this.loadOverview();
       } else {
         LP.toast(res?.message || 'Backup failed', 'error');
@@ -564,9 +626,15 @@ const BackupPage = {
   async restoreBackup(filename, target) {
     if (!(await LP.confirm(`Restore <strong>${LP.escHtml(filename)}</strong> to <strong>${LP.escHtml(target)}</strong>? Existing data may be overwritten.`, 'Restore Backup'))) return;
     try {
-      const res = await LP.post('/backup/restore', { filename, target });
+      const res = await LP.post('/backup/restore?async=true', { filename, target, async: true });
       if (res?.success) {
-        LP.toast('Restore completed!', 'success');
+        if (res.data?.id) {
+          LP.toast(`Restore task queued for "${filename}". Restoring...`, 'info');
+          this.pollJobUntilDone(res.data.id, `Restore completed for "${filename}"!`);
+        } else {
+          LP.toast('Restore completed!', 'success');
+        }
+        this.loadOverview();
       } else {
         LP.toast(res?.message || 'Restore failed', 'error');
       }

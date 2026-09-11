@@ -13,7 +13,7 @@
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
 
-import { jest, describe, test, expect } from '@jest/globals';
+import { jest, describe, test, expect, afterAll } from '@jest/globals';
 
 // ── Mock the Website model (native-ESM style) ──
 jest.unstable_mockModule('../src/models/Website.js', () => ({
@@ -23,7 +23,13 @@ jest.unstable_mockModule('../src/models/Website.js', () => ({
 }));
 
 const { default: websiteService } = await import('../src/modules/websites/websites.service.js');
+const { default: websitesController } = await import('../src/modules/websites/websites.controller.js');
 const Website = (await import('../src/models/Website.js')).default;
+
+afterAll(async () => {
+  const { default: queueManager } = await import('../src/core/queue/QueueManager.js');
+  await queueManager.closeAll();
+});
 
 describe('WebsiteService._validateGitRepo — accepts legitimate URLs', () => {
   test.each([
@@ -283,6 +289,121 @@ describe('WebsiteService._validateTargetHost & Proxy Configuration', () => {
 
     await expect(websiteService.updateWebsite('w-proxy-1', { targetHost: '192.168.1.50; injection' }))
       .rejects.toThrow('Target host contains invalid characters');
+  });
+});
+
+describe('Website Deploy Queue Integration', () => {
+  beforeAll(async () => {
+    const { default: queueManager } = await import('../src/core/queue/QueueManager.js');
+    queueManager.registerWorker('deploy', async () => ({ success: true, message: 'Mocked deploy', logs: ['Done'] }));
+  });
+
+  afterAll(async () => {
+    const { default: queueManager } = await import('../src/core/queue/QueueManager.js');
+    await queueManager.closeAll();
+  });
+  test('queueDeployGit throws error if website not found', async () => {
+    Website.findById.mockResolvedValueOnce(null);
+    await expect(websiteService.queueDeployGit('non_existent')).rejects.toThrow('Website not found');
+  });
+
+  test('queueDeployGit throws error if gitRepo not configured', async () => {
+    Website.findById.mockResolvedValueOnce({ id: 'w-no-git', domain: 'nogit.com' });
+    await expect(websiteService.queueDeployGit('w-no-git')).rejects.toThrow('Git repository not configured');
+  });
+
+  test('queueDeployGit enqueues a deploy job and returns jobId', async () => {
+    Website.findById.mockResolvedValueOnce({
+      id: 'w-git-1',
+      domain: 'gitapp.com',
+      gitRepo: 'https://github.com/user/app.git',
+      rootDirectory: '/var/www/gitapp.com',
+    });
+
+    const job = await websiteService.queueDeployGit('w-git-1');
+    expect(job).toBeDefined();
+    expect(job.id).toBeDefined();
+    expect(job.queueName).toBe('deploy');
+
+    const status = await websiteService.getDeployJobStatus(job.id);
+    expect(status).toBeDefined();
+    expect(status.name).toBe('deploy_git_w-git-1');
+  });
+
+  test('websitesController.deployGit with async=true enqueues job and returns 202', async () => {
+    Website.findById.mockResolvedValueOnce({
+      id: 'w-async-1',
+      domain: 'asyncapp.com',
+      gitRepo: 'https://github.com/user/async.git',
+    });
+
+    let statusCode = null;
+    let responseData = null;
+    const req = {
+      params: { id: 'w-async-1' },
+      query: { async: 'true' },
+    };
+    const res = {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json(data) {
+        responseData = data;
+        return this;
+      },
+    };
+
+    await websitesController.deployGit(req, res);
+    expect(statusCode).toBe(202);
+    expect(responseData.success).toBe(true);
+    expect(responseData.data.queueName).toBe('deploy');
+  });
+
+  test('websitesController.webhookDeploy enqueues job and returns 202', async () => {
+    Website.findById.mockResolvedValue({
+      id: 'w-hook-1',
+      domain: 'hook.com',
+      gitRepo: 'https://github.com/user/hook.git',
+      webhookToken: 'secret-token-123',
+    });
+
+    let statusCode = null;
+    let responseData = null;
+    const req = {
+      params: { id: 'w-hook-1', token: 'secret-token-123' },
+    };
+    const res = {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json(data) {
+        responseData = data;
+        return this;
+      },
+    };
+
+    await websitesController.webhookDeploy(req, res);
+    expect(statusCode).toBe(202);
+    expect(responseData.success).toBe(true);
+  });
+
+  test('websitesController.getDeployJobStatus returns 404 for unknown job', async () => {
+    let statusCode = null;
+    const req = { params: { jobId: 'fake_job_id' } };
+    const res = {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json() {
+        return this;
+      },
+    };
+
+    await websitesController.getDeployJobStatus(req, res);
+    expect(statusCode).toBe(404);
   });
 });
 

@@ -4,6 +4,9 @@ import { exec, execFile } from 'child_process';
 import crypto from 'crypto';
 import util from 'util';
 import Website from '../../models/Website.js';
+import cache from '../../helpers/cache.js';
+import eventBus, { EVENTS } from '../../core/events/EventBus.js';
+import queueManager from '../../core/queue/QueueManager.js';
 
 const execAsync = util.promisify(exec);
 const execFileAsync = util.promisify(execFile);
@@ -103,6 +106,14 @@ server {
 class WebsiteService {
   constructor() {
     this.nginxConfDir = '/etc/nginx/conf.d';
+    this._registerQueueWorker();
+  }
+
+  _registerQueueWorker() {
+    queueManager.registerWorker('deploy', async (job) => {
+      const { websiteId } = job.data;
+      return await this.deployGit(websiteId, job);
+    }, { concurrency: 1 });
   }
 
   /**
@@ -386,7 +397,9 @@ class WebsiteService {
   }
 
   async listWebsites() {
-    return Website.find({});
+    return await cache.remember('websites:list', 30, async () => {
+      return await Website.find({});
+    });
   }
 
   /**
@@ -499,6 +512,8 @@ class WebsiteService {
     }
 
     await this.generateNginxConfig(website);
+    await cache.delPattern('websites:*');
+    eventBus.publish(EVENTS.WEBSITE_CREATED, { websiteId: website._id, domain: website.domain });
     return website;
   }
 
@@ -562,10 +577,12 @@ class WebsiteService {
       }
     }
 
+    await cache.delPattern('websites:*');
+    eventBus.publish(EVENTS.WEBSITE_UPDATED, { websiteId: id, domain: updated.domain });
     return updated;
   }
 
-  async deployGit(id) {
+  async deployGit(id, job = null) {
     const website = await Website.findById(id);
     if (!website || !website.gitRepo) throw new Error('Website or Git Repo not found');
 
@@ -574,39 +591,40 @@ class WebsiteService {
     const safeGitRepo = this._validateGitRepo(website.gitRepo);
     
     const logs = [];
+    const rootDir = website.rootDirectory || (website.domain ? `/var/www/${website.domain}` : '/var/www/default');
     try {
-      const gitDir = path.join(website.rootDirectory, '.git');
+      const gitDir = path.join(rootDir, '.git');
       logs.push('Starting deployment pipeline...');
       
       try {
         await fs.access(gitDir);
         logs.push('Pulling latest commits from git repository...');
-        await execAsync(`git pull`, { cwd: website.rootDirectory, timeout: 60000 });
+        await execAsync(`git pull`, { cwd: rootDir, timeout: 60000 });
       } catch {
         logs.push('Target directory is not a git repository. Cloning fresh...');
         try {
-          const files = await fs.readdir(website.rootDirectory);
+          const files = await fs.readdir(rootDir);
           for (const f of files) {
-            await fs.rm(path.join(website.rootDirectory, f), { recursive: true, force: true });
+            await fs.rm(path.join(rootDir, f), { recursive: true, force: true });
           }
         } catch {}
         // [R3-H1 FIX] execFile + args array (NO shell) + validated URL.
         // NEVER revert to `execAsync('git clone ' + repo)`: the URL may
         // legally contain '%' sequences or '#' a shell would interpret.
-        await execFileAsync('git', ['clone', safeGitRepo, '.'], { cwd: website.rootDirectory, timeout: 120000 });
+        await execFileAsync('git', ['clone', safeGitRepo, '.'], { cwd: rootDir, timeout: 120000 });
       }
 
-      const filesInRoot = await fs.readdir(website.rootDirectory);
+      const filesInRoot = await fs.readdir(rootDir);
       
       if (filesInRoot.includes('package.json')) {
         logs.push('package.json found. Installing npm dependencies...');
-        await execAsync(`npm install --no-audit --no-fund`, { cwd: website.rootDirectory, timeout: 180000 });
+        await execAsync(`npm install --no-audit --no-fund`, { cwd: rootDir, timeout: 180000 });
         
         try {
-          const pkgData = JSON.parse(await fs.readFile(path.join(website.rootDirectory, 'package.json'), 'utf8'));
+          const pkgData = JSON.parse(await fs.readFile(path.join(rootDir, 'package.json'), 'utf8'));
           if (pkgData.scripts && pkgData.scripts.build) {
             logs.push('Build script found. Executing npm run build...');
-            await execAsync(`npm run build`, { cwd: website.rootDirectory, timeout: 180000 });
+            await execAsync(`npm run build`, { cwd: rootDir, timeout: 180000 });
           }
         } catch (e) {
           logs.push(`npm build skipped or failed: ${e.message}`);
@@ -615,7 +633,7 @@ class WebsiteService {
 
       if (filesInRoot.includes('composer.json')) {
         logs.push('composer.json found. Running composer install...');
-        await execAsync(`composer install --no-interaction --optimize-autoloader`, { cwd: website.rootDirectory, timeout: 180000 }).catch(e => {
+        await execAsync(`composer install --no-interaction --optimize-autoloader`, { cwd: rootDir, timeout: 180000 }).catch(e => {
           logs.push(`composer install skipped or failed: ${e.message}`);
         });
       }
@@ -623,13 +641,14 @@ class WebsiteService {
       if (filesInRoot.includes('deploy.sh')) {
         logs.push('deploy.sh found. Executing custom deployment script...');
         if (process.platform !== 'win32') {
-          await execAsync(`chmod +x deploy.sh`, { cwd: website.rootDirectory });
-          await execAsync(`./deploy.sh`, { cwd: website.rootDirectory, timeout: 300000 });
+          await execAsync(`chmod +x deploy.sh`, { cwd: rootDir });
+          await execAsync(`./deploy.sh`, { cwd: rootDir, timeout: 300000 });
         } else {
-          await execAsync(`bash deploy.sh`, { cwd: website.rootDirectory, timeout: 300000 });
+          await execAsync(`bash deploy.sh`, { cwd: rootDir, timeout: 300000 });
         }
       }
 
+      if (job) await job.updateProgress(100);
       logs.push('Deployment completed successfully.');
       await Website.findByIdAndUpdate(id, {
         settings: {
@@ -638,6 +657,7 @@ class WebsiteService {
           lastDeployTime: new Date().toISOString(),
         },
       }).catch(() => {});
+      eventBus.publish(EVENTS.DEPLOY_COMPLETE, { websiteId: id, domain: website.domain, result: { success: true, logs } });
       return { success: true, message: 'Deployment successful', logs };
     } catch (error) {
       console.error('Git deploy error:', error);
@@ -649,8 +669,25 @@ class WebsiteService {
           lastDeployTime: new Date().toISOString(),
         },
       }).catch(() => {});
+      eventBus.publish(EVENTS.DEPLOY_FAILED, { websiteId: id, domain: website?.domain, error: error.message });
       throw new Error(`Failed to deploy from Git: ${error.message}\nLogs:\n${logs.join('\n')}`);
     }
+  }
+
+  async queueDeployGit(id) {
+    const website = await Website.findById(id);
+    if (!website) throw new Error('Website not found');
+    if (!website.gitRepo) throw new Error('Git repository not configured for this website');
+
+    eventBus.publish(EVENTS.WEBSITE_DEPLOY_STARTED, { websiteId: id, domain: website.domain });
+    return await queueManager.addJob('deploy', `deploy_git_${id}`, {
+      websiteId: id,
+      domain: website.domain,
+    });
+  }
+
+  async getDeployJobStatus(jobId) {
+    return await queueManager.getJob('deploy', jobId);
   }
 
   async deleteWebsite(id) {
@@ -659,6 +696,8 @@ class WebsiteService {
 
     await this.removeNginxConfig(website.domain);
     await Website.findByIdAndDelete(id);
+    await cache.delPattern('websites:*');
+    eventBus.publish(EVENTS.WEBSITE_DELETED, { websiteId: id, domain: website.domain });
     return true;
   }
 

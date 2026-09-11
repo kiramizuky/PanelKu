@@ -221,6 +221,14 @@ export class CacheService {
       await this.delPattern('backup:*');
     }, 'cache_invalidation_backup');
 
+    const invalidateWebsites = async () => {
+      await this.delPattern('websites:*');
+    };
+    eventBus.subscribe(EVENTS.WEBSITE_CREATED, invalidateWebsites, 'cache_invalidation_website_created');
+    eventBus.subscribe(EVENTS.WEBSITE_UPDATED, invalidateWebsites, 'cache_invalidation_website_updated');
+    eventBus.subscribe(EVENTS.WEBSITE_DELETED, invalidateWebsites, 'cache_invalidation_website_deleted');
+    eventBus.subscribe(EVENTS.DEPLOY_COMPLETE, invalidateWebsites, 'cache_invalidation_website_deployed');
+
     logger.info('Cache: EventBus auto-invalidation active');
   }
 }
