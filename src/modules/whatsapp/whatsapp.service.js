@@ -20,7 +20,8 @@ class WhatsappService {
     mkdirSync(this.sessionsDir, { recursive: true });
 
     // Auto-restore sessions after boot
-    setTimeout(() => this.restoreSessions(), 5000);
+    const timer = setTimeout(() => this.restoreSessions(), 5000);
+    if (timer?.unref) timer.unref();
   }
 
   async restoreSessions() {

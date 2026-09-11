@@ -84,8 +84,7 @@
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/public/**",
-      "!src/config/swagger.js",
-      "!src/config/swagger.fixed.js"
+      "!src/config/swagger.js"
     ],
     "coverageThreshold": {
       "global": {

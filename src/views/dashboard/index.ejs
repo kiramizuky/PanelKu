@@ -208,7 +208,7 @@
       <% if (typeof loadedPlugins !== 'undefined' && loadedPlugins.length > 0) { %>
         <% loadedPlugins.forEach(function(plugin) { %>
           <a href="<%= plugin.path || '/plugins/' + plugin.name %>" class="lp-app-item" draggable="true" data-id="plugin-<%= plugin.name %>">
-            <div class="lp-app-icon" style="color: <%= plugin.color || '#38bdf8' %>;"><i class="bi <%= plugin.icon || 'bi-plugin' %>"></i></div>
+            <div class="lp-app-icon" <%- `style="color: ${plugin.color || '#38bdf8'};"` %>><i class="bi <%= plugin.icon || 'bi-plugin' %>"></i></div>
             <div style="font-size: 13px; font-weight: 500;"><%= plugin.name %></div>
           </a>
         <% }); %>
@@ -306,61 +306,6 @@
     document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'});
   }
 
-  // --- Drag and Drop Sort Logic ---
-  document.addEventListener('DOMContentLoaded', () => {
-    const container = document.getElementById('appGridContainer');
-    const items = [...container.querySelectorAll('.lp-app-item')];
-    let draggedItem = null;
-
-    // 1. Restore order from localStorage if exists
-    const savedOrder = JSON.parse(localStorage.getItem('dashboard_app_order') || '[]');
-    if (savedOrder.length > 0) {
-      const itemMap = new Map(items.map(item => [item.getAttribute('data-id'), item]));
-      // Append in sorted order
-      savedOrder.forEach(id => {
-        if (itemMap.has(id)) {
-          container.appendChild(itemMap.get(id));
-          itemMap.delete(id);
-        }
-      });
-      // Append any newly added items/plugins not yet saved in localStorage order
-      itemMap.forEach(item => container.appendChild(item));
-    }
-
-    // 2. Drag & Drop Event Listeners
-    container.addEventListener('dragstart', (e) => {
-      const item = e.target.closest('.lp-app-item');
-      if (item) {
-        draggedItem = item;
-        item.style.opacity = '0.5';
-        e.dataTransfer.effectAllowed = 'move';
-      }
-    });
-
-    container.addEventListener('dragend', (e) => {
-      if (draggedItem) {
-        draggedItem.style.opacity = '1';
-        draggedItem = null;
-      }
-      // Save new order to localStorage
-      const newOrder = [...container.querySelectorAll('.lp-app-item')].map(item => item.getAttribute('data-id'));
-      localStorage.setItem('dashboard_app_order', JSON.stringify(newOrder));
-    });
-
-    container.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      const target = e.target.closest('.lp-app-item');
-      if (target && target !== draggedItem) {
-        const bounding = target.getBoundingClientRect();
-        const offset = e.clientX - bounding.left;
-        if (offset > bounding.width / 2) {
-          target.after(draggedItem);
-        } else {
-          target.before(draggedItem);
-        }
-      }
-    });
-  });
   setInterval(updateTime, 1000);
   updateTime();
 

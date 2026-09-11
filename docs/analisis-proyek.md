@@ -83,7 +83,7 @@ homeserver/
 | Auth | `jsonwebtoken` (access 30d + refresh), `speakeasy`+`qrcode` (TOTP 2FA), `bcryptjs`, `ldapjs` (LDAP/SSO) |
 | Proses/PTY | `node-pty`, `systeminformation`, `dockerode`, `mysql2`, `pg` |
 | Notifikasi | `nodemailer` (SMTP), `@whiskeysockets/baileys` (WhatsApp), webhook/Telegram/Discord |
-| Job queue | `bullmq` (terpasang, **belum dipakai** — memakai `setInterval` via `Scheduler.js`) |
+| Job queue | `bullmq` via `QueueManager.js` (BullMQ dengan in-memory fallback otomatis & EventBus integration) |
 | Frontend | Bootstrap 5, jQuery, Chart.js, xterm.js, CodeMirror, DataTables, jsTree (semua **self-hosted**, tanpa CDN) |
 | Security | `helmet` (CSP nonce), `express-rate-limit`, WAF middleware custom, `cors` ketat |
 | Testing | Jest + supertest (native ESM, `unstable_mockModule`) |
@@ -265,8 +265,8 @@ Audit menyeluruh atas **seluruh titik eksekusi perintah** (`29 file src/` + `9 p
 | R1 | **Coverage test sangat rendah** — baseline 31 Jul 2026: 11.21% statement backend, 113 file 0% (termasuk 32 controller & 4 jobs & 6 websocket). 🚧 **Progres sesi ini**: 16 suite / 279 test, aktual 14.21% statement — **gate `coverageThreshold` sudah terpasang** (12/6/10/12%), namun masih jauh dari target 60% | Tinggi | Lanjut Phase 8 rencana.md: integration test supertest per modul kritis (auth/users/database/docker/backup/websites/waf) |
 | R2 | ~~CI belum meng-gate coverage~~ — ✅ **Selesai sesi ini**: `coverageThreshold` di jest config + `npm audit --audit-level=high` sebagai **blocker** di `ci.yml`/`docker-publish.yml`; 5 deps high di-patch | ~~Tinggi~~ ✅ | Naikkan threshold bertahap menuju 60% (rencana.md 8.1) |
 | R3 | **File raksasa** — `system.service.js` (850), `database.service.js` (1070), `caddy.service.js` (1003), `backup.service.js` (832), `updater.service.js` (765) | Sedang | Pecah per sub-domain (rencana.md 8.4) |
-| R4 | **BullMQ terpasang tapi tidak dipakai** — job berat (backup, deploy, SSL) berjalan sinkron di request/setInterval | Sedang | Migrasi bertahap ke BullMQ + UI progress (rencana.md 10.2) |
-| R5 | **Swagger dobel** — `swagger.js` (1497) + `swagger.fixed.js` (1305) | Rendah | Satukan, hilangkan duplikasi, generate `docs/openapi.json` |
+| R4 | ~~BullMQ terpasang tapi tidak dipakai~~ — ✅ **Selesai**: `QueueManager.js` menghubungkan BullMQ dengan in-memory fallback, worker backup aktif dengan endpoint status `/backup/queue` | ~~Sedang~~ ✅ | Lanjut migrasi deployGit dan SSL renewal ke worker queue |
+| R5 | ~~Swagger dobel~~ — ✅ **Selesai**: `swagger.fixed.js` dihapus; `swagger.js` menjadi kanonikal | ~~Rendah~~ ✅ | Pemeliharaan spec API |
 | R6 | ~~`exec` string interpolasi masih ada di sebagian titik~~ — ✅ **Selesai sesi ini**: audit penuh `src/` + `plugins/` (rencana.md 9.1) jalan — 16 temuan R3 (R3-H1..L6) tuntas; seluruh titik baru memakai `execFile` + args array atau string hardcoded; sisa `exec` statis di `savePgConfigFile` terdokumentasi aman | ~~Sedang~~ ✅ | Pertahankan aturan (CONTRIBUTING.md §Keamanan): setiap exec baru wajib `execFile`+args atau hardcoded |
 | R7 | **CSP masih memakai `'unsafe-inline'`** untuk `style-src`, `style-src-attr`, `script-src-attr` (126+ inline handler) | Rendah | Diterima secara desain (dikomentari baik di `app.js`); evaluasi bertahap |
 | R8 | **Frontend tanpa test sama sekali** (61 file, 0%) | Rendah | Pisahkan dari hitungan coverage backend; pertimbangkan jsdom smoke test |

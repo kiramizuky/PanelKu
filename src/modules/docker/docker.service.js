@@ -2,6 +2,7 @@ import Docker from 'dockerode';
 import logger from '../../config/logger.js';
 import packageManager from '../system/package-manager.js';
 import APP_STORE_CATALOG from './appstore.catalog.js';
+import cache from '../../helpers/cache.js';
 
 
 /**
@@ -171,20 +172,22 @@ class DockerService {
   }
 
   async listContainers(all = true) {
-    try {
-      const containers = await this.docker.listContainers({ all });
-      return containers.map(c => ({
-        id: c.Id.substring(0, 12),
-        names: c.Names.map(n => n.replace('/', '')),
-        image: c.Image,
-        state: c.State,
-        status: c.Status,
-        ports: c.Ports,
-        created: c.Created
-      }));
-    } catch (error) {
-      throw new Error(`Failed to list containers: ${error.message}`);
-    }
+    return cache.remember(`docker:containers:${all}`, 3, async () => {
+      try {
+        const containers = await this.docker.listContainers({ all });
+        return containers.map(c => ({
+          id: c.Id.substring(0, 12),
+          names: c.Names.map(n => n.replace('/', '')),
+          image: c.Image,
+          state: c.State,
+          status: c.Status,
+          ports: c.Ports,
+          created: c.Created
+        }));
+      } catch (error) {
+        throw new Error(`Failed to list containers: ${error.message}`);
+      }
+    });
   }
 
   async getContainerInfo(id) {
@@ -200,6 +203,7 @@ class DockerService {
     try {
       const container = this.docker.getContainer(id);
       await container.start();
+      await cache.delPattern('docker:*');
       return true;
     } catch (error) {
       throw new Error(`Failed to start container: ${error.message}`);
@@ -210,6 +214,7 @@ class DockerService {
     try {
       const container = this.docker.getContainer(id);
       await container.stop();
+      await cache.delPattern('docker:*');
       return true;
     } catch (error) {
       // 304 means container is already stopped

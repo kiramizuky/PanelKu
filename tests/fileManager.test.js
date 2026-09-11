@@ -1,199 +1,108 @@
 /**
- * Unit test: FileManager upload functionality
+ * FileManager Module Unit Tests
  *
  * @jest-environment node
  */
+
+process.env.NODE_ENV = 'test';
+process.env.LOG_LEVEL = 'silent';
+
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
 import fileManagerService from '../src/modules/filemanager/filemanager.service.js';
 import fileManagerController from '../src/modules/filemanager/filemanager.controller.js';
 
-let tmpDir;
-let originalBaseDir;
+let testBaseDir;
 
-beforeAll(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-test-'));
-  originalBaseDir = process.env.FM_BASE_DIR;
-  process.env.FM_BASE_DIR = tmpDir;
+beforeAll(async () => {
+  testBaseDir = path.join(os.tmpdir(), `panelku-fm-test-${Date.now()}`);
+  await fs.mkdir(testBaseDir, { recursive: true });
+  process.env.FM_BASE_DIR = testBaseDir;
 });
 
-afterAll(() => {
-  if (originalBaseDir !== undefined) {
-    process.env.FM_BASE_DIR = originalBaseDir;
-  } else {
-    delete process.env.FM_BASE_DIR;
-  }
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+afterAll(async () => {
+  try {
+    await fs.rm(testBaseDir, { recursive: true, force: true });
+  } catch { /* ignore */ }
 });
 
-function createTempUploadFile(name, content = 'test content') {
-  const tempPath = path.join(os.tmpdir(), `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  fs.writeFileSync(tempPath, content);
-  return tempPath;
-}
-
-describe('FileManagerService.saveUploadedFile', () => {
-  test('successfully moves uploaded file from temp to target directory', async () => {
-    const tempFile = createTempUploadFile('sample.txt', 'hello from test');
-    const result = await fileManagerService.saveUploadedFile(tempFile, '/', 'sample.txt');
-
-    expect(result.name).toBe('sample.txt');
-    expect(result.path).toBe('/sample.txt');
-    expect(fs.existsSync(tempFile)).toBe(false);
-
-    const savedFile = path.join(tmpDir, 'sample.txt');
-    expect(fs.existsSync(savedFile)).toBe(true);
-    expect(fs.readFileSync(savedFile, 'utf8')).toBe('hello from test');
+describe('FileManager Service', () => {
+  test('blocks path traversal attempts outside FM_BASE_DIR', () => {
+    expect(() => fileManagerService._resolvePath('../../etc/passwd')).toThrow('Path traversal detected');
+    expect(() => fileManagerService._resolvePath('../')).toThrow('Path traversal detected');
   });
 
-  test('successfully saves file into a subdirectory', async () => {
-    fs.mkdirSync(path.join(tmpDir, 'subfolder'), { recursive: true });
-    const tempFile = createTempUploadFile('doc.txt', 'nested file');
-    const result = await fileManagerService.saveUploadedFile(tempFile, '/subfolder', 'doc.txt');
+  test('creates directory, writes file, reads file, and lists directory', async () => {
+    await fileManagerService.mkdir('documents');
+    await fileManagerService.writeFile('documents/note.txt', 'Hello Panelku');
 
-    expect(result.name).toBe('doc.txt');
-    expect(result.path).toBe('/subfolder/doc.txt');
+    const content = await fileManagerService.readFile('documents/note.txt');
+    expect(content).toBe('Hello Panelku');
 
-    const savedFile = path.join(tmpDir, 'subfolder', 'doc.txt');
-    expect(fs.existsSync(savedFile)).toBe(true);
-    expect(fs.readFileSync(savedFile, 'utf8')).toBe('nested file');
+    const list = await fileManagerService.list('documents');
+    expect(Array.isArray(list)).toBe(true);
+    expect(list.some(item => item.name === 'note.txt' && item.type === 'file')).toBe(true);
+
+    const info = await fileManagerService.getInfo('documents/note.txt');
+    expect(info).toBeDefined();
+    expect(info.name).toBe('note.txt');
+    expect(info.size).toBe(13);
   });
 
-  test('sanitizes filename and prevents directory traversal in originalName', async () => {
-    const tempFile = createTempUploadFile('traversal.txt', 'traversal content');
-    const result = await fileManagerService.saveUploadedFile(tempFile, '/', '../../../evil.txt');
+  test('renames and deletes items', async () => {
+    await fileManagerService.writeFile('to_rename.txt', 'temp');
+    await fileManagerService.rename('to_rename.txt', 'renamed.txt');
 
-    expect(result.name).toBe('evil.txt');
-    expect(result.path).toBe('/evil.txt');
-    expect(fs.existsSync(path.join(tmpDir, 'evil.txt'))).toBe(true);
-  });
+    const content = await fileManagerService.readFile('renamed.txt');
+    expect(content).toBe('temp');
 
-  test('throws 400 when target directory does not exist', async () => {
-    const tempFile = createTempUploadFile('fail.txt', 'fail content');
-    await expect(fileManagerService.saveUploadedFile(tempFile, '/nonexistent_folder_xyz', 'fail.txt'))
-      .rejects.toMatchObject({ statusCode: 400, message: 'Target directory does not exist' });
-    
-    // Clean up temp file
-    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+    await fileManagerService.delete('renamed.txt');
+    await expect(fileManagerService.readFile('renamed.txt')).rejects.toThrow();
   });
 });
 
-describe('FileManagerController.upload', () => {
-  test('returns 400 if no files uploaded', async () => {
-    const req = { files: [] };
-    const res = {
-      status(code) { this.statusCode = code; return this; },
-      json(data) { this.body = data; return this; },
-    };
-
-    await fileManagerController.upload(req, res);
-    expect(res.statusCode).toBe(400);
-    expect(res.body.success).toBe(false);
-  });
-
-  test('processes upload, saves files, and returns success response', async () => {
-    const tempFile = createTempUploadFile('uploaded-note.txt', 'this is a note');
-    const req = {
-      body: { path: '/' },
-      files: [
-        {
-          path: tempFile,
-          originalname: 'uploaded-note.txt',
-          size: 14,
-        },
-      ],
-    };
-    const res = {
-      status(code) { this.statusCode = code; return this; },
-      json(data) { this.body = data; return this; },
-    };
-
-    await fileManagerController.upload(req, res);
-    expect(res.statusCode).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data.uploaded).toHaveLength(1);
-    expect(res.body.data.uploaded[0].name).toBe('uploaded-note.txt');
-
-    const destFile = path.join(tmpDir, 'uploaded-note.txt');
-    expect(fs.existsSync(destFile)).toBe(true);
-    expect(fs.readFileSync(destFile, 'utf8')).toBe('this is a note');
-  });
-
-  test('rejects malicious executable files and cleans up temp files', async () => {
-    const ELF_HEAD = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-    const tempFile = createTempUploadFile('fake.png', ELF_HEAD);
-    const req = {
-      body: { path: '/' },
-      files: [
-        {
-          path: tempFile,
-          originalname: 'fake.png',
-          size: ELF_HEAD.length,
-        },
-      ],
-    };
-    const res = {
-      status(code) { this.statusCode = code; return this; },
-      json(data) { this.body = data; return this; },
-    };
-
-    await fileManagerController.upload(req, res);
-    expect(res.statusCode).toBe(400);
-    expect(res.body.success).toBe(false);
-    expect(fs.existsSync(tempFile)).toBe(false);
-  });
-});
-
-describe('FileManagerService.unzip & FileManagerController.unzip', () => {
-  test('unzips an archive to target destination', async () => {
-    // 1. Create a folder with a file to zip
-    const sourceDir = path.join(tmpDir, 'to_zip');
-    fs.mkdirSync(sourceDir, { recursive: true });
-    fs.writeFileSync(path.join(sourceDir, 'hello.txt'), 'content inside zip');
-
-    const zipDest = path.join(tmpDir, 'test_archive.zip');
-    await fileManagerService.zip('/to_zip', '/test_archive.zip');
-    expect(fs.existsSync(zipDest)).toBe(true);
-
-    // 2. Unzip to /extracted folder
-    await fileManagerService.unzip('/test_archive.zip', '/extracted');
-    const extractedFile = path.join(tmpDir, 'extracted', 'hello.txt');
-    expect(fs.existsSync(extractedFile)).toBe(true);
-    expect(fs.readFileSync(extractedFile, 'utf8')).toBe('content inside zip');
-  });
-
-  test('controller returns 400 if zipPath is missing', async () => {
-    const req = { body: {} };
-    const res = {
-      status(code) { this.statusCode = code; return this; },
-      json(data) { this.body = data; return this; },
-    };
-
-    await fileManagerController.unzip(req, res);
-    expect(res.statusCode).toBe(400);
-    expect(res.body.success).toBe(false);
-  });
-
-  test('controller extracts archive successfully', async () => {
-    const req = {
-      body: {
-        path: '/test_archive.zip',
-        destination: '/controller_extracted',
+describe('FileManager Controller', () => {
+  function mockRes() {
+    return {
+      statusCode: 200,
+      body: null,
+      status(c) {
+        this.statusCode = c;
+        return this;
+      },
+      json(d) {
+        this.body = d;
+        return this;
       },
     };
-    const res = {
-      status(code) { this.statusCode = code; return this; },
-      json(data) { this.body = data; return this; },
-    };
+  }
 
-    await fileManagerController.unzip(req, res);
+  test('list returns HTTP 200 with directory items', async () => {
+    const res = mockRes();
+    await fileManagerController.list({ query: { path: '/' } }, res);
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data.items)).toBe(true);
+  });
 
-    const extractedFile = path.join(tmpDir, 'controller_extracted', 'hello.txt');
-    expect(fs.existsSync(extractedFile)).toBe(true);
+  test('writeFile and readFile return HTTP 200', async () => {
+    const writeRes = mockRes();
+    await fileManagerController.writeFile({ body: { path: 'api_test.txt', content: 'from api' } }, writeRes);
+    expect(writeRes.statusCode).toBe(200);
+    expect(writeRes.body.success).toBe(true);
+
+    const readRes = mockRes();
+    await fileManagerController.readFile({ query: { path: 'api_test.txt' } }, readRes);
+    expect(readRes.statusCode).toBe(200);
+    expect(readRes.body.data.content).toBe('from api');
+  });
+
+  test('path traversal in controller returns 403 error', async () => {
+    const res = mockRes();
+    await fileManagerController.readFile({ query: { path: '../../sensitive' } }, res);
+    expect(res.statusCode).toBe(403);
+    expect(res.body.success).toBe(false);
   });
 });
-

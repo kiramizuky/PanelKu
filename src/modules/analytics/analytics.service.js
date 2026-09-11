@@ -31,7 +31,7 @@ class AnalyticsService {
    */
   async getMetricsHistory(hours = 24) {
     const since = new Date(Date.now() - hours * 3600 * 1000);
-    const all = await MonitorHistory.find({});
+    const all = await MonitorHistory.find({ since });
 
     const filtered = all.filter(h => new Date(h.timestamp) >= since);
 

@@ -163,7 +163,6 @@ export default [
       '**/*.min.js',
       'src/public/js/codemirror/**',
       'src/public/js/vendor/**',
-      'src/config/swagger.fixed.js',
       'src/config/swagger.js',
     ],
   },

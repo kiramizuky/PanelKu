@@ -3,6 +3,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import logger from '../../config/logger.js';
 import { normalizeDisks } from '../../helpers/system.js';
+import cache from '../../helpers/cache.js';
 
 const execAsync = promisify(exec);
 
@@ -11,109 +12,100 @@ class DashboardService {
    * Get all realtime system metrics for dashboard.
    */
   async getMetrics() {
-    try {
-      const [cpu, mem, disk, osInfo, time, network, temp, load, ifaces] = await Promise.allSettled([
-        si.currentLoad(),
-        si.mem(),
-        si.fsSize(),
-        si.osInfo(),
-        si.time(),
-        si.networkStats(),
-        si.cpuTemperature(),
-        si.currentLoad(),
-        si.networkInterfaces(),
-      ]);
+    return cache.remember('dashboard:metrics', 2, async () => {
+      try {
+        const [cpu, mem, disk, osInfo, time, network, temp, load, ifaces] = await Promise.allSettled([
+          si.currentLoad(),
+          si.mem(),
+          si.fsSize(),
+          si.osInfo(),
+          si.time(),
+          si.networkStats(),
+          si.cpuTemperature(),
+          si.currentLoad(),
+          si.networkInterfaces(),
+        ]);
 
-      const cpuData = cpu.value || {};
-      const memData = mem.value || {};
-      const rawDiskData = disk.value || [];
-      const diskData = normalizeDisks(rawDiskData);
-      const osData = osInfo.value || {};
-      const timeData = time.value || {};
-      const netStats = network.value || [];
-      const netInterfaces = ifaces.value || [];
-      const tempData = temp.value || {};
-      const loadData = load.value || {};
+        const cpuData = cpu.value || {};
+        const memData = mem.value || {};
+        const rawDiskData = disk.value || [];
+        const diskData = normalizeDisks(rawDiskData);
+        const osData = osInfo.value || {};
+        const timeData = time.value || {};
+        const netStats = network.value || [];
+        const netInterfaces = ifaces.value || [];
+        const tempData = temp.value || {};
+        const loadData = load.value || {};
 
-      const networksMapped = netStats.map(stat => {
-        const info = netInterfaces.find(i => i.iface === stat.iface) || {};
+        const networksMapped = netStats.map(stat => {
+          const info = netInterfaces.find(i => i.iface === stat.iface) || {};
+          return {
+            iface: stat.iface,
+            ip4: info.ip4 || 'No IP',
+            rxSec: stat.rx_sec || 0,
+            txSec: stat.tx_sec || 0,
+            rxTotal: stat.rx_bytes || 0,
+            txTotal: stat.tx_bytes || 0,
+          };
+        });
+
         return {
-          iface: stat.iface,
-          ip4: info.ip4 || 'No IP',
-          rxSec: stat.rx_sec || 0,
-          txSec: stat.tx_sec || 0,
-          rxTotal: stat.rx_bytes || 0,
-          txTotal: stat.tx_bytes || 0,
+          cpu: {
+            usage: Math.round(cpuData.currentLoad || 0),
+            cores: cpuData.cpus?.length || 1,
+            speed: cpuData.cpus?.[0]?.speed || 0,
+            loadAvg: [loadData.avgLoad1 || 0, loadData.avgLoad5 || 0, loadData.avgLoad15 || 0],
+          },
+          memory: {
+            total: memData.total || 0,
+            used: memData.used || 0,
+            free: memData.free || 0,
+            percent: memData.total ? Math.round((memData.used / memData.total) * 100) : 0,
+          },
+          disk: diskData,
+          os: {
+            distro: osData.distro || '',
+            release: osData.release || '',
+            hostname: osData.hostname || '',
+            arch: osData.arch || '',
+            uptime: timeData.uptime || 0,
+          },
+          temperature: {
+            main: tempData.main || null,
+            max: tempData.max || null,
+            cores: tempData.cores || [],
+          },
+          network: networksMapped,
+          timestamp: Date.now(),
         };
-      });
-
-      return {
-        cpu: {
-          usage: Math.round(cpuData.currentLoad || 0),
-          cores: cpuData.cpus?.length || 1,
-          speed: cpuData.cpus?.[0]?.speed || 0,
-          loadAvg: [loadData.avgLoad1 || 0, loadData.avgLoad5 || 0, loadData.avgLoad15 || 0],
-        },
-        memory: {
-          total: memData.total || 0,
-          used: memData.used || 0,
-          free: memData.free || 0,
-          usedPercent: memData.total ? Math.round((memData.used / memData.total) * 100) : 0,
-          swapTotal: memData.swaptotal || 0,
-          swapUsed: memData.swapused || 0,
-        },
-        disk: diskData.map((d) => ({
-          fs: d.fs,
-          mount: d.mount,
-          type: d.type,
-          total: d.size,
-          used: d.used,
-          free: d.available,
-          usedPercent: d.use || 0,
-        })),
-        system: {
-          hostname: osData.hostname || 'unknown',
-          platform: osData.platform || 'linux',
-          distro: osData.distro || 'Linux',
-          release: osData.release || '',
-          kernel: osData.kernel || '',
-          arch: osData.arch || '',
-          uptime: timeData.uptime || 0,
-        },
-        temperature: {
-          main: tempData.main || null,
-          max: tempData.max || null,
-          cores: tempData.cores || [],
-        },
-        network: networksMapped,
-        timestamp: Date.now(),
-      };
-    } catch (err) {
-      logger.error('DashboardService.getMetrics error:', err);
-      throw err;
-    }
+      } catch (err) {
+        logger.error('DashboardService.getMetrics error:', err);
+        throw err;
+      }
+    });
   }
 
   /**
    * Get additional info: Docker status, firewall, public IP, services.
    */
   async getServerInfo() {
-    const results = await Promise.allSettled([
-      this._getDockerStatus(),
-      this._getFirewallStatus(),
-      this._getPublicIp(),
-      this._getRunningServices(),
-      si.networkInterfaces(),
-    ]);
+    return cache.remember('dashboard:server_info', 5, async () => {
+      const results = await Promise.allSettled([
+        this._getDockerStatus(),
+        this._getFirewallStatus(),
+        this._getPublicIp(),
+        this._getRunningServices(),
+        si.networkInterfaces(),
+      ]);
 
-    return {
-      docker: results[0].value || { running: false, containers: 0 },
-      firewall: results[1].value || { enabled: false, tool: 'none' },
-      publicIp: results[2].value || 'unknown',
-      services: results[3].value || [],
-      interfaces: (results[4].value || []).filter((i) => !i.virtual),
-      timestamp: Date.now(),
-    };
+      return {
+        docker: results[0].value || { running: false, containers: 0 },
+        firewall: results[1].value || { active: false },
+        publicIp: results[2].value || 'N/A',
+        services: results[3].value || {},
+        interfaces: results[4].value || [],
+      };
+    });
   }
 
   async _getDockerStatus() {

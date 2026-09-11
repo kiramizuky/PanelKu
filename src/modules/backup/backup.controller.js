@@ -85,6 +85,10 @@ class BackupController {
 
   async runBackupJob(req, res) {
     try {
+      if (req.query.async === 'true' || req.body?.async === true) {
+        const queued = await backupService.queueBackupJob(req.params.id);
+        return successResponse(res, queued, 'Backup job queued', 202);
+      }
       const result = await backupService.runBackupJob(req.params.id);
       return successResponse(res, result, result.message);
     } catch (error) {
@@ -107,6 +111,11 @@ class BackupController {
     try {
       const { type, target } = req.body;
       if (!type || !target) return errorResponse(res, 'Type and target are required', 400);
+
+      if (req.query.async === 'true' || req.body?.async === true) {
+        const queued = await backupService.queueCreateBackup(type, target);
+        return successResponse(res, queued, 'Backup creation queued', 202);
+      }
 
       const result = await backupService.createBackup(type, target);
       return successResponse(res, result, 'Backup created successfully');
@@ -132,8 +141,32 @@ class BackupController {
       const { filename, target } = req.body;
       if (!filename || !target) return errorResponse(res, 'Filename and target are required', 400);
 
+      if (req.query.async === 'true' || req.body?.async === true) {
+        const queued = await backupService.queueRestoreBackup(filename, target);
+        return successResponse(res, queued, 'Restore task queued', 202);
+      }
+
       const result = await backupService.restoreBackup(filename, target);
       return successResponse(res, result, result.message);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async getQueueJobStatus(req, res) {
+    try {
+      const job = await backupService.getQueueJobStatus(req.params.jobId);
+      if (!job) return errorResponse(res, 'Job not found', 404);
+      return successResponse(res, job);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async getQueueMetrics(req, res) {
+    try {
+      const metrics = await backupService.getQueueMetrics();
+      return successResponse(res, metrics);
     } catch (error) {
       return errorResponse(res, error.message, 500);
     }

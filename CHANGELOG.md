@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] — 2026-09-11
+
+### Added
+- **Queue Architecture (BullMQ + In-Memory Fallback)**: Built unified `QueueManager` supporting BullMQ backed by Redis for heavy background operations (backup, restore, git deploy) with seamless in-memory fallback, concurrency control, and EventBus status notifications (`BACKUP_COMPLETE`, `BACKUP_FAILED`, `DEPLOY_COMPLETE`, `DEPLOY_FAILED`).
+- **Asynchronous Queue Operations**: Added `/backup/queue/metrics` and `/backup/queue/:jobId` endpoints, plus non-blocking `?async=true` execution mode for database dumps, file archives, and disaster recovery restores.
+- **Dedicated Test Coverage Expansion**: Added 6 comprehensive test suites covering `queue`, `alerts`, `whatsapp`, `analytics`, `caddy`, `mail`, and `filemanager` (expanding test suites to 37 passed suites and 490 tests).
+
+### Fixed
+- **Orphaned Module Routes & Navigation**: Restored `/alerts` page route and desktop/mobile navigation links under Security; restored `/whatsapp` desktop/mobile navigation links under Services.
+- **Metrics History Truncation**: Resolved hardcoded 1,000-row truncate in `MonitorHistory.find` by adding indexed timestamp `since` filtering and dynamic limits up to 10,000 records.
+- **Dashboard Service Control Conflict & Route Alias**: Added `/system/services` alias alongside `/system/services/manage` to eliminate 404s when managing webserver services from the dashboard, and removed redundant duplicate Drag-and-Drop listener in dashboard view.
+- **Redis Cache Layer Activation**: Connected Redis client and EventBus invalidation (`cache.setClient`, `cache.initEventBusInvalidation`) in `bootstrap.js`; activated caching for dashboard metrics (TTL 2s), server info (TTL 5s), and Docker container list (TTL 3s) with auto-invalidation on container events.
+- **Event Loop & Teardown**: Handled `.unref()` on WhatsApp service session auto-restore timer to prevent hanging background intervals during test runs or graceful shutdown.
+- **Removed Swagger Spec Duplication**: Cleaned obsolete unreferenced `swagger.fixed.js` file.
+
 ## [3.5.0] — 2026-08-31
 
 ### Added

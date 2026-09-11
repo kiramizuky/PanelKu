@@ -16,6 +16,7 @@ router.get('/auto-update', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemControlle
 router.get('/package-manager/info', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getPackageManagerInfo.bind(systemController));
 
 // Write/execute endpoints - require EXECUTE permission
+router.post('/services', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.manageService.bind(systemController));
 router.post('/services/manage', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.manageService.bind(systemController));
 router.post('/install', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.installPackage.bind(systemController));
 router.post('/package-manager/update', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.runUpdate.bind(systemController));

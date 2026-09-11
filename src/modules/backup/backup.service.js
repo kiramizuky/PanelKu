@@ -4,6 +4,7 @@ import { spawn, exec } from 'child_process';
 import logger from '../../config/logger.js';
 import Setting from '../../models/Setting.js';
 import { detectRclone, getRcloneStatus as getRcloneStatusHelper } from '../../../plugins/shared/rclone-helper.js';
+import queueManager from '../../core/queue/QueueManager.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -86,6 +87,31 @@ class BackupService {
   constructor() {
     this.backupDir = path.resolve('storage', 'backups');
     this._initBackupDir();
+    this._registerQueueWorker();
+  }
+
+  _registerQueueWorker() {
+    queueManager.registerWorker('backup', async (job) => {
+      const { type, id, backupType, target, filename } = job.data;
+      if (type === 'run_job') {
+        await job.updateProgress(20);
+        const res = await this.runBackupJob(id);
+        await job.updateProgress(100);
+        return res;
+      } else if (type === 'create_backup') {
+        await job.updateProgress(20);
+        const res = await this.createBackup(backupType, target);
+        await job.updateProgress(100);
+        return res;
+      } else if (type === 'restore_backup') {
+        await job.updateProgress(20);
+        const res = await this.restoreBackup(filename, target);
+        await job.updateProgress(100);
+        return res;
+      } else {
+        throw new Error(`Unknown backup job type: ${type}`);
+      }
+    }, { concurrency: 1 });
   }
 
   async _initBackupDir() {
@@ -876,6 +902,41 @@ class BackupService {
     } catch (err) {
       throw new Error(`Failed to list remote backups: ${err.message}`);
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  SECTION 7 — Asynchronous Queue Methods
+  // ═══════════════════════════════════════════════════════════════════
+
+  async queueBackupJob(id) {
+    return await queueManager.addJob('backup', `backup_job_${id}`, {
+      type: 'run_job',
+      id,
+    });
+  }
+
+  async queueCreateBackup(type, target) {
+    return await queueManager.addJob('backup', `create_${type}_${target}`, {
+      type: 'create_backup',
+      backupType: type,
+      target,
+    });
+  }
+
+  async queueRestoreBackup(filename, target) {
+    return await queueManager.addJob('backup', `restore_${filename}`, {
+      type: 'restore_backup',
+      filename,
+      target,
+    });
+  }
+
+  async getQueueJobStatus(jobId) {
+    return await queueManager.getJob('backup', jobId);
+  }
+
+  async getQueueMetrics() {
+    return await queueManager.getQueueMetrics('backup');
   }
 }
 

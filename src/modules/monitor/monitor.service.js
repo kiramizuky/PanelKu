@@ -67,7 +67,7 @@ class MonitorService {
    */
   async getHistory(minutes = 60) {
     const since = new Date(Date.now() - minutes * 60 * 1000);
-    const all = await MonitorHistory.find({});
+    const all = await MonitorHistory.find({ since });
     return all.filter(h => new Date(h.timestamp) >= since);
   }
 

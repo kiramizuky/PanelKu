@@ -399,7 +399,7 @@ const Dashboard = (() => {
       if (!this.activeWebserver) return;
       if (!(await LP.confirm(`Are you sure you want to ${action} ${this.activeWebserver}?`, 'Confirm Action'))) return;
       
-      const res = await LP.post('/system/services', { service: this.activeWebserver, action });
+      const res = await LP.post('/system/services/manage', { service: this.activeWebserver, action });
       if (res?.success) {
         LP.toast(`Service ${this.activeWebserver} ${action}ed successfully.`, 'success');
         setTimeout(() => this.fetchWebserverStatus(), 1000);

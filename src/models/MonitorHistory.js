@@ -17,10 +17,23 @@ function rowToHistory(row) {
 }
 
 const MonitorHistory = {
-  async find(_filter = {}, options = {}) {
-    const db    = getDb();
-    const limit = options.limit || 1000;
-    const rows  = db.prepare('SELECT * FROM monitor_history ORDER BY timestamp DESC LIMIT ?').all(limit);
+  async find(filter = {}, options = {}) {
+    const db = getDb();
+    let query = 'SELECT * FROM monitor_history';
+    const params = [];
+
+    const since = filter?.since || filter?.timestamp?.$gte || (filter?.timestamp instanceof Date ? filter.timestamp : null);
+    if (since) {
+      query += ' WHERE timestamp >= ?';
+      params.push(since instanceof Date ? since.toISOString() : String(since));
+    }
+
+    query += ' ORDER BY timestamp DESC';
+    const limit = options.limit || (since ? MAX_ROWS : 1000);
+    query += ' LIMIT ?';
+    params.push(limit);
+
+    const rows = db.prepare(query).all(...params);
     return rows.map(rowToHistory).reverse();
   },
 

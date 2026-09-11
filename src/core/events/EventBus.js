@@ -73,6 +73,7 @@ export const EVENTS = {
   BACKUP_FAILED: 'backup.failed',
   SSL_EXPIRING: 'ssl.expiring',
   DEPLOY_COMPLETE: 'deploy.complete',
+  DEPLOY_FAILED: 'deploy.failed',
   PASSWORD_POLICY_CHANGED: 'password_policy.changed',
 };
 

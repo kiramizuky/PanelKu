@@ -14,6 +14,8 @@ import pluginLoader from './core/plugin-loader/PluginLoader.js';
 import auditRepository from './repositories/audit.repository.js';
 import { startPasswordExpiryReminder } from './jobs/password-expiry-reminder.job.js';
 import { mkdirSync } from 'fs';
+import cache from './helpers/cache.js';
+import queueManager from './core/queue/QueueManager.js';
 
 // Ensure storage directories exist
 ['./storage/logs', './storage/uploads', './storage/backups', './storage/temp'].forEach((dir) => {
@@ -40,10 +42,13 @@ export const bootstrap = async (app, httpServer) => {
   redis = new Redis(redisConfig);
   redis.on('error', (err) => logger.warn('Redis error: ' + err.message));
   redis.on('ready', () => logger.info('Redis connected'));
+  cache.setClient(redis);
+  cache.initEventBusInvalidation();
+  queueManager.init(redis);
   try {
     await redis.connect();
   } catch (err) {
-    logger.warn(`Failed to connect to Redis: ${err.message}. Panel will run without active background queues.`);
+    logger.warn(`Failed to connect to Redis: ${err.message}. Panel will run with in-memory cache.`);
   }
 
   // 3. Seed initial data (roles, super admin)
@@ -99,7 +104,8 @@ export const gracefulShutdown = async () => {
     });
   }
 
-  // Now safe to close DB and Redis
+  // Now safe to close Queues, DB and Redis
+  try { await queueManager.closeAll(); } catch (e) { logger.warn('Queue close error: ' + e.message); }
   try { getDb().close(); } catch (e) { logger.warn('DB close error: ' + e.message); }
   if (redis) {
     try { await redis.quit(); } catch (e) { logger.warn('Redis quit error: ' + e.message); }

@@ -25,6 +25,10 @@ router.put('/jobs/:id',       requirePermission('backup', 'update'),  backupCont
 router.delete('/jobs/:id',    requirePermission('backup', 'delete'),  backupController.deleteBackupJob.bind(backupController));
 router.post('/jobs/:id/run',  requirePermission('backup', 'execute'), backupController.runBackupJob.bind(backupController));
 
+// ── Queue Operations ──
+router.get('/queue/metrics',  requirePermission('backup', 'read'),    backupController.getQueueMetrics.bind(backupController));
+router.get('/queue/:jobId',   requirePermission('backup', 'read'),    backupController.getQueueJobStatus.bind(backupController));
+
 // ── Local Backups ──
 router.get('/',               requirePermission('backup', 'read'),    backupController.getBackups.bind(backupController));
 router.post('/',              requirePermission('backup', 'create'),  backupController.createBackup.bind(backupController));
