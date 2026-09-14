@@ -118,7 +118,7 @@ class MonitorService {
   }
 
   /**
-   * Get running system processes.
+   * Get running system processes with detailed memory footprint.
    */
   async getProcesses() {
     try {
@@ -128,12 +128,37 @@ class MonitorService {
         name: p.name,
         cpu: p.cpu,
         mem: p.mem,
+        memRss: p.memRss ? Math.round(p.memRss / 1024 / 1024) : 0, // MB
         user: p.user,
-        state: p.state
+        state: p.state,
+        priority: p.priority ?? 0,
+        command: p.command || p.name
       }));
     } catch (err) {
       logger.error('MonitorService.getProcesses error:', err);
       return [];
+    }
+  }
+
+  /**
+   * Terminate/kill a running process with safety guards.
+   */
+  async killProcess(pid, signal = 'SIGTERM') {
+    const targetPid = parseInt(pid, 10);
+    if (!targetPid || isNaN(targetPid) || targetPid <= 1) {
+      throw Object.assign(new Error('Invalid PID. Cannot terminate system init (PID 1) or non-positive PID.'), { statusCode: 400 });
+    }
+    if (targetPid === process.pid) {
+      throw Object.assign(new Error('Cannot terminate the Linux-Panel server process itself.'), { statusCode: 400 });
+    }
+    const allowedSignals = ['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP'];
+    const safeSignal = allowedSignals.includes(signal) ? signal : 'SIGTERM';
+
+    try {
+      process.kill(targetPid, safeSignal);
+      return { success: true, pid: targetPid, signal: safeSignal, message: `Signal ${safeSignal} sent to PID ${targetPid}` };
+    } catch (err) {
+      throw Object.assign(new Error(`Failed to terminate process ${targetPid}: ${err.message}`), { statusCode: 500 });
     }
   }
 }

@@ -70,6 +70,17 @@ class MonitorController {
       return error(res, err.message, 500);
     }
   }
+
+  async killProcess(req, res) {
+    try {
+      const { pid } = req.params;
+      const { signal = 'SIGTERM' } = req.body || {};
+      const result = await monitorService.killProcess(pid, signal);
+      return success(res, result, result.message);
+    } catch (err) {
+      return error(res, err.message, err.statusCode || 500);
+    }
+  }
 }
 
 const monitorController = new MonitorController();
