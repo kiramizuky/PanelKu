@@ -38,7 +38,16 @@
       Metrics history, log analytics, service health, and performance insights
     </p>
   </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <div class="dropdown d-inline-block">
+      <button class="btn-lp btn-lp-ghost btn-lp-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="border: 1px solid var(--glass-border);">
+        <i class="bi bi-download"></i> Export Data
+      </button>
+      <ul class="dropdown-menu dropdown-menu-dark" style="font-size: 13px; background-color: var(--glass-bg); border-color: var(--glass-border);">
+        <li><a class="dropdown-item" href="#" onclick="AnalyticsPage.exportData('csv')"><i class="bi bi-filetype-csv me-2 text-info"></i>Export CSV</a></li>
+        <li><a class="dropdown-item" href="#" onclick="AnalyticsPage.exportData('json')"><i class="bi bi-filetype-json me-2 text-warning"></i>Export JSON</a></li>
+      </ul>
+    </div>
     <select id="anlTimeRange" class="lp-input" style="width:130px;display:inline-block;" onchange="AnalyticsPage.refresh()">
       <option value="1">Last 1 hour</option>
       <option value="6">Last 6 hours</option>
@@ -196,9 +205,18 @@
           <option value="web-apache-access">Apache Access</option>
           <option value="web-apache-error">Apache Error</option>
         </select>
-        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="AnalyticsPage.loadLogs()">
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="AnalyticsPage.loadLogs()" title="Refresh Logs">
           <i class="bi bi-arrow-clockwise"></i>
         </button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" id="btnAutoTail" onclick="AnalyticsPage.toggleAutoTail()" title="Auto-tail live logs">
+          <i class="bi bi-play-circle" id="iconAutoTail"></i> <span id="textAutoTail">Auto-Tail</span>
+        </button>
+        <div class="btn-group btn-group-sm" id="logLevelFilters">
+          <button class="btn btn-outline-light active" style="font-size: 10px;" onclick="AnalyticsPage.filterLogs('ALL', this)">ALL</button>
+          <button class="btn btn-outline-danger" style="font-size: 10px;" onclick="AnalyticsPage.filterLogs('ERROR', this)">ERROR</button>
+          <button class="btn btn-outline-warning" style="font-size: 10px;" onclick="AnalyticsPage.filterLogs('WARN', this)">WARN</button>
+          <button class="btn btn-outline-info" style="font-size: 10px;" onclick="AnalyticsPage.filterLogs('INFO', this)">INFO</button>
+        </div>
       </div>
     </div>
     <div style="background:#0a0a0f;border-radius:10px;border:1px solid var(--glass-border);overflow:hidden;">
@@ -233,10 +251,11 @@
             <th>Sub</th>
             <th>CPU %</th>
             <th>RAM %</th>
+            <th>SLA (30d)</th>
           </tr>
         </thead>
         <tbody id="servicesTableBody">
-          <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
+          <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>
         </tbody>
       </table>
     </div>

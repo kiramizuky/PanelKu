@@ -10,8 +10,30 @@
   </div>
 </div>
 
-<div class="lp-glass-card" style="padding: 10px; background: rgba(0,0,0,0.5); position: relative;">
-  <div id="terminal" style="width: 100%; height: calc(100vh - 250px);"></div>
+<div class="lp-glass-card" style="padding: 10px; background: rgba(0,0,0,0.5); position: relative; display:flex; flex-direction:column; height: calc(100vh - 120px);">
+  <div id="terminalTabs" class="d-flex align-items-center mb-2" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 5px; overflow-x:auto;">
+    <div id="tabList" class="d-flex gap-1"></div>
+    <button class="btn btn-sm btn-outline-secondary ms-2" onclick="TerminalPage.addTab()" style="font-size:12px; flex-shrink:0;"><i class="bi bi-plus-lg"></i> New Tab</button>
+    
+    <div class="ms-auto d-flex gap-2">
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" style="font-size:12px;">
+          <i class="bi bi-code-slash"></i> Snippets
+        </button>
+        <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" style="font-size:12px;">
+          <li><a class="dropdown-item" href="#" onclick="TerminalPage.insertSnippet('htop')">Run htop</a></li>
+          <li><a class="dropdown-item" href="#" onclick="TerminalPage.insertSnippet('tail -f /var/log/syslog')">Tail Syslog</a></li>
+          <li><a class="dropdown-item" href="#" onclick="TerminalPage.insertSnippet('df -h')">Check Disk (df -h)</a></li>
+          <li><a class="dropdown-item" href="#" onclick="TerminalPage.insertSnippet('netstat -tulpn')">Check Ports (netstat)</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  
+  <div id="terminalsContainer" style="width: 100%; flex: 1; position:relative;">
+    <!-- terminal containers will be injected here -->
+  </div>
+  
   <button id="aiTerminalFixBtn" class="btn-lp btn-lp-primary d-none" style="position: absolute; bottom: 20px; right: 20px; z-index: 100; box-shadow: 0 4px 20px rgba(99,102,241,0.5); border: 1px solid rgba(255,255,255,0.2);" onclick="TerminalPage.openCopilotModal('fix')">
     <i class="bi bi-magic me-1"></i> Fix Error with AI
   </button>

@@ -23,6 +23,28 @@ class AnalyticsController {
     }
   }
 
+  async exportMetrics(req, res) {
+    try {
+      const hours = parseInt(req.query.hours) || 24;
+      const format = req.query.format || 'json';
+      const data = await analyticsService.getMetricsHistory(Math.min(Math.max(hours, 1), 720));
+      
+      if (format === 'csv') {
+        const csv = analyticsService.convertToCsv(data.series);
+        res.header('Content-Type', 'text/csv');
+        res.attachment(`metrics_export_${Date.now()}.csv`);
+        return res.send(csv);
+      }
+      
+      // JSON
+      res.header('Content-Type', 'application/json');
+      res.attachment(`metrics_export_${Date.now()}.json`);
+      return res.send(JSON.stringify(data, null, 2));
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
   // ── Logs ─────────────────────────────────────────────────────────
 
   async getSystemLogs(req, res) {

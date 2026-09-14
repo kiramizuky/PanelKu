@@ -9,7 +9,12 @@
   <div class="col-12 col-md-8">
     <!-- Host Services Table -->
     <div class="lp-glass-card system-services-card">
-      <div class="lp-card-title">Host Services</div>
+      <div class="system-card-header d-flex justify-content-between align-items-center mb-3">
+        <div class="lp-card-title m-0">Host Services</div>
+        <div style="width:200px;">
+          <input type="text" id="serviceSearch" class="lp-input py-1" style="font-size:12px;" placeholder="Search services..." oninput="SystemPage.filterServices()">
+        </div>
+      </div>
       <div class="system-services-scroll">
         <table class="lp-table">
           <thead>
@@ -109,6 +114,18 @@
       </div>
       <button class="btn-lp btn-lp-primary mt-3 w-100" onclick="SystemPage.savePHPConfig()">Save PHP-FPM Config & Reload</button>
     </div>
+
+    <!-- Sysctl / Kernel Info -->
+    <div class="lp-glass-card mt-3">
+      <div class="lp-card-title">Sysctl / Kernel Info</div>
+      <div class="table-responsive">
+        <table class="lp-table" style="font-size:12px;">
+          <tbody id="sysctlTableBody">
+            <tr><td colspan="2" class="text-center text-muted py-2">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <div class="col-12 col-md-4 system-sidebar">
@@ -182,6 +199,26 @@
       <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
         <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn-lp btn-lp-primary" onclick="SystemPage.addSshKey()">Add Key</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal for Service Logs -->
+<div class="modal fade" id="serviceLogModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content lp-glass-card" style="border: 1px solid rgba(255,255,255,0.1); background: rgba(20,20,25,0.95);">
+      <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <h5 class="modal-title font-mono text-white" style="font-size:15px;" id="serviceLogModalTitle">Service Logs</h5>
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" onclick="SystemPage.refreshServiceLog()" title="Refresh Logs">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+      </div>
+      <div class="modal-body p-3">
+        <pre id="serviceLogContent" style="background:#0a0a0a; color:#38bdf8; padding:15px; border-radius:8px; font-family:'JetBrains Mono', monospace; font-size:12px; max-height:450px; overflow-y:auto; margin:0; white-space:pre-wrap;"></pre>
       </div>
     </div>
   </div>

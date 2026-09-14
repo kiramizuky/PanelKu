@@ -43,6 +43,35 @@ const AnalyticsPage = {
   //  OVERVIEW TAB
   // ══════════════════════════════════════════════════════
 
+  async exportData(format = 'json') {
+    const hours = parseInt(document.getElementById('anlTimeRange').value) || 24;
+    try {
+      LP.loading(true);
+      const res = await fetch(`/api/analytics/metrics/export?hours=${hours}&format=${format}`, {
+        headers: {
+          'Authorization': `Bearer ${LP.state.accessToken}`
+        }
+      });
+      if (!res.ok) {
+        throw new Error('Export failed with status: ' + res.status);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `metrics_export_${Date.now()}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      LP.toast(`Metrics exported (${format.toUpperCase()})`, 'success');
+    } catch (err) {
+      LP.toast('Export error: ' + err.message, 'error');
+    } finally {
+      LP.loading(false);
+    }
+  },
+
   async loadOverview(hours) {
     try {
       const res = await LP.get(`/analytics/metrics/history?hours=${hours}`);
@@ -316,9 +345,70 @@ const AnalyticsPage = {
   // ══════════════════════════════════════════════════════
   //  LOGS TAB
   // ══════════════════════════════════════════════════════
+  
+  _autoTailInterval: null,
+  _currentLogFilter: 'ALL',
+  _lastLoadedLogs: [],
 
   toggleLogSource() {
     this.loadLogs();
+  },
+
+  toggleAutoTail() {
+    const btn = document.getElementById('btnAutoTail');
+    const icon = document.getElementById('iconAutoTail');
+    const text = document.getElementById('textAutoTail');
+    
+    if (this._autoTailInterval) {
+      clearInterval(this._autoTailInterval);
+      this._autoTailInterval = null;
+      btn.classList.remove('active', 'btn-primary');
+      btn.classList.add('btn-lp-ghost');
+      icon.className = 'bi bi-play-circle';
+      text.textContent = 'Auto-Tail';
+    } else {
+      this._autoTailInterval = setInterval(() => this.loadLogs(), 3000);
+      btn.classList.remove('btn-lp-ghost');
+      btn.classList.add('active', 'btn-primary');
+      icon.className = 'bi bi-pause-circle';
+      text.textContent = 'Streaming';
+      this.loadLogs();
+    }
+  },
+
+  filterLogs(level, btn) {
+    this._currentLogFilter = level;
+    document.querySelectorAll('#logLevelFilters button').forEach(b => b.classList.remove('active'));
+    if (btn && btn.classList) {
+      btn.classList.add('active');
+    } else {
+      const found = Array.from(document.querySelectorAll('#logLevelFilters button')).find(b => b.textContent.trim() === level);
+      if (found) found.classList.add('active');
+    }
+    this.renderLogs();
+  },
+
+  renderLogs() {
+    const outputPre = document.getElementById('logOutputPre');
+    let displayLines = this._lastLoadedLogs;
+    if (this._currentLogFilter !== 'ALL') {
+      const targetLevel = this._currentLogFilter.toLowerCase();
+      displayLines = displayLines.filter(l => l.level === targetLevel || (targetLevel === 'error' && l.status >= 400));
+    }
+
+    if (displayLines.length === 0) {
+      outputPre.textContent = '[No log entries found for this filter]';
+      return;
+    }
+
+    outputPre.innerHTML = displayLines.map(l => {
+      const color = l.level === 'error' || l.status >= 400 ? '#ef4444' : (l.level === 'warn' ? '#f59e0b' : '#94a3b8');
+      return `<span style="color:${color};">${LP.escHtml(l.raw || l.message)}</span>`;
+    }).join('\n');
+    
+    // scroll to bottom
+    const container = document.getElementById('logOutputArea');
+    container.scrollTop = container.scrollHeight;
   },
 
   async loadLogs() {
@@ -364,10 +454,8 @@ const AnalyticsPage = {
       }
 
       // Render with color coding
-      outputPre.innerHTML = lines.map(l => {
-        const color = l.level === 'error' ? '#ef4444' : l.level === 'warn' ? '#f59e0b' : '#94a3b8';
-        return `<span style="color:${color};">${LP.escHtml(l.raw || l.message)}</span>`;
-      }).join('\n');
+      this._lastLoadedLogs = lines;
+      this.renderLogs();
 
     } catch (err) {
       outputPre.textContent = `[Error: ${err.message}]`;
@@ -408,6 +496,7 @@ const AnalyticsPage = {
             <td style="color:var(--text-muted);font-size:12px;">${s.sub || '—'}</td>
             <td class="font-mono" style="font-size:12px;">${s.cpu ?? '—'}%</td>
             <td class="font-mono" style="font-size:12px;">${s.mem ?? '—'}%</td>
+            <td class="font-mono" style="font-size:12px; color: ${s.uptimeSla ? '#10b981' : 'inherit'};">${s.uptimeSla || '—'}</td>
           </tr>
         `;
       }).join('');

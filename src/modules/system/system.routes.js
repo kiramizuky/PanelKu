@@ -11,6 +11,8 @@ router.use(authenticate);
 // Read endpoints - only require READ permission
 router.get('/services', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getServicesStatus.bind(systemController));
 router.get('/services/status', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getServicesStatus.bind(systemController));
+router.get('/services/:service/logs', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getServiceLogs.bind(systemController));
+router.get('/sysctl', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getSysctlInfo.bind(systemController));
 router.get('/check-install', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getInstallStatus.bind(systemController));
 router.get('/auto-update', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getAutoUpdate.bind(systemController));
 router.get('/package-manager/info', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getPackageManagerInfo.bind(systemController));

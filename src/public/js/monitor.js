@@ -114,13 +114,21 @@ const MonitorPage = (() => {
   }
 
   async function pollMetrics() {
+    if (isPaused) return;
     try {
       const res = await LP.get('/monitor/metrics');
       if (res?.success) {
         const d = res.data;
         
         // Update Uptime
-        document.getElementById('sys-uptime').textContent = formatUptime(d.system?.uptime || 0);
+        document.getElementById('sys-uptime').textContent = formatUptime(d.system?.uptime || d.os?.uptime || 0);
+
+        // Update Load Averages
+        if (d.cpu?.loadAvg) {
+          document.getElementById('load-1m').textContent = (d.cpu.loadAvg[0] || 0).toFixed(2);
+          document.getElementById('load-5m').textContent = (d.cpu.loadAvg[1] || 0).toFixed(2);
+          document.getElementById('load-15m').textContent = (d.cpu.loadAvg[2] || 0).toFixed(2);
+        }
 
         // Update CPU Chart
         const cpuPct = Math.round(d.cpu?.usage || 0);
@@ -150,6 +158,34 @@ const MonitorPage = (() => {
   let processesList = [];
   let currentSortField = 'cpu';
   let processesModalInstance = null;
+  let searchTerm = '';
+  let showMemMB = false;
+
+  function filterProcesses() {
+    searchTerm = (document.getElementById('processSearch').value || '').toLowerCase();
+    renderProcessesTable();
+  }
+
+  function toggleMemFormat() {
+    showMemMB = document.getElementById('memFormatToggle').checked;
+    renderProcessesTable();
+  }
+
+  async function killProcess(pid, signal = 'SIGTERM') {
+    if (!confirm(`Are you sure you want to send ${signal} to process ${pid}?`)) return;
+    
+    try {
+      const res = await LP.post(`/monitor/processes/${pid}/kill`, { signal });
+      if (res?.success) {
+        LP.toast('success', res.message || `Process ${pid} killed`);
+        setTimeout(fetchProcesses, 1000);
+      } else {
+        LP.toast('error', res?.message || 'Failed to kill process');
+      }
+    } catch (err) {
+      LP.toast('error', 'Error killing process');
+    }
+  }
 
   async function openProcessesModal(sortField = 'cpu') {
     currentSortField = sortField;
@@ -182,11 +218,21 @@ const MonitorPage = (() => {
   function renderProcessesTable() {
     const tbody = document.getElementById('processesTableBody');
     if (!processesList.length) {
-      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No processes running</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No processes running</td></tr>`;
       return;
     }
 
-    const sorted = [...processesList].sort((a, b) => {
+    let filtered = processesList;
+    if (searchTerm) {
+      filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm) || String(p.pid).includes(searchTerm));
+    }
+
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No matching processes found</td></tr>`;
+      return;
+    }
+
+    const sorted = [...filtered].sort((a, b) => {
       const valA = parseFloat(a[currentSortField]) || 0;
       const valB = parseFloat(b[currentSortField]) || 0;
       return valB - valA;
@@ -204,16 +250,25 @@ const MonitorPage = (() => {
       }
     }
 
-    tbody.innerHTML = sorted.map(p => `
+    tbody.innerHTML = sorted.map(p => {
+      let memDisplay = (p.mem || 0).toFixed(1) + '%';
+      if (showMemMB && p.memRss) {
+        memDisplay = (p.memRss / 1024).toFixed(1) + ' MB';
+      }
+      return `
       <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle;">
         <td style="font-family: monospace; font-weight: 600; color: var(--text-muted);">${p.pid}</td>
         <td style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 180px;" title="${LP.escHtml(p.name)}">${LP.escHtml(p.name)}</td>
         <td class="font-mono ${currentSortField === 'cpu' ? 'text-success font-weight-bold' : ''}">${(p.cpu || 0).toFixed(1)}%</td>
-        <td class="font-mono ${currentSortField === 'mem' ? 'text-info font-weight-bold' : ''}">${(p.mem || 0).toFixed(1)}%</td>
+        <td class="font-mono ${currentSortField === 'mem' ? 'text-info font-weight-bold' : ''}">${memDisplay}</td>
         <td style="color: var(--text-muted);">${LP.escHtml(p.user || 'root')}</td>
         <td><span class="badge bg-dark text-muted" style="font-size:10px;">${p.state || 'running'}</span></td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 11px;" onclick="MonitorPage.killProcess('${p.pid}')" title="Kill Process"><i class="bi bi-x-circle"></i></button>
+        </td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
   }
 
   function sortProcesses(field) {
@@ -221,7 +276,26 @@ const MonitorPage = (() => {
     renderProcessesTable();
   }
 
-  let _pollInterval;
+  let _pollInterval = null;
+  let currentInterval = 3000;
+  let isPaused = false;
+
+  function setRefreshInterval(val) {
+    if (val === 'pause') {
+      isPaused = true;
+      document.getElementById('streamStatusBadge').className = 'spinner-grow spinner-grow-sm text-warning me-2';
+      document.getElementById('streamStatusText').textContent = 'PAUSED';
+      if (_pollInterval) clearInterval(_pollInterval);
+    } else {
+      isPaused = false;
+      currentInterval = parseInt(val, 10);
+      document.getElementById('streamStatusBadge').className = 'spinner-grow spinner-grow-sm text-success me-2';
+      document.getElementById('streamStatusText').textContent = 'LIVE';
+      if (_pollInterval) clearInterval(_pollInterval);
+      _pollInterval = setInterval(pollMetrics, currentInterval);
+      pollMetrics();
+    }
+  }
 
   async function init() {
     await LP.init();
@@ -234,10 +308,11 @@ const MonitorPage = (() => {
     if (memCtx) memChartInstance = new Chart(memCtx, chartConfig('#06b6d4', 'RAM %', chartData.mem));
 
     await loadSysInfo();
-    await pollMetrics();      _pollInterval = setInterval(pollMetrics, 3000);
+    await pollMetrics();
+    _pollInterval = setInterval(pollMetrics, currentInterval);
   }
 
-  return { init, openProcessesModal, sortProcesses };
+  return { init, openProcessesModal, sortProcesses, setRefreshInterval, filterProcesses, toggleMemFormat, killProcess };
 })();
 
 // [FIX] Expose to window for LP.call() resolution

@@ -309,6 +309,42 @@ class SystemService {
     return true;
   }
 
+  async getServiceLogs(serviceName, lines = 100) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(serviceName)) throw new Error('Invalid service name');
+    try {
+      if (process.platform === 'win32') {
+        return `[Mock] Logs for ${serviceName}\nLine 1: Started successfully.\nLine 2: Running...`;
+      }
+      const out = await this._execFile('sudo', ['journalctl', '-u', serviceName, '-n', String(lines), '--no-pager']);
+      return out;
+    } catch (e) {
+      return `Failed to fetch logs for ${serviceName}: ${e.message}`;
+    }
+  }
+
+  async getSysctlInfo() {
+    try {
+      if (process.platform === 'win32') {
+        return {
+          'kernel.hostname': 'panelku-dev-win',
+          'kernel.osrelease': '10.0.19045',
+          'net.ipv4.ip_forward': '0',
+          'vm.swappiness': '60'
+        };
+      }
+      // Get some key sysctl params
+      const keys = ['kernel.hostname', 'kernel.osrelease', 'net.ipv4.ip_forward', 'vm.swappiness'];
+      const result = {};
+      for (const k of keys) {
+        const out = await this._execFile('sysctl', ['-n', k]).catch(() => 'unknown');
+        result[k] = out.trim();
+      }
+      return result;
+    } catch (e) {
+      return {};
+    }
+  }
+
   // ── Package Management ─────────────────────────────────────────
 
   async isInstalled(pkgName) {

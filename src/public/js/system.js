@@ -6,6 +6,7 @@ const SystemPage = {
     await this.loadSshKeys();
     await this.loadSshConfig();
     await this.loadPHPConfig();
+    await this.loadSysctlInfo();
   },
 
   async loadAutoUpdate() {
@@ -51,6 +52,9 @@ const SystemPage = {
     }
   },
 
+  _allServices: {},
+  _currentLogService: null,
+
   async loadServices() {
     const tbody = document.getElementById('servicesTableBody');
     tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">Loading...</td></tr>';
@@ -58,36 +62,8 @@ const SystemPage = {
     try {
       const res = await LP.get('/system/services');
       if (res?.success) {
-        const statuses = res.data;
-        const services = Object.keys(statuses);
-
-        if (services.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">No services found</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = services.map(svc => `
-          <tr>
-            <td style="font-weight:500;">${LP.escHtml(svc)}</td>
-            <td>
-              <span class="lp-badge ${statuses[svc] ? 'lp-badge-success' : 'lp-badge-danger'}">
-                ${statuses[svc] ? 'Running' : 'Stopped'}
-              </span>
-            </td>
-            <td style="text-align:right">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('restart')}')" style="color:var(--accent-info)">
-                <i class="bi bi-arrow-repeat"></i> Restart
-              </button>
-              ${statuses[svc] ? `
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('stop')}')" style="color:var(--accent-danger)">
-                <i class="bi bi-stop-circle"></i> Stop
-              </button>` : `
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('start')}')" style="color:var(--accent-success)">
-                <i class="bi bi-play-circle"></i> Start
-              </button>`}
-            </td>
-          </tr>
-        `).join('');
+        this._allServices = res.data;
+        this.renderServices();
       } else {
         tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--accent-danger)">Error: ${LP.escHtml(res?.message || 'Failed to load services')}</td></tr>`;
       }
@@ -96,11 +72,87 @@ const SystemPage = {
     }
   },
 
+  filterServices() {
+    this.renderServices();
+  },
+
+  renderServices() {
+    const tbody = document.getElementById('servicesTableBody');
+    const search = (document.getElementById('serviceSearch').value || '').toLowerCase();
+    
+    const services = Object.keys(this._allServices).filter(svc => svc.toLowerCase().includes(search));
+
+    if (services.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">No services found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = services.map(svc => `
+      <tr>
+        <td style="font-weight:500;">${LP.escHtml(svc)}</td>
+        <td>
+          <span class="lp-badge ${this._allServices[svc] ? 'lp-badge-success' : 'lp-badge-danger'}">
+            ${this._allServices[svc] ? 'Running' : 'Stopped'}
+          </span>
+        </td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.showServiceLog', '${LP.encJsArg(svc)}')" style="color:var(--text-muted)" title="View Logs">
+            <i class="bi bi-card-text"></i> Logs
+          </button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('restart')}')" style="color:var(--accent-info)">
+            <i class="bi bi-arrow-repeat"></i> Restart
+          </button>
+          ${this._allServices[svc] ? `
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('stop')}')" style="color:var(--accent-danger)">
+            <i class="bi bi-stop-circle"></i> Stop
+          </button>` : `
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('start')}')" style="color:var(--accent-success)">
+            <i class="bi bi-play-circle"></i> Start
+          </button>`}
+        </td>
+      </tr>
+    `).join('');
+  },
+
+  async showServiceLog(svc) {
+    if (typeof svc === 'string' && (svc.startsWith('%22') || svc.startsWith('"'))) {
+      try { svc = JSON.parse(decodeURIComponent(svc)); } catch (_) {}
+    }
+    this._currentLogService = svc;
+    const titleEl = document.getElementById('serviceLogModalTitle');
+    const contentEl = document.getElementById('serviceLogContent');
+    const modalEl = document.getElementById('serviceLogModal');
+    if (titleEl) titleEl.textContent = `${svc} Logs`;
+    if (contentEl) contentEl.textContent = 'Loading logs...';
+    if (modalEl) new bootstrap.Modal(modalEl).show();
+    await this.refreshServiceLog();
+  },
+
+  async refreshServiceLog() {
+    if (!this._currentLogService) return;
+    const contentEl = document.getElementById('serviceLogContent');
+    try {
+      const res = await LP.get(`/system/services/${encodeURIComponent(this._currentLogService)}/logs?lines=150`);
+      if (res?.success) {
+        if (contentEl) {
+          contentEl.textContent = res.data.logs || '[No logs available]';
+          contentEl.scrollTop = contentEl.scrollHeight;
+        }
+      } else {
+        if (contentEl) contentEl.textContent = `Error: ${res?.message}`;
+      }
+    } catch (e) {
+      if (contentEl) contentEl.textContent = 'Failed to load logs.';
+    }
+  },
+
   async manageService(service, action) {
-    const btn = event.currentTarget;
-    const oldHtml = btn.innerHTML;
-    btn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> ...';
-    btn.disabled = true;
+    const btn = window.event ? (window.event.currentTarget || window.event.target) : null;
+    const oldHtml = btn ? btn.innerHTML : null;
+    if (btn) {
+      btn.innerHTML = '<i class="bi bi-arrow-repeat spin"></i> ...';
+      btn.disabled = true;
+    }
 
     try {
       const res = await LP.post('/system/services/manage', { service, action });
@@ -109,13 +161,17 @@ const SystemPage = {
         this.loadServices();
       } else {
         LP.toast(res?.message || `Failed to ${action} service`, 'error');
-        btn.innerHTML = oldHtml;
-        btn.disabled = false;
+        if (btn && oldHtml) {
+          btn.innerHTML = oldHtml;
+          btn.disabled = false;
+        }
       }
     } catch (err) {
       LP.toast('Connection error', 'error');
-      btn.innerHTML = oldHtml;
-      btn.disabled = false;
+      if (btn && oldHtml) {
+        btn.innerHTML = oldHtml;
+        btn.disabled = false;
+      }
     }
   },
 
@@ -324,6 +380,31 @@ const SystemPage = {
       }
     } catch (err) {
       LP.toast('Failed to initiate reboot', 'error');
+    }
+  },
+
+  async loadSysctlInfo() {
+    const tbody = document.getElementById('sysctlTableBody');
+    try {
+      const res = await LP.get('/system/sysctl');
+      if (res?.success) {
+        const info = res.data;
+        const keys = Object.keys(info);
+        if (keys.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">No sysctl info available</td></tr>';
+          return;
+        }
+        tbody.innerHTML = keys.map(k => `
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+            <td style="font-family:monospace; color:var(--text-muted);">${LP.escHtml(k)}</td>
+            <td style="font-family:monospace; text-align:right;">${LP.escHtml(info[k])}</td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = `<tr><td colspan="2" class="text-center text-danger">Error: ${LP.escHtml(res?.message)}</td></tr>`;
+      }
+    } catch {
+      tbody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Failed to load sysctl info</td></tr>';
     }
   }
 };

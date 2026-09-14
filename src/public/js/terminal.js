@@ -5,15 +5,15 @@
 
 const TerminalPage = (() => {
   let socket = null;
-  let term = null;
-  let fitAddon = null;
-  let sessionId = null;
+  let tabs = {};
+  let activeTabId = null;
+  let tabCounter = 0;
   let selectedOsUser = 'root';
   let loginModal = null;
   let nodeId = null;
 
   let initialCwd = null;
-  let lastOutputBuffer = [];
+  let lastOutputBuffer = []; // Shared buffer for AI analysis (uses active tab)
 
   async function init() {
     await LP.init();
@@ -57,56 +57,71 @@ const TerminalPage = (() => {
     });
 
     socket.on('connect', () => {
-      if (term && !sessionId) {
-        socket.emit('terminal:create', {
-          cols: term.cols,
-          rows: term.rows,
-          shell: 'bash',
-          osUser: selectedOsUser,
-          nodeId: nodeId,
-          cwd: initialCwd
-        });
-      }
+      Object.keys(tabs).forEach(id => {
+        const tab = tabs[id];
+        if (tab.term && !tab.sessionId) {
+          socket.emit('terminal:create', {
+            cols: tab.term.cols,
+            rows: tab.term.rows,
+            shell: 'bash',
+            osUser: tab.osUser,
+            nodeId: nodeId,
+            cwd: initialCwd
+          }, (ack) => {
+            if (ack && ack.sessionId) tab.sessionId = ack.sessionId; // fallback if needed, relying on terminal:created
+          });
+        }
+      });
     });
 
     socket.on('terminal:created', (data) => {
-      sessionId = data.sessionId;
+      // Find a tab that is waiting for a session id
+      const pendingTabId = Object.keys(tabs).find(id => !tabs[id].sessionId);
+      if (pendingTabId) {
+        tabs[pendingTabId].sessionId = data.sessionId;
+      }
     });
 
     socket.on('terminal:data', (data) => {
-      if (data.sessionId === sessionId && term) {
-        term.write(data.data);
-        lastOutputBuffer.push(data.data);
-        if (lastOutputBuffer.length > 50) lastOutputBuffer.shift();
+      const tabId = Object.keys(tabs).find(id => tabs[id].sessionId === data.sessionId);
+      if (tabId) {
+        const tab = tabs[tabId];
+        tab.term.write(data.data);
+        if (tabId === activeTabId) {
+          lastOutputBuffer.push(data.data);
+          if (lastOutputBuffer.length > 50) lastOutputBuffer.shift();
 
-        const lowerData = data.data.toLowerCase();
-        if (lowerData.includes('command not found') || 
-            lowerData.includes('permission denied') || 
-            lowerData.includes('no such file or directory') || 
-            lowerData.includes('error:') || 
-            lowerData.includes('failed:')) {
-          const btn = document.getElementById('aiTerminalFixBtn');
-          if (btn) btn.classList.remove('d-none');
+          const lowerData = data.data.toLowerCase();
+          if (lowerData.includes('command not found') || 
+              lowerData.includes('permission denied') || 
+              lowerData.includes('no such file or directory') || 
+              lowerData.includes('error:') || 
+              lowerData.includes('failed:')) {
+            const btn = document.getElementById('aiTerminalFixBtn');
+            if (btn) btn.classList.remove('d-none');
+          }
         }
       }
     });
 
     socket.on('terminal:exit', (data) => {
-      if (data.sessionId === sessionId && term) {
-        term.write(`\r\n\x1b[33m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
-        sessionId = null;
-        sessionStorage.removeItem('lp_terminal_user');
+      const tabId = Object.keys(tabs).find(id => tabs[id].sessionId === data.sessionId);
+      if (tabId) {
+        const tab = tabs[tabId];
+        tab.term.write(`\r\n\x1b[33m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
+        tab.sessionId = null;
       }
     });
 
     socket.on('terminal:error', (data) => {
       console.error('Terminal Error:', data);
-      if (term) term.write(`\r\n\x1b[31mTerminal Error: ${data.message || 'Unknown error'}\x1b[0m\r\n`);
+      const tabId = Object.keys(tabs).find(id => tabs[id].sessionId === data.sessionId);
+      if (tabId) {
+        tabs[tabId].term.write(`\r\n\x1b[31mTerminal Error: ${data.message || 'Unknown error'}\x1b[0m\r\n`);
+      }
     });
 
-    socket.on('disconnect', () => {
-      // Terminal socket disconnected — will auto-reconnect
-    });
+    socket.on('disconnect', () => {});
 
     if (savedUser) {
       connect(savedUser);
@@ -118,53 +133,66 @@ const TerminalPage = (() => {
     selectedOsUser = osUser;
     sessionStorage.setItem('lp_terminal_user', osUser);
     if (loginModal) loginModal.hide();
-    
-    initTerminal();
+    addTab();
   }
 
-  function initTerminal() {
-    const container = document.getElementById('terminal');
-    if (!container) return;
+  function addTab() {
+    tabCounter++;
+    const tabId = `tab-${tabCounter}`;
+    
+    // Create UI elements
+    const tabList = document.getElementById('tabList');
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-sm btn-outline-secondary';
+    btn.id = `btn-${tabId}`;
+    btn.innerHTML = `Tab ${tabCounter} <i class="bi bi-x" onclick="event.stopPropagation(); TerminalPage.closeTab('${tabId}')"></i>`;
+    btn.onclick = () => switchTab(tabId);
+    btn.style.fontSize = '12px';
+    tabList.appendChild(btn);
 
-    term = new Terminal({
+    const container = document.getElementById('terminalsContainer');
+    const termDiv = document.createElement('div');
+    termDiv.id = `term-${tabId}`;
+    termDiv.style.width = '100%';
+    termDiv.style.height = '100%';
+    termDiv.style.display = 'none';
+    container.appendChild(termDiv);
+
+    // Initialize xterm
+    const term = new Terminal({
       fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
       fontSize: 14,
       lineHeight: 1.4,
-      theme: {
-        background: 'transparent',
-        foreground: '#e6edf3',
-        cursor: '#6366f1',
-        selectionBackground: 'rgba(99, 102, 241, 0.3)',
-      },
+      theme: { background: 'transparent', foreground: '#e6edf3', cursor: '#6366f1', selectionBackground: 'rgba(99, 102, 241, 0.3)' },
       cursorBlink: true,
       allowTransparency: true
     });
-
-    fitAddon = new FitAddon.FitAddon();
+    const fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
+    
+    // Store in tabs
+    tabs[tabId] = { term, fitAddon, sessionId: null, osUser: selectedOsUser, div: termDiv, btn: btn };
 
-    term.open(container);
-    fitAddon.fit();
+    term.open(termDiv);
+    
+    // Important: fit needs the div to be visible
+    switchTab(tabId);
 
     term.onData((data) => {
-      if (socket && sessionId) {
-        socket.emit('terminal:input', { sessionId, data });
+      const tab = tabs[tabId];
+      if (socket && tab.sessionId) {
+        socket.emit('terminal:input', { sessionId: tab.sessionId, data });
       }
     });
 
     term.onResize((size) => {
-      if (socket && sessionId) {
-        socket.emit('terminal:resize', { sessionId, cols: size.cols, rows: size.rows });
+      const tab = tabs[tabId];
+      if (socket && tab.sessionId) {
+        socket.emit('terminal:resize', { sessionId: tab.sessionId, cols: size.cols, rows: size.rows });
       }
     });
 
-    window.addEventListener('resize', () => {
-      try {
-        fitAddon.fit();
-      } catch (e) {}
-    });
-
-    if (socket && socket.connected && !sessionId) {
+    if (socket && socket.connected) {
       socket.emit('terminal:create', {
         cols: term.cols,
         rows: term.rows,
@@ -173,6 +201,65 @@ const TerminalPage = (() => {
         nodeId: nodeId,
         cwd: initialCwd
       });
+    }
+  }
+
+  function switchTab(tabId) {
+    if (!tabs[tabId]) return;
+    
+    // Hide all
+    Object.keys(tabs).forEach(id => {
+      tabs[id].div.style.display = 'none';
+      tabs[id].btn.classList.remove('active');
+    });
+
+    activeTabId = tabId;
+    tabs[tabId].div.style.display = 'block';
+    tabs[tabId].btn.classList.add('active');
+    
+    // Fit and focus
+    setTimeout(() => {
+      tabs[tabId].fitAddon.fit();
+      tabs[tabId].term.focus();
+    }, 10);
+  }
+
+  function closeTab(tabId) {
+    if (!tabs[tabId]) return;
+    if (Object.keys(tabs).length <= 1) {
+      LP.toast('Cannot close the last tab', 'warning');
+      return;
+    }
+
+    const tab = tabs[tabId];
+    if (tab.sessionId && socket) {
+      socket.emit('terminal:input', { sessionId: tab.sessionId, data: 'exit\n' });
+    }
+    
+    tab.term.dispose();
+    tab.div.remove();
+    tab.btn.remove();
+    delete tabs[tabId];
+
+    if (activeTabId === tabId) {
+      const remainingIds = Object.keys(tabs);
+      switchTab(remainingIds[remainingIds.length - 1]);
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    if (activeTabId && tabs[activeTabId]) {
+      try { tabs[activeTabId].fitAddon.fit(); } catch (e) {}
+    }
+  });
+
+  function insertSnippet(cmd) {
+    if (activeTabId && tabs[activeTabId]) {
+      const tab = tabs[activeTabId];
+      if (socket && tab.sessionId) {
+        socket.emit('terminal:input', { sessionId: tab.sessionId, data: cmd + '\n' });
+        tab.term.focus();
+      }
     }
   }
 
@@ -297,8 +384,8 @@ const TerminalPage = (() => {
     const confirmed = await LP.confirm(msg, title);
     if (!confirmed) return;
 
-    if (socket && sessionId) {
-      socket.emit('terminal:input', { sessionId, data: cleanCmd + '\n' });
+    if (socket && activeTabId && tabs[activeTabId] && tabs[activeTabId].sessionId) {
+      socket.emit('terminal:input', { sessionId: tabs[activeTabId].sessionId, data: cleanCmd + '\n' });
       if (copilotModal) copilotModal.hide();
       LP.toast('Perintah dikirim ke sesi terminal', 'info');
     } else {
@@ -488,6 +575,10 @@ const TerminalPage = (() => {
     copyFixCommand,
     runFixCommand,
     sendModalChatMessage,
+    addTab,
+    switchTab,
+    closeTab,
+    insertSnippet,
     insertCodeToTerminal,
     insertCodeFromB64,
   };

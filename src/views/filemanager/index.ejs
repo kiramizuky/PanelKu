@@ -18,7 +18,34 @@
   <div class="lp-card-header" style="background:rgba(0,0,0,0.2); border-bottom:1px solid var(--glass-border); padding:10px 20px; display:flex; align-items:center; gap:10px;">
     <button class="btn-lp btn-lp-ghost btn-lp-sm" id="upBtn" onclick="FMPage.goUp()" title="Go Up" disabled><i class="bi bi-arrow-up"></i></button>
     <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FMPage.refresh()" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
-    <input type="text" id="currentPath" class="lp-input font-mono" style="flex:1; padding:6px 10px; margin:0;" onkeypress="if(event.key==='Enter') FMPage.navigate(this.value)" placeholder="/">
+    
+    <!-- Quick Bookmarks -->
+    <div class="dropdown">
+      <button class="btn-lp btn-lp-ghost btn-lp-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" title="Bookmarks">
+        <i class="bi bi-bookmark-star"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-dark" style="font-size:13px;">
+        <li><a class="dropdown-item" href="#" onclick="FMPage.navigate('/')"><i class="bi bi-hdd me-2"></i>Root (/)</a></li>
+        <li><a class="dropdown-item" href="#" onclick="FMPage.navigate('/var/log')"><i class="bi bi-card-text me-2"></i>/var/log</a></li>
+        <li><a class="dropdown-item" href="#" onclick="FMPage.navigate('/etc')"><i class="bi bi-gear me-2"></i>/etc</a></li>
+        <li><a class="dropdown-item" href="#" onclick="FMPage.navigate('/home')"><i class="bi bi-house me-2"></i>/home</a></li>
+      </ul>
+    </div>
+
+    <!-- Breadcrumbs / Path Input -->
+    <div style="flex:1; display:flex; flex-direction:column; gap:2px; min-width:0;">
+      <div id="fmBreadcrumbs" style="display:flex; gap:4px; font-size:11px; overflow-x:auto; padding-bottom:2px; color:var(--text-muted); font-family:monospace; white-space:nowrap; scrollbar-width:none;">
+        <!-- Breadcrumbs injected by JS -->
+      </div>
+      <input type="text" id="currentPath" class="lp-input font-mono" style="padding:4px 8px; margin:0; font-size:12px; height:28px;" onkeypress="if(event.key==='Enter') FMPage.navigate(this.value)" placeholder="/">
+    </div>
+    
+    <!-- Search Bar -->
+    <div class="input-group" style="width: 200px;">
+      <span class="input-group-text" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-right:none; font-size:12px;"><i class="bi bi-search"></i></span>
+      <input type="text" id="fmSearchInput" class="lp-input" style="height:32px; font-size:12px; border-left:none;" placeholder="Search files..." onkeypress="if(event.key==='Enter') FMPage.searchFiles(this.value)">
+    </div>
+
     <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="FMPage.openTerminal()" title="Open Terminal Here"><i class="bi bi-terminal-fill me-1"></i> Terminal</button>
   </div>
 
@@ -1052,4 +1079,15 @@
 <script src="/js/codemirror/yaml.min.js"></script>
 <script src="/js/codemirror/markdown.min.js"></script>
 <script src="/js/codemirror/clike.min.js"></script>
+
+<!-- Global Drag & Drop Overlay -->
+<div id="dropOverlay" style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); z-index: 9999; display: none; align-items: center; justify-content: center; flex-direction: column; border: 3px dashed var(--accent-primary); pointer-events: none;">
+  <i class="bi bi-cloud-arrow-up text-primary mb-3" style="font-size: 64px;"></i>
+  <h3 class="text-white fw-bold">Drop files here to upload</h3>
+  <p class="text-muted">Files will be queued for upload into current directory</p>
+</div>
+<style>
+  #dropOverlay.visible { display: flex !important; }
+</style>
+
 <script src="/js/filemanager.js"></script>

@@ -20,6 +20,28 @@ class SystemController {
     }
   }
 
+  async getServiceLogs(req, res) {
+    try {
+      const { service } = req.params;
+      const lines = parseInt(req.query.lines) || 100;
+      if (!service) return errorResponse(res, 'Service name is required', 400);
+
+      const logs = await systemService.getServiceLogs(service, lines);
+      return success(res, { logs });
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to get service logs', 500);
+    }
+  }
+
+  async getSysctlInfo(req, res) {
+    try {
+      const info = await systemService.getSysctlInfo();
+      return success(res, info);
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to get sysctl info', 500);
+    }
+  }
+
   async manageService(req, res) {
     try {
       const { service, action } = req.body;

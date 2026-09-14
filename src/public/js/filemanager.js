@@ -143,9 +143,72 @@ const FMPage = (() => {
 
     grid.innerHTML = html;
     
+    // Update breadcrumbs
+    renderBreadcrumbs(currentPath);
+
     // Hide bulk bar on every navigate/refresh
     const bulkBar = document.getElementById('fmBulkBar');
     if (bulkBar) bulkBar.style.display = 'none';
+  }
+
+  function renderBreadcrumbs(path) {
+    const container = document.getElementById('fmBreadcrumbs');
+    if (!container) return;
+    
+    if (path === '/') {
+      container.innerHTML = `<span style="cursor:pointer; color:var(--accent-primary);" onclick="LP.call('FMPage.navigate', '/')">/</span>`;
+      return;
+    }
+
+    const parts = path.split('/').filter(Boolean);
+    let html = `<span style="cursor:pointer; transition:color 0.2s;" onmouseover="this.style.color='var(--accent-primary)'" onmouseout="this.style.color=''" onclick="LP.call('FMPage.navigate', '/')">/</span>`;
+    let accum = '';
+    
+    parts.forEach((p, idx) => {
+      accum += '/' + p;
+      const isLast = idx === parts.length - 1;
+      if (isLast) {
+        html += `<span class="mx-1">/</span><span style="color:var(--text-primary); font-weight:600;">${escHtml(p)}</span>`;
+      } else {
+        html += `<span class="mx-1">/</span><span style="cursor:pointer; transition:color 0.2s;" onmouseover="this.style.color='var(--accent-primary)'" onmouseout="this.style.color=''" onclick="LP.call('FMPage.navigate', '${LP.encJsArg(accum)}')">${escHtml(p)}</span>`;
+      }
+    });
+
+    container.innerHTML = html;
+    container.scrollLeft = container.scrollWidth;
+  }
+
+  async function searchFiles(query) {
+    if (!query) {
+      navigate(currentPath);
+      return;
+    }
+    try {
+      LP.loading(true);
+      const res = await LP.get(`/filemanager/search?path=${encodeURIComponent(currentPath)}&query=${encodeURIComponent(query)}`);
+      LP.loading(false);
+      
+      if (!res?.success) {
+        LP.toast('Search failed: ' + res?.message, 'error');
+        return;
+      }
+      
+      const items = res.data.results || [];
+      // To re-use renderItems, we need to map paths properly
+      renderItems(items.map(item => ({
+        ...item,
+        size: 0, // Not provided by search API currently
+        owner: '-',
+        permissions: '-'
+      })));
+      
+      const subTitleEl = document.querySelector('.lp-page-subtitle');
+      if (subTitleEl) subTitleEl.innerHTML = `Search results for "${escHtml(query)}" in <code class="text-info" style="font-size:12px;">${escHtml(currentPath)}</code>`;
+      
+    } catch (err) {
+      LP.loading(false);
+      LP.toast('Search error: ' + err.message, 'error');
+    }
   }
 
   // ── Context Menu ──────────────────────────────────
@@ -1738,6 +1801,54 @@ const FMPage = (() => {
   }
 
   // ── Public ────────────────────────────────────────
+  // Drag and Drop global overlay
+  function initDragAndDrop() {
+    const overlay = document.getElementById('dropOverlay');
+    if (!overlay) return;
+
+    let dragCounter = 0;
+
+    document.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      if (dragCounter === 1) {
+        overlay.classList.add('visible');
+      }
+    });
+
+    document.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter === 0) {
+        overlay.classList.remove('visible');
+      }
+    });
+
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      overlay.classList.remove('visible');
+      
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        // Show upload modal and set files
+        const modal = new bootstrap.Modal(document.getElementById('uploadModal'));
+        modal.show();
+        
+        // Wait for modal to render then process files
+        setTimeout(() => {
+          handleSelectedUploads(e.dataTransfer.files);
+        }, 300);
+      }
+    });
+  }
+
+  // --- Initialize ---
+  initDragAndDrop();
+
   return {
     async init() {
       await LP.init();
@@ -1803,6 +1914,7 @@ const FMPage = (() => {
     bulkDownload,
     bulkChmod,
     bulkDelete,
+    searchFiles,
 
     // Split view / editor
     openSplitView,

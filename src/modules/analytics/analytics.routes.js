@@ -10,6 +10,7 @@ router.use(requireAuth);
 router.use(requirePermission(RESOURCES.DASHBOARD, ACTIONS.READ));
 
 // ── Metrics History ──
+router.get('/metrics/export', analyticsController.exportMetrics.bind(analyticsController));
 router.get('/metrics/history', analyticsController.getMetricsHistory.bind(analyticsController));
 router.get('/metrics/realtime', analyticsController.getRealtimeMetrics.bind(analyticsController));
 

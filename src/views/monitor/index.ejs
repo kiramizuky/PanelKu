@@ -1,6 +1,22 @@
-<div class="lp-page-header" style="margin-bottom:20px;">
-  <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">System Monitoring</h1>
-  <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Real-time performance metrics</p>
+<div class="d-flex justify-content-between align-items-center" style="margin-bottom:20px;">
+  <div class="lp-page-header">
+    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">System Monitoring</h1>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Real-time performance metrics</p>
+  </div>
+  <div class="d-flex align-items-center gap-3">
+    <div class="d-flex align-items-center" style="background: rgba(255,255,255,0.05); padding: 5px 12px; border-radius: 20px; font-size: 13px; border: 1px solid var(--glass-border);">
+      <span class="spinner-grow spinner-grow-sm text-success me-2" id="streamStatusBadge" role="status" style="width: 8px; height: 8px;"></span>
+      <span id="streamStatusText" style="color: var(--text-primary); font-weight: 500;">LIVE</span>
+    </div>
+    <select class="form-select form-select-sm" id="refreshInterval" onchange="MonitorPage.setRefreshInterval(this.value)" style="width: auto; background-color: var(--glass-bg); border-color: var(--glass-border); color: var(--text-primary);">
+      <option value="1000">1s</option>
+      <option value="2000">2s</option>
+      <option value="3000" selected>3s</option>
+      <option value="5000">5s</option>
+      <option value="10000">10s</option>
+      <option value="pause">Pause</option>
+    </select>
+  </div>
 </div>
 
 <div class="row g-4">
@@ -28,6 +44,26 @@
 
   <!-- Charts -->
   <div class="col-12 col-xl-8">
+    <div class="row g-4 mb-4">
+      <div class="col-4">
+        <div class="lp-glass-card text-center" style="padding: 15px; border-bottom: 2px solid var(--accent-info);">
+          <div style="font-size:12px; color:var(--text-muted); font-weight: 600; text-transform: uppercase;">Load 1m</div>
+          <div id="load-1m" style="font-size:24px; font-weight:bold; color:var(--text-primary)">0.00</div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="lp-glass-card text-center" style="padding: 15px; border-bottom: 2px solid rgba(255,255,255,0.1);">
+          <div style="font-size:12px; color:var(--text-muted); font-weight: 600; text-transform: uppercase;">Load 5m</div>
+          <div id="load-5m" style="font-size:24px; font-weight:bold; color:var(--text-primary)">0.00</div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="lp-glass-card text-center" style="padding: 15px; border-bottom: 2px solid rgba(255,255,255,0.1);">
+          <div style="font-size:12px; color:var(--text-muted); font-weight: 600; text-transform: uppercase;">Load 15m</div>
+          <div id="load-15m" style="font-size:24px; font-weight:bold; color:var(--text-primary)">0.00</div>
+        </div>
+      </div>
+    </div>
     <div class="row g-4">
       <div class="col-12 col-md-6">
         <div class="lp-glass-card" style="cursor: pointer; transition: all 0.2s;" onclick="MonitorPage.openProcessesModal('cpu')" title="Click to view running processes">
@@ -92,7 +128,13 @@
       </div>
       <div class="modal-body" style="max-height: 500px; overflow-y: auto; padding: 20px;">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <span style="font-size: 13px; color: var(--text-muted);">Click column headers to sort by CPU or RAM</span>
+          <div class="d-flex gap-2 align-items-center">
+            <input type="text" id="processSearch" class="form-control form-control-sm" placeholder="Search processes..." oninput="MonitorPage.filterProcesses()" style="background-color: var(--glass-bg); border-color: var(--glass-border); color: var(--text-primary); width: 220px;">
+            <div class="form-check form-switch ms-2 mb-0">
+              <input class="form-check-input" type="checkbox" id="memFormatToggle" onchange="MonitorPage.toggleMemFormat()">
+              <label class="form-check-label" for="memFormatToggle" style="font-size: 13px; color: var(--text-muted);">MB</label>
+            </div>
+          </div>
           <div class="btn-group btn-group-sm">
             <button class="btn btn-outline-light btn-sm" id="btnSortCpu" onclick="MonitorPage.sortProcesses('cpu')">Sort by CPU</button>
             <button class="btn btn-outline-light btn-sm" id="btnSortMem" onclick="MonitorPage.sortProcesses('mem')">Sort by RAM</button>
@@ -108,6 +150,7 @@
                 <th style="cursor:pointer; padding: 10px;" onclick="MonitorPage.sortProcesses('mem')">RAM % <i class="bi bi-arrow-down-up ms-1" style="font-size: 10px;"></i></th>
                 <th style="padding: 10px;">User</th>
                 <th style="padding: 10px;">State</th>
+                <th style="padding: 10px; text-align: right;">Action</th>
               </tr>
             </thead>
             <tbody id="processesTableBody">
