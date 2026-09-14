@@ -19,7 +19,7 @@ const DANGEROUS_PATTERNS = [
   /\b(wget|curl)\s+.*\|.*sh/,  // download and execute
   /\bnc\b.*\s+-e\s+/,          // netcat reverse shell
   /\bpython.*-c.*exec/,         // python code exec
-  />\/dev\/sd[a-z]/,            // write to disk device
+  />\s*\/dev\/sd[a-z]/,          // write to disk device
   /\/etc\/passwd/,              // accessing passwd
   /\/etc\/shadow/,              // accessing shadow
 ];

@@ -80,7 +80,11 @@ describe('SSLService — Input validation and Self-Signed generation', () => {
     expect(keyStat.isFile()).toBe(true);
 
     // Clean up
-    await fs.rm(path.dirname(certData.certificate), { recursive: true, force: true });
+    try {
+      await fs.rm(path.dirname(certData.certificate), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {
+      // ignore cleanup error if file handle temporarily busy on Windows
+    }
   });
 });
 
