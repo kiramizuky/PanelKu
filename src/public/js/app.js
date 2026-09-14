@@ -13,34 +13,38 @@ const LP = {
   // ── State ─────────────────────────────────────────────
   state: {
     user: null,
-    accessToken: null,
-    sidebarCollapsed: localStorage.getItem('lp_sidebar_collapsed') === 'true',
+    accessToken: typeof localStorage !== 'undefined' ? localStorage.getItem('lp_token') : null,
+    sidebarCollapsed: typeof localStorage !== 'undefined' && localStorage.getItem('lp_sidebar_collapsed') === 'true',
     refreshPromise: null,
   },
 
   // ── Init ──────────────────────────────────────────────
   async init() {
-    this.initSidebar();
-    this.initToasts();
-    this.highlightActiveNav();
-    this.initTheme();
-    this.initServiceWorker();
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = (async () => {
+      this.initSidebar();
+      this.initToasts();
+      this.highlightActiveNav();
+      this.initTheme();
+      this.initServiceWorker();
 
-    // Try to restore session
-    const token = localStorage.getItem('lp_token');
-    if (token) {
-      this.state.accessToken = token;
-      try {
-        await this.fetchProfile();
-        this.updateUserUI();
-        this.startSessionKeepAlive();
-        this.checkPanelUpdateDaily().catch(() => {});
-      } catch {
+      // Try to restore session
+      const token = this.state.accessToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('lp_token') : null);
+      if (token) {
+        this.state.accessToken = token;
+        try {
+          await this.fetchProfile();
+          this.updateUserUI();
+          this.startSessionKeepAlive();
+          this.checkPanelUpdateDaily().catch(() => {});
+        } catch {
+          this.logout();
+        }
+      } else if (!window.location.pathname.startsWith('/login') && window.location.pathname !== '/') {
         this.logout();
       }
-    } else if (!window.location.pathname.startsWith('/login') && window.location.pathname !== '/') {
-      this.logout();
-    }
+    })();
+    return this._initPromise;
   },
 
   // ── API ───────────────────────────────────────────────
@@ -67,8 +71,13 @@ const LP = {
   },
 
   async api(method, endpoint, data = null, opts = {}) {
-    // Clean %22 and quotes from endpoint URL query parameters
+    // Strip redundant leading /api if passed (e.g., /api/plugins/...)
     let cleanEndpoint = endpoint;
+    if (cleanEndpoint.startsWith('/api/')) {
+      cleanEndpoint = cleanEndpoint.substring(4);
+    }
+
+    // Clean %22 and quotes from endpoint URL query parameters
     if (cleanEndpoint.includes('%22') || cleanEndpoint.includes('%27') || cleanEndpoint.includes('"')) {
       const parts = cleanEndpoint.split('?');
       if (parts.length > 1) {
@@ -88,8 +97,10 @@ const LP = {
     const url = `${this.config.apiBase}${cleanEndpoint}`;
     const headers = { 'Content-Type': 'application/json' };
 
-    if (this.state.accessToken) {
-      headers['Authorization'] = `Bearer ${this.state.accessToken}`;
+    const token = this.state.accessToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('lp_token') : null);
+    if (token) {
+      this.state.accessToken = token;
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     const cleanBodyData = data ? this._cleanApiData(data) : undefined;
@@ -114,8 +125,8 @@ const LP = {
       return { success: false, message: 'Too many requests, please slow down.' };
     }
 
-    // Token expired (401) — try refresh once
-    if (res.status === 401 && !opts._retry) {
+    // Token expired (401) — try refresh once (skip for login/2fa verification)
+    if (res.status === 401 && !opts._retry && !cleanEndpoint.startsWith('/auth/login') && !cleanEndpoint.startsWith('/auth/2fa')) {
       const refreshed = await this.refreshToken();
       if (refreshed) {
         return this.api(method, endpoint, data, { ...opts, _retry: true });
@@ -222,6 +233,7 @@ const LP = {
   },
 
   logout() {
+    this._initPromise = null;
     if (this._sessionKeepAliveTimer) clearInterval(this._sessionKeepAliveTimer);
     this.post('/auth/logout').catch(() => {});
     localStorage.removeItem('lp_token');

@@ -67,16 +67,26 @@ export default {
 
           <script>
             const LogAnalyzer = (() => {
+              async function ensureReady() {
+                if (window.LP && typeof LP.init === 'function') {
+                  await LP.init();
+                }
+              }
+
               async function loadLogs() {
-                const logType = document.getElementById('logFileSelect').value;
+                await ensureReady();
+                const select = document.getElementById('logFileSelect');
+                if (!select) return;
+                const logType = select.value;
                 const container = document.getElementById('logContentContainer');
+                if (!container) return;
                 container.textContent = 'Streaming log file contents...';
 
                 try {
                   const res = await LP.get('/plugins/log-analyzer-manager/read?type=' + logType);
                   if (res?.success) {
                     // Render colorized logs
-                    const lines = res.data.lines;
+                    const lines = res.data?.lines || [];
                     // [SECURITY] Escape HTML entities to prevent XSS from log content
                     function escapeHtml(str) {
                       const div = document.createElement('div');
@@ -94,8 +104,10 @@ export default {
                     }).join('');
 
                     // Update anomaly counters
-                    document.getElementById('bruteForceCount').textContent = res.data.anomalies.bruteForce + ' instances located';
-                    document.getElementById('invalidUserCount').textContent = res.data.anomalies.invalidUser + ' instances located';
+                    const bruteForceEl = document.getElementById('bruteForceCount');
+                    const invalidUserEl = document.getElementById('invalidUserCount');
+                    if (bruteForceEl) bruteForceEl.textContent = (res.data?.anomalies?.bruteForce || 0) + ' instances located';
+                    if (invalidUserEl) invalidUserEl.textContent = (res.data?.anomalies?.invalidUser || 0) + ' instances located';
                     
                     // Scroll to bottom
                     container.scrollTop = container.scrollHeight;
@@ -107,7 +119,8 @@ export default {
                 }
               }
 
-              document.addEventListener('DOMContentLoaded', () => {
+              document.addEventListener('DOMContentLoaded', async () => {
+                await ensureReady();
                 loadLogs();
               });
 
@@ -122,7 +135,7 @@ export default {
     });
 
     // 2. Read Log API
-    app.get('/plugins/log-analyzer-manager/read', async (req, res) => {
+    app.get(['/plugins/log-analyzer-manager/read', '/api/plugins/log-analyzer-manager/read'], async (req, res) => {
       try {
         const { type = 'auth' } = req.query;
         let logPath = type === 'auth' ? '/var/log/auth.log' : '/var/log/syslog';

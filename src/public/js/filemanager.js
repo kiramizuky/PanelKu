@@ -90,6 +90,43 @@ const FMPage = (() => {
     }
   }
 
+  let _currentItems = [];
+  let _sortField = 'name';
+  let _sortAsc = true;
+
+  function formatDateTime(dateVal) {
+    if (!dateVal) return '-';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '-';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function formatShortDate(dateVal) {
+    if (!dateVal) return '';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  function sortBy(field) {
+    if (_sortField === field) {
+      _sortAsc = !_sortAsc;
+    } else {
+      _sortField = field;
+      _sortAsc = true;
+    }
+    renderItems(_currentItems);
+  }
+
+  function getSortIcon(field) {
+    if (_sortField !== field) return '<i class="bi bi-arrow-down-up opacity-25 ms-1" style="font-size:10px;"></i>';
+    return _sortAsc
+      ? '<i class="bi bi-chevron-up text-primary ms-1" style="font-size:11px;"></i>'
+      : '<i class="bi bi-chevron-down text-primary ms-1" style="font-size:11px;"></i>';
+  }
+
   function renderItems(items) {
     const grid = document.getElementById('fmGrid');
 
@@ -100,10 +137,31 @@ const FMPage = (() => {
       document.getElementById('fmWrapper').classList.remove('fm-list-view');
     }
 
-    if (!items.length) {
+    _currentItems = items || [];
+    if (!_currentItems.length) {
       grid.innerHTML = '<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-muted)"><i class="bi bi-folder-x" style="font-size:40px;display:block;margin-bottom:8px"></i>Empty directory</div>';
       return;
     }
+
+    const dir = _sortAsc ? 1 : -1;
+    const sorted = [..._currentItems].sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+      if (_sortField === 'name') return a.name.localeCompare(b.name) * dir;
+      if (_sortField === 'size') return ((a.size || 0) - (b.size || 0)) * dir;
+      if (_sortField === 'modified') {
+        const timeA = a.modified ? new Date(a.modified).getTime() : 0;
+        const timeB = b.modified ? new Date(b.modified).getTime() : 0;
+        return (timeA - timeB) * dir;
+      }
+      if (_sortField === 'created') {
+        const timeA = a.created ? new Date(a.created).getTime() : 0;
+        const timeB = b.created ? new Date(b.created).getTime() : 0;
+        return (timeA - timeB) * dir;
+      }
+      if (_sortField === 'permissions') return (a.permissions || '').localeCompare(b.permissions || '') * dir;
+      if (_sortField === 'owner') return (a.owner || '').localeCompare(b.owner || '') * dir;
+      return 0;
+    });
 
     let html = '';
     if (viewMode === 'list') {
@@ -113,33 +171,46 @@ const FMPage = (() => {
             <input type="checkbox" id="selectAllCheckbox" onclick="FMPage.toggleSelectAll(this)" style="width:14px; height:14px; cursor:pointer;">
           </div>
           <div style="width:18px;"></div>
-          <div style="flex:1;">Name</div>
-          <div style="width:80px;">Permissions</div>
-          <div style="width:120px;">Owner</div>
-          <div style="width:90px; text-align:right;">Size</div>
+          <div class="fm-sort-th" onclick="FMPage.sortBy('name')" style="flex:1; min-width:140px; cursor:pointer; user-select:none; display:flex; align-items:center;">Name ${getSortIcon('name')}</div>
+          <div class="fm-sort-th fm-header-modified" onclick="FMPage.sortBy('modified')" style="width:130px; cursor:pointer; user-select:none; display:flex; align-items:center;">Modified ${getSortIcon('modified')}</div>
+          <div class="fm-sort-th fm-header-created" onclick="FMPage.sortBy('created')" style="width:130px; cursor:pointer; user-select:none; display:flex; align-items:center;">Created ${getSortIcon('created')}</div>
+          <div class="fm-sort-th fm-header-size" onclick="FMPage.sortBy('size')" style="width:90px; text-align:right; cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:flex-end;">Size ${getSortIcon('size')}</div>
+          <div class="fm-sort-th fm-header-permissions" onclick="FMPage.sortBy('permissions')" style="width:75px; cursor:pointer; user-select:none; display:flex; align-items:center;">Perms ${getSortIcon('permissions')}</div>
+          <div class="fm-sort-th fm-header-owner" onclick="FMPage.sortBy('owner')" style="width:100px; cursor:pointer; user-select:none; display:flex; align-items:center;">Owner ${getSortIcon('owner')}</div>
         </div>
       `;
     }
 
-    html += items.map(item => `
+    html += sorted.map(item => {
+      const tooltip = `${item.name}\nType: ${item.type === 'dir' ? 'Folder' : 'File'}\nSize: ${item.type === 'dir' ? 'Folder' : LP.formatBytes(item.size) + ' (' + (item.size || 0).toLocaleString() + ' bytes)'}\nModified: ${formatDateTime(item.modified)}\nCreated: ${formatDateTime(item.created)}\nPermissions: ${item.permissions || '-'}\nOwner: ${item.owner || '-'}`;
+      return `
       <div class="fm-item fade-in"
         data-path="${escHtml(item.path)}"
         data-type="${item.type}"
         data-name="${escHtml(item.name)}"
+        data-size="${item.size || 0}"
+        data-modified="${item.modified || ''}"
+        data-created="${item.created || ''}"
+        data-permissions="${item.permissions || '-'}"
+        data-owner="${item.owner || '-'}"
         onclick="FMPage.selectItem(this, event)"
         ondblclick="FMPage.openItem(this)"
         oncontextmenu="FMPage.showContextMenu(event, this)"
-        title="${escHtml(item.path)}">
+        title="${escHtml(tooltip)}">
         <div class="fm-checkbox-wrapper" onclick="event.stopPropagation()">
           <input type="checkbox" class="fm-checkbox" data-path="${escHtml(item.path)}" onchange="FMPage.updateBulkBar()" style="margin:0;">
         </div>
         <div class="fm-item-icon">${getIcon(item)}</div>
-        <div class="fm-item-name">${escHtml(item.name)}</div>
+        <div class="fm-item-name" title="${escHtml(item.name)}">${escHtml(item.name)}</div>
+        <div class="fm-item-modified">${formatDateTime(item.modified)}</div>
+        <div class="fm-item-created">${formatDateTime(item.created)}</div>
+        <div class="fm-item-size">${item.type === 'dir' ? 'Folder' : LP.formatBytes(item.size)}</div>
+        <div class="fm-item-date" title="Modified: ${formatDateTime(item.modified)}">${formatShortDate(item.modified)}</div>
         <div class="fm-item-permissions font-mono">${item.permissions || '-'}</div>
         <div class="fm-item-owner">${item.owner || '-'}</div>
-        <div class="fm-item-size">${item.type === 'dir' ? 'Folder' : LP.formatBytes(item.size)}</div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     grid.innerHTML = html;
     

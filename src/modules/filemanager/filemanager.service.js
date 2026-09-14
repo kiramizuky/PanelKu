@@ -79,6 +79,7 @@ class FileManagerService {
         try { stats = await stat(filePath); } catch { return null; }
         
         const owner = await this.getOwnerString(stats.uid, stats.gid);
+        const created = (stats.birthtime && stats.birthtime.getTime() !== 0) ? stats.birthtime : stats.ctime;
 
         return {
           name: entry.name,
@@ -86,6 +87,7 @@ class FileManagerService {
           type: entry.isDirectory() ? 'dir' : 'file',
           size: stats.size,
           modified: stats.mtime,
+          created,
           permissions: stats.mode.toString(8).slice(-3),
           owner: owner,
           isHidden: entry.name.startsWith('.'),
@@ -102,13 +104,16 @@ class FileManagerService {
   async getInfo(filePath) {
     const full = this._resolvePath(filePath);
     const stats = await stat(full);
+    const owner = await this.getOwnerString(stats.uid, stats.gid);
+    const created = (stats.birthtime && stats.birthtime.getTime() !== 0) ? stats.birthtime : stats.ctime;
     return {
       name: basename(full),
       path: filePath,
       size: stats.size,
       modified: stats.mtime,
-      created: stats.birthtime,
+      created,
       permissions: stats.mode.toString(8).slice(-3),
+      owner,
       isDirectory: stats.isDirectory(),
     };
   }
@@ -269,10 +274,19 @@ class FileManagerService {
     for (const entry of entries) {
       if (results.length >= maxResults) break;
       if (entry.name.toLowerCase().includes(query)) {
+        let stats = null;
+        try { stats = await stat(join(fullPath, entry.name)); } catch (_) {}
+        const owner = stats ? await this.getOwnerString(stats.uid, stats.gid) : 'root:root';
+        const created = stats ? ((stats.birthtime && stats.birthtime.getTime() !== 0) ? stats.birthtime : stats.ctime) : null;
         results.push({
           name: entry.name,
           path: join(relPath, entry.name).replace(/\\/g, '/'),
           type: entry.isDirectory() ? 'dir' : 'file',
+          size: stats ? stats.size : 0,
+          modified: stats ? stats.mtime : null,
+          created,
+          permissions: stats ? stats.mode.toString(8).slice(-3) : '-',
+          owner,
         });
       }
       if (entry.isDirectory()) {
