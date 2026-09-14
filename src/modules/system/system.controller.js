@@ -252,7 +252,7 @@ class SystemController {
 
   async updatePHPConfig(req, res) {
     try {
-      const version = req.body.version || req.query.version || '8.2';
+      const version = req.body?.version || req.query?.version || '8.2';
       await phpService.updateConfig(req.body, version);
       return success(res, null, `PHP ${version}-FPM configuration updated successfully`);
     } catch (error) {

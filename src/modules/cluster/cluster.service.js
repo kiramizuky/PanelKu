@@ -69,17 +69,18 @@ class ClusterService {
     if (!node) throw new Error('Node not found');
 
     let status = 'offline';
+    let timeoutId;
     try {
       const baseUrl = this._buildBaseUrl(node);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      timeoutId = setTimeout(() => controller.abort(), 5000);
+      if (timeoutId?.unref) timeoutId.unref();
 
       const res = await fetch(`${baseUrl}/api/agent/health`, {
         method: 'GET',
         headers: { 'X-API-Key': node.api_key, 'Accept': 'application/json' },
         signal: controller.signal,
       });
-      clearTimeout(timeoutId);
 
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -89,6 +90,8 @@ class ClusterService {
       }
     } catch {
       status = 'offline';
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
 
     db.prepare('UPDATE cluster_nodes SET status = ?, updated_at = ? WHERE id = ?')
@@ -102,23 +105,26 @@ class ClusterService {
     const node = db.prepare('SELECT * FROM cluster_nodes WHERE id = ?').get(id);
     if (!node) throw new Error('Node not found');
 
+    let timeoutId;
     try {
       const baseUrl = this._buildBaseUrl(node);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      timeoutId = setTimeout(() => controller.abort(), 6000);
+      if (timeoutId?.unref) timeoutId.unref();
 
       const res = await fetch(`${baseUrl}/api/agent/metrics`, {
         method: 'GET',
         headers: { 'X-API-Key': node.api_key, 'Accept': 'application/json' },
         signal: controller.signal,
       });
-      clearTimeout(timeoutId);
 
       if (!res.ok) return null;
       const data = await res.json();
       return data?.data || null;
     } catch {
       return null;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
 

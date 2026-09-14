@@ -12,9 +12,10 @@ storage/temp/*
 storage/*.db
 storage/*.db-shm
 storage/*.db-wal
+storage/mock_*
 dist/
 coverage/
 .nyc_output/
 landing/
 index.html
-install.sh
+install.sh

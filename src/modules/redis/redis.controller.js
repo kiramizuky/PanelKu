@@ -198,7 +198,7 @@ class RedisController {
    */
   async getSlowLog(req, res) {
     try {
-      const count = req.query.count || 10;
+      const count = req.query?.count || 10;
       const entries = await redisService.getSlowLog(count);
       return successResponse(res, { entries });
     } catch (error) {

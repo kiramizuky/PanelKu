@@ -12,7 +12,7 @@ const DANGEROUS_PATTERNS = [
   { pattern: /iptables\s+(-F|--flush)/, reason: 'Flushing firewall rules may expose server ports' },
   { pattern: /chmod\s+(-R\s+)*777\s+(\/|\/\*|~)/, reason: 'Excessive permissions on root or system folders' },
   { pattern: />\s*\/dev\/(sd[a-z]|nvme[0-9]|hd[a-z]|mem|kmem)/, reason: 'Redirection to raw devices' },
-  { pattern: /:(){ :\|:& };:/, reason: 'Fork bomb attack' },
+  { pattern: /:\(\)\s*\{\s*:\|:&\s*\};:/, reason: 'Fork bomb attack' },
   { pattern: /shutdown|reboot|poweroff|init\s+0/, reason: 'System shutdown or reboot' },
 ];
 

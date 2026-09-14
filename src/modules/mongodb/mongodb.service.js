@@ -65,10 +65,20 @@ class MongoDBService {
       const { stdout } = await execFileAsync('mongosh', args, { timeout: 15000 });
       // mongosh sometimes wraps output — try to extract JSON
       const trimmed = stdout.trim();
-      // Find JSON in output (mongosh may print warnings before JSON)
-      const jsonMatch = trimmed.match(/\{[\s\S]+\}/) || trimmed.match(/\[[\s\S]+\]/);
+      const firstBrace = trimmed.indexOf('{');
+      const firstBracket = trimmed.indexOf('[');
+      let jsonMatch = null;
+      if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
+        jsonMatch = trimmed.match(/\[[\s\S]*\]/);
+      } else if (firstBrace !== -1) {
+        jsonMatch = trimmed.match(/\{[\s\S]*\}/);
+      }
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+        try {
+          return JSON.parse(jsonMatch[0]);
+        } catch {
+          // fallback to raw
+        }
       }
       return { raw: trimmed };
     } catch (err) {
@@ -77,8 +87,21 @@ class MongoDBService {
         const args = this._buildArgs(db, ['--quiet', '--eval', jsCode]);
         const { stdout } = await execFileAsync('mongo', args, { timeout: 15000 });
         const trimmed = stdout.trim();
-        const jsonMatch = trimmed.match(/\{[\s\S]+\}/) || trimmed.match(/\[[\s\S]+\]/);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+        const firstBrace = trimmed.indexOf('{');
+        const firstBracket = trimmed.indexOf('[');
+        let jsonMatch = null;
+        if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
+          jsonMatch = trimmed.match(/\[[\s\S]*\]/);
+        } else if (firstBrace !== -1) {
+          jsonMatch = trimmed.match(/\{[\s\S]*\}/);
+        }
+        if (jsonMatch) {
+          try {
+            return JSON.parse(jsonMatch[0]);
+          } catch {
+            // fallback to raw
+          }
+        }
         return { raw: trimmed };
       } catch (err2) {
         throw new Error(`MongoDB command failed: ${err.message}. Also tried legacy mongo: ${err2.message}`);

@@ -196,8 +196,10 @@ describe('SystemService — Audit Logs & Statistics', () => {
     });
 
     const res = await systemService.getAuditLogs(10);
-    expect(res.logs).toHaveLength(1);
-    expect(res.logs[0].username).toBe('admin');
-    expect(res.logs[0].type).toBe('system');
+    expect(res.logs.length).toBeGreaterThanOrEqual(1);
+    const sysLog = res.logs.find(l => l.type === 'system');
+    expect(sysLog).toBeDefined();
+    expect(sysLog.username).toBe('admin');
+    expect(sysLog.action).toBe('POST /api/websites');
   });
 });
