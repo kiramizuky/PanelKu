@@ -184,7 +184,10 @@ const CDN = (() => {
     } catch { LP.toast('Error', 'error'); }
   }
 
-  document.addEventListener('DOMContentLoaded', loadData);
+  document.addEventListener('DOMContentLoaded', async () => {
+    await LP.init();
+    loadData();
+  });
 
   return { loadData, loadCfZones, purgeZone, purgeAll, loadCfAnalytics,
     loadVarnish, varnishAction, saveVcl, varnishPurge,

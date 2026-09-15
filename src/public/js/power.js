@@ -210,7 +210,10 @@ const POWER = (() => {
     } catch { LP.toast('Error', 'error'); }
   }
 
-  document.addEventListener('DOMContentLoaded', loadData);
+  document.addEventListener('DOMContentLoaded', async () => {
+    await LP.init();
+    loadData();
+  });
 
   return { loadData, setGovernor, setFrequency, setProfile, systemAction };
 })();

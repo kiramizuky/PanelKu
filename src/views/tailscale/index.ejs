@@ -358,7 +358,8 @@
   };
 
   // Init page status
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
+    await LP.init();
     TailscalePage.init();
   });
 </script>

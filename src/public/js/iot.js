@@ -243,7 +243,10 @@ const IOT = (() => {
     } catch { el.innerHTML = '<p class="text-danger">Failed</p>'; }
   }
 
-  document.addEventListener('DOMContentLoaded', loadData);
+  document.addEventListener('DOMContentLoaded', async () => {
+    await LP.init();
+    loadData();
+  });
 
   return { loadData,
     installMosquitto, mqttAction, saveMqttConfig, addMqttUser, deleteMqttUser, publish,

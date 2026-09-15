@@ -197,7 +197,8 @@ const CronPage = (() => {
   }
 
   // Initialize
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
+    await LP.init();
     loadData();
   });
 

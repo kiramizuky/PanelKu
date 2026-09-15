@@ -142,7 +142,8 @@ const N8nPage = (() => {
   return { loadStatus, startN8n, stopN8n, uninstallN8n };
 })();
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await LP.init();
   N8nPage.loadStatus();
 });
 </script>

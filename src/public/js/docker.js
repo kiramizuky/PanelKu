@@ -1586,7 +1586,8 @@ services:
 
 window.DockerPage = DockerPage;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await LP.init();
   DockerPage.loadData();
 });
 

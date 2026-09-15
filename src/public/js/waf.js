@@ -695,7 +695,8 @@ const WAFPage = {
 // [FIX] Expose to window for LP.call() resolution
 window.WAFPage = WAFPage;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await LP.init();
   WAFPage.init();
 });
 

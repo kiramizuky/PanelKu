@@ -154,7 +154,10 @@ const GPU = (() => {
 
   async function checkGpu() { loadData(); }
 
-  document.addEventListener('DOMContentLoaded', loadData);
+  document.addEventListener('DOMContentLoaded', async () => {
+    await LP.init();
+    loadData();
+  });
 
   return { loadData, checkGpu, killProcess, setPowerLimit, resetGpu };
 })();

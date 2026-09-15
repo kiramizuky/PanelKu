@@ -409,7 +409,8 @@ const SystemPage = {
   }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await LP.init();
   SystemPage.init();
 });
 window.SystemPage = SystemPage;
