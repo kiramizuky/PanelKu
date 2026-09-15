@@ -354,10 +354,14 @@ class UpdaterService {
         log.push('📦 Installing npm dependencies...');
         const npmOut = await this._runCommand('npm install --production 2>&1');
         log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
+        log.push('🔨 Rebuilding native dependencies...');
+        await this._runCommand('npm rebuild better-sqlite3 node-pty 2>&1').catch(() => {});
       } else if (method === 'npm') {
         log.push('📦 Running npm install only...');
         const npmOut = await this._runCommand('npm install --production 2>&1');
         log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
+        log.push('🔨 Rebuilding native dependencies...');
+        await this._runCommand('npm rebuild better-sqlite3 node-pty 2>&1').catch(() => {});
       }
 
       // 3. Syntax check (health check before restart)
