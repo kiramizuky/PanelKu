@@ -394,7 +394,7 @@ const WAFPage = {
                 <div class="text-muted mb-1" style="font-size:10.5px; text-transform:uppercase; font-weight:600;"><i class="bi bi-shield-exclamation me-1 text-danger"></i> Block Reason</div>
                 <div class="text-danger" style="font-weight:600;">${LP.escHtml(t.reason || 'Automated Intrusion Block')}</div>
                 <div class="mt-2 d-flex gap-2">
-                  <button class="btn-lp btn-lp-sm btn-lp-ghost text-info" onclick="navigator.clipboard.writeText('${LP.encJsArg(t.ip)}'); LP.toast('IP Copied to clipboard!', 'info');" style="font-size:11px; padding:3px 8px;">
+                  <button class="btn-lp btn-lp-sm btn-lp-ghost text-info" onclick="LP.copy('${LP.escHtml(t.ip)}', 'IP Copied to clipboard!')" style="font-size:11px; padding:3px 8px;">
                     <i class="bi bi-clipboard me-1"></i> Copy IP
                   </button>
                 </div>
@@ -534,7 +534,7 @@ const WAFPage = {
             <td><span class="lp-badge lp-badge-warning" style="font-size:10px;">${LP.escHtml(d.duration)}</span></td>
             <td style="font-size:11px; color:var(--text-muted);">${new Date(d.createdAt).toLocaleString()}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="WAFPage.deleteCrowdSecDecision('${LP.encJsArg(d.ip)}')" title="Unban IP">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('WAFPage.deleteCrowdSecDecision', '${LP.encJsArg(d.ip)}')" title="Unban IP">
                 <i class="bi bi-trash"></i> Unban
               </button>
             </td>
@@ -579,11 +579,12 @@ const WAFPage = {
   },
 
   async deleteCrowdSecDecision(ip) {
-    if (!(await LP.confirm(`Remove ban for IP ${ip}?`, 'Unban IP'))) return;
+    const cleanIp = LP.cleanText(ip);
+    if (!(await LP.confirm(`Remove ban for IP ${cleanIp}?`, 'Unban IP'))) return;
     try {
-      const res = await LP.delete(`/waf/crowdsec/decisions/${encodeURIComponent(ip)}`);
+      const res = await LP.delete(`/waf/crowdsec/decisions/${encodeURIComponent(cleanIp)}`);
       if (res?.success) {
-        LP.toast(`IP ${ip} unbanned`, 'success');
+        LP.toast(`IP ${cleanIp} unbanned`, 'success');
         this.loadCrowdSec();
         this.loadRules();
       } else {
@@ -643,10 +644,10 @@ const WAFPage = {
               <td><span class="lp-badge lp-badge-danger"><span class="lp-badge-dot"></span>AUTO-BANNED</span></td>
               <td style="font-size:11px; color:var(--text-muted);">${new Date(h.created_at).toLocaleString()}</td>
               <td style="text-align:right;">
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="WAFPage.deleteCrowdSecDecision('${LP.encJsArg(h.ip)}')" title="Unban this IP">
-                  <i class="bi bi-unlock"></i> Unban
-                </button>
-              </td>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="LP.call('WAFPage.deleteCrowdSecDecision', '${LP.encJsArg(h.ip)}')" title="Unban this IP">
+                <i class="bi bi-unlock"></i> Unban
+              </button>
+            </td>
             </tr>
           `).join('');
         }

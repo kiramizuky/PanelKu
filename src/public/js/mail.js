@@ -173,7 +173,7 @@ const MAIL = (() => {
             <td><strong><i class="bi bi-globe me-2 text-primary"></i>${LP.escHtml(d)}</strong></td>
             <td><span class="badge bg-success" style="font-size:11px;">Configured</span></td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm me-1" title="View DNS Records" onclick="MAIL.selectDomainForDns('${LP.encJsArg(d)}')">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm me-1" title="View DNS Records" onclick="LP.call('MAIL.selectDomainForDns', '${LP.encJsArg(d)}')">
                 <i class="bi bi-shield-check"></i> DNS
               </button>
               <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" title="Remove Domain" onclick="LP.call('MAIL.removeDomain', '${LP.encJsArg(d)}')">
@@ -205,7 +205,7 @@ const MAIL = (() => {
             <td><strong><i class="bi bi-envelope-at me-2 text-info"></i>${LP.escHtml(a.email)}</strong></td>
             <td style="font-size:12px;color:var(--text-muted);font-family:monospace;">${LP.escHtml(a.mailbox)}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm me-1" title="Change Password" onclick="MAIL.showChangePasswordModal('${LP.encJsArg(a.email)}')">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm me-1" title="Change Password" onclick="LP.call('MAIL.showChangePasswordModal', '${LP.encJsArg(a.email)}')">
                 <i class="bi bi-key"></i>
               </button>
               <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" title="Delete Account" onclick="LP.call('MAIL.deleteAccount', '${LP.encJsArg(a.email)}')">
@@ -241,7 +241,7 @@ const MAIL = (() => {
               <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${LP.escHtml(r.note || '')}</div>
             </td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" title="Copy Record Value" onclick="MAIL.copySnippet('${LP.encJsArg(r.value)}')">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" title="Copy Record Value" onclick="LP.copy('${LP.escHtml(r.value)}', 'Record copied to clipboard!')">
                 <i class="bi bi-clipboard"></i>
               </button>
             </td>

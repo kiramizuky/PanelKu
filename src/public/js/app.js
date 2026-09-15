@@ -397,6 +397,53 @@ const LP = {
    * Example: onclick="handler(decodeURIComponent('${LP.escJsStr(val)}'))"
    */
   /**
+   * Helper to clean any accidental %22 or outer quotes from string values
+   */
+  cleanText(val) {
+    if (val === null || val === undefined) return '';
+    let str = String(val);
+    if (str.includes('%22') || str.includes('%27')) {
+      try { str = decodeURIComponent(str); } catch (_) {}
+    }
+    return str.replace(/^["']|["']$/g, '').trim();
+  },
+
+  /**
+   * Universal clipboard copy method with toast notification and quote/%22 sanitization
+   */
+  copy(text, msg = 'Berhasil disalin ke clipboard!') {
+    const clean = this.cleanText(text);
+    if (!clean) return;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(clean).then(() => {
+        this.toast(msg, 'success');
+      }).catch(() => {
+        this._fallbackCopy(clean, msg);
+      });
+    } else {
+      this._fallbackCopy(clean, msg);
+    }
+  },
+
+  _fallbackCopy(text, msg = 'Berhasil disalin ke clipboard!') {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      this.toast(msg, 'success');
+    } catch {
+      this.toast('Gagal menyalin ke clipboard', 'warning');
+    }
+  },
+
+  /**
    * Encode a value for safe injection into a JS single-quoted string inside onclick.
    * Uses JSON.stringify + encodeURIComponent so output contains NO raw single-quotes,
    * double-quotes, backslashes, or other JS/HTML-special characters.
