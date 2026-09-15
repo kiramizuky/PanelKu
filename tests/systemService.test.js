@@ -183,11 +183,12 @@ describe('SystemService — Audit Logs & Statistics', () => {
   });
 
   test('getAuditLogs returns formatted system audit logs', async () => {
+    const freshDate = new Date(Date.now() + 3600000).toISOString();
     mockDb.prepare.mockReturnValue({
       all: jest.fn().mockReturnValue([
         {
           id: 'log-1',
-          created_at: '2026-09-14T10:00:00Z',
+          created_at: freshDate,
           username: 'admin',
           action: 'POST /api/websites',
           details: 'Created website',
@@ -195,7 +196,7 @@ describe('SystemService — Audit Logs & Statistics', () => {
       ]),
     });
 
-    const res = await systemService.getAuditLogs(10);
+    const res = await systemService.getAuditLogs(50);
     expect(res.logs.length).toBeGreaterThanOrEqual(1);
     const sysLog = res.logs.find(l => l.type === 'system');
     expect(sysLog).toBeDefined();

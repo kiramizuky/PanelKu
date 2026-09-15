@@ -85,6 +85,9 @@ describe('FileManagerController - File Operations', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.data.name).toBe('hello.txt');
     expect(res.body.data.size).toBe(20);
+    expect(res.body.data.modified).toBeDefined();
+    expect(res.body.data.created).toBeDefined();
+    expect(res.body.data.owner).toBeDefined();
   });
 
   test('list retrieves directory entries', async () => {
@@ -93,7 +96,12 @@ describe('FileManagerController - File Operations', () => {
     await fileManagerController.list(req, res);
     expect(res.statusCode).toBe(200);
     expect(res.body.data.items).toBeDefined();
-    expect(res.body.data.items.some(i => i.name === 'hello.txt')).toBe(true);
+    const item = res.body.data.items.find(i => i.name === 'hello.txt');
+    expect(item).toBeDefined();
+    expect(item.size).toBe(20);
+    expect(item.modified).toBeDefined();
+    expect(item.created).toBeDefined();
+    expect(item.owner).toBeDefined();
   });
 
   test('copy duplicates file to new destination', async () => {

@@ -319,8 +319,58 @@ const FMPage = (() => {
         path: el.dataset.path,
         type: el.dataset.type,
         name: el.dataset.name,
+        size: parseInt(el.dataset.size || '0', 10),
+        modified: el.dataset.modified || '',
+        created: el.dataset.created || '',
+        permissions: el.dataset.permissions || '-',
+        owner: el.dataset.owner || '-',
         el,
       };
+    }
+  }
+
+  async function showProperties() {
+    if (!selectedItem) return;
+    const path = selectedItem.path;
+    const modalEl = document.getElementById('propertiesModal');
+    if (!modalEl) return;
+
+    const name = selectedItem.name || path.split('/').pop() || '/';
+    document.getElementById('propName').textContent = name;
+    document.getElementById('propPath').textContent = path;
+    document.getElementById('propTypeBadge').textContent = selectedItem.type === 'dir' ? 'Folder' : 'File';
+    document.getElementById('propIcon').textContent = getIcon(selectedItem);
+    document.getElementById('propSize').textContent = selectedItem.type === 'dir' ? 'Folder' : `${LP.formatBytes(selectedItem.size || 0)} (${(selectedItem.size || 0).toLocaleString()} bytes)`;
+    document.getElementById('propModified').textContent = formatDateTime(selectedItem.modified);
+    document.getElementById('propCreated').textContent = formatDateTime(selectedItem.created);
+    document.getElementById('propPermissions').textContent = selectedItem.permissions || '-';
+    document.getElementById('propOwner').textContent = selectedItem.owner || '-';
+
+    const bsModal = new bootstrap.Modal(modalEl);
+    bsModal.show();
+
+    try {
+      const res = await LP.get(`/filemanager/info?path=${encodeURIComponent(path)}`);
+      if (res?.success && res.data) {
+        const info = res.data;
+        document.getElementById('propName').textContent = info.name;
+        document.getElementById('propPath').textContent = info.path;
+        document.getElementById('propTypeBadge').textContent = info.isDirectory ? 'Directory' : 'File';
+        document.getElementById('propSize').textContent = info.isDirectory ? 'Directory' : `${LP.formatBytes(info.size || 0)} (${(info.size || 0).toLocaleString()} bytes)`;
+        document.getElementById('propModified').textContent = formatDateTime(info.modified);
+        document.getElementById('propCreated').textContent = formatDateTime(info.created);
+        document.getElementById('propPermissions').textContent = info.permissions ? `${info.permissions} (Octal)` : '-';
+        if (info.owner) document.getElementById('propOwner').textContent = info.owner;
+      }
+    } catch (_) {}
+  }
+
+  function copyPropPath() {
+    const path = document.getElementById('propPath')?.textContent;
+    if (path && navigator.clipboard) {
+      navigator.clipboard.writeText(path).then(() => {
+        LP.toast('Path copied to clipboard', 'success');
+      }).catch(() => {});
     }
   }
 
@@ -1986,6 +2036,9 @@ const FMPage = (() => {
     bulkChmod,
     bulkDelete,
     searchFiles,
+    sortBy,
+    showProperties,
+    copyPropPath,
 
     // Split view / editor
     openSplitView,
