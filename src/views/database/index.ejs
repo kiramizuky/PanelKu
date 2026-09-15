@@ -3,11 +3,29 @@
     <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Database Explorer</h1>
     <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage MySQL, PostgreSQL, SQLite — Browse, Query, Export & Import</p>
   </div>
-  <div style="display:flex;gap:10px">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button class="btn-lp btn-lp-ghost text-info" onclick="DB.showVersionModal()"><i class="bi bi-arrow-left-right me-1"></i> Version &amp; Upgrade</button>
     <button class="btn-lp btn-lp-ghost" onclick="DB.showAutoBackupModal()"><i class="bi bi-clock-history me-1"></i> Auto-Backup</button>
     <button class="btn-lp btn-lp-ghost" onclick="DB.showCredentialsModal()"><i class="bi bi-gear-fill me-1"></i> DB Credentials</button>
     <button class="btn-lp btn-lp-primary" onclick="DB.showCreateModal()"><i class="bi bi-plus-lg"></i> Create DB</button>
   </div>
+</div>
+
+<!-- Environment & Instance Detection Banner -->
+<div id="dbEnvBanner" class="lp-glass-card mb-3" style="display:none; padding:12px 18px; border-left:4px solid var(--accent-info); background:rgba(15,23,42,0.65);">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-3">
+      <div style="width:34px; height:34px; border-radius:8px; background:rgba(59,130,246,0.15); display:flex; align-items:center; justify-content:center; color:var(--accent-info); font-size:18px;">
+        <i class="bi bi-diagram-3-fill"></i>
+      </div>
+      <div>
+        <div style="font-size:13px; font-weight:600; color:#fff;" id="dbEnvTitle">Pendeteksian Lingkungan Database</div>
+        <div style="font-size:11.5px; color:var(--text-muted);" id="dbEnvSubtitle">Memeriksa status container Docker, modul panel lain, dan database native...</div>
+      </div>
+    </div>
+    <div id="dbEnvBadges" class="d-flex align-items-center gap-2 flex-wrap"></div>
+  </div>
+  <div id="dbEnvDetails" class="mt-2 pt-2 border-top border-secondary border-opacity-25" style="display:none; font-size:12px;"></div>
 </div>
 
 <style>
@@ -480,6 +498,123 @@
           <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Tutup</button>
           <button type="button" class="btn-lp btn-lp-primary" onclick="DB.saveAutoBackup()"><i class="bi bi-save me-1"></i> Simpan Pengaturan</button>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Database Version & Upgrade/Downgrade Assistant Modal -->
+<div class="modal fade" id="dbVersionModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content lp-glass-card" style="background:rgba(15,20,32,0.98);border:1px solid var(--glass-border);color:#fff;box-shadow:0 16px 48px rgba(0,0,0,0.6);">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title font-mono" style="font-size:16px;">
+          <i class="bi bi-arrow-left-right text-info me-2"></i>Database Version &amp; Upgrade / Downgrade Assistant
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:15px;">
+          Panduan manajemen versi, kompatibilitas, peningkatan (upgrade), dan penurunan versi (downgrade) aman untuk MySQL, MariaDB, dan PostgreSQL.
+        </p>
+
+        <!-- Current Detected Engines -->
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <div class="p-3 rounded" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <strong style="font-size:13px;color:#60a5fa;"><i class="bi bi-database me-1"></i> MySQL / MariaDB</strong>
+                <span id="verBadgeMysql" class="lp-badge lp-badge-success" style="font-size:10px;">Detected</span>
+              </div>
+              <div id="verDetailMysql" class="font-mono text-white mb-2" style="font-size:12px;">Memeriksa versi...</div>
+              <div class="small" style="font-size:11px;color:var(--text-muted);">
+                Target Rekomendasi: <span class="text-info font-mono" id="verRecMysql">8.0 LTS / 8.4 LTS / MariaDB 10.11 LTS</span>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 rounded" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <strong style="font-size:13px;color:#38bdf8;"><i class="bi bi-database me-1"></i> PostgreSQL</strong>
+                <span id="verBadgePg" class="lp-badge lp-badge-success" style="font-size:10px;">Detected</span>
+              </div>
+              <div id="verDetailPg" class="font-mono text-white mb-2" style="font-size:12px;">Memeriksa versi...</div>
+              <div class="small" style="font-size:11px;color:var(--text-muted);">
+                Target Rekomendasi: <span class="text-info font-mono" id="verRecPg">PostgreSQL 15 / 16 LTS</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Procedures Tabs -->
+        <ul class="nav nav-pills gap-2 mb-3" style="background:rgba(0,0,0,0.3);padding:4px;border-radius:8px;">
+          <li class="nav-item" style="flex:1;">
+            <button class="nav-link active w-100 py-1" data-bs-toggle="pill" data-bs-target="#tab-ver-upgrade" style="font-size:12px;text-align:center;">
+              <i class="bi bi-arrow-up-circle me-1"></i> Prosedur Upgrade
+            </button>
+          </li>
+          <li class="nav-item" style="flex:1;">
+            <button class="nav-link w-100 py-1" data-bs-toggle="pill" data-bs-target="#tab-ver-downgrade" style="font-size:12px;text-align:center;">
+              <i class="bi bi-arrow-down-circle me-1"></i> Prosedur Downgrade
+            </button>
+          </li>
+          <li class="nav-item" style="flex:1;">
+            <button class="nav-link w-100 py-1" data-bs-toggle="pill" data-bs-target="#tab-ver-docker" style="font-size:12px;text-align:center;">
+              <i class="bi bi-box-seam me-1"></i> Docker Switch Tag
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content" style="font-size:12.5px;">
+          <!-- Tab Upgrade -->
+          <div class="tab-pane fade show active" id="tab-ver-upgrade">
+            <div class="alert alert-warning py-2 px-3 mb-2" style="font-size:11.5px;background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.2);color:#fbbf24;">
+              <i class="bi bi-shield-exclamation me-1"></i> <strong>PENTING:</strong> Selalu buat cadangan (dump) seluruh database sebelum memperbarui paket binary database di server.
+            </div>
+            <ol class="ps-3 mb-2" style="line-height:1.6;color:var(--text-secondary);">
+              <li><strong>Backup Penuh:</strong> Klik tombol <em>"Backup Semua Database Sekarang"</em> di bawah ini untuk mengunduh arsip aman.</li>
+              <li><strong>MySQL / MariaDB:</strong> Gunakan APT repository resmi MySQL (<code class="font-mono text-info">repo.mysql.com</code>) atau MariaDB repository tool untuk update versi mayor.</li>
+              <li><strong>PostgreSQL:</strong> Install paket versi target (<code class="font-mono text-info">postgresql-16</code>) bersama versi lama, lalu migrasikan klaster dengan utilitas resmi <code class="font-mono text-info">pg_upgradecluster</code>.</li>
+            </ol>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="DB.showAutoBackupModal()"><i class="bi bi-cloud-arrow-down me-1"></i> Backup Semua Database</button>
+          </div>
+
+          <!-- Tab Downgrade -->
+          <div class="tab-pane fade" id="tab-ver-downgrade">
+            <div class="alert alert-danger py-2 px-3 mb-2" style="font-size:11.5px;background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.2);color:#fca5a5;">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i> Downgrade in-place (menimpa folder data lama dengan binary versi lebih rendah) <strong>dapat merusak data ibdata/cluster</strong>!
+            </div>
+            <p style="color:var(--text-secondary);line-height:1.5;margin-bottom:8px;">
+              Prosedur yang aman dan teruji untuk melakukan downgrade:
+            </p>
+            <ol class="ps-3 mb-0" style="line-height:1.6;color:var(--text-secondary);">
+              <li>Export seluruh database ke file SQL murni via fitur <strong>Export</strong> atau <strong>Backup</strong> di Panelku.</li>
+              <li>Hentikan service database dan uninstall paket versi lebih tinggi.</li>
+              <li>Install paket versi target yang diinginkan.</li>
+              <li>Import kembali file SQL ke dalam database yang baru terpasang.</li>
+            </ol>
+          </div>
+
+          <!-- Tab Docker -->
+          <div class="tab-pane fade" id="tab-ver-docker">
+            <p style="color:var(--text-secondary);line-height:1.5;margin-bottom:8px;">
+              Jika menggunakan Docker, penggantian versi database sangat mudah dan terisolasi tanpa merusak OS host:
+            </p>
+            <pre class="p-3 rounded mb-2 font-mono text-info" style="background:#05070d;border:1px solid rgba(255,255,255,0.08);font-size:11.5px;white-space:pre-wrap;"># Contoh docker-compose.yml:
+services:
+  database:
+    image: mysql:8.0          # Ubah ke mysql:8.4 atau mariadb:10.11
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"</pre>
+            <small style="color:var(--text-muted);font-size:11px;">Panelku akan otomatis mengenali kontainer database Docker baru dan memetakan portnya.</small>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Tutup</button>
       </div>
     </div>
   </div>

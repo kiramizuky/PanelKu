@@ -39,6 +39,18 @@ class MailService {
   // ── Install / Status ──────────────────────────────────────
 
   async getStatus() {
+    if (process.platform === 'win32' && process.env.NODE_ENV !== 'test') {
+      return {
+        postfix: false,
+        dovecot: false,
+        spamassassin: false,
+        roundcube: false,
+        installed: false,
+        queueSize: 0,
+        version: null,
+      };
+    }
+
     const services = {};
     for (const svc of ['postfix', 'dovecot', 'spamassassin', 'roundcube']) {
       try {
@@ -47,8 +59,8 @@ class MailService {
       } catch { services[svc] = false; }
     }
     try {
-      const { stdout } = await execAsync('command -v postfix 2>/dev/null && echo "yes" || echo "no"');
-      services.installed = stdout.trim() === 'yes';
+      const { stdout } = await execAsync('which postfix 2>/dev/null || command -v postfix 2>/dev/null || true');
+      services.installed = stdout.trim().length > 0;
     } catch { services.installed = false; }
 
     // Get mail queue size
@@ -328,6 +340,31 @@ class MailService {
       const { stdout } = await execAsync(`sudo journalctl -u ${service} --no-pager -n ${count} 2>/dev/null || sudo tail -${count} /var/log/mail.log 2>/dev/null || echo "No logs found"`);
       return stdout.trim().split('\n').filter(l => l.trim());
     } catch { return []; }
+  }
+
+  // ── DNS & Deliverability Helper ───────────────────────────
+
+  async getDnsHelper(domain) {
+    const d = (domain && typeof domain === 'string' && domain.trim()) ? domain.trim() : 'example.com';
+    let serverIp = 'YOUR_SERVER_IP';
+    try {
+      const { stdout } = await execAsync('hostname -I 2>/dev/null || echo ""');
+      const ip = stdout.trim().split(/\s+/)[0];
+      if (ip && !ip.startsWith('127.')) serverIp = ip;
+    } catch {}
+
+    return {
+      domain: d,
+      serverIp,
+      records: [
+        { type: 'MX', host: '@', priority: 10, value: `mail.${d}`, note: 'Mail Exchange - routes incoming emails to your server' },
+        { type: 'A', host: 'mail', priority: null, value: serverIp, note: 'Points mail host to your server IP address' },
+        { type: 'TXT (SPF)', host: '@', priority: null, value: `v=spf1 mx a ip4:${serverIp} ~all`, note: 'Sender Policy Framework - authorizes this IP to send emails' },
+        { type: 'TXT (DMARC)', host: '_dmarc', priority: null, value: `v=DMARC1; p=quarantine; rua=mailto:postmaster@${d}; pct=100`, note: 'Domain-based Message Authentication policy' },
+        { type: 'TXT (DKIM)', host: 'default._domainkey', priority: null, value: 'v=DKIM1; k=rsa; p=<public-key>', note: 'Cryptographic signature validating email authenticity' },
+        { type: 'PTR (rDNS)', host: serverIp, priority: null, value: `mail.${d}`, note: 'Reverse DNS - configure at VPS/Hosting provider dashboard' }
+      ]
+    };
   }
 }
 

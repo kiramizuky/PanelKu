@@ -113,9 +113,15 @@ class MailController {
 
   async getLogs(req, res) {
     try {
-      const { service = 'postfix', lines = 50 } = req.query;
-      const logs = await mailService.getLogs(service, parseInt(lines));
-      return success(res, { logs });
+      const { service, lines } = req.query;
+      return success(res, { logs: await mailService.getLogs(service, lines) });
+    } catch (err) { return error(res, err.message, 500); }
+  }
+
+  async getDnsHelper(req, res) {
+    try {
+      const domain = req.query.domain || req.body?.domain;
+      return success(res, await mailService.getDnsHelper(domain));
     } catch (err) { return error(res, err.message, 500); }
   }
 }

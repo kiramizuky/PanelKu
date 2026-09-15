@@ -1675,6 +1675,294 @@ class DatabaseService {
       cleanedCount
     };
   }
+
+  /**
+   * Detect running and installed database environments:
+   * 1. Docker MySQL/MariaDB/PostgreSQL containers
+   * 2. Alternative server modules/panels (ex-aaPanel / Baota, XAMPP, custom compiled)
+   * 3. Native host OS services & versions
+   * 4. Version metadata & upgrade/downgrade instructions
+   */
+  async detectEnvironments() {
+    const results = {
+      docker: {
+        available: false,
+        containers: [],
+      },
+      otherPanels: [],
+      native: {
+        mysql: {
+          installed: false,
+          active: false,
+          version: null,
+          variant: null, // 'mysql' or 'mariadb'
+          binaryPath: null,
+          listening: false,
+        },
+        postgres: {
+          installed: false,
+          active: false,
+          version: null,
+          binaryPath: null,
+          listening: false,
+        }
+      },
+      ports: {
+        3306: { listening: false, process: null },
+        5432: { listening: false, process: null },
+      },
+      versionMatrix: {
+        mysql: {
+          recommended: '8.0 LTS or 8.4 LTS (MySQL) / 10.11 LTS (MariaDB)',
+          legacyEol: ['5.5', '5.6', '5.7'],
+          currentDetected: null,
+          upgradeGuidance: [
+            '1. Amankan seluruh database dengan membuat full backup / dump terlebih dahulu.',
+            '2. Pastikan disk space tersisa minimal 2x lipat dari ukuran database terbesar.',
+            '3. Upgrade MySQL / MariaDB pada OS Debian/Ubuntu disarankan menggunakan repository resmi.',
+            '4. Untuk Docker: cukup ganti image tag (misal mysql:8.0 -> mysql:8.4) dan jalankan mysql_upgrade bila diperlukan.'
+          ],
+          downgradeGuidance: [
+            'PERINGATAN: Downgrade binary database in-place tidak didukung secara native oleh MySQL/MariaDB.',
+            'Prosedur aman: Export seluruh database ke file .sql (Dump), uninstall versi tinggi, install versi target, lalu Import kembali .sql.'
+          ]
+        },
+        postgres: {
+          recommended: '15.x / 16.x LTS',
+          legacyEol: ['9.x', '10.x', '11.x', '12.x'],
+          currentDetected: null,
+          upgradeGuidance: [
+            '1. Lakukan backup seluruh database via pg_dumpall.',
+            '2. Pada Linux, install versi baru secara berdampingan (misal postgresql-16 di samping postgresql-14).',
+            '3. Gunakan pg_upgradecluster untuk migrasi data cluster secara otomatis dan cepat.',
+            '4. Verifikasi koneksi dan data sebelum menghapus cluster versi lama.'
+          ],
+          downgradeGuidance: [
+            'Downgrade PostgreSQL memerlukan dump SQL logika (pg_dumpall --clean) dan restore pada versi target.'
+          ]
+        }
+      }
+    };
+
+    // 1. Docker Check
+    try {
+      const { default: dockerService } = await import('../docker/docker.service.js');
+      const containers = await dockerService.listContainers(true);
+      results.docker.available = true;
+
+      for (const c of (containers || [])) {
+        const image = (c.image || '').toLowerCase();
+        const names = (c.names || []).join(', ').toLowerCase();
+        const isMysql = image.includes('mysql') || image.includes('mariadb') || names.includes('mysql') || names.includes('mariadb');
+        const isPg = image.includes('postgres') || image.includes('pgsql') || image.includes('timescale') || names.includes('postgres');
+
+        if (isMysql || isPg) {
+          const ports = (c.ports || []).map(p => ({
+            privatePort: p.PrivatePort || p.privatePort,
+            publicPort: p.PublicPort || p.publicPort,
+            type: p.Type || p.type,
+            ip: p.IP || p.ip,
+          }));
+
+          const mappedPort = ports.find(p => p.publicPort)?.publicPort || (isMysql ? 3306 : 5432);
+
+          results.docker.containers.push({
+            id: c.id,
+            name: (c.names && c.names[0]) ? c.names[0].replace(/^\//, '') : 'container',
+            image: c.image,
+            state: c.state,
+            status: c.status,
+            type: isMysql ? 'mysql' : 'postgres',
+            ports,
+            suggestedHost: '127.0.0.1',
+            suggestedPort: mappedPort,
+          });
+        }
+      }
+    } catch (_) {
+      results.docker.available = false;
+    }
+
+    // 2. Alternative Panels (aaPanel, XAMPP, custom)
+    const panelPaths = [
+      {
+        name: 'aaPanel (Baota Panel)',
+        type: 'mysql',
+        paths: ['/www/server/mysql', '/www/server/data'],
+        binary: '/www/server/mysql/bin/mysql',
+        socket: '/tmp/mysql.sock',
+        service: 'bt-mysql',
+      },
+      {
+        name: 'aaPanel (Baota Panel)',
+        type: 'postgres',
+        paths: ['/www/server/pgsql'],
+        binary: '/www/server/pgsql/bin/psql',
+        socket: '/tmp/.s.PGSQL.5432',
+        service: 'pgsql',
+      },
+      {
+        name: 'XAMPP / LAMPP',
+        type: 'mysql',
+        paths: ['/opt/lampp/bin/mysql', '/opt/lampp/var/mysql'],
+        binary: '/opt/lampp/bin/mysql',
+        socket: '/opt/lampp/var/mysql/mysql.sock',
+        service: null,
+      },
+      {
+        name: 'Custom Compiled Installation',
+        type: 'mysql',
+        paths: ['/usr/local/mysql'],
+        binary: '/usr/local/mysql/bin/mysql',
+        socket: null,
+        service: null,
+      },
+      {
+        name: 'Custom Compiled PostgreSQL',
+        type: 'postgres',
+        paths: ['/usr/local/pgsql'],
+        binary: '/usr/local/pgsql/bin/psql',
+        socket: null,
+        service: null,
+      }
+    ];
+
+    for (const p of panelPaths) {
+      let foundPath = false;
+      for (const checkPath of p.paths) {
+        try {
+          await fs.access(checkPath);
+          foundPath = true;
+          break;
+        } catch (_) {}
+      }
+
+      if (foundPath) {
+        let hasBinary = false;
+        let version = null;
+        if (p.binary) {
+          try {
+            await fs.access(p.binary);
+            hasBinary = true;
+            const { stdout } = await runCli(p.binary, ['--version']).catch(() => ({ stdout: '' }));
+            if (stdout) version = stdout.trim();
+          } catch (_) {}
+        }
+
+        let socketExists = false;
+        if (p.socket) {
+          try {
+            await fs.access(p.socket);
+            socketExists = true;
+          } catch (_) {}
+        }
+
+        results.otherPanels.push({
+          name: p.name,
+          type: p.type,
+          detectedPaths: p.paths,
+          binary: hasBinary ? p.binary : null,
+          socket: socketExists ? p.socket : null,
+          service: p.service,
+          version,
+        });
+      }
+    }
+
+    // 3. Native Host OS Databases & Listening Ports
+    if (process.platform === 'linux') {
+      // MySQL / MariaDB native check
+      try {
+        const { stdout: binPath } = await runCli('which', ['mysql']).catch(() => runCli('command', ['-v', 'mysql'])).catch(() => ({ stdout: '' }));
+        if (binPath && binPath.trim()) {
+          results.native.mysql.installed = true;
+          results.native.mysql.binaryPath = binPath.trim();
+        }
+      } catch (_) {}
+
+      try {
+        const { stdout: verOut } = await runCli('mysql', ['--version']).catch(() => ({ stdout: '' }));
+        if (verOut && verOut.trim()) {
+          results.native.mysql.installed = true;
+          results.native.mysql.version = verOut.trim();
+          results.native.mysql.variant = verOut.toLowerCase().includes('mariadb') ? 'mariadb' : 'mysql';
+          results.versionMatrix.mysql.currentDetected = verOut.trim();
+        }
+      } catch (_) {}
+
+      try {
+        const { stdout: statusOut } = await runCli('systemctl', ['is-active', 'mysql']).catch(() => runCli('systemctl', ['is-active', 'mariadb'])).catch(() => ({ stdout: '' }));
+        results.native.mysql.active = (statusOut || '').trim() === 'active';
+      } catch (_) {}
+
+      // PostgreSQL native check
+      try {
+        const { stdout: binPath } = await runCli('which', ['psql']).catch(() => runCli('command', ['-v', 'psql'])).catch(() => ({ stdout: '' }));
+        if (binPath && binPath.trim()) {
+          results.native.postgres.installed = true;
+          results.native.postgres.binaryPath = binPath.trim();
+        }
+      } catch (_) {}
+
+      try {
+        const { stdout: verOut } = await runCli('psql', ['--version']).catch(() => ({ stdout: '' }));
+        if (verOut && verOut.trim()) {
+          results.native.postgres.installed = true;
+          results.native.postgres.version = verOut.trim();
+          results.versionMatrix.postgres.currentDetected = verOut.trim();
+        }
+      } catch (_) {}
+
+      try {
+        const { stdout: statusOut } = await runCli('systemctl', ['is-active', 'postgresql']).catch(() => ({ stdout: '' }));
+        results.native.postgres.active = (statusOut || '').trim() === 'active';
+      } catch (_) {}
+
+      // Port checks (3306 & 5432)
+      try {
+        const { stdout: netOut } = await runCli('ss', ['-tulnp']).catch(() => runCli('netstat', ['-tulnp'])).catch(() => ({ stdout: '' }));
+        if (netOut) {
+          if (netOut.includes(':3306')) {
+            results.ports[3306].listening = true;
+            results.native.mysql.listening = true;
+          }
+          if (netOut.includes(':5432')) {
+            results.ports[5432].listening = true;
+            results.native.postgres.listening = true;
+          }
+        }
+      } catch (_) {}
+    } else {
+      // Windows / fallback simulation
+      try {
+        const pool = await this.getMysqlConnection();
+        const [rows] = await pool.query('SELECT VERSION() AS ver');
+        if (rows && rows[0]?.ver) {
+          results.native.mysql.installed = true;
+          results.native.mysql.active = true;
+          results.native.mysql.version = `MySQL ${rows[0].ver}`;
+          results.native.mysql.listening = true;
+          results.ports[3306].listening = true;
+          results.versionMatrix.mysql.currentDetected = `MySQL ${rows[0].ver}`;
+        }
+      } catch (_) {}
+
+      try {
+        const client = await this.getPgConnection();
+        const res = await client.query('SELECT version();');
+        if (res && res.rows && res.rows[0]?.version) {
+          results.native.postgres.installed = true;
+          results.native.postgres.active = true;
+          results.native.postgres.version = res.rows[0].version;
+          results.native.postgres.listening = true;
+          results.ports[5432].listening = true;
+          results.versionMatrix.postgres.currentDetected = res.rows[0].version;
+        }
+      } catch (_) {}
+    }
+
+    return results;
+  }
 }
 
 export default new DatabaseService();

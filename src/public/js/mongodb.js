@@ -15,11 +15,18 @@ const MongoDBPage = {
   },
 
   async refresh() {
-    await Promise.all([
-      this.loadStatus(),
-      this.loadDatabases(),
-      this.loadUsers(),
-    ]);
+    const status = await this.loadStatus();
+    if (status && status.installed && status.running) {
+      await Promise.all([
+        this.loadDatabases(),
+        this.loadUsers(),
+      ]);
+    } else {
+      const dbList = document.getElementById('mdbDatabaseList');
+      if (dbList) {
+        dbList.innerHTML = '<div style="padding:25px;text-align:center;color:var(--text-muted);font-size:13px;"><i class="bi bi-info-circle me-1"></i> MongoDB service is not running. Start or install MongoDB to manage databases.</div>';
+      }
+    }
   },
 
   switchTab(tabId) {
@@ -45,7 +52,7 @@ const MongoDBPage = {
 
         if (!status.installed || !status.running) {
           if (banner) banner.style.display = 'block';
-          return;
+          return status;
         }
         if (banner) banner.style.display = 'none';
 
@@ -55,8 +62,10 @@ const MongoDBPage = {
         this.loadServerInfo();
         this.populateQueryDbSelect();
         this.populateBackupDbSelect();
+        return status;
       }
     } catch {}
+    return null;
   },
 
   async loadServerInfo() {

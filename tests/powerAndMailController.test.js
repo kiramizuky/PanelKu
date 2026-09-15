@@ -261,5 +261,11 @@ describe('MailController', () => {
     const resLogs = mockRes();
     await mailController.getLogs({ query: { service: 'postfix', lines: '20' } }, resLogs);
     expect(resLogs.statusCode).toBe(200);
+
+    jest.spyOn(mailService, 'getDnsHelper').mockResolvedValue({ domain: 'example.com', records: [] });
+    const resDns = mockRes();
+    await mailController.getDnsHelper({ query: { domain: 'example.com' } }, resDns);
+    expect(resDns.statusCode).toBe(200);
+    expect(resDns.body.data.domain).toBe('example.com');
   });
 });

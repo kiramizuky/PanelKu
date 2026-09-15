@@ -12,7 +12,7 @@ class MonitorService {
       si.currentLoad(),
       si.mem(),
       si.fsSize(),
-      si.networkStats(),
+      si.networkStats('*'),
       si.cpuTemperature(),
       si.disksIO(),
     ]);
@@ -28,7 +28,10 @@ class MonitorService {
    */
   _buildMetrics(cpu, mem, disk, net, temp, diskIO) {
     const primaryDisk = getPrimaryDisk(disk || []);
-    const primaryNet = (net || [])[0] || {};
+    const netList = Array.isArray(net) ? net : (net ? [net] : []);
+    const totalRx = netList.reduce((sum, n) => sum + (n.rx_sec || 0), 0);
+    const totalTx = netList.reduce((sum, n) => sum + (n.tx_sec || 0), 0);
+    const primaryNet = netList[0] || {};
     const loadData = cpu || {};
 
     return {
@@ -42,8 +45,8 @@ class MonitorService {
       diskUsed: primaryDisk.used || 0,
       diskTotal: primaryDisk.size || 0,
       diskPercent: primaryDisk.use || 0,
-      networkRx: primaryNet.rx_sec || 0,
-      networkTx: primaryNet.tx_sec || 0,
+      networkRx: totalRx || primaryNet.rx_sec || 0,
+      networkTx: totalTx || primaryNet.tx_sec || 0,
       diskRead: diskIO?.rIO_sec || 0,
       diskWrite: diskIO?.wIO_sec || 0,
       loadAvg: [loadData.avgLoad1 || 0, loadData.avgLoad5 || 0, loadData.avgLoad15 || 0],
@@ -96,11 +99,11 @@ class MonitorService {
   async getNetworkStats() {
     const [ifaces, stats, connections] = await Promise.allSettled([
       si.networkInterfaces(),
-      si.networkStats(),
+      si.networkStats('*'),
       si.networkConnections(),
     ]);
     return {
-      interfaces: (ifaces.value || []).filter((i) => !i.virtual),
+      interfaces: (ifaces.value || []).filter((i) => (!i.virtual || (i.ip4 && i.ip4 !== '127.0.0.1')) && i.iface !== 'lo'),
       stats: stats.value || [],
       connections: (connections.value || []).length,
     };

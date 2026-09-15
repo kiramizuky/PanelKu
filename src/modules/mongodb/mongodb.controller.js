@@ -46,9 +46,9 @@ class MongoDBController {
   async listDatabases(req, res) {
     try {
       const dbs = await mongodbService.listDatabases();
-      return successResponse(res, { databases: dbs });
+      return successResponse(res, { databases: dbs || [] });
     } catch (error) {
-      return errorResponse(res, error.message, 500);
+      return successResponse(res, { databases: [], message: error.message });
     }
   }
 
@@ -147,9 +147,9 @@ class MongoDBController {
   async listUsers(req, res) {
     try {
       const users = await mongodbService.listUsers();
-      return successResponse(res, { users });
+      return successResponse(res, { users: users || [] });
     } catch (error) {
-      return errorResponse(res, error.message, 500);
+      return successResponse(res, { users: [], message: error.message });
     }
   }
 

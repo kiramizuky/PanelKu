@@ -89,7 +89,7 @@ const TerminalPage = (() => {
         tab.term.write(data.data);
         if (tabId === activeTabId) {
           lastOutputBuffer.push(data.data);
-          if (lastOutputBuffer.length > 50) lastOutputBuffer.shift();
+          if (lastOutputBuffer.length > 500) lastOutputBuffer.shift();
 
           const lowerData = data.data.toLowerCase();
           if (lowerData.includes('command not found') || 
@@ -158,14 +158,15 @@ const TerminalPage = (() => {
     termDiv.style.display = 'none';
     container.appendChild(termDiv);
 
-    // Initialize xterm
+    // Initialize xterm with 10,000 lines scrollback
     const term = new Terminal({
       fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
       fontSize: 14,
       lineHeight: 1.4,
       theme: { background: 'transparent', foreground: '#e6edf3', cursor: '#6366f1', selectionBackground: 'rgba(99, 102, 241, 0.3)' },
       cursorBlink: true,
-      allowTransparency: true
+      allowTransparency: true,
+      scrollback: 10000,
     });
     const fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);

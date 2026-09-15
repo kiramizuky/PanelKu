@@ -148,21 +148,36 @@ class MongoDBService {
       const isDebian = osRelease.includes('debian');
 
       if (isUbuntu || isDebian) {
-        // Import MongoDB GPG key and add repo
+        // Extract codename e.g. VERSION_CODENAME=jammy or UBUNTU_CODENAME=jammy
+        const codenameMatch = osRelease.match(/(?:VERSION_CODENAME|UBUNTU_CODENAME)=([a-zA-Z0-9_-]+)/);
+        let codename = codenameMatch ? codenameMatch[1] : (isUbuntu ? 'jammy' : 'bookworm');
+
+        const repoDistro = isUbuntu ? 'ubuntu' : 'debian';
+        const repoComponent = isUbuntu ? 'multiverse' : 'main';
+
+        // Ensure supported LTS codename for 7.0
+        if (isUbuntu && !['focal', 'jammy'].includes(codename)) {
+          codename = 'jammy'; // most compatible LTS repo for MongoDB 7.0
+        } else if (isDebian && !['bullseye', 'bookworm'].includes(codename)) {
+          codename = 'bookworm';
+        }
+
+        const repoUrl = `http://repo.mongodb.org/apt/${repoDistro} ${codename}/mongodb-org/7.0 ${repoComponent}`;
+
         await execAsync(
-          'curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg && ' +
-          'echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list && ' +
-          'apt-get update -qq && apt-get install -y mongodb-org mongosh',
+          'curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg 2>/dev/null && ' +
+          `echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] ${repoUrl}" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list && ` +
+          'apt-get update -qq && (apt-get install -y mongodb-org mongosh || apt-get install -y mongodb-org || apt-get install -y mongodb)',
           { timeout: 180000 }
         );
       } else {
-        // Generic: try npm global install of mongosh
-        await execAsync('npm install -g mongosh', { timeout: 60000 });
+        // Generic: try package manager or npm global install of mongosh
+        await execAsync('apt-get update -qq && apt-get install -y mongodb 2>/dev/null || yum install -y mongodb-org 2>/dev/null || npm install -g mongosh 2>/dev/null', { timeout: 120000 });
       }
 
-      // Try to start MongoDB
+      // Try to start and enable MongoDB
       try {
-        await execAsync('systemctl start mongod 2>/dev/null || systemctl start mongodb 2>/dev/null || mongod --fork --logpath /var/log/mongod.log --dbpath /var/lib/mongodb 2>/dev/null || true');
+        await execAsync('systemctl daemon-reload 2>/dev/null; systemctl enable mongod 2>/dev/null || systemctl enable mongodb 2>/dev/null; systemctl start mongod 2>/dev/null || systemctl start mongodb 2>/dev/null || mongod --fork --logpath /var/log/mongod.log --dbpath /var/lib/mongodb 2>/dev/null || true');
       } catch {
         // Non-critical
       }
@@ -214,6 +229,11 @@ class MongoDBService {
    * Get detailed server info.
    */
   async getServerInfo() {
+    const isInstalled = await this._checkMongoInstalled();
+    if (!isInstalled) {
+      return { server: null, databases: [] };
+    }
+
     try {
       const info = await this._runMongoCommand(`
         JSON.stringify({
@@ -240,14 +260,14 @@ class MongoDBService {
             empty: d.empty,
           }))
         )
-      `);
+      `).catch(() => []);
 
       return {
         server: info,
         databases: Array.isArray(dbsResult) ? dbsResult : [],
       };
-    } catch (err) {
-      throw new Error(`Failed to get MongoDB server info: ${err.message}`);
+    } catch (_) {
+      return { server: null, databases: [] };
     }
   }
 
@@ -257,6 +277,9 @@ class MongoDBService {
    * List all databases.
    */
   async listDatabases() {
+    const isInstalled = await this._checkMongoInstalled();
+    if (!isInstalled) return [];
+
     try {
       const result = await this._runMongoCommand(`
         JSON.stringify(
@@ -268,8 +291,8 @@ class MongoDBService {
         )
       `);
       return Array.isArray(result) ? result : [];
-    } catch (err) {
-      throw new Error(`Failed to list databases: ${err.message}`);
+    } catch (_) {
+      return [];
     }
   }
 
@@ -389,6 +412,9 @@ class MongoDBService {
    * List MongoDB users.
    */
   async listUsers() {
+    const isInstalled = await this._checkMongoInstalled();
+    if (!isInstalled) return [];
+
     try {
       const result = await this._runMongoCommand(`
         JSON.stringify(
@@ -402,8 +428,8 @@ class MongoDBService {
         )
       `);
       return Array.isArray(result) ? result : [];
-    } catch (err) {
-      throw new Error(`Failed to list users: ${err.message}`);
+    } catch (_) {
+      return [];
     }
   }
 

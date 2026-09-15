@@ -20,7 +20,7 @@ class DashboardService {
           si.fsSize(),
           si.osInfo(),
           si.time(),
-          si.networkStats(),
+          si.networkStats('*'),
           si.cpuTemperature(),
           si.currentLoad(),
           si.networkInterfaces(),
@@ -37,16 +37,38 @@ class DashboardService {
         const tempData = temp.value || {};
         const loadData = load.value || {};
 
-        const networksMapped = netStats.map(stat => {
-          const info = netInterfaces.find(i => i.iface === stat.iface) || {};
+        const ifacesList = Array.isArray(netInterfaces) ? netInterfaces : [];
+        const statsList = Array.isArray(netStats) ? netStats : [];
+        const nonLoopIfaces = ifacesList.filter(i => i.iface !== 'lo' && i.ip4 !== '127.0.0.1');
+        const activeIfaces = nonLoopIfaces.length > 0 ? nonLoopIfaces : ifacesList;
+
+        const networksMapped = activeIfaces.map(info => {
+          const stat = statsList.find(s => s.iface === info.iface) || {};
           return {
-            iface: stat.iface,
+            iface: info.iface,
             ip4: info.ip4 || 'No IP',
+            mac: info.mac || '',
+            operstate: info.operstate || stat.operstate || 'unknown',
             rxSec: stat.rx_sec || 0,
             txSec: stat.tx_sec || 0,
             rxTotal: stat.rx_bytes || 0,
             txTotal: stat.tx_bytes || 0,
           };
+        });
+
+        statsList.forEach(stat => {
+          if (stat.iface && stat.iface !== 'lo' && !networksMapped.some(n => n.iface === stat.iface)) {
+            networksMapped.push({
+              iface: stat.iface,
+              ip4: 'No IP',
+              mac: '',
+              operstate: stat.operstate || 'unknown',
+              rxSec: stat.rx_sec || 0,
+              txSec: stat.tx_sec || 0,
+              rxTotal: stat.rx_bytes || 0,
+              txTotal: stat.tx_bytes || 0,
+            });
+          }
         });
 
         return {

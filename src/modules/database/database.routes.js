@@ -23,6 +23,7 @@ router.use(requireAuth);
 
 // Database CRUD
 router.get('/', requirePermission('database:read'), databaseController.getDatabases);
+router.get('/environments', requirePermission('database:read'), databaseController.getEnvironments.bind(databaseController));
 router.post('/', requirePermission('database:create'), databaseController.createDatabase.bind(databaseController));
 router.delete('/', requirePermission('database:delete'), databaseController.deleteDatabase.bind(databaseController));
 

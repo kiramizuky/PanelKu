@@ -30,5 +30,6 @@ router.post('/spam', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), mailController.upd
 
 router.get('/ssl', rbac(RESOURCES.SYSTEM, ACTIONS.READ), mailController.getSslInfo.bind(mailController));
 router.get('/logs', rbac(RESOURCES.SYSTEM, ACTIONS.READ), mailController.getLogs.bind(mailController));
+router.get('/dns-helper', rbac(RESOURCES.SYSTEM, ACTIONS.READ), mailController.getDnsHelper.bind(mailController));
 
 export default router;

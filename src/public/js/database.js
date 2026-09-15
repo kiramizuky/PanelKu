@@ -9,27 +9,144 @@ const DB = (() => {
   let currentPage = 1;
   let currentSort = { column: null, dir: 'ASC' };
   let _historyModal;
+  let cachedEnvironments = null;
+  let versionModal = null;
 
   // ── Initialization ───────────────────────────────────
 
   async function loadData() {
     try {
-      const statusRes = await LP.get('/system/check-install');
-      const statuses = statusRes?.success ? statusRes.data : {};
-      const res = await LP.get('/database');
-      if (res?.success) {
-        renderDbList('mysql', res.data.mysql || [], statuses.mysql);
-        renderDbList('postgres', res.data.postgres || [], statuses.postgres);
-        renderDbList('sqlite', res.data.sqlite || [], statuses.sqlite);
+      const [statusRes, res, envRes] = await Promise.allSettled([
+        LP.get('/system/check-install'),
+        LP.get('/database'),
+        LP.get('/database/environments')
+      ]);
+
+      const statuses = statusRes.status === 'fulfilled' && statusRes.value?.success ? statusRes.value.data : {};
+      const envData = envRes.status === 'fulfilled' && envRes.value?.success ? envRes.value.data : null;
+      cachedEnvironments = envData;
+
+      if (envData) {
+        renderEnvironments(envData);
+      }
+
+      if (res.status === 'fulfilled' && res.value?.success) {
+        renderDbList('mysql', res.value.data.mysql || [], statuses.mysql, envData);
+        renderDbList('postgres', res.value.data.postgres || [], statuses.postgres, envData);
+        renderDbList('sqlite', res.value.data.sqlite || [], statuses.sqlite, envData);
       }
     } catch (e) {
       LP.toast('Failed to load databases', 'error');
     }
   }
 
-  function renderDbList(type, dbs, isInstalled) {
+  function renderEnvironments(env) {
+    const banner = document.getElementById('dbEnvBanner');
+    const badgesEl = document.getElementById('dbEnvBadges');
+    const detailsEl = document.getElementById('dbEnvDetails');
+    if (!banner || !badgesEl) return;
+
+    banner.style.display = 'block';
+    const badges = [];
+    const details = [];
+
+    // 1. Docker
+    if (env.docker?.containers?.length > 0) {
+      const names = env.docker.containers.map(c => `${c.name} (${c.type.toUpperCase()})`).join(', ');
+      badges.push(`<span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1"><i class="bi bi-box-seam me-1"></i> Docker: ${LP.escHtml(names)}</span>`);
+      env.docker.containers.forEach(c => {
+        details.push(`
+          <div class="d-flex justify-content-between align-items-center py-1">
+            <span><i class="bi bi-box-seam text-primary me-1"></i> <strong>Docker:</strong> ${LP.escHtml(c.name)} (<span class="font-mono text-info">${LP.escHtml(c.image)}</span>) — Port: <code class="text-warning">${c.suggestedPort}</code></span>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info py-0 px-2" onclick="DB.quickConnectDocker('${c.type}', '${c.suggestedHost}', ${c.suggestedPort})"><i class="bi bi-plug me-1"></i> Hubungkan</button>
+          </div>
+        `);
+      });
+    }
+
+    // 2. Other Panels (aaPanel, XAMPP, etc.)
+    if (env.otherPanels?.length > 0) {
+      env.otherPanels.forEach(p => {
+        badges.push(`<span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1"><i class="bi bi-hdd-network me-1"></i> ${LP.escHtml(p.name)}</span>`);
+        details.push(`
+          <div class="d-flex justify-content-between align-items-center py-1">
+            <span><i class="bi bi-hdd-network text-warning me-1"></i> <strong>${LP.escHtml(p.name)}:</strong> ${LP.escHtml(p.type.toUpperCase())} di <code class="font-mono">${LP.escHtml(p.detectedPaths[0])}</code> ${p.version ? `(${LP.escHtml(p.version)})` : ''}</span>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning py-0 px-2" onclick="DB.quickConnectPanel('${p.type}', '${LP.encJsArg(p.socket || '')}')"><i class="bi bi-link-45deg me-1"></i> Gunakan Config</button>
+          </div>
+        `);
+      });
+    }
+
+    // 3. Native
+    if (env.native?.mysql?.installed) {
+      const ver = env.native.mysql.version ? env.native.mysql.version.split(' ')[0] : (env.native.mysql.variant || 'mysql');
+      badges.push(`<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="bi bi-check-circle me-1"></i> Host MySQL (${LP.escHtml(ver)})</span>`);
+    }
+    if (env.native?.postgres?.installed) {
+      badges.push(`<span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1"><i class="bi bi-check-circle me-1"></i> Host PostgreSQL</span>`);
+    }
+
+    badges.push(`<button class="btn btn-sm btn-link text-decoration-none py-0 px-1 text-muted" onclick="DB.toggleEnvDetails()" style="font-size:11px;"><i class="bi bi-chevron-down"></i> Detail</button>`);
+    badgesEl.innerHTML = badges.join(' ');
+
+    if (details.length > 0 && detailsEl) {
+      detailsEl.innerHTML = details.join('');
+    }
+  }
+
+  function toggleEnvDetails() {
+    const el = document.getElementById('dbEnvDetails');
+    if (el) {
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+  }
+
+  function quickConnectDocker(type, host, port) {
+    showCredentialsModal();
+    if (type === 'mysql') {
+      document.getElementById('credMysqlHost').value = host || '127.0.0.1';
+      document.getElementById('credMysqlPort').value = port || 3306;
+      LP.toast(`Kredensial host/port Docker diisi (${host}:${port}). Masukkan user & password lalu simpan.`, 'info');
+    } else if (type === 'postgres') {
+      document.getElementById('credPgHost').value = host || '127.0.0.1';
+      document.getElementById('credPgPort').value = port || 5432;
+      LP.toast(`Kredensial host/port Docker diisi (${host}:${port}). Masukkan user & password lalu simpan.`, 'info');
+    }
+  }
+
+  function quickConnectPanel(_type, _socket) {
+    showCredentialsModal();
+    LP.toast(`Panel lain terdeteksi. Gunakan host 127.0.0.1 dan user database yang dibuat dari panel tersebut.`, 'info');
+  }
+
+  function showVersionModal() {
+    if (!versionModal) versionModal = new bootstrap.Modal(document.getElementById('dbVersionModal'));
+    if (cachedEnvironments) {
+      const m = cachedEnvironments.versionMatrix?.mysql;
+      const p = cachedEnvironments.versionMatrix?.postgres;
+      const elMy = document.getElementById('verDetailMysql');
+      const elPg = document.getElementById('verDetailPg');
+      if (elMy) elMy.textContent = m?.currentDetected || (cachedEnvironments.native?.mysql?.installed ? 'Installed (Active)' : 'Tidak terpasang di host OS');
+      if (elPg) elPg.textContent = p?.currentDetected || (cachedEnvironments.native?.postgres?.installed ? 'Installed (Active)' : 'Tidak terpasang di host OS');
+    }
+    versionModal.show();
+  }
+
+  function renderDbList(type, dbs, isInstalled, envData) {
     const tbody = document.getElementById(type + 'TableBody');
+    const hasDocker = envData?.docker?.containers?.some(c => c.type === type);
+    const hasPanel = envData?.otherPanels?.some(p => p.type === type);
+    const isListening = (type === 'mysql' && envData?.ports?.[3306]?.listening) || (type === 'postgres' && envData?.ports?.[5432]?.listening);
+
     if (isInstalled === false && type !== 'sqlite') {
+      if (hasDocker || hasPanel || isListening) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:30px;">
+          <h5 style="margin-bottom:8px;color:#60a5fa;"><i class="bi bi-hdd-network me-2"></i>${type.toUpperCase()} Terdeteksi via ${hasDocker ? 'Docker Container' : (hasPanel ? 'Modul Panel Lain' : 'Service Port')}</h5>
+          <p style="color:var(--text-muted);font-size:12px;margin-bottom:15px;">Instance database aktif terdeteksi. Silakan atur kredensial koneksi untuk melihat dan mengelola database.</p>
+          <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="DB.showCredentialsModal()"><i class="bi bi-gear-fill me-1"></i> Atur Kredensial ${type.toUpperCase()}</button>
+        </td></tr>`;
+        return;
+      }
       tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:40px;">
         <h4 style="margin-bottom:15px;">${type.charAt(0).toUpperCase() + type.slice(1)} is not installed</h4>
         <button class="btn-lp btn-lp-primary" onclick="DB.installPackage('${type}')"><i class="bi bi-download"></i> Install ${type.charAt(0).toUpperCase() + type.slice(1)}</button>
@@ -1061,7 +1178,8 @@ const DB = (() => {
     enablePgRemoteAccess, loadPgConfigFiles, savePgConfigFile,
     makeCellEditable, deleteRow, showInsertRowModal, submitInsertRow,
     backupDatabase, showRestoreModal, executeRestore,
-    showAutoBackupModal, saveAutoBackup, runAutoBackupNow
+    showAutoBackupModal, saveAutoBackup, runAutoBackupNow,
+    showVersionModal, quickConnectDocker, quickConnectPanel, toggleEnvDetails
   };
 })();
 

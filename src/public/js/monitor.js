@@ -92,18 +92,31 @@ const MonitorPage = (() => {
       container.innerHTML = '<div class="text-center text-muted">No network data</div>';
       return;
     }
-    container.innerHTML = networks.map(n => `
-      <div class="d-flex justify-content-between align-items-center mb-2" style="font-size:13px; padding: 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
-        <div>
-          <div style="font-weight:600; color:#f8fafc">${LP.escHtml(n.iface)}</div>
-          <div class="font-mono" style="font-size:11px; color:#cbd5e1">${LP.escHtml(n.ip4 || 'No IP')}</div>
+    container.innerHTML = networks.map(n => {
+      const isUp = n.operstate === 'up' || (n.rxSec > 0 || n.txSec > 0) || (n.ip4 && n.ip4 !== 'No IP');
+      const stateBadge = isUp
+        ? '<span class="badge bg-success-subtle text-success border border-success-subtle py-0 px-1" style="font-size:10px;">UP</span>'
+        : '<span class="badge bg-secondary-subtle text-muted border border-secondary-subtle py-0 px-1" style="font-size:10px;">DOWN</span>';
+
+      return `
+        <div class="d-flex justify-content-between align-items-center mb-2" style="font-size:13px; padding: 9px 12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:8px;">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-ethernet text-info" style="font-size:14px;"></i>
+              <strong style="color:#f8fafc; font-size:13.5px;">${LP.escHtml(n.iface)}</strong>
+              ${stateBadge}
+            </div>
+            <div class="font-mono" style="font-size:11px; color:#cbd5e1; margin-top:2px;">
+              IP: ${LP.escHtml(n.ip4 || 'No IP')} ${n.mac ? `<span style="opacity:0.6;">(${LP.escHtml(n.mac)})</span>` : ''}
+            </div>
+          </div>
+          <div class="text-end" style="font-size:12px; font-family:var(--font-mono);">
+            <div><span class="text-info"><i class="bi bi-arrow-down-short"></i></span> ${LP.formatBytes(n.rxSec || n.rx_sec || 0)}/s</div>
+            <div><span class="text-warning"><i class="bi bi-arrow-up-short"></i></span> ${LP.formatBytes(n.txSec || n.tx_sec || 0)}/s</div>
+          </div>
         </div>
-        <div class="text-end" style="font-size:12px;">
-          <div><span class="text-info"><i class="bi bi-arrow-down"></i></span> ${LP.formatBytes(n.rxSec || n.rx_sec || 0)}/s</div>
-          <div><span class="text-warning"><i class="bi bi-arrow-up"></i></span> ${LP.formatBytes(n.txSec || n.tx_sec || 0)}/s</div>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
   function formatUptime(seconds) {

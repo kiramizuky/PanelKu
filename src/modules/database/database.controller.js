@@ -23,6 +23,15 @@ class DatabaseController {
     }
   }
 
+  async getEnvironments(req, res) {
+    try {
+      const data = await databaseService.detectEnvironments();
+      success(res, data);
+    } catch (err) {
+      error(res, err.message, 500);
+    }
+  }
+
   async createDatabase(req, res) {
     try {
       const type = cleanStr(req.body.type);

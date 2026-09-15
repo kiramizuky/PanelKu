@@ -1,93 +1,242 @@
-<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
   <div>
     <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Mail Server Manager</h1>
-    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Postfix & Dovecot — Domains, Accounts, Queue, Spam Filter, Logs</p>
+    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Postfix & Dovecot — Domains, Accounts, Deliverability (SPF/DKIM/DMARC), Queue, Logs</p>
   </div>
-  <div style="display:flex;gap:10px">
-    <button class="btn-lp btn-lp-ghost" onclick="MAIL.loadData()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <button class="btn-lp btn-lp-ghost" id="mailRefreshBtn" onclick="MAIL.loadData()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
   </div>
 </div>
 
 <style>
-  .mail-tabs { border-bottom:1px solid var(--glass-border); }
-  .mail-tabs .nav-link { color:var(--text-muted); background:transparent; border:none; padding:10px 16px; font-weight:500; border-radius:8px 8px 0 0; }
+  .mail-tabs { border-bottom:1px solid var(--glass-border); margin-bottom: 20px; }
+  .mail-tabs .nav-link { color:var(--text-muted); background:transparent; border:none; padding:10px 16px; font-weight:500; border-radius:8px 8px 0 0; transition:all 0.2s ease; }
   .mail-tabs .nav-link:hover { color:var(--text-primary); }
-  .mail-tabs .nav-link.active { color:var(--accent-primary); background:rgba(99,102,241,0.1); border:1px solid var(--glass-border); border-bottom-color:transparent; }
+  .mail-tabs .nav-link.active { color:var(--accent-primary); background:rgba(99,102,241,0.12); border:1px solid var(--glass-border); border-bottom-color:transparent; font-weight:600; }
+  .mail-stat-card {
+    background: var(--card-bg, rgba(255,255,255,0.03));
+    border: 1px solid var(--glass-border, rgba(255,255,255,0.08));
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+  .mail-stat-card:hover {
+    border-color: rgba(99,102,241,0.3);
+  }
+  .dns-code-badge {
+    font-family: monospace;
+    background: rgba(0,0,0,0.25);
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+    font-size: 12px;
+    word-break: break-all;
+  }
 </style>
 
+<!-- Initial Loading State (prevents blank screen) -->
+<div id="mailLoading" class="lp-glass-card" style="padding:50px;text-align:center;">
+  <div class="spinner-border text-primary mb-3" style="width: 2.5rem; height: 2.5rem;" role="status"></div>
+  <h5 style="margin:0 0 6px;font-size:16px;">Connecting to Mail Services...</h5>
+  <p style="color:var(--text-muted);font-size:13px;margin:0;">Checking Postfix, Dovecot, and SpamAssassin daemon status.</p>
+</div>
+
+<!-- Mail Server Not Installed Screen -->
 <div id="mailNotInstalled" style="display:none;">
-  <div class="lp-glass-card" style="padding:60px;text-align:center;">
-    <i class="bi bi-envelope" style="font-size:48px;color:var(--text-muted);opacity:0.3;"></i>
-    <h4 style="margin:20px 0 10px;">Mail Server Not Installed</h4>
-    <p style="color:var(--text-muted);font-size:13px;">Postfix, Dovecot, and SpamAssassin are not installed on this server.</p>
-    <button class="btn-lp btn-lp-primary mt-3" onclick="MAIL.install()"><i class="bi bi-download"></i> Install Mail Server</button>
+  <div class="lp-glass-card" style="padding:32px;margin-bottom:24px;">
+    <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+      <div style="width:60px;height:60px;border-radius:14px;background:rgba(99,102,241,0.12);display:flex;align-items:center;justify-content:center;color:#6366f1;font-size:28px;flex-shrink:0;">
+        <i class="bi bi-envelope-slash"></i>
+      </div>
+      <div style="flex:1;min-width:280px;">
+        <h3 style="font-size:20px;font-weight:600;margin:0 0 6px;">Mail Server Not Detected</h3>
+        <p style="color:var(--text-muted);font-size:13px;line-height:1.5;margin:0 0 16px;">
+          Postfix (MTA), Dovecot (IMAP/POP3), or SpamAssassin packages are not active or not installed on this server.
+          You can deploy a native mail server in 1-click or use containerized mail services.
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn-lp btn-lp-primary" id="mailInstallBtn" onclick="MAIL.install()">
+            <i class="bi bi-download"></i> Install Mail Server (Postfix + Dovecot)
+          </button>
+          <button class="btn-lp btn-lp-ghost" onclick="MAIL.openDnsHelperPreview()">
+            <i class="bi bi-shield-check"></i> DNS & Deliverability Guide (SPF/DKIM/rDNS)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prerequisites & Port Checks -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="lp-glass-card" style="height:100%;padding:20px;">
+        <h5 style="font-size:15px;font-weight:600;margin:0 0 12px;display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-diagram-3 text-info"></i> Critical Mail Ports & Deliverability
+        </h5>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
+          Mail servers require open firewall ports. Note: Many cloud providers (AWS, DigitalOcean, Hetzner) block outbound Port 25 by default to prevent spam.
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;font-size:12px;">
+          <div style="padding:8px 12px;background:rgba(0,0,0,0.15);border-radius:8px;border:1px solid var(--glass-border);">
+            <strong>Port 25</strong>: SMTP (Server-to-server)
+          </div>
+          <div style="padding:8px 12px;background:rgba(0,0,0,0.15);border-radius:8px;border:1px solid var(--glass-border);">
+            <strong>Port 587</strong>: Submission (STARTTLS)
+          </div>
+          <div style="padding:8px 12px;background:rgba(0,0,0,0.15);border-radius:8px;border:1px solid var(--glass-border);">
+            <strong>Port 465</strong>: SMTPS (Implicit TLS)
+          </div>
+          <div style="padding:8px 12px;background:rgba(0,0,0,0.15);border-radius:8px;border:1px solid var(--glass-border);">
+            <strong>Port 993</strong>: IMAPS (Secure Inbox)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="lp-glass-card" style="height:100%;padding:20px;">
+        <h5 style="font-size:15px;font-weight:600;margin:0 0 12px;display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-box text-warning"></i> Alternative: Docker Mailserver
+        </h5>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
+          If you prefer an isolated containerized stack with Postfix, Dovecot, Rspamd, ClamAV & DKIM:
+        </p>
+        <div style="position:relative;">
+          <pre style="background:rgba(0,0,0,0.3);padding:10px 14px;border-radius:8px;font-size:11px;overflow:auto;margin:0;color:#94a3b8;border:1px solid var(--glass-border);">docker run -d --name mailserver \<br>  -p 25:25 -p 587:587 -p 993:993 \<br>  -v /data/mail:/var/mail \<br>  mailserver/docker-mailserver:latest</pre>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" style="position:absolute;top:6px;right:6px;padding:2px 8px;font-size:11px;" onclick="MAIL.copySnippet('docker run -d --name mailserver -p 25:25 -p 587:587 -p 993:993 -v /data/mail:/var/mail mailserver/docker-mailserver:latest')">
+            <i class="bi bi-clipboard"></i> Copy
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
+<!-- Mail Server Installed & Active Screen -->
 <div id="mailContent" style="display:none;">
   <!-- Status Cards -->
-  <div id="mailStatusCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;"></div>
+  <div id="mailStatusCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;"></div>
 
-  <ul class="nav nav-tabs mb-4 mail-tabs">
-    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#mail-domains">Domains</a></li>
-    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-accounts">Accounts</a></li>
-    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-queue">Queue</a></li>
-    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-spam">Spam Filter</a></li>
-    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-logs">Logs</a></li>
+  <ul class="nav nav-tabs mail-tabs">
+    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#mail-domains"><i class="bi bi-globe me-1"></i> Domains</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-accounts"><i class="bi bi-person me-1"></i> Accounts</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-dns"><i class="bi bi-shield-check me-1"></i> DNS & Deliverability</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-queue"><i class="bi bi-send me-1"></i> Queue <span id="mailQueueCountBadge" class="badge bg-secondary ms-1"></span></a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-spam"><i class="bi bi-shield-exclamation me-1"></i> Spam Filter</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#mail-logs"><i class="bi bi-journal-text me-1"></i> Logs</a></li>
   </ul>
 
   <div class="tab-content">
-    <!-- Domains -->
+    <!-- Domains Tab -->
     <div class="tab-pane fade show active" id="mail-domains">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <span style="font-size:13px;color:var(--text-muted);">Manage email domains (virtual mail domains)</span>
+        <span style="font-size:13px;color:var(--text-muted);">Virtual mail domains served by Postfix</span>
         <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="MAIL.showAddDomainModal()"><i class="bi bi-plus-lg"></i> Add Domain</button>
       </div>
-      <div class="lp-glass-card" style="padding:0;">
+      <div class="lp-glass-card" style="padding:0;overflow:hidden;">
         <table class="lp-table">
-          <thead><tr><th>Domain</th><th style="width:100px;text-align:right">Actions</th></tr></thead>
-          <tbody id="mailDomainsBody"><tr><td colspan="2" class="text-muted" style="text-align:center;">Loading...</td></tr></tbody>
+          <thead>
+            <tr>
+              <th>Domain</th>
+              <th>Status</th>
+              <th style="width:160px;text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="mailDomainsBody">
+            <tr><td colspan="3" class="text-muted" style="text-align:center;">Loading domains...</td></tr>
+          </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Accounts -->
+    <!-- Accounts Tab -->
     <div class="tab-pane fade" id="mail-accounts">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <span style="font-size:13px;color:var(--text-muted);">Email accounts</span>
+        <span style="font-size:13px;color:var(--text-muted);">User mailboxes configured in Dovecot</span>
         <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="MAIL.showAddAccountModal()"><i class="bi bi-plus-lg"></i> Add Account</button>
       </div>
-      <div class="lp-glass-card" style="padding:0;">
+      <div class="lp-glass-card" style="padding:0;overflow:hidden;">
         <table class="lp-table">
-          <thead><tr><th>Email</th><th>Mailbox</th><th style="width:120px;text-align:right">Actions</th></tr></thead>
-          <tbody id="mailAccountsBody"><tr><td colspan="3" class="text-muted" style="text-align:center;">Loading...</td></tr></tbody>
+          <thead>
+            <tr>
+              <th>Email Address</th>
+              <th>Storage Mailbox</th>
+              <th style="width:180px;text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="mailAccountsBody">
+            <tr><td colspan="3" class="text-muted" style="text-align:center;">Loading accounts...</td></tr>
+          </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Queue -->
+    <!-- DNS & Deliverability Tab -->
+    <div class="tab-pane fade" id="mail-dns">
+      <div class="lp-glass-card" style="padding:20px;margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+          <div>
+            <h5 style="margin:0 0 4px;font-size:16px;font-weight:600;"><i class="bi bi-shield-check text-success me-2"></i>DNS Records & Deliverability Helper</h5>
+            <p style="color:var(--text-muted);font-size:12px;margin:0;">Essential DNS records required to prevent your emails from going directly to spam or getting rejected by Gmail & Yahoo.</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="mailDnsDomainInput" class="lp-input" placeholder="yourdomain.com" style="width:200px;font-size:12px;">
+            <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="MAIL.loadDnsHelper()"><i class="bi bi-arrow-repeat"></i> Generate</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="lp-table" style="font-size:12px;">
+            <thead>
+              <tr>
+                <th style="width:110px;">Type</th>
+                <th style="width:140px;">Host / Name</th>
+                <th style="width:70px;">Priority</th>
+                <th>Target Value</th>
+                <th style="width:80px;text-align:right;">Copy</th>
+              </tr>
+            </thead>
+            <tbody id="mailDnsTableBody">
+              <tr><td colspan="5" class="text-muted" style="text-align:center;">Enter or select a domain to generate DNS templates.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:16px;padding:12px 16px;border-radius:8px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);font-size:12px;color:#fef08a;">
+          <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+          <strong>Don't forget rDNS (Reverse DNS / PTR)!</strong> You must configure a PTR record for your server IP in your cloud hosting provider's dashboard (DigitalOcean, Linode, AWS, Hetzner, etc.) matching your hostname (e.g. <code>mail.yourdomain.com</code>).
+        </div>
+      </div>
+    </div>
+
+    <!-- Queue Tab -->
     <div class="tab-pane fade" id="mail-queue">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <span style="font-size:13px;color:var(--text-muted);">Mail Queue <span id="mailQueueCount"></span></span>
         <div style="display:flex;gap:8px;">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.flushQueue()"><i class="bi bi-send"></i> Flush</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.flushQueue()"><i class="bi bi-send"></i> Flush Queue</button>
           <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.loadQueue()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
       </div>
       <div class="lp-glass-card" style="padding:0;">
-        <pre id="mailQueueContent" style="margin:0;padding:15px;font-size:11px;max-height:400px;overflow:auto;white-space:pre-wrap;"></pre>
+        <pre id="mailQueueContent" style="margin:0;padding:15px;font-size:11px;max-height:400px;overflow:auto;white-space:pre-wrap;font-family:monospace;"></pre>
       </div>
     </div>
 
-    <!-- Spam Filter -->
+    <!-- Spam Filter Tab -->
     <div class="tab-pane fade" id="mail-spam">
-      <div class="lp-glass-card" style="padding:20px;max-width:500px;">
-        <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;">SpamAssassin Configuration</h5>
+      <div class="lp-glass-card" style="padding:20px;max-width:540px;">
+        <h5 style="font-size:14px;font-weight:600;margin:0 0 15px;display:flex;align-items:center;gap:8px;">
+          <i class="bi bi-shield-lock text-warning"></i> SpamAssassin Configuration
+        </h5>
         <div id="spamConfigContent"><p class="text-muted">Loading...</p></div>
       </div>
     </div>
 
-    <!-- Logs -->
+    <!-- Logs Tab -->
     <div class="tab-pane fade" id="mail-logs">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
         <select id="mailLogService" class="lp-input" style="width:auto;font-size:12px;">
@@ -96,7 +245,7 @@
           <option value="spamassassin">SpamAssassin</option>
         </select>
         <input type="number" id="mailLogLines" class="lp-input" style="width:80px;font-size:12px;" value="50" min="10" max="500">
-        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.loadLogs()"><i class="bi bi-arrow-clockwise"></i> Load</button>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.loadLogs()"><i class="bi bi-arrow-clockwise"></i> Load Logs</button>
       </div>
       <div class="lp-glass-card" style="padding:0;">
         <pre id="mailLogContent" style="margin:0;padding:15px;font-size:11px;max-height:500px;overflow:auto;white-space:pre-wrap;font-family:monospace;"></pre>
@@ -128,6 +277,20 @@
         <div class="lp-form-group"><label class="lp-label">Password</label><input type="password" id="accPasswordInput" class="lp-input" placeholder="Min 6 characters" required minlength="6"></div>
       </div>
       <div class="modal-footer"><button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn-lp btn-lp-primary">Create Account</button></div>
+    </form>
+  </div></div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Change Account Password</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <form id="changePasswordForm" onsubmit="MAIL.updatePassword(event)">
+      <div class="modal-body">
+        <div class="lp-form-group"><label class="lp-label">Email Address</label><input type="email" id="changePasswordEmail" class="lp-input" readonly></div>
+        <div class="lp-form-group"><label class="lp-label">New Password</label><input type="password" id="changePasswordNew" class="lp-input" placeholder="Min 6 characters" required minlength="6"></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn-lp btn-lp-primary">Save Password</button></div>
     </form>
   </div></div>
 </div>

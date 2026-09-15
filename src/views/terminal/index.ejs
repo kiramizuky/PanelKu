@@ -1,4 +1,23 @@
-<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
+<style>
+  .lp-container:has(#terminalsContainer) {
+    padding-top: 15px !important;
+    padding-bottom: 15px !important;
+  }
+  .terminal-main-card {
+    padding: 10px;
+    background: rgba(0,0,0,0.55);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 215px);
+    min-height: 480px;
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    box-shadow: var(--glass-shadow);
+  }
+</style>
+
+<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;">
   <div>
     <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Web Terminal</h1>
     <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Direct shell access to the host</p>
@@ -10,7 +29,7 @@
   </div>
 </div>
 
-<div class="lp-glass-card" style="padding: 10px; background: rgba(0,0,0,0.5); position: relative; display:flex; flex-direction:column; height: calc(100vh - 120px);">
+<div class="terminal-main-card">
   <div id="terminalTabs" class="d-flex align-items-center mb-2" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 5px; overflow-x:auto;">
     <div id="tabList" class="d-flex gap-1"></div>
     <button class="btn btn-sm btn-outline-secondary ms-2" onclick="TerminalPage.addTab()" style="font-size:12px; flex-shrink:0;"><i class="bi bi-plus-lg"></i> New Tab</button>
@@ -30,7 +49,7 @@
     </div>
   </div>
   
-  <div id="terminalsContainer" style="width: 100%; flex: 1; position:relative;">
+  <div id="terminalsContainer" style="width: 100%; flex: 1; min-height: 0; position:relative; overflow:hidden;">
     <!-- terminal containers will be injected here -->
   </div>
   
@@ -84,9 +103,12 @@
           <div class="tab-pane fade show active" id="tab-generate" role="tabpanel">
             <div class="lp-form-group mb-3">
               <label class="lp-label" style="font-size:12.5px; font-weight:500; margin-bottom:6px;">Tuliskan apa yang ingin Anda lakukan dalam bahasa sehari-hari:</label>
-              <div class="input-group">
-                <input type="text" id="copilotPromptInput" class="lp-input" style="font-size:13.5px; height:42px;" placeholder="Contoh: Cari file > 100MB di disk, periksa port aktif, cek pemakaian RAM..." onkeydown="if(event.key==='Enter') TerminalPage.generateCopilotCommand()">
-                <button class="btn-lp btn-lp-primary px-3" onclick="TerminalPage.generateCopilotCommand()"><i class="bi bi-arrow-right me-1"></i> Generate</button>
+              <textarea id="copilotPromptInput" class="lp-input font-mono" rows="3" style="font-size:13px; line-height:1.5; resize:vertical; margin-bottom:8px; border-radius:8px;" placeholder="Contoh: Cari file > 100MB di disk, periksa port aktif, cek pemakaian RAM... (Tekan Ctrl+Enter untuk generate)" onkeydown="if(event.ctrlKey && event.key==='Enter') { event.preventDefault(); TerminalPage.generateCopilotCommand(); }"></textarea>
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted" style="font-size:11px;"><kbd style="background:rgba(255,255,255,0.1);color:#ddd;padding:2px 5px;border-radius:4px;">Ctrl</kbd> + <kbd style="background:rgba(255,255,255,0.1);color:#ddd;padding:2px 5px;border-radius:4px;">Enter</kbd> untuk generate cepat</span>
+                <button class="btn-lp btn-lp-primary px-3 py-2" id="copilotGenerateBtn" onclick="TerminalPage.generateCopilotCommand()" style="font-size:13px; font-weight:600; box-shadow:0 2px 10px rgba(99,102,241,0.3);">
+                  <i class="bi bi-stars me-1"></i> Generate Command
+                </button>
               </div>
             </div>
 
@@ -159,9 +181,11 @@
                 Halo! Saya adalah <strong>Terminal AI Assistant</strong>. Tanyakan apa saja mengenai sintaks bash, perbaikan sistem Linux, konfigurasi service, atau manajemen server.
               </div>
             </div>
-            <div class="input-group">
-              <input type="text" id="modalChatInput" class="lp-input" style="font-size:13.5px; height:42px;" placeholder="Tanyakan seputar Linux, bash command, atau problem server..." onkeydown="if(event.key==='Enter') TerminalPage.sendModalChatMessage()">
-              <button class="btn-lp btn-lp-primary px-3" onclick="TerminalPage.sendModalChatMessage()"><i class="bi bi-send-fill me-1"></i> Kirim</button>
+            <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+              <input type="text" id="modalChatInput" class="lp-input" style="flex: 1 1 auto; margin: 0; font-size: 13.5px; height: 42px;" placeholder="Tanyakan seputar Linux, bash command, atau problem server..." onkeydown="if(event.key==='Enter') TerminalPage.sendModalChatMessage()">
+              <button class="btn-lp btn-lp-primary" style="flex-shrink: 0; height: 42px; padding: 0 18px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;" onclick="TerminalPage.sendModalChatMessage()">
+                <i class="bi bi-send-fill"></i> Kirim
+              </button>
             </div>
           </div>
 
