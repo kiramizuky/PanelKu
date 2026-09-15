@@ -71,7 +71,7 @@ const DB = (() => {
         details.push(`
           <div class="d-flex justify-content-between align-items-center py-1">
             <span><i class="bi bi-hdd-network text-warning me-1"></i> <strong>${LP.escHtml(p.name)}:</strong> ${LP.escHtml(p.type.toUpperCase())} di <code class="font-mono">${LP.escHtml(p.detectedPaths[0])}</code> ${p.version ? `(${LP.escHtml(p.version)})` : ''}</span>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning py-0 px-2" onclick="DB.quickConnectPanel('${p.type}', '${LP.encJsArg(p.socket || '')}')"><i class="bi bi-link-45deg me-1"></i> Gunakan Config</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning py-0 px-2" onclick="LP.call('DB.quickConnectPanel', '${p.type}', '${LP.encJsArg(p.socket || '')}')"><i class="bi bi-link-45deg me-1"></i> Gunakan Config</button>
           </div>
         `);
       });

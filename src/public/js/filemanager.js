@@ -367,10 +367,8 @@ const FMPage = (() => {
 
   function copyPropPath() {
     const path = document.getElementById('propPath')?.textContent;
-    if (path && navigator.clipboard) {
-      navigator.clipboard.writeText(path).then(() => {
-        LP.toast('Path copied to clipboard', 'success');
-      }).catch(() => {});
+    if (path) {
+      LP.copy(path, 'Path copied to clipboard');
     }
   }
 

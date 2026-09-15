@@ -396,8 +396,7 @@ const TerminalPage = (() => {
 
   function copyCopilotCommand() {
     if (!currentGeneratedCommand) return;
-    navigator.clipboard.writeText(currentGeneratedCommand);
-    LP.toast('Command copied to clipboard', 'success');
+    LP.copy(currentGeneratedCommand, 'Command copied to clipboard');
   }
 
   async function runCopilotCommand() {
@@ -466,8 +465,7 @@ const TerminalPage = (() => {
 
   function copyFixCommand() {
     if (!currentFixCommand) return;
-    navigator.clipboard.writeText(currentFixCommand);
-    LP.toast('Perintah solusi berhasil disalin', 'success');
+    LP.copy(currentFixCommand, 'Perintah solusi berhasil disalin');
   }
 
   async function runFixCommand() {

@@ -763,15 +763,13 @@ const LP = {
     const copyBtn = document.getElementById(`${modalId}_copyBtn`);
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(cmd).then(() => {
+        const ok = LP.copy(cmd, 'Perintah berhasil disalin ke clipboard!');
+        if (ok) {
           copyBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Tersalin!';
-          LP.toast('Perintah berhasil disalin ke clipboard!', 'success');
           setTimeout(() => {
             copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Salin Perintah';
           }, 3000);
-        }).catch(() => {
-          LP.toast('Gagal menyalin perintah', 'error');
-        });
+        }
       });
     }
 

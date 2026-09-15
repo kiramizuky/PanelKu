@@ -184,15 +184,7 @@ const UsersPage = (() => {
       if (eyeIcon) eyeIcon.className = 'bi bi-eye-slash';
     }
 
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(pwd).then(() => {
-        LP.toast('Strong password generated & copied to clipboard!', 'info');
-      }).catch(() => {
-        LP.toast('Strong password generated!', 'info');
-      });
-    } else {
-      LP.toast('Strong password generated!', 'info');
-    }
+    LP.copy(pwd, 'Strong password generated & copied to clipboard!');
   }
 
   async function saveUser(e) {

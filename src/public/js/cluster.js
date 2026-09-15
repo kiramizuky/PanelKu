@@ -518,12 +518,7 @@ const ClusterPage = (() => {
   }
 
   async function copyHost(host) {
-    try {
-      await navigator.clipboard.writeText(host);
-      LP.toast('Host disalin ke clipboard', 'success');
-    } catch {
-      LP.toast('Gagal menyalin', 'error');
-    }
+    LP.copy(host, 'Host disalin ke clipboard');
   }
 
   // ── Fleet Capacity Aggregation ────────────────────────────────
@@ -617,12 +612,7 @@ const ClusterPage = (() => {
   async function copyPairingCommand() {
     const cmdText = document.getElementById('pairingCommandText')?.textContent;
     if (!cmdText) return;
-    try {
-      await navigator.clipboard.writeText(cmdText);
-      LP.toast('Installer command copied to clipboard!', 'success');
-    } catch {
-      LP.toast('Failed to copy', 'error');
-    }
+    LP.copy(cmdText, 'Installer command copied to clipboard!');
   }
 
   // ── Distributed Command Runner ────────────────────────────────

@@ -509,15 +509,7 @@ const MAIL = (() => {
 
   function copySnippet(text) {
     if (!text) return;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(() => {
-        LP.toast('Copied to clipboard!', 'success');
-      }).catch(() => {
-        LP.toast('Failed to copy', 'error');
-      });
-    } else {
-      LP.toast('Clipboard not supported', 'warning');
-    }
+    LP.copy(text, 'Copied to clipboard!');
   }
 
   document.addEventListener('DOMContentLoaded', async () => {

@@ -619,7 +619,7 @@ services:
         s.exposedPorts.map(ep => `
           <div class="d-flex align-items-center gap-2 p-1 px-2 rounded" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); font-size:11px;">
             <span class="font-mono" style="color:var(--accent-info); font-weight:600;"><i class="bi bi-hdd-network me-1"></i>${ep.hostPort} &rarr; ${ep.containerPort}</span>
-            <button class="btn-lp btn-lp-primary btn-lp-sm" style="padding: 1px 6px; font-size:10px; height:20px; line-height:1;" onclick="DockerPage.openAutoProxyModal('${LP.encJsArg(s.name)}', '${LP.encJsArg(ep.service)}', ${ep.hostPort})" title="Map to Domain with SSL">
+            <button class="btn-lp btn-lp-primary btn-lp-sm" style="padding: 1px 6px; font-size:10px; height:20px; line-height:1;" onclick="LP.call('DockerPage.openAutoProxyModal', '${LP.encJsArg(s.name)}', '${LP.encJsArg(ep.service)}', ${ep.hostPort})" title="Map to Domain with SSL">
               <i class="bi bi-shield-lock me-1"></i>HTTPS Proxy
             </button>
           </div>
@@ -661,15 +661,15 @@ services:
             <div class="d-flex justify-content-between align-items-center pt-3 mt-2 flex-wrap gap-2" style="border-top:1px solid rgba(255,255,255,0.06);">
               <div class="d-flex gap-1">
                 ${isRunning
-                  ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.stopStack('${LP.encJsArg(s.name)}')"><i class="bi bi-stop-fill me-1"></i>Stop</button>
-                     <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="DockerPage.restartStack('${LP.encJsArg(s.name)}')"><i class="bi bi-arrow-clockwise me-1"></i>Restart</button>`
-                  : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="DockerPage.startStack('${LP.encJsArg(s.name)}')"><i class="bi bi-play-fill me-1"></i>Start</button>`
+                  ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DockerPage.stopStack', '${LP.encJsArg(s.name)}')"><i class="bi bi-stop-fill me-1"></i>Stop</button>
+                     <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="LP.call('DockerPage.restartStack', '${LP.encJsArg(s.name)}')"><i class="bi bi-arrow-clockwise me-1"></i>Restart</button>`
+                  : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="LP.call('DockerPage.startStack', '${LP.encJsArg(s.name)}')"><i class="bi bi-play-fill me-1"></i>Start</button>`
                 }
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="DockerPage.openStackLogs('${LP.encJsArg(s.name)}')"><i class="bi bi-terminal me-1"></i>Logs</button>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('DockerPage.openStackLogs', '${LP.encJsArg(s.name)}')"><i class="bi bi-terminal me-1"></i>Logs</button>
               </div>
               <div class="d-flex gap-1">
-                <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="DockerPage.openEditStudio('${LP.encJsArg(s.name)}')"><i class="bi bi-pencil-square me-1"></i>Edit Studio</button>
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.deleteStack('${LP.encJsArg(s.name)}')"><i class="bi bi-trash"></i></button>
+                <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LP.call('DockerPage.openEditStudio', '${LP.encJsArg(s.name)}')"><i class="bi bi-pencil-square me-1"></i>Edit Studio</button>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DockerPage.deleteStack', '${LP.encJsArg(s.name)}')"><i class="bi bi-trash"></i></button>
               </div>
             </div>
           </div>
@@ -704,6 +704,7 @@ services:
   }
 
   async function openEditStudio(projectName) {
+    projectName = LP.cleanText(projectName);
     document.getElementById('composeListView').style.display = 'none';
     document.getElementById('composeStudioView').style.display = 'block';
     document.getElementById('studioTitle').innerHTML = `<i class="bi bi-pencil-square text-primary me-2"></i>Edit Stack: <span class="text-white">${LP.escHtml(projectName)}</span>`;
@@ -1046,6 +1047,7 @@ services:
   }
 
   async function startStack(name) {
+    name = LP.cleanText(name);
     LP.toast(`Starting stack ${name}...`, 'info');
     const res = await LP.post(`/docker/compose/stacks/${encodeURIComponent(name)}/start`, {});
     if (res?.success) {
@@ -1057,6 +1059,7 @@ services:
   }
 
   async function stopStack(name) {
+    name = LP.cleanText(name);
     LP.toast(`Stopping stack ${name}...`, 'info');
     const res = await LP.post(`/docker/compose/stacks/${encodeURIComponent(name)}/stop`, {});
     if (res?.success) {
@@ -1068,6 +1071,7 @@ services:
   }
 
   async function restartStack(name) {
+    name = LP.cleanText(name);
     LP.toast(`Restarting stack ${name}...`, 'info');
     const res = await LP.post(`/docker/compose/stacks/${encodeURIComponent(name)}/restart`, {});
     if (res?.success) {
@@ -1079,6 +1083,7 @@ services:
   }
 
   async function deleteStack(name) {
+    name = LP.cleanText(name);
     if (!(await LP.confirm(`Are you sure you want to delete Compose Stack "${name}"? This will stop all associated containers.`, 'Delete Compose Stack'))) return;
     LP.toast(`Deleting stack ${name}...`, 'info');
     const res = await LP.delete(`/docker/compose/stacks/${encodeURIComponent(name)}`);
@@ -1091,6 +1096,7 @@ services:
   }
 
   async function openStackLogs(name) {
+    name = LP.cleanText(name);
     activeLogsStack = name;
     document.getElementById('stackLogsTitle').textContent = `Logs: ${name}`;
     const termEl = document.getElementById('stackLogsTerminal');
@@ -1119,6 +1125,8 @@ services:
   }
 
   function openAutoProxyModal(projectName, serviceName, port) {
+    projectName = LP.cleanText(projectName);
+    serviceName = LP.cleanText(serviceName);
     document.getElementById('proxyProjectName').value = projectName || '';
     document.getElementById('proxyServiceName').value = serviceName || 'web';
     document.getElementById('proxyTargetPort').value = port || '';

@@ -883,15 +883,7 @@ const BackupPage = {
       LP.toast('No config path available', 'warning');
       return;
     }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(path).then(() => {
-        LP.toast('Config path copied!', 'success');
-      }).catch(() => {
-        this._fallbackCopy(path);
-      });
-    } else {
-      this._fallbackCopy(path);
-    }
+    LP.copy(path, 'Config path copied!');
   },
 
   _fallbackCopy(text) {

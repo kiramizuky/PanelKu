@@ -519,7 +519,7 @@ const WebsitesPage = (() => {
 
   function copyWebhookUrl() {
     const url = document.getElementById('editWebhookUrl').value;
-    navigator.clipboard.writeText(url).then(() => LP.toast('Webhook URL copied!', 'success'));
+    if (url) LP.copy(url, 'Webhook URL copied!');
   }
 
   function editOpenFolder() {

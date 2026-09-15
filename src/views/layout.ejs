@@ -317,8 +317,7 @@
     function copyAICode(b64) {
       try {
         const code = decodeURIComponent(escape(atob(b64)));
-        navigator.clipboard.writeText(code);
-        LP.toast('Perintah disalin ke clipboard', 'success');
+        LP.copy(code, 'Perintah disalin ke clipboard');
       } catch (e) {
         LP.toast('Gagal menyalin perintah', 'error');
       }

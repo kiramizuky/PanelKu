@@ -407,17 +407,14 @@ const ProfilePage = (() => {
 
   async function copyApiKey() {
     if (!rawApiKey) return;
-    try {
-      await navigator.clipboard.writeText(rawApiKey);
-      const btn = document.getElementById('btnCopyApiKey');
+    LP.copy(rawApiKey, 'API Key copied to clipboard');
+    const btn = document.getElementById('btnCopyApiKey');
+    if (btn) {
       const oldHtml = btn.innerHTML;
       btn.innerHTML = '<i class="bi bi-check2"></i>';
-      LP.toast('API Key copied to clipboard', 'success');
       setTimeout(() => {
         btn.innerHTML = oldHtml;
       }, 2000);
-    } catch (err) {
-      LP.toast('Failed to copy to clipboard', 'error');
     }
   }
 
