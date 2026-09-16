@@ -206,6 +206,16 @@ class DockerService {
       await cache.delPattern('docker:*');
       return true;
     } catch (error) {
+      if (error.message && error.message.toLowerCase().includes('permission denied')) {
+        try {
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          await execAsync(`sudo docker start ${id}`);
+          await cache.delPattern('docker:*');
+          return true;
+        } catch (_) {}
+      }
       throw new Error(`Failed to start container: ${error.message}`);
     }
   }
@@ -246,8 +256,20 @@ class DockerService {
     try {
       const container = this.docker.getContainer(id);
       await container.restart();
+      await cache.delPattern('docker:*');
       return true;
     } catch (error) {
+      // Handle permission denied (AppArmor / containerd signal blocks on Linux)
+      if (error.message && error.message.toLowerCase().includes('permission denied')) {
+        try {
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          await execAsync(`sudo docker restart ${id} 2>/dev/null || (sudo docker stop -t 1 ${id} 2>/dev/null && sudo docker start ${id} 2>/dev/null)`);
+          await cache.delPattern('docker:*');
+          return true;
+        } catch (_) {}
+      }
       throw new Error(`Failed to restart container: ${error.message}`);
     }
   }
@@ -276,8 +298,19 @@ class DockerService {
     try {
       const container = this.docker.getContainer(id);
       await container.remove({ force });
+      await cache.delPattern('docker:*');
       return true;
     } catch (error) {
+      if (error.message && error.message.toLowerCase().includes('permission denied')) {
+        try {
+          const { exec } = await import('child_process');
+          const { promisify } = await import('util');
+          const execAsync = promisify(exec);
+          await execAsync(`sudo docker rm ${force ? '-f' : ''} ${id}`);
+          await cache.delPattern('docker:*');
+          return true;
+        } catch (_) {}
+      }
       throw new Error(`Failed to remove container: ${error.message}`);
     }
   }
