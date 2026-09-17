@@ -46,7 +46,7 @@ class UpdaterController {
   // ── Perform Update ─────────────────────────────────────────────
   async performUpdate(req, res) {
     try {
-      const { method = 'git', branch = 'main', channel = 'stable', skipBackup = false, dryRun = false } = req.body;
+      const { method = 'git', branch = 'master', channel = 'stable', skipBackup = false, dryRun = false } = req.body;
       const result = await updaterService.performUpdate({ method, branch, channel, skipBackup, dryRun });
       return success(res, result, result.success ? 'Update completed successfully' : 'Update encountered issues');
     } catch (error) {
@@ -57,7 +57,7 @@ class UpdaterController {
   // ── Dry Run Update ─────────────────────────────────────────────
   async dryRunUpdate(req, res) {
     try {
-      const { method = 'git', branch = 'main', channel = 'stable' } = req.body;
+      const { method = 'git', branch = 'master', channel = 'stable' } = req.body;
       const result = await updaterService.performUpdate({ method, branch, channel, dryRun: true });
       return success(res, result, 'Dry run completed');
     } catch (error) {

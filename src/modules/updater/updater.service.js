@@ -342,6 +342,14 @@ class UpdaterService {
         await this._runCommand(`git config --global --add safe.directory "${PANEL_DIR}" 2>&1`).catch(() => {});
         await this._runCommand('git config --global --add safe.directory "*" 2>&1').catch(() => {});
 
+        // Backup runtime storage/panel.json and temporarily remove it to prevent untracked merge conflicts
+        const panelJsonPath = path.join(STORAGE_DIR, 'panel.json');
+        let savedPanelConfig = null;
+        try {
+          savedPanelConfig = await fs.readFile(panelJsonPath, 'utf8');
+          await fs.unlink(panelJsonPath).catch(() => {});
+        } catch {}
+
         // Stash local changes to avoid merge conflicts
         log.push('📝 Stashing local changes...');
         await this._runCommand('git -c user.name="Panelku" -c user.email="updater@panelku.local" stash --include-untracked 2>&1').catch(() => {});
@@ -352,21 +360,28 @@ class UpdaterService {
         log.push(`⬇️ Pulling from origin/${branch}...`);
         let pullOut = await this._runCommand(`git pull origin ${branch} 2>&1`);
 
-        // If git pull failed, fallback to git fetch + reset --hard
-        if (pullOut.includes('[ERROR]')) {
+        // If git pull failed or encountered merge/overwrite errors, fallback to git fetch + reset --hard
+        if (pullOut.includes('[ERROR]') || pullOut.toLowerCase().includes('error:') || pullOut.toLowerCase().includes('fatal:') || pullOut.includes('Aborting')) {
           log.push(`   ${pullOut.trim().split('\n').join('\n   ')}`);
-          log.push('   ⚠️ Standard git pull failed. Attempting git fetch and reset fallback...');
+          log.push('   ⚠️ Standard git pull encountered an issue. Falling back to git fetch and reset...');
           const fetchOut = await this._runCommand(`git fetch origin ${branch} 2>&1`);
-          if (fetchOut.includes('[ERROR]')) {
+          if (fetchOut.includes('[ERROR]') || fetchOut.toLowerCase().includes('fatal:')) {
             throw new Error(`Git update failed during fetch: ${fetchOut.replace('[ERROR]', '').trim()}`);
           }
           const resetOut = await this._runCommand(`git reset --hard origin/${branch} 2>&1`);
-          if (resetOut.includes('[ERROR]')) {
+          if (resetOut.includes('[ERROR]') || resetOut.toLowerCase().includes('fatal:')) {
             throw new Error(`Git update failed during reset: ${resetOut.replace('[ERROR]', '').trim()}`);
           }
           pullOut = resetOut;
         }
         log.push(`   ${pullOut.trim().split('\n').join('\n   ')}`);
+
+        // Restore runtime panel.json config
+        if (savedPanelConfig) {
+          try {
+            await fs.writeFile(panelJsonPath, savedPanelConfig, 'utf8');
+          } catch {}
+        }
 
         // Install dependencies
         log.push('📦 Installing npm dependencies...');
