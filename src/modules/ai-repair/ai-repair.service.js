@@ -12,15 +12,12 @@
  *   - AI-powered incident response
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import fs from 'fs/promises';
 import logger from '../../config/logger.js';
 import Setting from '../../models/Setting.js';
 import Notification from '../../models/Notification.js';
 import { getPrimaryDisk } from '../../helpers/system.js';
-
-const execAsync = promisify(exec);
+import { execCmd, execShell } from '../../helpers/exec.js';
 
 // ── Known fix patterns ─────────────────────────────────────────────
 const FIX_PATTERNS = {
@@ -29,17 +26,20 @@ const FIX_PATTERNS = {
     severity: 'critical',
     detect: (log) => /address already in use|EADDRINUSE|bind.*failed/i.test(log),
     diagnose: async () => {
-      const { stdout } = await execAsync("ss -tlnp 2>/dev/null | head -20 || netstat -tlnp 2>/dev/null | head -20").catch(() => ({ stdout: '' }));
+      // [SAFE] Hardcoded command — pipes require shell
+      const stdout = await execShell("ss -tlnp 2>/dev/null | head -20 || netstat -tlnp 2>/dev/null | head -20").catch(() => '');
       return `Active ports:\n${stdout}`;
     },
     fix: async (port) => {
       port = parseInt(port) || 0;
       if (port > 0) {
-        const { stdout } = await execAsync(`lsof -ti :${port} 2>/dev/null | head -1`).catch(() => ({ stdout: '' }));
-        const pidStr = stdout.trim();
+        // [SAFE] execFile: lsof -ti takes port as separate arg
+        const stdout = await execCmd('lsof', ['-ti', `:${port}`]).catch(() => '');
+        const pidStr = stdout.trim().split('\n')[0];
         // [SECURITY] Validate PID before passing to kill — must be a positive integer
         if (pidStr && /^\d+$/.test(pidStr)) {
-          await execAsync(`kill -9 ${pidStr}`).catch(() => {});
+          // [SAFE] execFile: kill -9 <validated_pid>
+          await execCmd('kill', ['-9', pidStr]).catch(() => {});
           return `Killed process on port ${port} (PID: ${pidStr})`;
         } else if (pidStr) {
           return `Invalid PID format from lsof output: "${pidStr}". Skipping kill.`;
@@ -53,19 +53,21 @@ const FIX_PATTERNS = {
     severity: 'critical',
     detect: (log) => /no space left|disk full|ENOSPC|write error/i.test(log),
     diagnose: async () => {
-      const { stdout } = await execAsync("df -h / 2>/dev/null | tail -1").catch(() => ({ stdout: '' }));
-      return `Disk usage:\n${stdout}`;
+      // [SAFE] execFile: df -h / — no user input
+      const stdout = await execCmd('df', ['-h', '/']).catch(() => '');
+      const lastLine = stdout.trim().split('\n').pop() || '';
+      return `Disk usage:\n${lastLine}`;
     },
     fix: async () => {
+      // [SAFE] All hardcoded commands — no user input
       const cmds = [
-        'journalctl --vacuum-time=3d 2>/dev/null',
-        'docker system prune -f --volumes 2>/dev/null || true',
-        'apt-get clean 2>/dev/null || yum clean all 2>/dev/null || true',
+        { bin: 'journalctl', args: ['--vacuum-time=3d'] },
+        { bin: 'docker', args: ['system', 'prune', '-f', '--volumes'] },
       ];
-      for (const cmd of cmds) {
-        try { await execAsync(cmd, { timeout: 60000 }); } catch { /* ignore */ }
+      for (const { bin, args } of cmds) {
+        try { await execCmd(bin, args, { timeout: 60000 }); } catch { /* ignore */ }
       }
-      return 'Cleaned journal logs (3d), Docker unused data, and package cache.';
+      return 'Cleaned journal logs (3d) and Docker unused data.';
     },
   },
   'service.down': {
@@ -74,16 +76,18 @@ const FIX_PATTERNS = {
     detect: (log) => /failed|not running|inactive|connection refused/i.test(log),
     diagnose: async (service) => {
       if (service) {
-        const { stdout } = await execAsync(`systemctl status "${service}" 2>/dev/null | head -10`).catch(() => ({ stdout: '' }));
-        return `Service status:\n${stdout}`;
+        // [SAFE] execFile: service name validated by _validateFixContext
+        const stdout = await execCmd('systemctl', ['status', service]).catch(() => '');
+        return `Service status:\n${stdout.split('\n').slice(0, 10).join('\n')}`;
       }
       return 'Service not specified';
     },
     fix: async (service) => {
       if (!service) return 'No service specified';
       try {
-        await execAsync(`systemctl restart "${service}" 2>&1`, { timeout: 15000 });
-        const { stdout } = await execAsync(`systemctl is-active "${service}" 2>/dev/null`).catch(() => ({ stdout: '' }));
+        // [SAFE] execFile: service name validated by _validateFixContext
+        await execCmd('systemctl', ['restart', service], { timeout: 15000 });
+        const stdout = await execCmd('systemctl', ['is-active', service]).catch(() => '');
         return stdout.trim() === 'active'
           ? `${service} restarted successfully.`
           : `${service} restart attempted but still inactive.`;
@@ -96,11 +100,11 @@ const FIX_PATTERNS = {
     name: 'Permission Denied',
     severity: 'medium',
     detect: (log) => /permission denied|EACCES|access denied/i.test(log),
-    diagnose: async (path) => {
-      if (path) {
+    diagnose: async (targetPath) => {
+      if (targetPath) {
         try {
-          const stat = await fs.stat(path).catch(() => null);
-          if (stat) return `${path}: ${stat.mode.toString(8)} | owner: ${stat.uid}:${stat.gid}`;
+          const stat = await fs.stat(targetPath).catch(() => null);
+          if (stat) return `${targetPath}: ${stat.mode.toString(8)} | owner: ${stat.uid}:${stat.gid}`;
         } catch { /* ignore */ }
       }
       return 'Path not specified or inaccessible';
@@ -108,7 +112,8 @@ const FIX_PATTERNS = {
     fix: async (targetPath) => {
       if (!targetPath) return 'No path specified';
       try {
-        await execAsync(`chmod -R 755 "${targetPath}" 2>/dev/null`).catch(() => {});
+        // [SAFE] execFile: chmod -R 755 <validated_path>
+        await execCmd('chmod', ['-R', '755', targetPath]).catch(() => {});
         return `Permissions reset on ${targetPath}`;
       } catch (err) {
         throw new Error(`Failed to fix permissions: ${err.message}`);
@@ -120,11 +125,12 @@ const FIX_PATTERNS = {
     severity: 'high',
     detect: (metrics) => metrics?.cpu > 90,
     diagnose: async () => {
-      const { stdout } = await execAsync("ps -eo pid,pcpu,pmem,cmd --sort=-pcpu 2>/dev/null | head -6").catch(() => ({ stdout: '' }));
-      return `Top CPU processes:\n${stdout}`;
+      // [SAFE] execFile: ps with args array — no shell needed
+      const stdout = await execCmd('ps', ['-eo', 'pid,pcpu,pmem,cmd', '--sort=-pcpu']).catch(() => '');
+      const topLines = stdout.trim().split('\n').slice(0, 6).join('\n');
+      return `Top CPU processes:\n${topLines}`;
     },
     fix: async () => {
-      // Just diagnostic, no automatic kill
       return 'High CPU detected. Check processes above. Consider restarting the offending service or adding resource limits.';
     },
   },
@@ -133,11 +139,14 @@ const FIX_PATTERNS = {
     severity: 'high',
     detect: (metrics) => metrics?.ram > 90,
     diagnose: async () => {
-      const { stdout } = await execAsync("ps -eo pid,pmem,rss,cmd --sort=-pmem 2>/dev/null | head -6").catch(() => ({ stdout: '' }));
-      return `Top RAM processes:\n${stdout}`;
+      // [SAFE] execFile: ps with args array — no shell needed
+      const stdout = await execCmd('ps', ['-eo', 'pid,pmem,rss,cmd', '--sort=-pmem']).catch(() => '');
+      const topLines = stdout.trim().split('\n').slice(0, 6).join('\n');
+      return `Top RAM processes:\n${topLines}`;
     },
     fix: async () => {
-      await execAsync('sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null').catch(() => {});
+      // [SAFE] Hardcoded shell command — requires shell for echo redirect
+      await execShell('sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null').catch(() => {});
       return 'Cleared OS cache. Consider restarting memory-heavy services if the issue persists.';
     },
   },
@@ -146,11 +155,11 @@ const FIX_PATTERNS = {
     severity: 'high',
     detect: (log) => /nginx.*fail|nginx.*error|syntax error/i.test(log),
     diagnose: async () => {
-      const { stdout } = await execAsync('nginx -t 2>&1').catch(() => ({ stdout: '' }));
+      // [SAFE] execFile: nginx -t — no user input
+      const stdout = await execCmd('nginx', ['-t']).catch(() => '');
       return `Nginx test:\n${stdout}`;
     },
     fix: async () => {
-      // Can't auto-fix nginx config, but can suggest rollback
       return 'Nginx configuration test failed. Check /etc/nginx/nginx.conf for syntax errors. A backup of the previous config may be available at /etc/nginx/nginx.conf.bak.';
     },
   },
@@ -410,7 +419,8 @@ class AIRepairService {
     const services = ['nginx', 'apache2', 'mysql', 'postgresql', 'redis-server', 'docker', 'ssh', 'ufw'];
     for (const svc of services) {
       try {
-        const { stdout } = await execAsync(`systemctl is-active ${svc} 2>/dev/null || echo "inactive"`);
+        // [SAFE] execFile: systemctl is-active — svc from hardcoded list
+        const stdout = await execCmd('systemctl', ['is-active', svc]).catch(() => 'inactive');
         const isActive = stdout.trim() === 'active';
         results.services.push({ name: svc, status: isActive ? 'running' : 'stopped' });
         if (!isActive) results.issues.push({ type: 'service', name: svc, severity: 'high' });
@@ -443,7 +453,8 @@ class AIRepairService {
 
     // 3. Check Docker
     try {
-      const { stdout } = await execAsync('docker info --format "{{.Containers}}:{{.Images}}" 2>/dev/null || echo ""');
+      // [SAFE] execFile: docker info with format string
+      const stdout = await execCmd('docker', ['info', '--format', '{{.Containers}}:{{.Images}}']).catch(() => '');
       const parts = stdout.trim().split(':');
       results.docker = {
         running: true,
@@ -457,7 +468,8 @@ class AIRepairService {
 
     // 4. Check listening ports
     try {
-      const { stdout } = await execAsync('ss -tlnp 2>/dev/null | grep -E ":(80|443|3306|5432|6379|8080|27017)\\s" || echo ""');
+      // [SAFE] execShell: ss with pipe/grep — hardcoded, no user input
+      const stdout = await execShell('ss -tlnp 2>/dev/null | grep -E ":(80|443|3306|5432|6379|8080|27017)\\s" || echo ""').catch(() => '');
       results.ports = stdout.split('\n').filter(Boolean).map(l => l.trim());
     } catch { /* ignore */ }
 

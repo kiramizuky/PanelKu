@@ -1,11 +1,8 @@
 /**
  * Lightweight Kubernetes (K3s / MicroK8s) Cluster Service (Fase 5)
  */
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import logger from '../../config/logger.js';
-
-const execAsync = promisify(exec);
+import { execCmd } from '../../helpers/exec.js';
 
 class K8sService {
   constructor() {
@@ -18,18 +15,20 @@ class K8sService {
   async detectCli() {
     if (this._cli) return this._cli;
 
+    // [SAFE] Each candidate is a hardcoded string — split into bin + args for execFile
     const candidates = [
-      'k3s kubectl',
-      'microk8s kubectl',
-      'kubectl',
+      { bin: 'k3s', args: ['kubectl'] },
+      { bin: 'microk8s', args: ['kubectl'] },
+      { bin: 'kubectl', args: [] },
     ];
 
-    for (const cmd of candidates) {
+    for (const { bin, args } of candidates) {
       try {
-        const { stdout } = await execAsync(`${cmd} version --client -o json`, { timeout: 5000 });
+        // [SAFE] execFile: kubectl version --client -o json
+        const stdout = await execCmd(bin, [...args, 'version', '--client', '-o', 'json'], { timeout: 5000 });
         if (stdout && stdout.includes('gitVersion')) {
-          this._cli = cmd;
-          return cmd;
+          this._cli = [bin, ...args].join(' ');
+          return this._cli;
         }
       } catch {
         // Not found
@@ -56,15 +55,17 @@ class K8sService {
     }
 
     try {
+      // [SAFE] cli is from detectCli() — hardcoded candidates, no user input
+      const cliParts = cli.split(' ');
       const [nodesOut, podsOut, svcOut] = await Promise.all([
-        execAsync(`${cli} get nodes -o json`, { timeout: 10000 }).catch(() => ({ stdout: '{"items":[]}' })),
-        execAsync(`${cli} get pods -A -o json`, { timeout: 10000 }).catch(() => ({ stdout: '{"items":[]}' })),
-        execAsync(`${cli} get svc -A -o json`, { timeout: 10000 }).catch(() => ({ stdout: '{"items":[]}' })),
+        execCmd(cliParts[0], [...cliParts.slice(1), 'get', 'nodes', '-o', 'json'], { timeout: 10000 }).catch(() => '{"items":[]}'),
+        execCmd(cliParts[0], [...cliParts.slice(1), 'get', 'pods', '-A', '-o', 'json'], { timeout: 10000 }).catch(() => '{"items":[]}'),
+        execCmd(cliParts[0], [...cliParts.slice(1), 'get', 'svc', '-A', '-o', 'json'], { timeout: 10000 }).catch(() => '{"items":[]}'),
       ]);
 
-      const nodes = JSON.parse(nodesOut.stdout || '{"items":[]}').items || [];
-      const pods = JSON.parse(podsOut.stdout || '{"items":[]}').items || [];
-      const services = JSON.parse(svcOut.stdout || '{"items":[]}').items || [];
+      const nodes = JSON.parse(nodesOut || '{"items":[]}').items || [];
+      const pods = JSON.parse(podsOut || '{"items":[]}').items || [];
+      const services = JSON.parse(svcOut || '{"items":[]}').items || [];
 
       return {
         installed: true,

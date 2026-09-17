@@ -1,59 +1,12 @@
 /**
- * SQLite Database Singleton
- * Replaces MongoDB/Mongoose as the primary data store.
- * Uses better-sqlite3 (synchronous, zero-config).
- *
- * All table definitions live here so the DB is fully self-initializing
- * on first run — no manual migration steps required.
+ * Migration 001: Initial Schema
+ * Creates all base tables for Panelku.
  */
-import Database from 'better-sqlite3';
-import { mkdirSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { v4 as uuidv4 } from 'uuid';
-import logger from '../../config/logger.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+export const version = '001';
+export const name = 'initial_schema';
 
-// [TEST FIX] Compute DB_PATH lazily inside getDb() so tests can change CWD before first call.
-// ESM hoists all imports to the top of the module, so process.chdir() in test setup
-// happens AFTER this module is evaluated. Making DB_PATH lazy ensures the correct
-// working directory is used even when tests call chdir() before their first getDb() call.
-function getDbPath() {
-  // Allow override via env var for testing
-  if (process.env.PANELKU_DB_PATH) {
-    return resolve(process.env.PANELKU_DB_PATH);
-  }
-  return resolve(process.cwd(), 'storage', 'panelku.db');
-}
-
-let _db = null;
-let _storageEnsured = false;
-
-function ensureStorageDir() {
-  if (_storageEnsured) return;
-  _storageEnsured = true;
-  try {
-    mkdirSync(resolve(process.cwd(), 'storage'), { recursive: true });
-  } catch {}
-}
-
-export function getDb() {
-  if (!_db) {
-    const dbPath = getDbPath();
-    ensureStorageDir();
-    _db = new Database(dbPath);
-    _db.pragma('journal_mode = WAL');
-    _db.pragma('foreign_keys = ON');
-    _db.pragma('synchronous = NORMAL');
-    initSchema(_db);
-    logger.info(`SQLite database initialized at ${dbPath}`);
-  }
-  return _db;
-}
-
-/** Create all tables on first open */
-function initSchema(db) {
+export function up(db) {
   db.exec(`
     -- Roles
     CREATE TABLE IF NOT EXISTS roles (
@@ -85,17 +38,12 @@ function initSchema(db) {
       api_key_enabled     INTEGER NOT NULL DEFAULT 0,
       is_active           INTEGER NOT NULL DEFAULT 1,
       is_super_admin      INTEGER NOT NULL DEFAULT 0,
-      is_ldap_user        INTEGER NOT NULL DEFAULT 0,
-      sso_links           TEXT NOT NULL DEFAULT '{}',
-      ai_settings         TEXT NOT NULL DEFAULT '{"provider":"openai","apiKey":"","model":"gpt-4o-mini"}',
       sessions            TEXT NOT NULL DEFAULT '[]',
       last_login          TEXT,
       last_login_ip       TEXT,
       login_count         INTEGER NOT NULL DEFAULT 0,
       reset_token         TEXT,
       reset_token_expiry  TEXT,
-      must_change_password INTEGER NOT NULL DEFAULT 0,
-      password_changed_at  TEXT,
       created_at          TEXT NOT NULL,
       updated_at          TEXT NOT NULL
     );
@@ -125,12 +73,10 @@ function initSchema(db) {
       type            TEXT NOT NULL DEFAULT 'static',
       root_directory  TEXT NOT NULL,
       git_repo        TEXT NOT NULL DEFAULT '',
-      git_branch      TEXT NOT NULL DEFAULT '',
       webhook_token   TEXT NOT NULL DEFAULT '',
       auto_deploy     INTEGER NOT NULL DEFAULT 0,
       php_version     TEXT NOT NULL DEFAULT '8.2',
       port            INTEGER,
-      target_host     TEXT NOT NULL DEFAULT '127.0.0.1',
       status          TEXT NOT NULL DEFAULT 'active',
       ssl             TEXT NOT NULL DEFAULT '{}',
       settings        TEXT NOT NULL DEFAULT '{}',
@@ -296,7 +242,7 @@ function initSchema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_security_scans_created ON security_scans(created_at);
 
-    -- Incident Post-Mortem & RCA Reports (Fase 3)
+    -- Incident Post-Mortem & RCA Reports
     CREATE TABLE IF NOT EXISTS incident_reports (
       id                  TEXT PRIMARY KEY,
       title               TEXT NOT NULL,
@@ -311,7 +257,7 @@ function initSchema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_incident_created ON incident_reports(created_at);
 
-    -- Instant Volume Snapshots & Rollback Points (Fase 4)
+    -- Instant Volume Snapshots & Rollback Points
     CREATE TABLE IF NOT EXISTS backup_snapshots (
       id            TEXT PRIMARY KEY,
       name          TEXT NOT NULL,
@@ -325,37 +271,17 @@ function initSchema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_snapshots_created ON backup_snapshots(created_at);
   `);
-  
-
 }
 
-// ── Convenience helpers ────────────────────────────────────────────────────
-
-/** Generate a new UUID */
-export function generateId() {
-  return uuidv4();
-}
-
-/** Current ISO timestamp */
-export function now() {
-  return new Date().toISOString();
-}
-
-/** Serialize a JS value to JSON string for storage */
-export function toJson(value) {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'string') return value;
-  return JSON.stringify(value);
-}
-
-/** Deserialize a JSON string from storage */
-export function fromJson(str, fallback = null) {
-  if (str === null || str === undefined) return fallback;
-  try {
-    return JSON.parse(str);
-  } catch {
-    return fallback;
+export function down(db) {
+  const tables = [
+    'backup_snapshots', 'incident_reports', 'security_scans',
+    'webpush_subscriptions', 'passkeys', 'cluster_nodes',
+    'whatsapp_sessions', 'notifications', 'honeypot_hits',
+    'waf_rules', 'monitor_history', 'alert_configs',
+    'audit_logs', 'settings', 'websites', 'sessions', 'users', 'roles',
+  ];
+  for (const table of tables) {
+    db.exec(`DROP TABLE IF EXISTS ${table}`);
   }
 }
-
-export default getDb;

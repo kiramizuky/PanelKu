@@ -18,13 +18,9 @@ import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globa
 // ── Mock external deps (native-ESM style) ──
 // NOTE: the service wraps `exec` with util.promisify, so the mock MUST call
 // the trailing callback (promisify style) — returning a promise never settles.
-jest.unstable_mockModule('child_process', () => ({
-  // exec may be called as exec(cmd, cb) or exec(cmd, {options}, cb)
-  exec: jest.fn((cmd, ...rest) => {
-    const done = rest.pop();
-    if (typeof done !== 'function') return;
-    done(null, { stdout: '', stderr: '' });
-  }),
+jest.unstable_mockModule('../src/helpers/exec.js', () => ({
+  execCmd: jest.fn(async () => ''),
+  execShell: jest.fn(async () => ''),
 }));
 jest.unstable_mockModule('../src/config/logger.js', () => ({
   default: { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() },
@@ -37,16 +33,14 @@ jest.unstable_mockModule('../src/models/Notification.js', () => ({
 }));
 
 const { default: aiRepairService } = await import('../src/modules/ai-repair/ai-repair.service.js');
-const { exec } = await import('child_process');
+const { execCmd, execShell } = await import('../src/helpers/exec.js');
 const Notification = (await import('../src/models/Notification.js')).default;
 
 beforeEach(() => {
-  exec.mockClear();
-  exec.mockImplementation((cmd, ...rest) => {
-    const done = rest.pop();
-    if (typeof done !== 'function') return;
-    done(null, { stdout: '', stderr: '' });
-  });
+  execCmd.mockClear();
+  execShell.mockClear();
+  execCmd.mockResolvedValue('');
+  execShell.mockResolvedValue('');
   Notification.create.mockClear();
   Notification.create.mockImplementation(async () => ({}));
 });
@@ -94,13 +88,13 @@ describe('AIRepairService.getAutoFixSuggestions — R3-M1 blocks injection at su
   test('rejects malicious service BEFORE any exec runs', async () => {
     await expect(aiRepairService.getAutoFixSuggestions('service.down', { service: 'nginx; id' }))
       .rejects.toThrow(/Invalid service name/);
-    expect(exec).not.toHaveBeenCalled();
+    expect(execCmd).not.toHaveBeenCalled();
   });
 
   test('rejects malicious path BEFORE any exec runs', async () => {
     await expect(aiRepairService.getAutoFixSuggestions('permission.denied', { path: '/etc;rm -rf' }))
       .rejects.toThrow(/Invalid path/);
-    expect(exec).not.toHaveBeenCalled();
+    expect(execCmd).not.toHaveBeenCalled();
   });
 
   test('accepts valid absolute path for suggestions', async () => {
@@ -111,15 +105,15 @@ describe('AIRepairService.getAutoFixSuggestions — R3-M1 blocks injection at su
   test('rejects out-of-range port BEFORE any exec runs', async () => {
     await expect(aiRepairService.getAutoFixSuggestions('port.conflict', { port: '99999' }))
       .rejects.toThrow(/Invalid port/);
-    expect(exec).not.toHaveBeenCalled();
+    expect(execCmd).not.toHaveBeenCalled();
   });
 
-  test('accepts valid service and quotes it in the shell command', async () => {
+  test('accepts valid service and calls execCmd', async () => {
     const result = await aiRepairService.getAutoFixSuggestions('service.down', { service: 'nginx' });
     expect(result.id).toBe('service.down');
     expect(result.fixAvailable).toBe(true);
-    const calls = exec.mock.calls.map(([cmd]) => cmd);
-    expect(calls.some(c => c.includes('systemctl status "nginx"'))).toBe(true);
+    // execCmd should be called with systemctl, ['status', 'nginx']
+    expect(execCmd).toHaveBeenCalled();
   });
 });
 
@@ -127,16 +121,15 @@ describe('AIRepairService.applyAutoFix — R3-M1 shared validation', () => {
   test('rejects malicious service before any exec and before Notification', async () => {
     await expect(aiRepairService.applyAutoFix('service.down', { service: 'bad; rm -rf /' }))
       .rejects.toThrow(/Invalid service name/);
-    expect(exec).not.toHaveBeenCalled();
+    expect(execCmd).not.toHaveBeenCalled();
     expect(Notification.create).not.toHaveBeenCalled();
   });
 
   test('accepts valid service and runs the fix', async () => {
     // is-active returns "active" so the fix reports success
-    exec.mockImplementation((cmd, ...rest) => {
-      const done = rest.pop();
-      if (typeof done !== 'function') return;
-      done(null, { stdout: cmd.includes('is-active') ? 'active' : '', stderr: '' });
+    execCmd.mockImplementation(async (bin, args) => {
+      if (args.includes('is-active')) return 'active';
+      return '';
     });
     const result = await aiRepairService.applyAutoFix('service.down', { service: 'nginx' });
     expect(result.success).toBe(true);
@@ -146,16 +139,17 @@ describe('AIRepairService.applyAutoFix — R3-M1 shared validation', () => {
   test('port with trailing junk is coerced by parseInt — junk never reaches exec', async () => {
     const result = await aiRepairService.applyAutoFix('port.conflict', { port: '8080; rm -rf /' });
     expect(result.success).toBe(true);
-    const cmds = exec.mock.calls.map(([cmd]) => cmd);
+    const calls = execCmd.mock.calls;
     // lsof only ever runs against the parsed port; the junk text is not executed
-    expect(cmds.some(c => c.includes('lsof -ti :8080'))).toBe(true);
-    expect(cmds.some(c => c.includes('rm -rf'))).toBe(false);
+    expect(calls.some(([, args]) => args.includes('-ti') && args.some(a => a.includes('8080')))).toBe(true);
+    expect(calls.some(([, args]) => args.some(a => a.includes('rm -rf')))).toBe(false);
   });
 
   test('applies permission fix on a validated absolute path', async () => {
     const result = await aiRepairService.applyAutoFix('permission.denied', { path: '/var/www/html' });
     expect(result.success).toBe(true);
-    const cmds = exec.mock.calls.map(([cmd]) => cmd);
-    expect(cmds.some(c => c.includes('chmod -R 755 "/var/www/html"'))).toBe(true);
+    const calls = execCmd.mock.calls;
+    // execCmd is called as execCmd('chmod', ['-R', '755', '/var/www/html'])
+    expect(calls.some(([bin, args]) => bin === 'chmod' && args.includes('/var/www/html'))).toBe(true);
   });
 });

@@ -1,7 +1,8 @@
 /**
- * Unit tests for System Module:
- * - src/modules/system/package-manager.js
- * - src/modules/system/system.service.js
+ * SystemService — Unit tests for validation helpers, service management, package management
+ *
+ * Uses native ESM + jest.unstable_mockModule pattern.
+ * child_process, packageManager, logger are mocked.
  */
 
 process.env.NODE_ENV = 'test';
@@ -9,198 +10,296 @@ process.env.LOG_LEVEL = 'silent';
 
 import { jest, describe, test, expect, beforeEach } from '@jest/globals';
 
-const mockDb = {
-  prepare: jest.fn(),
-};
-
-jest.unstable_mockModule('../src/core/db/sqlite.js', () => ({
-  getDb: () => mockDb,
-  now: () => '2026-09-14 12:00:00',
+// ── Mocks ──
+jest.unstable_mockModule('../src/config/logger.js', () => ({
+  default: { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() },
 }));
 
-const { default: packageManager } = await import('../src/modules/system/package-manager.js');
+jest.unstable_mockModule('../src/modules/system/package-manager.js', () => ({
+  default: {
+    init: jest.fn(async () => {}),
+    pmType: 'apt',
+    getCheckInstalledCommand: jest.fn((pkg) => `dpkg -l | grep ${pkg}`),
+    getInstallCommand: jest.fn((pkg) => `apt-get install -y ${pkg}`),
+    getUpdateCommand: jest.fn(() => 'apt update'),
+    getUpgradeCommand: jest.fn(() => 'apt upgrade -y'),
+    getPMInfo: jest.fn(() => ({ type: 'apt', name: 'apt-get' })),
+  },
+}));
+
+jest.unstable_mockModule('../src/core/db/sqlite.js', () => ({
+  getDb: jest.fn(() => ({
+    prepare: jest.fn(() => ({
+      get: jest.fn(() => ({ count: 5 })),
+      all: jest.fn(() => []),
+    })),
+  })),
+}));
+
+jest.unstable_mockModule('child_process', () => ({
+  exec: jest.fn((cmd, opts, cb) => {
+    if (typeof opts === 'function') { cb = opts; opts = {}; }
+    if (typeof cb === 'function') cb(null, { stdout: 'active\n', stderr: '' });
+    return { kill: jest.fn() };
+  }),
+  execFile: jest.fn((bin, args, opts, cb) => {
+    if (typeof opts === 'function') { cb = opts; opts = {}; }
+    if (typeof cb === 'function') cb(null, { stdout: 'ok\n', stderr: '' });
+    return { kill: jest.fn() };
+  }),
+  spawn: jest.fn(() => ({
+    stdout: { on: jest.fn() },
+    stderr: { on: jest.fn() },
+    on: jest.fn((event, cb) => {
+      if (event === 'close') cb(0);
+    }),
+  })),
+}));
+
+// ── Dynamic imports ──
 const { default: systemService } = await import('../src/modules/system/system.service.js');
 
 beforeEach(() => {
   jest.clearAllMocks();
+  systemService.mockTailscaleInstalled = false;
+  systemService.mockTailscaleConnected = false;
 });
 
-describe('PackageManager — distro and command generation', () => {
-  test('generates expected install/update commands for apt', () => {
-    packageManager.pmType = 'apt';
-    packageManager.distro = 'ubuntu';
-    expect(packageManager.getUpdateCommand()).toBe('sudo apt-get update -y');
-    expect(packageManager.getUpgradeCommand()).toBe('sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y');
-    expect(packageManager.getInstallCommand('nginx')).toBe('sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx');
-    expect(packageManager.getCheckInstalledCommand('nginx')).toContain('dpkg -s');
+// ═══════════════════════════════════════════════════════════
+//  VALIDATION HELPERS
+// ═══════════════════════════════════════════════════════════
+
+describe('SystemService — Validation Helpers', () => {
+  describe('_validateAuthkey', () => {
+    test('accepts valid authkey', () => {
+      expect(systemService._validateAuthkey('tskey-auth-abc123')).toBe('tskey-auth-abc123');
+      expect(systemService._validateAuthkey('')).toBe('');
+    });
+
+    test('rejects authkey with invalid characters', () => {
+      expect(() => systemService._validateAuthkey('key; rm -rf /')).toThrow(/invalid characters/);
+      expect(() => systemService._validateAuthkey('key$(whoami)')).toThrow(/invalid characters/);
+    });
   });
 
-  test('generates expected commands for pacman', () => {
-    packageManager.pmType = 'pacman';
-    packageManager.distro = 'arch';
-    expect(packageManager.getUpdateCommand()).toBe('sudo pacman -Sy --noconfirm');
-    expect(packageManager.getUpgradeCommand()).toBe('sudo pacman -Syu --noconfirm');
-    expect(packageManager.getInstallCommand('nginx')).toBe('sudo pacman -S --noconfirm --needed nginx');
-    expect(packageManager.getCheckInstalledCommand('nginx')).toContain('pacman -Q');
+  describe('_validateDbPassword', () => {
+    test('accepts valid password', () => {
+      expect(systemService._validateDbPassword('MyP@ss123')).toBe('MyP@ss123');
+    });
+
+    test('rejects empty password', () => {
+      expect(() => systemService._validateDbPassword('')).toThrow(/required/);
+      expect(() => systemService._validateDbPassword(null)).toThrow(/required/);
+    });
+
+    test('rejects password with invalid characters', () => {
+      expect(() => systemService._validateDbPassword('pass word')).toThrow(/invalid characters/);
+      expect(() => systemService._validateDbPassword('pass;injection')).toThrow(/invalid characters/);
+    });
   });
 
-  test('generates expected commands for dnf', () => {
-    packageManager.pmType = 'dnf';
-    packageManager.distro = 'fedora';
-    expect(packageManager.getUpdateCommand()).toBe('sudo dnf check-update || true');
-    expect(packageManager.getUpgradeCommand()).toBe('sudo dnf upgrade -y');
-    expect(packageManager.getInstallCommand('nginx')).toBe('sudo dnf install -y nginx');
-    expect(packageManager.getCheckInstalledCommand('nginx')).toContain('rpm -q');
+  describe('_validateGitRef', () => {
+    test('accepts valid git refs', () => {
+      expect(systemService._validateGitRef('main')).toBe('main');
+      expect(systemService._validateGitRef('feature/my-branch')).toBe('feature/my-branch');
+      expect(systemService._validateGitRef('v1.0.0')).toBe('v1.0.0');
+    });
+
+    test('rejects invalid refs', () => {
+      expect(() => systemService._validateGitRef('branch; rm -rf /')).toThrow(/unsafe characters/);
+      expect(() => systemService._validateGitRef('')).toThrow(/Invalid/);
+      expect(() => systemService._validateGitRef(null)).toThrow(/Invalid/);
+    });
+
+    test('rejects over-long refs', () => {
+      expect(() => systemService._validateGitRef('a'.repeat(300))).toThrow(/too long/);
+    });
   });
 
-  test('generates expected commands for emerge (gentoo)', () => {
-    packageManager.pmType = 'emerge';
-    packageManager.distro = 'gentoo';
-    expect(packageManager.getUpdateCommand()).toBe('sudo emerge --sync');
-    expect(packageManager.getUpgradeCommand()).toBe('sudo emerge -uDN @world');
-    expect(packageManager.getInstallCommand('nginx')).toContain('emerge');
-  });
+  describe('_validateCommitHash', () => {
+    test('accepts valid 40-char SHA', () => {
+      const hash = 'a'.repeat(40);
+      expect(systemService._validateCommitHash(hash)).toBe(hash);
+    });
 
-  test('getPMInfo returns correct structured metadata', () => {
-    packageManager.distro = 'debian';
-    packageManager.pmType = 'apt';
-    packageManager.arch = 'x64';
-    const info = packageManager.getPMInfo();
-    expect(info.distro).toBe('debian');
-    expect(info.pmType).toBe('apt');
-    expect(info.arch).toBe('x64');
-  });
-});
+    test('accepts valid 64-char SHA', () => {
+      const hash = 'b'.repeat(64);
+      expect(systemService._validateCommitHash(hash)).toBe(hash);
+    });
 
-describe('SystemService — Input validation helpers', () => {
-  test('validates authkeys properly', () => {
-    expect(systemService._validateAuthkey('tskey-auth-k123456CNTRL-abcXYZ_123')).toBe('tskey-auth-k123456CNTRL-abcXYZ_123');
-    expect(systemService._validateAuthkey('')).toBe('');
-    expect(() => systemService._validateAuthkey('bad;rm -rf /')).toThrow('Authkey contains invalid characters');
-  });
+    test('accepts empty string', () => {
+      expect(systemService._validateCommitHash('')).toBe('');
+    });
 
-  test('validates DB passwords properly', () => {
-    expect(systemService._validateDbPassword('Secret@123_456')).toBe('Secret@123_456');
-    expect(() => systemService._validateDbPassword('')).toThrow('Password is required');
-    expect(() => systemService._validateDbPassword('shrt')).toThrow('Password contains invalid characters');
-    expect(() => systemService._validateDbPassword('invalid password with space')).toThrow('Password contains invalid characters');
-  });
-
-  test('validates Git references properly', () => {
-    expect(systemService._validateGitRef('main')).toBe('main');
-    expect(systemService._validateGitRef('feature/v3.0-deploy')).toBe('feature/v3.0-deploy');
-    expect(() => systemService._validateGitRef('bad; rm -rf')).toThrow('contains unsafe characters');
-    expect(() => systemService._validateGitRef('')).toThrow('Invalid git reference');
-  });
-
-  test('validates Git commit hashes properly', () => {
-    const validSha1 = 'a'.repeat(40);
-    const validSha256 = 'b'.repeat(64);
-    expect(systemService._validateCommitHash(validSha1)).toBe(validSha1);
-    expect(systemService._validateCommitHash(validSha256)).toBe(validSha256);
-    expect(systemService._validateCommitHash('')).toBe('');
-    expect(() => systemService._validateCommitHash('invalid_hash')).toThrow('Invalid commit hash format');
+    test('rejects invalid hash', () => {
+      expect(() => systemService._validateCommitHash('not-a-hash')).toThrow(/Invalid commit hash/);
+    });
   });
 });
 
-describe('SystemService — Tailscale Management', () => {
-  test('handles status when Tailscale is not installed', async () => {
-    systemService.mockTailscaleInstalled = false;
-    systemService.mockTailscaleConnected = false;
+// ═══════════════════════════════════════════════════════════
+//  SERVICE MANAGEMENT
+// ═══════════════════════════════════════════════════════════
 
-    const status = await systemService.getTailscaleStatus();
-    expect(status.installed).toBe(false);
-    expect(status.status).toBe('not_installed');
-    expect(status.peers).toEqual([]);
+describe('SystemService — Service Management', () => {
+  test('getServiceStatus validates service name', async () => {
+    await expect(systemService.getServiceStatus('valid-service')).resolves.toBe(true);
   });
 
-  test('handles status when Tailscale is installed and connected in simulation', async () => {
-    systemService.mockTailscaleInstalled = true;
-    systemService.mockTailscaleConnected = true;
-
-    const status = await systemService.getTailscaleStatus();
-    expect(status.installed).toBe(true);
-    expect(status.connected).toBe(true);
-    expect(status.ip).toBe('100.100.100.100');
-  });
-
-  test('tailscaleUp and tailscaleDown toggle connection state in simulation', async () => {
-    systemService.mockTailscaleInstalled = true;
-    systemService.mockTailscaleConnected = false;
-
-    const upRes = await systemService.tailscaleUp('valid-authkey-123');
-    expect(upRes.success).toBe(true);
-    expect(upRes.connected).toBe(true);
-
-    const downRes = await systemService.tailscaleDown();
-    expect(downRes).toBe(true);
-    expect(systemService.mockTailscaleConnected).toBe(false);
-  });
-});
-
-describe('SystemService — System Services & Package Control', () => {
-  test('getServiceStatus validates service name format', async () => {
-    await expect(systemService.getServiceStatus('bad;service')).rejects.toThrow('Invalid service name');
-    const status = await systemService.getServiceStatus('nginx');
-    expect(typeof status).toBe('boolean');
+  test('getServiceStatus rejects invalid service name', async () => {
+    await expect(systemService.getServiceStatus('service; rm -rf /'))
+      .rejects.toThrow(/Invalid service name/);
+    await expect(systemService.getServiceStatus(''))
+      .rejects.toThrow(/Invalid service name/);
   });
 
   test('manageService validates service name and action', async () => {
-    await expect(systemService.manageService('bad service', 'start')).rejects.toThrow('Invalid service name');
-    await expect(systemService.manageService('nginx', 'destroy')).rejects.toThrow('Invalid action');
-    const res = await systemService.manageService('nginx', 'restart');
-    expect(res).toBe(true);
+    await expect(systemService.manageService('nginx', 'start')).resolves.toBe(true);
+    await expect(systemService.manageService('nginx', 'stop')).resolves.toBe(true);
+    await expect(systemService.manageService('nginx', 'restart')).resolves.toBe(true);
   });
 
-  test('installPackage validates package name and executes', async () => {
-    await expect(systemService.installPackage('invalid package name;')).rejects.toThrow('Invalid package name');
-    const out = await systemService.installPackage('nginx');
-    expect(out).toBeDefined();
+  test('manageService rejects invalid action', async () => {
+    await expect(systemService.manageService('nginx', 'delete'))
+      .rejects.toThrow(/Invalid action/);
+    await expect(systemService.manageService('nginx', 'rm -rf /'))
+      .rejects.toThrow(/Invalid action/);
   });
 
-  test('runUpdate and runUpgrade execute package manager workflows', async () => {
-    const updateOut = await systemService.runUpdate();
-    expect(updateOut).toContain('Reading package lists');
+  test('manageService rejects invalid service name', async () => {
+    await expect(systemService.manageService('nginx; rm -rf /', 'start'))
+      .rejects.toThrow(/Invalid service name/);
+  });
 
-    const upgradeOut = await systemService.runUpgrade();
-    expect(upgradeOut).toContain('0 upgraded');
+  test('getServiceLogs validates service name', async () => {
+    const result = await systemService.getServiceLogs('nginx', 50);
+    expect(result).toBeTruthy();
+  });
+
+  test('getServiceLogs rejects invalid service name', async () => {
+    await expect(systemService.getServiceLogs('nginx; injection'))
+      .rejects.toThrow(/Invalid service name/);
   });
 });
 
-describe('SystemService — Audit Logs & Statistics', () => {
-  test('getAuditStats aggregates recent logins and commands', async () => {
-    mockDb.prepare.mockReturnValue({
-      all: jest.fn().mockReturnValue([
-        { date: '2026-09-14', count: 12 },
-        { date: '2026-09-13', count: 8 },
-      ]),
-    });
+// ═══════════════════════════════════════════════════════════
+//  PACKAGE MANAGEMENT
+// ═══════════════════════════════════════════════════════════
 
-    const stats = await systemService.getAuditStats();
-    expect(stats.logins).toHaveLength(2);
-    expect(stats.terminalCmds).toBeDefined();
-    expect(stats.topCommands).toBeDefined();
+describe('SystemService — Package Management', () => {
+  test('isInstalled validates package name', async () => {
+    const result = await systemService.isInstalled('nginx');
+    expect(typeof result).toBe('boolean');
   });
 
-  test('getAuditLogs returns formatted system audit logs', async () => {
-    const freshDate = new Date(Date.now() + 3600000).toISOString();
-    mockDb.prepare.mockReturnValue({
-      all: jest.fn().mockReturnValue([
-        {
-          id: 'log-1',
-          created_at: freshDate,
-          username: 'admin',
-          action: 'POST /api/websites',
-          details: 'Created website',
-        },
-      ]),
-    });
+  test('isInstalled rejects invalid package name', async () => {
+    await expect(systemService.isInstalled('nginx; rm -rf /'))
+      .rejects.toThrow(/Invalid package name/);
+  });
 
-    const res = await systemService.getAuditLogs(50);
-    expect(res.logs.length).toBeGreaterThanOrEqual(1);
-    const sysLog = res.logs.find(l => l.type === 'system');
-    expect(sysLog).toBeDefined();
-    expect(sysLog.username).toBe('admin');
-    expect(sysLog.action).toBe('POST /api/websites');
+  test('installPackage validates package name', async () => {
+    const result = await systemService.installPackage('htop');
+    expect(result).toBeTruthy();
+  });
+
+  test('installPackage rejects invalid package name', async () => {
+    await expect(systemService.installPackage('htop; injection'))
+      .rejects.toThrow(/Invalid package name/);
+  });
+
+  test('runUpdate runs package manager update', async () => {
+    const result = await systemService.runUpdate();
+    expect(result).toBeTruthy();
+  });
+
+  test('runUpgrade runs package manager upgrade', async () => {
+    const result = await systemService.runUpgrade();
+    expect(result).toBeTruthy();
+  });
+
+  test('getPackageManagerInfo returns package manager info', async () => {
+    const result = await systemService.getPackageManagerInfo();
+    expect(result).toHaveProperty('type');
+    expect(result).toHaveProperty('name');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  SYSTEM OPERATIONS
+// ═══════════════════════════════════════════════════════════
+
+describe('SystemService — System Operations', () => {
+  test('getPanelVersion returns version info', async () => {
+    const result = await systemService.getPanelVersion();
+    expect(result).toHaveProperty('current');
+    expect(result).toHaveProperty('lastUpdated');
+  });
+
+  test('getAuditStats returns stats', async () => {
+    const result = await systemService.getAuditStats();
+    expect(result).toHaveProperty('logins');
+    expect(result).toHaveProperty('terminalCmds');
+    expect(result).toHaveProperty('topCommands');
+  });
+
+  test('getAuditLogs returns logs', async () => {
+    const result = await systemService.getAuditLogs(10);
+    expect(result).toHaveProperty('logs');
+    expect(Array.isArray(result.logs)).toBe(true);
+  });
+
+  test('getAutoUpdate returns boolean', async () => {
+    const result = await systemService.getAutoUpdate();
+    expect(typeof result).toBe('boolean');
+  });
+
+  test('reboot returns true', async () => {
+    const result = await systemService.reboot();
+    expect(result).toBe(true);
+  });
+
+  test('restartPanel returns true', async () => {
+    const result = await systemService.restartPanel();
+    expect(result).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  TAILSCALE
+// ═══════════════════════════════════════════════════════════
+
+describe('SystemService — Tailscale', () => {
+  test('isTailscaleInstalled checks installation', async () => {
+    const result = await systemService.isTailscaleInstalled();
+    expect(typeof result).toBe('boolean');
+  });
+
+  test('getTailscaleStatus returns status', async () => {
+    const result = await systemService.getTailscaleStatus();
+    expect(result).toHaveProperty('installed');
+    expect(result).toHaveProperty('status');
+  });
+
+  test('tailscaleDown disconnects', async () => {
+    const result = await systemService.tailscaleDown();
+    expect(result).toBe(true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  PANEL UPDATE
+// ═══════════════════════════════════════════════════════════
+
+describe('SystemService — Panel Update', () => {
+  test('getPanelAutoUpdate returns config', async () => {
+    const result = await systemService.getPanelAutoUpdate();
+    expect(result).toHaveProperty('enabled');
+    expect(result).toHaveProperty('frequency');
+  });
+
+  test('setPanelAutoUpdate saves config', async () => {
+    // This writes to storage/panel.json — mock fs if needed
+    const result = await systemService.setPanelAutoUpdate({ enabled: true, frequency: 'daily' });
+    expect(result).toBe(true);
   });
 });

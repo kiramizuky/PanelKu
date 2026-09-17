@@ -9,18 +9,11 @@ process.env.LOG_LEVEL = 'silent';
 
 import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 
-let mockExecHandler = jest.fn();
+let mockExecCmdHandler = jest.fn(async () => 'active');
 
-jest.unstable_mockModule('child_process', () => ({
-  exec: jest.fn((cmd, ...rest) => {
-    const cb = rest.pop();
-    const opts = typeof rest[0] === 'object' ? rest[0] : {};
-    mockExecHandler(cmd, opts, cb);
-  }),
-  execFile: jest.fn((file, ...rest) => {
-    const cb = rest.pop();
-    cb(null, { stdout: 'ok', stderr: '' });
-  }),
+jest.unstable_mockModule('../src/helpers/exec.js', () => ({
+  execCmd: jest.fn(async (...args) => mockExecCmdHandler(...args)),
+  execShell: jest.fn(async () => ''),
 }));
 
 const mockSettingsStore = {};
@@ -87,14 +80,11 @@ beforeEach(() => {
   autohealService._incidentCounts = {};
   autohealService._initialized = false;
 
-  mockExecHandler.mockImplementation((cmd, opts, cb) => {
-    if (cmd.includes('systemctl is-active')) {
-      cb(null, { stdout: 'active', stderr: '' });
-    } else if (cmd.includes('docker info')) {
-      cb(null, { stdout: 'Server Version: 24.0.5', stderr: '' });
-    } else {
-      cb(null, { stdout: 'ok', stderr: '' });
-    }
+  mockExecCmdHandler.mockImplementation(async (bin, args) => {
+    const cmd = [bin, ...(args || [])].join(' ');
+    if (cmd.includes('systemctl is-active')) return 'active';
+    if (cmd.includes('docker info')) return 'Server Version: 24.0.5';
+    return 'ok';
   });
 
   const db = getDb();
@@ -151,14 +141,13 @@ describe('AutoHealService — Health Checks & Auto-Recovery', () => {
 
   test('_checkService auto-restarts and recovers inactive service', async () => {
     let callCount = 0;
-    mockExecHandler.mockImplementation((cmd, opts, cb) => {
+    mockExecCmdHandler.mockImplementation(async (bin, args) => {
+      const cmd = [bin, ...(args || [])].join(' ');
       if (cmd.includes('systemctl is-active')) {
         callCount++;
-        // First check returns inactive, check after restart returns active
-        cb(null, { stdout: callCount === 1 ? 'inactive' : 'active', stderr: '' });
-      } else {
-        cb(null, { stdout: 'restarted', stderr: '' });
+        return callCount === 1 ? 'inactive' : 'active';
       }
+      return 'restarted';
     });
 
     const config = await autohealService.getConfig();
@@ -168,12 +157,10 @@ describe('AutoHealService — Health Checks & Auto-Recovery', () => {
   });
 
   test('_checkService reports critical if restart attempt fails', async () => {
-    mockExecHandler.mockImplementation((cmd, opts, cb) => {
-      if (cmd.includes('systemctl is-active')) {
-        cb(null, { stdout: 'inactive', stderr: '' });
-      } else {
-        cb(new Error('Job failed'));
-      }
+    mockExecCmdHandler.mockImplementation(async (bin, args) => {
+      const cmd = [bin, ...(args || [])].join(' ');
+      if (cmd.includes('systemctl is-active')) return 'inactive';
+      throw new Error('Job failed');
     });
 
     const config = await autohealService.getConfig();
@@ -191,14 +178,14 @@ describe('AutoHealService — Health Checks & Auto-Recovery', () => {
 
   test('_checkDocker restarts docker when down', async () => {
     let callCount = 0;
-    mockExecHandler.mockImplementation((cmd, opts, cb) => {
+    mockExecCmdHandler.mockImplementation(async (bin, args) => {
+      const cmd = [bin, ...(args || [])].join(' ');
       if (cmd.includes('docker info')) {
         callCount++;
-        if (callCount === 1) cb(new Error('daemon not running'));
-        else cb(null, { stdout: 'Server Version: 24.0.0', stderr: '' });
-      } else {
-        cb(null, { stdout: 'started', stderr: '' });
+        if (callCount === 1) throw new Error('daemon not running');
+        return 'Server Version: 24.0.0';
       }
+      return 'started';
     });
 
     const config = await autohealService.getConfig();
@@ -243,6 +230,11 @@ describe('AutoHealService — Status & Incident History', () => {
   test('healService manually restarts service', async () => {
     await expect(autohealService.healService('')).rejects.toThrow('Service name is required');
 
+    mockExecCmdHandler.mockImplementation(async (bin, args) => {
+      const cmd = [bin, ...(args || [])].join(' ');
+      if (cmd.includes('systemctl is-active')) return 'active';
+      return 'restarted';
+    });
     const res = await autohealService.healService('nginx');
     expect(res.success).toBe(true);
     expect(res.message).toContain('restarted successfully');

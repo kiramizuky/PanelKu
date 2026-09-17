@@ -10,20 +10,21 @@ process.env.LOG_LEVEL = 'silent';
 
 import { jest, describe, test, expect, beforeEach } from '@jest/globals';
 
-const mockExecHandlers = [];
+const mockExecCmdHandlers = [];
 
-jest.unstable_mockModule('child_process', () => ({
-  exec: jest.fn((cmd, opts, cb) => {
-    const callback = typeof opts === 'function' ? opts : cb;
-    for (const handler of mockExecHandlers) {
+jest.unstable_mockModule('../src/helpers/exec.js', () => ({
+  execCmd: jest.fn(async (bin, args) => {
+    const cmd = [bin, ...(args || [])].join(' ');
+    for (const handler of mockExecCmdHandlers) {
       const match = handler(cmd);
       if (match !== undefined) {
-        if (match instanceof Error) return callback(match);
-        return callback(null, match);
+        if (match instanceof Error) throw match;
+        return match.stdout || '';
       }
     }
-    return callback(null, { stdout: '', stderr: '' });
+    return '';
   }),
+  execShell: jest.fn(async () => ''),
 }));
 
 const mockDb = {
@@ -71,14 +72,14 @@ function mockRes() {
 }
 
 beforeEach(() => {
-  mockExecHandlers.length = 0;
+  mockExecCmdHandlers.length = 0;
   k8sService._cli = null;
   jest.clearAllMocks();
 });
 
 describe('K8sService — Kubernetes & K3s Discovery', () => {
   test('detectCli identifies available kubectl binary', async () => {
-    mockExecHandlers.push(cmd => {
+    mockExecCmdHandlers.push(cmd => {
       if (cmd.includes('k3s kubectl')) return { stdout: '{"clientVersion":{"gitVersion":"v1.28.2+k3s1"}}' };
     });
 
@@ -87,7 +88,7 @@ describe('K8sService — Kubernetes & K3s Discovery', () => {
   });
 
   test('getClusterSummary returns not installed when no k8s cli is present', async () => {
-    mockExecHandlers.push(() => new Error('command not found'));
+    mockExecCmdHandlers.push(() => new Error('command not found'));
 
     const summary = await k8sService.getClusterSummary();
     expect(summary.installed).toBe(false);
@@ -98,7 +99,7 @@ describe('K8sService — Kubernetes & K3s Discovery', () => {
   test('getClusterSummary parses nodes, pods, and services', async () => {
     k8sService._cli = 'kubectl';
 
-    mockExecHandlers.push(cmd => {
+    mockExecCmdHandlers.push(cmd => {
       if (cmd.includes('get nodes')) {
         return {
           stdout: JSON.stringify({

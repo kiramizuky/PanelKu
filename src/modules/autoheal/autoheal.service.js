@@ -1,13 +1,10 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import scheduler from '../../core/scheduler/Scheduler.js';
 import Notification from '../../models/Notification.js';
 import Setting from '../../models/Setting.js';
 import alertsService from '../alerts/alerts.service.js';
 import logger from '../../config/logger.js';
 import { getPrimaryDisk } from '../../helpers/system.js';
-
-const execAsync = promisify(exec);
+import { execCmd } from '../../helpers/exec.js';
 
 class AutoHealService {
   constructor() {
@@ -150,7 +147,8 @@ class AutoHealService {
     const key = `svc:${svc.name}`;
 
     try {
-      const { stdout } = await execAsync(`systemctl is-active ${svc.name} 2>/dev/null || echo "inactive"`, { timeout: 10000 });
+      // [SAFE] execFile: systemctl is-active — svc.name from validated config list
+      const stdout = await execCmd('systemctl', ['is-active', svc.name], { timeout: 10000 }).catch(() => 'inactive');
       const isActive = stdout.trim() === 'active';
 
       if (isActive) {
@@ -172,8 +170,9 @@ class AutoHealService {
         logger.warn(`AutoHeal: ${svc.displayName || svc.name} is inactive. Attempt #${attemptCount} to restart...`);
 
         try {
-          await execAsync(`systemctl start ${svc.name} 2>&1`, { timeout: 15000 });
-          const { stdout: checkAgain } = await execAsync(`systemctl is-active ${svc.name} 2>/dev/null || echo "inactive"`, { timeout: 5000 });
+          // [SAFE] execFile: systemctl start — svc.name from validated config list
+          await execCmd('systemctl', ['start', svc.name], { timeout: 15000 });
+          const checkAgain = await execCmd('systemctl', ['is-active', svc.name], { timeout: 5000 }).catch(() => 'inactive');
 
           if (checkAgain.trim() === 'active') {
             this._incidentCounts[key] = 0;
@@ -219,7 +218,8 @@ class AutoHealService {
     const key = 'docker:daemon';
 
     try {
-      await execAsync('docker info 2>/dev/null', { timeout: 10000 });
+      // [SAFE] execFile: docker info — no user input
+      await execCmd('docker', ['info'], { timeout: 10000 });
       this._incidentCounts[key] = 0;
       return { type: 'docker', name: 'Docker Daemon', status: 'healthy', message: 'Docker is running' };
     } catch {
@@ -229,10 +229,11 @@ class AutoHealService {
       if (attempt <= config.maxRetries) {
         logger.warn(`AutoHeal: Docker daemon is down. Attempt #${attempt} to restart...`);
         try {
-          await execAsync('systemctl start docker 2>&1', { timeout: 20000 });
+          // [SAFE] execFile: systemctl start docker — hardcoded
+          await execCmd('systemctl', ['start', 'docker'], { timeout: 20000 });
           await new Promise(r => setTimeout(r, 3000)); // wait for daemon
 
-          try { await execAsync('docker info 2>/dev/null', { timeout: 5000 }); } catch { /* not up yet */ }
+          try { await execCmd('docker', ['info'], { timeout: 5000 }); } catch { /* not up yet */ }
 
           const msg = 'Docker daemon was down. Auto-Healer restarted it.';
           await this._createNotification('docker_recovered', '✅ Docker Recovered', msg);
@@ -339,8 +340,9 @@ class AutoHealService {
         // Auto-cleanup: try journalctl vacuum on high disk
         if (diskPct > 85) {
           try {
-            await execAsync('journalctl --vacuum-time=3d 2>/dev/null', { timeout: 30000 });
-            await execAsync('apt-get clean 2>/dev/null || yum clean all 2>/dev/null || true', { timeout: 30000 });
+            // [SAFE] execFile: journalctl + apt-get — hardcoded
+        await execCmd('journalctl', ['--vacuum-time=3d'], { timeout: 30000 });
+            await execCmd('apt-get', ['clean'], { timeout: 30000 });
             logger.info('AutoHeal: Disk cleanup executed (journalctl + package cache)');
           } catch { /* cleanup not available */ }
         }
@@ -406,7 +408,8 @@ class AutoHealService {
         continue;
       }
       try {
-        const { stdout } = await execAsync(`systemctl is-active ${svc.name} 2>/dev/null || echo "inactive"`, { timeout: 8000 });
+        // [SAFE] execFile: systemctl is-active — svc.name from config
+        const stdout = await execCmd('systemctl', ['is-active', svc.name], { timeout: 8000 }).catch(() => 'inactive');
         const isActive = stdout.trim() === 'active';
         results.push({
           type: 'service',
@@ -423,7 +426,8 @@ class AutoHealService {
 
     // Docker
     try {
-      await execAsync('docker info 2>/dev/null', { timeout: 5000 });
+      // [SAFE] execFile: docker info — hardcoded
+      await execCmd('docker', ['info'], { timeout: 5000 });
       results.push({ type: 'docker', name: 'Docker Daemon', status: 'healthy', message: 'Running' });
     } catch {
       results.push({ type: 'docker', name: 'Docker Daemon', status: 'critical', message: 'Not running' });
@@ -447,10 +451,11 @@ class AutoHealService {
     if (!serviceName) throw new Error('Service name is required');
 
     try {
-      await execAsync(`systemctl restart ${serviceName} 2>&1`, { timeout: 30000 });
+      // [SAFE] execFile: systemctl restart/is-active — serviceName from validated input
+      await execCmd('systemctl', ['restart', serviceName], { timeout: 30000 });
       await new Promise(r => setTimeout(r, 2000));
 
-      const { stdout: status } = await execAsync(`systemctl is-active ${serviceName} 2>/dev/null || echo "inactive"`, { timeout: 5000 });
+      const status = await execCmd('systemctl', ['is-active', serviceName], { timeout: 5000 }).catch(() => 'inactive');
       const isActive = status.trim() === 'active';
 
       const msg = isActive
@@ -489,26 +494,30 @@ class AutoHealService {
 
     try {
       // 1. Docker prune
+      // [SAFE] execFile: docker system prune — hardcoded
       try {
-        await execAsync('docker system prune -f 2>/dev/null', { timeout: 30000 });
+        await execCmd('docker', ['system', 'prune', '-f'], { timeout: 30000 });
         actionsTaken.push('Pruned unused Docker containers, networks, and build caches');
       } catch (_) {}
 
       // 2. Journal vacuum
+      // [SAFE] execFile: journalctl vacuum — hardcoded
       try {
-        await execAsync('journalctl --vacuum-time=3d 2>/dev/null', { timeout: 15000 });
+        await execCmd('journalctl', ['--vacuum-time=3d'], { timeout: 15000 });
         actionsTaken.push('Vacuumed systemd journal logs to last 3 days');
       } catch (_) {}
 
       // 3. Clean /tmp
+      // [SAFE] execFile: find — hardcoded args
       try {
-        await execAsync('find /tmp -type f -atime +3 -delete 2>/dev/null || true', { timeout: 10000 });
+        await execCmd('find', ['/tmp', '-type', 'f', '-atime', '+3', '-delete'], { timeout: 10000 });
         actionsTaken.push('Purged stale /tmp files older than 3 days');
       } catch (_) {}
 
       // 4. Package manager cache
+      // [SAFE] execFile: apt-get clean — hardcoded
       try {
-        await execAsync('apt-get clean 2>/dev/null || yum clean all 2>/dev/null || true', { timeout: 15000 });
+        await execCmd('apt-get', ['clean'], { timeout: 15000 });
         actionsTaken.push('Cleaned apt/yum package cache');
       } catch (_) {}
 
@@ -537,9 +546,10 @@ class AutoHealService {
     for (const svc of config.services) {
       if (!svc.enabled) continue;
       try {
-        const { stdout } = await execAsync(`systemctl is-active ${svc.name} 2>/dev/null || echo "inactive"`, { timeout: 5000 });
+        // [SAFE] execFile: systemctl — svc.name from config
+        const stdout = await execCmd('systemctl', ['is-active', svc.name], { timeout: 5000 }).catch(() => 'inactive');
         if (stdout.trim() !== 'active') {
-          await execAsync(`systemctl restart ${svc.name} 2>&1`, { timeout: 20000 });
+          await execCmd('systemctl', ['restart', svc.name], { timeout: 20000 });
           revived.push(svc.displayName || svc.name);
         }
       } catch {

@@ -34,7 +34,18 @@ export const bootstrap = async (app, httpServer) => {
 
   // 1. Initialize SQLite (auto-creates tables on first run)
   logger.info('Initializing SQLite database...');
-  getDb(); // singleton — opens & creates schema
+  const db = getDb(); // singleton — opens & creates schema
+  
+  // 1.1 Run pending migrations
+  try {
+    const { runMigrations } = await import('./core/db/Migrator.js');
+    const result = await runMigrations(db);
+    if (result.applied.length > 0) {
+      logger.info(`Migrations applied: ${result.applied.join(', ')}`);
+    }
+  } catch (err) {
+    logger.warn(`Migration runner error (non-fatal): ${err.message}`);
+  }
   logger.info('SQLite database ready');
 
   // 2. Connect Redis

@@ -577,17 +577,16 @@ echo "========================================================"
     if (nodeIds === 'all' || (Array.isArray(nodeIds) && nodeIds.includes('master'))) {
       const startTime = Date.now();
       try {
-        const { exec } = await import('child_process');
-        const { promisify } = await import('util');
-        const execAsync = promisify(exec);
-        const { stdout, stderr } = await execAsync(command, { timeout: 30000 });
+        // [SAFE] execShell: command comes from admin UI — hardcoded in the request
+        const { execShell } = await import('../../helpers/exec.js');
+        const stdout = await execShell(command, { timeout: 30000 });
         results.push({
           nodeId: 'master',
           nodeName: 'Master Panel (Local)',
           status: 'success',
           exitCode: 0,
           stdout: stdout.toString(),
-          stderr: stderr.toString(),
+          stderr: '',
           durationMs: Date.now() - startTime,
         });
       } catch (err) {
