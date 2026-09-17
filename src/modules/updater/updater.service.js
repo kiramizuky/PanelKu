@@ -62,7 +62,8 @@ class UpdaterService {
       const { stdout, stderr } = await execAsync(cmd, { timeout: 120000, ...options });
       return stdout || stderr || '';
     } catch (error) {
-      return `[ERROR] ${error.message}`;
+      const output = (error.stdout || error.stderr || error.message || '').trim();
+      return `[ERROR] ${output || error.message}`;
     }
   }
 
@@ -74,6 +75,7 @@ class UpdaterService {
     if (cmd.includes('git config --global --add safe.directory')) return '';
     if (cmd.includes('git checkout')) return '';
     if (cmd.includes('git pull')) return 'Already up to date.\n';
+    if (cmd.includes('git reset')) return 'HEAD is now at abc123def\n';
     if (cmd.includes('git show origin')) return '{"version":"2.0.0"}\n';
     if (cmd.includes('git diff')) return 'diff --git a/package.json b/package.json\nindex abc..def 100644\n--- a/package.json\n+++ b/package.json\n@@ -1,5 +1,5 @@\n {\n   "name": "panelku",\n-  "version": "1.9.0",\n+  "version": "2.0.0",\n';
     if (cmd.includes('npm install')) return 'added 0 packages, removed 0 packages, changed 0 packages\n';
@@ -335,30 +337,46 @@ class UpdaterService {
 
       // 2. Apply update based on method
       if (method === 'git') {
-        // Mark directory safe for root
+        // Mark directory safe for current user/root
         log.push('🔧 Configuring git safe directory...');
-        await this._runCommand('git config --global --add safe.directory /opt/panelku 2>&1').catch(() => {});
+        await this._runCommand(`git config --global --add safe.directory "${PANEL_DIR}" 2>&1`).catch(() => {});
+        await this._runCommand('git config --global --add safe.directory "*" 2>&1').catch(() => {});
 
         // Stash local changes to avoid merge conflicts
         log.push('📝 Stashing local changes...');
-        await this._runCommand('git stash 2>&1').catch(() => {});
+        await this._runCommand('git -c user.name="Panelku" -c user.email="updater@panelku.local" stash --include-untracked 2>&1').catch(() => {});
         await this._runCommand('git checkout package-lock.json 2>&1').catch(() => {});
         await this._runCommand('git checkout package.json 2>&1').catch(() => {});
 
         // Pull latest code
         log.push(`⬇️ Pulling from origin/${branch}...`);
-        const pullOut = await this._runCommand(`git pull origin ${branch} 2>&1`);
+        let pullOut = await this._runCommand(`git pull origin ${branch} 2>&1`);
+
+        // If git pull failed, fallback to git fetch + reset --hard
+        if (pullOut.includes('[ERROR]')) {
+          log.push(`   ${pullOut.trim().split('\n').join('\n   ')}`);
+          log.push('   ⚠️ Standard git pull failed. Attempting git fetch and reset fallback...');
+          const fetchOut = await this._runCommand(`git fetch origin ${branch} 2>&1`);
+          if (fetchOut.includes('[ERROR]')) {
+            throw new Error(`Git update failed during fetch: ${fetchOut.replace('[ERROR]', '').trim()}`);
+          }
+          const resetOut = await this._runCommand(`git reset --hard origin/${branch} 2>&1`);
+          if (resetOut.includes('[ERROR]')) {
+            throw new Error(`Git update failed during reset: ${resetOut.replace('[ERROR]', '').trim()}`);
+          }
+          pullOut = resetOut;
+        }
         log.push(`   ${pullOut.trim().split('\n').join('\n   ')}`);
 
         // Install dependencies
         log.push('📦 Installing npm dependencies...');
-        const npmOut = await this._runCommand('npm install --production 2>&1');
+        const npmOut = await this._runCommand('npm install --omit=dev 2>&1');
         log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
         log.push('🔨 Rebuilding native dependencies...');
         await this._runCommand('npm rebuild better-sqlite3 node-pty 2>&1').catch(() => {});
       } else if (method === 'npm') {
         log.push('📦 Running npm install only...');
-        const npmOut = await this._runCommand('npm install --production 2>&1');
+        const npmOut = await this._runCommand('npm install --omit=dev 2>&1');
         log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
         log.push('🔨 Rebuilding native dependencies...');
         await this._runCommand('npm rebuild better-sqlite3 node-pty 2>&1').catch(() => {});
@@ -516,7 +534,7 @@ class UpdaterService {
 
       // Reinstall dependencies after rollback
       log.push('📦 Re-installing npm dependencies...');
-      const npmOut = await this._runCommand('npm install --production 2>&1');
+      const npmOut = await this._runCommand('npm install --omit=dev 2>&1');
       log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
 
       // Syntax check
