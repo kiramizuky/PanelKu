@@ -214,16 +214,55 @@
 
     <!-- Queue Tab -->
     <div class="tab-pane fade" id="mail-queue">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <span style="font-size:13px;color:var(--text-muted);">Mail Queue <span id="mailQueueCount"></span></span>
-        <div style="display:flex;gap:8px;">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.flushQueue()"><i class="bi bi-send"></i> Flush Queue</button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.loadQueue()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <span style="font-size:13px;color:var(--text-muted);">Mail Queue <span id="mailQueueCount"></span></span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="MAIL.flushQueue()" title="Attempt delivery of all queued messages immediately">
+            <i class="bi bi-send-fill"></i> Flush All
+          </button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.requeue('ALL')" title="Requeue all messages for retry">
+            <i class="bi bi-arrow-repeat"></i> Requeue All
+          </button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="MAIL.deleteFromQueue('ALL')" title="Purge all messages from mail queue">
+            <i class="bi bi-trash"></i> Purge All
+          </button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MAIL.loadQueue()" title="Refresh queue list">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+          </button>
         </div>
       </div>
-      <div class="lp-glass-card" style="padding:0;">
-        <pre id="mailQueueContent" style="margin:0;padding:15px;font-size:11px;max-height:400px;overflow:auto;white-space:pre-wrap;font-family:monospace;"></pre>
+
+      <div class="lp-glass-card" style="padding:0;overflow:hidden;margin-bottom:16px;">
+        <div class="table-responsive">
+          <table class="lp-table" style="font-size:12px;">
+            <thead>
+              <tr>
+                <th style="width:140px;">Queue ID</th>
+                <th style="width:95px;">Status</th>
+                <th>Sender</th>
+                <th>Recipient / Reason</th>
+                <th style="width:85px;">Size</th>
+                <th style="width:140px;">Arrival Time</th>
+                <th style="width:120px;text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="mailQueueTableBody">
+              <tr><td colspan="7" class="text-muted" style="text-align:center;padding:24px;">Loading queue...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      <details style="font-size:12px;color:var(--text-muted);cursor:pointer;">
+        <summary style="font-weight:600;margin-bottom:8px;">
+          <i class="bi bi-terminal me-1"></i> View Raw mailq CLI Output
+        </summary>
+        <div class="lp-glass-card" style="padding:0;">
+          <pre id="mailQueueContent" style="margin:0;padding:12px;font-size:11px;max-height:220px;overflow:auto;white-space:pre-wrap;font-family:monospace;"></pre>
+        </div>
+      </details>
     </div>
 
     <!-- Spam Filter Tab -->

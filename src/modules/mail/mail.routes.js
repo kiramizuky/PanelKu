@@ -23,6 +23,7 @@ router.post('/accounts/password', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), mailC
 
 router.get('/queue', rbac(RESOURCES.SYSTEM, ACTIONS.READ), mailController.getQueue.bind(mailController));
 router.post('/queue/flush', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), mailController.flushQueue.bind(mailController));
+router.post('/queue/requeue', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), mailController.requeue.bind(mailController));
 router.delete('/queue', rbac(RESOURCES.SYSTEM, ACTIONS.DELETE), mailController.deleteFromQueue.bind(mailController));
 
 router.get('/spam', rbac(RESOURCES.SYSTEM, ACTIONS.READ), mailController.getSpamConfig.bind(mailController));

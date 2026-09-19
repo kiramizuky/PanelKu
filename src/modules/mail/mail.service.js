@@ -356,15 +356,73 @@ class MailService {
   async getQueue() {
     try {
       const { stdout } = await execAsync('mailq 2>/dev/null || echo "Mail queue is empty"', { timeout: 4000 });
-      const lines = stdout.split('\n').filter(l => l.trim());
+      const lines = stdout.split('\n');
       const queue = [];
       let current = null;
 
-      for (const line of lines) {
-        if (/^[A-F0-9]{10,}/.test(line.trim())) {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed.startsWith('-Queue ID-') || trimmed.includes('Mail queue is empty') || trimmed.startsWith('-- ')) continue;
+
+        // Matches Postfix mailq entry line e.g. "4F8B31234567*    1234 Mon Jan 10 12:00:00  sender@example.com"
+        const idMatch = line.match(/^([A-Za-z0-9]+)([*!])?\s+(\d+)\s+([A-Za-z]{3}\s+[A-Za-z]{3}\s+\d+\s+[\d:]+)\s+(\S+.*)$/);
+        if (idMatch) {
           if (current) queue.push(current);
-          current = { id: line.trim().split(/\s+/)[0], status: 'queued', lines: [line] };
-        } else if (current) {
+          const rawId = idMatch[1];
+          const flag = idMatch[2] || '';
+          const size = parseInt(idMatch[3]) || 0;
+          const date = idMatch[4].trim();
+          const sender = idMatch[5].trim();
+          const status = flag === '*' ? 'active' : flag === '!' ? 'hold' : 'deferred';
+
+          current = {
+            id: rawId,
+            status,
+            size,
+            date,
+            sender,
+            recipient: '',
+            error: '',
+            lines: [line]
+          };
+          continue;
+        }
+
+        // Generic fallback if spacing or date differs slightly
+        if (!idMatch && /^[A-Za-z0-9]{6,}/.test(trimmed)) {
+          if (current) queue.push(current);
+          const parts = trimmed.split(/\s+/);
+          const rawId = parts[0].replace(/[*!]$/, '');
+          const flag = parts[0].endsWith('*') ? '*' : parts[0].endsWith('!') ? '!' : '';
+          current = {
+            id: rawId,
+            status: flag === '*' ? 'active' : flag === '!' ? 'hold' : 'deferred',
+            size: parseInt(parts[1]) || 0,
+            date: parts.slice(2, 6).join(' ') || new Date().toISOString(),
+            sender: parts[6] || 'unknown',
+            recipient: '',
+            error: '',
+            lines: [line]
+          };
+          continue;
+        }
+
+        // Error message lines in parentheses: (host mx.example.com said: 554 ...)
+        if (current && trimmed.startsWith('(') && trimmed.endsWith(')')) {
+          current.error = trimmed.slice(1, -1);
+          current.lines.push(line);
+          continue;
+        }
+
+        // Recipient line: indented email address(es)
+        if (current && !trimmed.startsWith('(')) {
+          if (!current.recipient) {
+            current.recipient = trimmed;
+          } else {
+            current.recipient += ', ' + trimmed;
+          }
           current.lines.push(line);
         }
       }
@@ -376,7 +434,7 @@ class MailService {
 
   async flushQueue() {
     try {
-      await execAsync('sudo postfix flush 2>/dev/null');
+      await execAsync('sudo postfix flush 2>/dev/null || sudo postqueue -f 2>/dev/null');
       return { success: true };
     } catch (err) {
       throw new Error('Failed to flush queue: ' + err.message);
@@ -384,12 +442,28 @@ class MailService {
   }
 
   async deleteFromQueue(queueId) {
-    if (!/^[A-F0-9]{10,}$/.test(queueId)) throw new Error('Invalid queue ID');
+    const cleanId = String(queueId || '').trim();
+    if (cleanId !== 'ALL' && !/^[A-Za-z0-9]{6,}$/.test(cleanId)) {
+      throw new Error('Invalid queue ID');
+    }
     try {
-      await execAsync(`sudo postsuper -d ${queueId} 2>/dev/null`);
-      return { success: true };
+      await execAsync(`sudo postsuper -d ${cleanId} 2>/dev/null`);
+      return { success: true, queueId: cleanId };
     } catch (err) {
       throw new Error('Failed to delete from queue: ' + err.message);
+    }
+  }
+
+  async requeue(queueId = 'ALL') {
+    const cleanId = String(queueId || '').trim();
+    if (cleanId !== 'ALL' && !/^[A-Za-z0-9]{6,}$/.test(cleanId)) {
+      throw new Error('Invalid queue ID');
+    }
+    try {
+      await execAsync(`sudo postsuper -r ${cleanId} 2>/dev/null`);
+      return { success: true, queueId: cleanId };
+    } catch (err) {
+      throw new Error('Failed to requeue: ' + err.message);
     }
   }
 

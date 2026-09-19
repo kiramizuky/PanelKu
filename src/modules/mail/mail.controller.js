@@ -87,9 +87,16 @@ class MailController {
 
   async deleteFromQueue(req, res) {
     try {
-      const { queueId } = req.body;
+      const queueId = req.body?.queueId || req.query?.queueId;
       if (!queueId) return error(res, 'Queue ID is required', 400);
       return success(res, await mailService.deleteFromQueue(queueId), 'Message removed from queue');
+    } catch (err) { return error(res, err.message, 500); }
+  }
+
+  async requeue(req, res) {
+    try {
+      const queueId = req.body?.queueId || req.query?.queueId || 'ALL';
+      return success(res, await mailService.requeue(queueId), 'Message requeued');
     } catch (err) { return error(res, err.message, 500); }
   }
 

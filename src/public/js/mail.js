@@ -280,18 +280,76 @@ const MAIL = (() => {
     loadDnsHelper();
   }
 
+  function formatBytes(bytes) {
+    if (!bytes || isNaN(bytes) || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+  }
+
   async function loadQueue() {
     try {
       const res = await LP.get('/mail/queue');
       const badge = document.getElementById('mailQueueCountBadge');
       const countEl = document.getElementById('mailQueueCount');
       const contentEl = document.getElementById('mailQueueContent');
+      const tbody = document.getElementById('mailQueueTableBody');
 
       if (res?.success) {
-        const total = res.data?.total || 0;
+        const queue = res.data?.queue || [];
+        const total = res.data?.total !== undefined ? res.data.total : queue.length;
         if (badge) badge.textContent = total;
-        if (countEl) countEl.textContent = `(${total} messages)`;
+        if (countEl) countEl.textContent = `(${total} message${total === 1 ? '' : 's'})`;
         if (contentEl) contentEl.textContent = res.data?.raw || 'Mail queue is empty.';
+
+        if (tbody) {
+          if (queue.length === 0) {
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="7" class="text-muted" style="text-align:center;padding:32px;">
+                  <i class="bi bi-check2-circle text-success me-2" style="font-size:18px;"></i>Mail queue is empty. No pending deliveries.
+                </td>
+              </tr>
+            `;
+          } else {
+            tbody.innerHTML = queue.map(item => {
+              const status = item.status || 'deferred';
+              let badgeClass = 'bg-warning text-dark';
+              if (status === 'active') badgeClass = 'bg-primary text-white';
+              if (status === 'hold') badgeClass = 'bg-secondary text-white';
+
+              return `
+                <tr>
+                  <td><code style="font-weight:600;font-size:11.5px;color:var(--text-primary);">${LP.escHtml(item.id)}</code></td>
+                  <td><span class="badge ${badgeClass}" style="font-size:10.5px;text-transform:uppercase;">${LP.escHtml(status)}</span></td>
+                  <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${LP.escHtml(item.sender || 'MAILER-DAEMON')}">
+                    ${LP.escHtml(item.sender || 'MAILER-DAEMON')}
+                  </td>
+                  <td style="max-width:240px;">
+                    <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${LP.escHtml(item.recipient || '-')}">
+                      ${LP.escHtml(item.recipient || '-')}
+                    </div>
+                    ${item.error ? `
+                      <div class="text-danger mt-1" style="font-size:10.5px;line-height:1.3;max-width:320px;" title="${LP.escHtml(item.error)}">
+                        <i class="bi bi-exclamation-triangle me-1"></i>${LP.escHtml(item.error)}
+                      </div>
+                    ` : ''}
+                  </td>
+                  <td><span class="text-muted">${formatBytes(item.size)}</span></td>
+                  <td style="font-size:11px;color:var(--text-muted);">${LP.escHtml(item.date || '-')}</td>
+                  <td style="text-align:right;">
+                    <button class="btn-lp btn-lp-ghost btn-lp-sm me-1" title="Retry Delivery (Requeue)" onclick="LP.call('MAIL.requeue', '${LP.encJsArg(item.id)}')">
+                      <i class="bi bi-arrow-repeat text-info"></i>
+                    </button>
+                    <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" title="Delete message" onclick="LP.call('MAIL.deleteFromQueue', '${LP.encJsArg(item.id)}')">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('');
+          }
+        }
       }
     } catch (err) {
       console.warn('loadQueue error:', err);
@@ -493,6 +551,46 @@ const MAIL = (() => {
     }
   }
 
+  async function requeue(queueId = 'ALL') {
+    const isAll = queueId === 'ALL';
+    const msg = isAll
+      ? 'Requeue ALL deferred messages in the queue for immediate delivery retry?'
+      : `Requeue message "${queueId}" for immediate retry?`;
+    if (!(await LP.confirm(msg, isAll ? 'Requeue All Messages' : 'Requeue Message'))) return;
+
+    try {
+      const res = await LP.post('/mail/queue/requeue', { queueId });
+      if (res?.success) {
+        LP.toast(isAll ? 'All messages requeued for delivery' : `Message ${queueId} requeued`, 'success');
+        loadQueue();
+      } else {
+        LP.toast(res?.message || 'Failed to requeue message', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Error requeuing message', 'error');
+    }
+  }
+
+  async function deleteFromQueue(queueId) {
+    const isAll = queueId === 'ALL';
+    const msg = isAll
+      ? 'Are you sure you want to PURGE ALL messages from the mail queue? Undelivered emails will be permanently deleted.'
+      : `Delete message "${queueId}" from the mail queue?`;
+    if (!(await LP.confirm(msg, isAll ? 'Purge Entire Mail Queue' : 'Delete Message'))) return;
+
+    try {
+      const res = await LP.delete(`/mail/queue?queueId=${encodeURIComponent(queueId)}`, { queueId });
+      if (res?.success) {
+        LP.toast(isAll ? 'Mail queue purged' : `Message ${queueId} removed from queue`, 'success');
+        loadQueue();
+      } else {
+        LP.toast(res?.message || 'Failed to delete message', 'error');
+      }
+    } catch (err) {
+      LP.toast(err.message || 'Error deleting from queue', 'error');
+    }
+  }
+
   async function updateSpamScore() {
     const score = document.getElementById('spamScoreInput')?.value;
     try {
@@ -538,6 +636,8 @@ const MAIL = (() => {
     updatePassword,
     deleteAccount,
     flushQueue,
+    requeue,
+    deleteFromQueue,
     updateSpamScore,
     copySnippet
   };
