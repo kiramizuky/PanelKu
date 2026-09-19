@@ -57,9 +57,25 @@ describe('Fase 2: Docker App Store & GeoIP Threat Map', () => {
       const data = await geoipService.getThreatMapData();
       expect(data).toHaveProperty('totalThreats');
       expect(data).toHaveProperty('uniqueIps');
+      expect(data).toHaveProperty('timeRange', '24h');
       expect(Array.isArray(data.countries)).toBe(true);
       expect(Array.isArray(data.allCountryOptions)).toBe(true);
       expect(data.allCountryOptions.length).toBeGreaterThan(10);
+    });
+
+    it('filters threat map data by specific time ranges', async () => {
+      for (const range of ['today', 'yesterday', '7d', '30d', 'all']) {
+        const res = await geoipService.getThreatMapData(range);
+        expect(res).toBeDefined();
+        expect(res.timeRange).toBe(range);
+        expect(Array.isArray(res.threats)).toBe(true);
+      }
+
+      // Test custom range
+      const customRes = await geoipService.getThreatMapData('custom', '2026-01-01', '2026-12-31');
+      expect(customRes.timeRange).toBe('custom');
+      expect(customRes.startTime).toContain('2026-01-01');
+      expect(customRes.endTime).toContain('2026-12-31');
     });
 
     it('handles 1-click Country Geo-Blocking and unblocking', async () => {

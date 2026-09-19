@@ -80,7 +80,8 @@ class WafController {
 
   async getThreatMap(req, res) {
     try {
-      const mapData = await geoipService.getThreatMapData();
+      const { range = '24h', startDate, endDate } = req.query;
+      const mapData = await geoipService.getThreatMapData(range, startDate, endDate);
       return success(res, mapData, 'Threat map data retrieved');
     } catch (error) {
       return errorResponse(res, error, 500);

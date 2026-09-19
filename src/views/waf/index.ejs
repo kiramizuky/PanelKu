@@ -261,8 +261,26 @@
               <h6 style="font-weight:700; font-size:13px; margin:0; color:#fff;"><i class="bi bi-radar me-2 text-danger"></i>Recent Blocked Attack Feed</h6>
               <span id="tmThreatCountBadge" class="lp-badge lp-badge-danger" style="font-size:10px;">LIVE MONITOR</span>
             </div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <div style="position:relative; width:180px;">
+            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+              <!-- Time Range Selector -->
+              <div style="display:flex; align-items:center; gap:4px;">
+                <select id="tmTimeRangeSelect" class="lp-input font-mono" onchange="WAFPage.changeThreatTimeRange(this.value)" style="font-size:11px; padding:3px 8px; height:28px; width:130px; cursor:pointer;" title="Filter rentang waktu serangan">
+                  <option value="24h" selected>24 Jam Terakhir</option>
+                  <option value="today">Hari Ini</option>
+                  <option value="yesterday">Kemarin</option>
+                  <option value="7d">7 Hari Terakhir</option>
+                  <option value="30d">30 Hari Terakhir</option>
+                  <option value="all">Semua Riwayat</option>
+                  <option value="custom">Rentang Khusus...</option>
+                </select>
+                <div id="tmCustomDateContainer" style="display:none; align-items:center; gap:4px;">
+                  <input type="date" id="tmStartDate" class="lp-input" style="font-size:11px; padding:2px 6px; height:28px; width:115px;" onchange="WAFPage.applyCustomDateRange()" title="Tanggal Mulai">
+                  <span class="text-muted" style="font-size:11px;">-</span>
+                  <input type="date" id="tmEndDate" class="lp-input" style="font-size:11px; padding:2px 6px; height:28px; width:115px;" onchange="WAFPage.applyCustomDateRange()" title="Tanggal Selesai">
+                </div>
+              </div>
+
+              <div style="position:relative; width:150px;">
                 <input type="text" id="tmThreatSearchInput" class="lp-input" placeholder="Filter IP, path..." onkeyup="WAFPage.filterThreats(this.value)" style="font-size:11px; padding:4px 10px; height:28px;">
               </div>
               <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="WAFPage.loadThreatMap()" title="Refresh Feed" style="padding:4px 8px; font-size:11px;">

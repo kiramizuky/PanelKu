@@ -74,19 +74,75 @@ class GeoIpService {
 
   /**
    * Parse Fail2ban logs, Honeypot hits & WAF audit logs into comprehensive threat map data
+   * @param {string} [timeRange='24h'] - '24h' | 'today' | 'yesterday' | '7d' | '30d' | 'all' | 'custom'
+   * @param {string} [customStart] - ISO string or YYYY-MM-DD
+   * @param {string} [customEnd] - ISO string or YYYY-MM-DD
    */
-  async getThreatMapData() {
+  async getThreatMapData(timeRange = '24h', customStart = null, customEnd = null) {
     const rawLogs = await wafService.getFail2BanLogs();
     const db = getDb();
+
+    // Determine timestamp filters
+    let startTime = null;
+    let endTime = null;
+    const nowObj = new Date();
+
+    if (timeRange === '24h') {
+      startTime = new Date(nowObj.getTime() - 24 * 3600 * 1000);
+    } else if (timeRange === 'today') {
+      startTime = new Date(nowObj);
+      startTime.setHours(0, 0, 0, 0);
+    } else if (timeRange === 'yesterday') {
+      const todayStart = new Date(nowObj);
+      todayStart.setHours(0, 0, 0, 0);
+      startTime = new Date(todayStart);
+      startTime.setDate(startTime.getDate() - 1);
+      endTime = todayStart;
+    } else if (timeRange === '7d') {
+      startTime = new Date(nowObj.getTime() - 7 * 86400 * 1000);
+    } else if (timeRange === '30d') {
+      startTime = new Date(nowObj.getTime() - 30 * 86400 * 1000);
+    } else if (timeRange === 'custom') {
+      if (customStart) startTime = new Date(customStart);
+      if (customEnd) {
+        endTime = new Date(customEnd);
+        if (typeof customEnd === 'string' && customEnd.length === 10) {
+          endTime.setHours(23, 59, 59, 999);
+        }
+      }
+    }
+
+    const isWithinRange = (dateCandidate) => {
+      if (!dateCandidate) return true;
+      const d = dateCandidate instanceof Date ? dateCandidate : new Date(dateCandidate);
+      if (isNaN(d.getTime())) return true;
+      if (startTime && d < startTime) return false;
+      if (endTime && d > endTime) return false;
+      return true;
+    };
 
     // Fetch blocked IPs & countries from waf_rules
     const wafRules = db.prepare("SELECT * FROM waf_rules WHERE type = 'ip' AND action = 'block' ORDER BY created_at DESC").all();
     const blockedCountries = db.prepare("SELECT * FROM waf_rules WHERE type = 'country' AND action = 'block'").all();
 
-    // Fetch Honeypot Hits from DB
+    // Fetch Honeypot Hits from DB with time filtering
     let honeypotHits = [];
     try {
-      honeypotHits = db.prepare("SELECT * FROM honeypot_hits ORDER BY created_at DESC LIMIT 300").all();
+      if (startTime && endTime) {
+        honeypotHits = db.prepare(
+          "SELECT * FROM honeypot_hits WHERE created_at >= ? AND created_at <= ? ORDER BY created_at DESC LIMIT 500"
+        ).all(startTime.toISOString(), endTime.toISOString());
+      } else if (startTime) {
+        honeypotHits = db.prepare(
+          "SELECT * FROM honeypot_hits WHERE created_at >= ? ORDER BY created_at DESC LIMIT 500"
+        ).all(startTime.toISOString());
+      } else if (endTime) {
+        honeypotHits = db.prepare(
+          "SELECT * FROM honeypot_hits WHERE created_at <= ? ORDER BY created_at DESC LIMIT 500"
+        ).all(endTime.toISOString());
+      } else {
+        honeypotHits = db.prepare("SELECT * FROM honeypot_hits ORDER BY created_at DESC LIMIT 500").all();
+      }
     } catch (_) {}
 
     const threatMap = new Map();
@@ -126,6 +182,9 @@ class GeoIpService {
       const match = banRegex.exec(line);
       if (match) {
         const [, timeStr, jail, ip] = match;
+        const logDate = new Date(timeStr.replace(' ', 'T'));
+        if (!isWithinRange(logDate)) continue;
+
         if (!threatMap.has(ip)) {
           threatMap.set(ip, {
             id: generateId(),
@@ -146,6 +205,7 @@ class GeoIpService {
       } else {
         const fbMatch = fallbackRegex.exec(line);
         if (fbMatch) {
+          if (!isWithinRange(nowObj)) continue;
           const ip = fbMatch[1];
           if (!threatMap.has(ip)) {
             threatMap.set(ip, {
@@ -168,8 +228,11 @@ class GeoIpService {
       }
     }
 
-    // 3. Add WAF rule blocked IPs
+    // 3. Add WAF rule blocked IPs (include if all time or if created within range)
     for (const rule of wafRules) {
+      if (timeRange !== 'all' && rule.created_at && !isWithinRange(new Date(rule.created_at))) {
+        continue;
+      }
       if (!threatMap.has(rule.value)) {
         threatMap.set(rule.value, {
           id: rule.id || generateId(),
@@ -189,6 +252,7 @@ class GeoIpService {
 
     // Baseline fallback if completely empty
     if (threatMap.size === 0) {
+      const demoTime = startTime ? new Date(startTime.getTime() + 60000).toISOString() : now();
       const demoEvents = [
         { ip: '45.33.32.156', target: '/wp-login.php', count: 7, category: 'Honeypot Trap', reason: 'WordPress admin brute force attack', userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) BotScanner/2.1', payload: 'log=admin&pwd=password123' },
         { ip: '185.220.101.5', target: '/.env', count: 12, category: 'Malicious Probe', reason: 'Attempted environment file exfiltration', userAgent: 'curl/7.81.0-DEV', payload: 'GET /.env HTTP/1.1' },
@@ -207,8 +271,8 @@ class GeoIpService {
           userAgent: d.userAgent,
           payload: d.payload,
           action: 'BLOCKED',
-          timestamp: new Date(Date.now() - Math.floor(Math.random() * 86400000)).toISOString(),
-          lastSeen: now(),
+          timestamp: demoTime,
+          lastSeen: demoTime,
         });
       }
     }
@@ -251,6 +315,9 @@ class GeoIpService {
     return {
       totalThreats,
       uniqueIps: threatMap.size,
+      timeRange,
+      startTime: startTime ? startTime.toISOString() : null,
+      endTime: endTime ? endTime.toISOString() : null,
       topAttackingCountries: countries.slice(0, 10),
       countries,
       threats, // Return ALL aggregated threats

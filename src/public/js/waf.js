@@ -183,13 +183,49 @@ const WAFPage = {
   // ── Real-Time GeoIP Threat Map & Geo-Shield ────────────────
   async loadThreatMap() {
     try {
-      const res = await LP.get('/waf/threat-map');
+      const range = this._threatTimeRange || '24h';
+      let url = `/waf/threat-map?range=${encodeURIComponent(range)}`;
+      if (range === 'custom') {
+        const startEl = document.getElementById('tmStartDate');
+        const endEl = document.getElementById('tmEndDate');
+        if (startEl?.value) url += `&startDate=${encodeURIComponent(startEl.value)}`;
+        if (endEl?.value) url += `&endDate=${encodeURIComponent(endEl.value)}`;
+      }
+      const res = await LP.get(url);
       if (res?.success && res.data) {
         this.renderThreatMap(res.data);
       }
     } catch {
       LP.toast('Failed to load Threat Map data', 'error');
     }
+  },
+
+  changeThreatTimeRange(range) {
+    this._threatTimeRange = range;
+    const customContainer = document.getElementById('tmCustomDateContainer');
+    if (customContainer) {
+      if (range === 'custom') {
+        customContainer.style.display = 'inline-flex';
+        const startEl = document.getElementById('tmStartDate');
+        const endEl = document.getElementById('tmEndDate');
+        if (startEl && !startEl.value) {
+          const d = new Date();
+          d.setDate(d.getDate() - 7);
+          startEl.value = d.toISOString().split('T')[0];
+        }
+        if (endEl && !endEl.value) {
+          endEl.value = new Date().toISOString().split('T')[0];
+        }
+      } else {
+        customContainer.style.display = 'none';
+      }
+    }
+    this.loadThreatMap();
+  },
+
+  applyCustomDateRange() {
+    this._threatTimeRange = 'custom';
+    this.loadThreatMap();
   },
 
   renderThreatMap(data) {
@@ -313,7 +349,17 @@ const WAFPage = {
     const perPage = this._threatsPerPage || 10;
 
     if (countBadge) {
-      countBadge.textContent = `${this._allThreats.length} THREATS`;
+      const rangeLabels = {
+        '24h': '24 JAM',
+        'today': 'HARI INI',
+        'yesterday': 'KEMARIN',
+        '7d': '7 HARI',
+        '30d': '30 HARI',
+        'all': 'SEMUA WAKTU',
+        'custom': 'RENTANG KHUSUS'
+      };
+      const rangeText = rangeLabels[this._threatTimeRange || '24h'] || '24 JAM';
+      countBadge.textContent = `${rangeText}: ${this._allThreats.length} THREATS`;
     }
 
     if (!tbody) return;
