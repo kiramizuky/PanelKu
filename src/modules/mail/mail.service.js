@@ -65,7 +65,7 @@ class MailService {
     const serviceChecks = [
       { key: 'postfix', cmd: 'systemctl is-active postfix 2>/dev/null || echo "inactive"' },
       { key: 'dovecot', cmd: 'systemctl is-active dovecot 2>/dev/null || echo "inactive"' },
-      { key: 'spamassassin', cmd: 'systemctl is-active spamassassin 2>/dev/null || systemctl is-active spamd 2>/dev/null || echo "inactive"' },
+      { key: 'spamassassin', cmd: '(systemctl is-active --quiet spamassassin 2>/dev/null || systemctl is-active --quiet spamd 2>/dev/null || pgrep -x spamd >/dev/null 2>&1) && echo "active" || echo "inactive"' },
       { key: 'roundcube', cmd: 'systemctl is-active roundcube 2>/dev/null || echo "inactive"' },
     ];
     await Promise.allSettled(
@@ -125,8 +125,10 @@ class MailService {
       await execAsync('test -f /etc/postfix/virtual_mailbox || sudo touch /etc/postfix/virtual_mailbox');
       await execAsync('sudo postmap /etc/postfix/virtual_mailbox 2>/dev/null || true');
 
-      await execAsync('sudo systemctl enable postfix dovecot spamassassin 2>/dev/null').catch(() => {});
-      await execAsync('sudo systemctl start postfix dovecot 2>/dev/null').catch(() => {});
+      await execAsync('sudo sed -i "s/^ENABLED=0/ENABLED=1/" /etc/default/spamassassin 2>/dev/null || true');
+      await execAsync('sudo systemctl unmask spamassassin spamd 2>/dev/null || true');
+      await execAsync('sudo systemctl enable postfix dovecot spamassassin spamd 2>/dev/null').catch(() => {});
+      await execAsync('sudo systemctl start postfix dovecot spamassassin 2>/dev/null || sudo systemctl start spamd 2>/dev/null || true').catch(() => {});
       return { success: true, log: stdout.trim() };
     } catch (err) {
       throw new Error('Mail server install failed: ' + err.message);
@@ -150,10 +152,36 @@ class MailService {
     if (!['start', 'stop', 'restart', 'reload'].includes(action)) throw new Error('Invalid action');
 
     try {
-      let svcCmd = `sudo systemctl ${action} ${service} 2>&1`;
       if (service === 'spamassassin') {
-        svcCmd = `(sudo systemctl ${action} spamassassin 2>&1 || sudo systemctl ${action} spamd 2>&1)`;
+        // Ensure ENABLED=1 in /etc/default/spamassassin so Debian/Ubuntu sysv/systemd allows spamd to run
+        if (action === 'start' || action === 'restart') {
+          await execAsync('if [ -f /etc/default/spamassassin ]; then sudo sed -i "s/^ENABLED=0/ENABLED=1/" /etc/default/spamassassin; fi 2>/dev/null || true');
+          await execAsync('sudo systemctl unmask spamassassin spamd 2>/dev/null || true');
+          await execAsync('sudo systemctl daemon-reload 2>/dev/null || true');
+        }
+
+        const svcCmd = (action === 'stop')
+          ? 'sudo systemctl stop spamassassin 2>/dev/null || sudo systemctl stop spamd 2>/dev/null || sudo service spamassassin stop 2>/dev/null || sudo pkill -9 spamd 2>/dev/null || true'
+          : `sudo systemctl ${action} spamassassin 2>/dev/null || sudo systemctl ${action} spamd 2>/dev/null || sudo service spamassassin ${action} 2>/dev/null || sudo service spamd ${action} 2>/dev/null`;
+
+        const { stdout } = await execAsync(svcCmd, { timeout: 10000 });
+
+        // Verify if it actually became active on start/restart
+        if (process.env.NODE_ENV !== 'test' && (action === 'start' || action === 'restart')) {
+          const { stdout: checkOut } = await execAsync('(systemctl is-active --quiet spamassassin 2>/dev/null || systemctl is-active --quiet spamd 2>/dev/null || pgrep -x spamd >/dev/null 2>&1) && echo "active" || echo "inactive"', { timeout: 3000 });
+          if (checkOut.trim() !== 'active') {
+            const { stdout: binCheck } = await execAsync('which spamassassin 2>/dev/null || command -v spamd 2>/dev/null || echo ""', { timeout: 2000 });
+            if (!binCheck.trim()) {
+              throw new Error('SpamAssassin is not installed on this system. Please run: sudo apt-get install -y spamassassin');
+            }
+            throw new Error('SpamAssassin failed to activate. Check /etc/default/spamassassin (ENABLED=1) or run: sudo journalctl -u spamassassin -n 20');
+          }
+        }
+
+        return { success: true, output: stdout.trim() };
       }
+
+      const svcCmd = `sudo systemctl ${action} ${service} 2>&1`;
       const { stdout } = await execAsync(svcCmd, { timeout: 10000 });
       return { success: true, output: stdout.trim() };
     } catch (err) {
@@ -375,7 +403,7 @@ class MailService {
       if (scoreMatch) config.requiredScore = parseFloat(scoreMatch[1]);
 
       // Check if spamd or spamassassin is running
-      const { stdout: status } = await execAsync('systemctl is-active spamassassin 2>/dev/null || systemctl is-active spamd 2>/dev/null || echo "inactive"', { timeout: 2500 });
+      const { stdout: status } = await execAsync('(systemctl is-active --quiet spamassassin 2>/dev/null || systemctl is-active --quiet spamd 2>/dev/null || pgrep -x spamd >/dev/null 2>&1) && echo "active" || echo "inactive"', { timeout: 2500 });
       config.active = status.trim() === 'active';
       return config;
     } catch { return { requiredScore: 5.0, active: false }; }
