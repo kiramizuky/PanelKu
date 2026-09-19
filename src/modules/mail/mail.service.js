@@ -261,8 +261,37 @@ class MailService {
 
     try {
       const { stdout: hash } = await execAsync(`sudo doveadm pw -s SHA512-CRYPT -p '${newPassword.replace(/'/g, "'\\''")}' 2>/dev/null`);
-      const userLine = hash.trim();
-      await execAsync(`sudo sed -i "s/^${email.replace(/\./g, '\\.')}:.*/${email.replace(/\./g, '\\.')}:${userLine.replace(/\$/g, '\\$')}/" /etc/dovecot/users 2>/dev/null`);
+      const newHash = hash.trim();
+      if (!newHash) throw new Error('Failed to generate password hash');
+
+      // Read current dovecot users safely without sed delimiter conflicts
+      const { stdout: usersContent } = await execAsync('sudo cat /etc/dovecot/users 2>/dev/null || echo ""');
+      const lines = usersContent.split('\n');
+      let found = false;
+      const updatedLines = lines.map(line => {
+        if (line.startsWith(`${email}:`)) {
+          found = true;
+          const parts = line.split(':');
+          // parts[0] = email, parts[1] = hash, rest = uid:gid::home::
+          parts[1] = newHash;
+          return parts.join(':');
+        }
+        return line;
+      });
+
+      // If user wasn't in /etc/dovecot/users yet, create entry
+      if (!found) {
+        const localPart = email.split('@')[0];
+        const domain = email.split('@')[1];
+        const mailboxPath = `/var/mail/vhosts/${domain}/${localPart}/`;
+        updatedLines.push(`${email}:${newHash}:5000:5000::${mailboxPath}::`);
+      }
+
+      const newContent = updatedLines.join('\n');
+      const b64 = Buffer.from(newContent).toString('base64');
+      await execAsync(`echo "${b64}" | base64 -d | sudo tee /etc/dovecot/users >/dev/null`);
+      await execAsync('sudo systemctl reload dovecot 2>/dev/null || true');
+
       return { success: true, email };
     } catch (err) {
       throw new Error('Failed to update password: ' + err.message);
