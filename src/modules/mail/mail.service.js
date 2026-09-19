@@ -81,7 +81,18 @@ class MailService {
 
   async install() {
     try {
+      // Pre-seed debconf so Postfix creates /etc/postfix/main.cf properly during install
+      await execAsync('echo "postfix postfix/main_mailer_type select Internet Site" | sudo debconf-set-selections 2>/dev/null || true');
+      await execAsync('echo "postfix postfix/mailname string $(hostname -f 2>/dev/null || hostname)" | sudo debconf-set-selections 2>/dev/null || true');
+
       const { stdout } = await execAsync('sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postfix postfix-mysql dovecot-core dovecot-imapd dovecot-pop3d dovecot-mysql spamassassin roundcube roundcube-mysql 2>&1 | tail -5');
+
+      // Ensure basic main.cf and virtual directories exist if not created by package
+      await execAsync('sudo mkdir -p /etc/postfix /var/mail/vhosts 2>/dev/null');
+      await execAsync('test -f /etc/postfix/main.cf || sudo cp /usr/share/postfix/main.cf.dist /etc/postfix/main.cf 2>/dev/null || sudo touch /etc/postfix/main.cf');
+      await execAsync('test -f /etc/postfix/virtual_mailbox || sudo touch /etc/postfix/virtual_mailbox');
+      await execAsync('sudo postmap /etc/postfix/virtual_mailbox 2>/dev/null || true');
+
       await execAsync('sudo systemctl enable postfix dovecot spamassassin 2>/dev/null').catch(() => {});
       await execAsync('sudo systemctl start postfix dovecot 2>/dev/null').catch(() => {});
       return { success: true, log: stdout.trim() };
@@ -207,15 +218,18 @@ class MailService {
   async addDomain(domain) {
     this._validateDomain(domain);
     try {
-      await execAsync(`sudo mkdir -p /var/mail/vhosts/${domain} 2>/dev/null`);
+      await execAsync(`sudo mkdir -p /var/mail/vhosts/${domain} /etc/postfix 2>/dev/null`);
+      await execAsync('test -f /etc/postfix/main.cf || sudo cp /usr/share/postfix/main.cf.dist /etc/postfix/main.cf 2>/dev/null || sudo touch /etc/postfix/main.cf');
+      await execAsync('test -f /etc/postfix/virtual_mailbox || sudo touch /etc/postfix/virtual_mailbox');
+
       // Add to postfix virtual domains
       const { stdout: current } = await execAsync('sudo postconf virtual_mailbox_domains 2>/dev/null || echo ""');
       let domains = current.replace('virtual_mailbox_domains = ', '').trim();
       if (!domains.includes(domain)) {
         domains = domains ? `${domains} ${domain}` : domain;
-        await execAsync(`sudo postconf -e "virtual_mailbox_domains=${domains}" 2>/dev/null`);
+        await execAsync(`sudo postconf -e "virtual_mailbox_domains=${domains}"`);
       }
-      await execAsync('sudo systemctl reload postfix 2>/dev/null');
+      await execAsync('sudo systemctl reload postfix 2>/dev/null || sudo systemctl restart postfix 2>/dev/null || true');
       return { success: true, domain };
     } catch (err) {
       throw new Error('Failed to add domain: ' + err.message);
@@ -228,8 +242,8 @@ class MailService {
       const { stdout: current } = await execAsync('sudo postconf virtual_mailbox_domains 2>/dev/null || echo ""');
       let domains = current.replace('virtual_mailbox_domains = ', '').trim();
       domains = domains.split(/\s+/).filter(d => d !== domain).join(' ');
-      await execAsync(`sudo postconf -e "virtual_mailbox_domains=${domains}" 2>/dev/null`);
-      await execAsync('sudo systemctl reload postfix 2>/dev/null');
+      await execAsync(`sudo postconf -e "virtual_mailbox_domains=${domains}"`);
+      await execAsync('sudo systemctl reload postfix 2>/dev/null || sudo systemctl restart postfix 2>/dev/null || true');
       return { success: true, domain };
     } catch (err) {
       throw new Error('Failed to remove domain: ' + err.message);
