@@ -62,14 +62,19 @@ class MailService {
     };
 
     // 1. Check services in parallel with strict timeout (max 2.5s)
-    const serviceNames = ['postfix', 'dovecot', 'spamassassin', 'roundcube'];
+    const serviceChecks = [
+      { key: 'postfix', cmd: 'systemctl is-active postfix 2>/dev/null || echo "inactive"' },
+      { key: 'dovecot', cmd: 'systemctl is-active dovecot 2>/dev/null || echo "inactive"' },
+      { key: 'spamassassin', cmd: 'systemctl is-active spamassassin 2>/dev/null || systemctl is-active spamd 2>/dev/null || echo "inactive"' },
+      { key: 'roundcube', cmd: 'systemctl is-active roundcube 2>/dev/null || echo "inactive"' },
+    ];
     await Promise.allSettled(
-      serviceNames.map(async (svc) => {
+      serviceChecks.map(async ({ key, cmd }) => {
         try {
-          const { stdout } = await execAsync(`systemctl is-active ${svc} 2>/dev/null || echo "inactive"`, { timeout: 2500 });
-          services[svc] = stdout.trim() === 'active';
+          const { stdout } = await execAsync(cmd, { timeout: 2500 });
+          services[key] = stdout.trim() === 'active';
         } catch {
-          services[svc] = false;
+          services[key] = false;
         }
       })
     );
@@ -145,7 +150,11 @@ class MailService {
     if (!['start', 'stop', 'restart', 'reload'].includes(action)) throw new Error('Invalid action');
 
     try {
-      const { stdout } = await execAsync(`sudo systemctl ${action} ${service} 2>&1`);
+      let svcCmd = `sudo systemctl ${action} ${service} 2>&1`;
+      if (service === 'spamassassin') {
+        svcCmd = `(sudo systemctl ${action} spamassassin 2>&1 || sudo systemctl ${action} spamd 2>&1)`;
+      }
+      const { stdout } = await execAsync(svcCmd, { timeout: 10000 });
       return { success: true, output: stdout.trim() };
     } catch (err) {
       throw new Error(`Failed to ${action} ${service}: ${err.message}`);
@@ -328,8 +337,8 @@ class MailService {
       const scoreMatch = stdout.match(/required_score\s+([\d.]+)/);
       if (scoreMatch) config.requiredScore = parseFloat(scoreMatch[1]);
 
-      // Check if spamd is running
-      const { stdout: status } = await execAsync('systemctl is-active spamassassin 2>/dev/null || echo "inactive"', { timeout: 2500 });
+      // Check if spamd or spamassassin is running
+      const { stdout: status } = await execAsync('systemctl is-active spamassassin 2>/dev/null || systemctl is-active spamd 2>/dev/null || echo "inactive"', { timeout: 2500 });
       config.active = status.trim() === 'active';
       return config;
     } catch { return { requiredScore: 5.0, active: false }; }
@@ -343,7 +352,7 @@ class MailService {
       await execAsync(`sudo sed -i "s/^required_score.*/required_score ${score}/" /etc/spamassassin/local.cf 2>/dev/null`);
       // If not present, add it
       await execAsync(`grep -q "^required_score" /etc/spamassassin/local.cf 2>/dev/null || echo "required_score ${score}" | sudo tee -a /etc/spamassassin/local.cf 2>/dev/null`);
-      await execAsync('sudo systemctl reload spamassassin 2>/dev/null || sudo systemctl restart spamassassin 2>/dev/null');
+      await execAsync('sudo systemctl reload spamassassin 2>/dev/null || sudo systemctl reload spamd 2>/dev/null || sudo systemctl restart spamassassin 2>/dev/null || sudo systemctl restart spamd 2>/dev/null || true');
       return { success: true, requiredScore: score };
     } catch (err) {
       throw new Error('Failed to update SpamAssassin config: ' + err.message);
