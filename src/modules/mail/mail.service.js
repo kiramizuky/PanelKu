@@ -51,30 +51,57 @@ class MailService {
       };
     }
 
-    const services = {};
-    for (const svc of ['postfix', 'dovecot', 'spamassassin', 'roundcube']) {
-      try {
-        const { stdout } = await execAsync(`systemctl is-active ${svc} 2>/dev/null || echo "inactive"`);
-        services[svc] = stdout.trim() === 'active';
-      } catch { services[svc] = false; }
-    }
+    const services = {
+      postfix: false,
+      dovecot: false,
+      spamassassin: false,
+      roundcube: false,
+      installed: false,
+      queueSize: 0,
+      version: null,
+    };
+
+    // 1. Check services in parallel with strict timeout (max 2.5s)
+    const serviceNames = ['postfix', 'dovecot', 'spamassassin', 'roundcube'];
+    await Promise.allSettled(
+      serviceNames.map(async (svc) => {
+        try {
+          const { stdout } = await execAsync(`systemctl is-active ${svc} 2>/dev/null || echo "inactive"`, { timeout: 2500 });
+          services[svc] = stdout.trim() === 'active';
+        } catch {
+          services[svc] = false;
+        }
+      })
+    );
+
+    // 2. Check if postfix binary is installed
     try {
-      const { stdout } = await execAsync('which postfix 2>/dev/null || command -v postfix 2>/dev/null || true');
+      const { stdout } = await execAsync('which postfix 2>/dev/null || command -v postfix 2>/dev/null || true', { timeout: 2500 });
       services.installed = stdout.trim().length > 0;
-    } catch { services.installed = false; }
+    } catch {
+      services.installed = false;
+    }
 
-    // Get mail queue size
-    try {
-      const { stdout } = await execAsync('mailq 2>/dev/null | tail -1');
-      const match = stdout.match(/(\d+)\s+request/);
-      services.queueSize = match ? parseInt(match[1]) : 0;
-    } catch { services.queueSize = 0; }
+    // 3. Get mail queue size (only if postfix is installed and responsive, with timeout)
+    if (services.installed) {
+      try {
+        const { stdout } = await execAsync('mailq 2>/dev/null | tail -1', { timeout: 2500 });
+        const match = stdout.match(/(\d+)\s+request/);
+        services.queueSize = match ? parseInt(match[1]) : 0;
+      } catch {
+        services.queueSize = 0;
+      }
+    }
 
-    // Get Postfix version
-    try {
-      const { stdout } = await execAsync('postconf mail_version 2>/dev/null || postfix --version 2>/dev/null | head -1');
-      services.version = stdout.trim() || null;
-    } catch { services.version = null; }
+    // 4. Get Postfix version with timeout
+    if (services.installed) {
+      try {
+        const { stdout } = await execAsync('postconf mail_version 2>/dev/null || postconf -d mail_version 2>/dev/null || postfix --version 2>/dev/null | head -1', { timeout: 2500 });
+        services.version = stdout.replace('mail_version = ', '').trim() || null;
+      } catch {
+        services.version = null;
+      }
+    }
 
     return services;
   }
@@ -130,7 +157,7 @@ class MailService {
   async getAccounts() {
     try {
       // Read virtual mailbox map
-      const { stdout } = await execAsync('sudo cat /etc/postfix/virtual_mailbox 2>/dev/null || echo ""');
+      const { stdout } = await execAsync('sudo cat /etc/postfix/virtual_mailbox 2>/dev/null || echo ""', { timeout: 3000 });
       const accounts = [];
       const lines = stdout.split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
       for (const line of lines) {
@@ -209,7 +236,7 @@ class MailService {
 
   async getDomains() {
     try {
-      const { stdout } = await execAsync('sudo postconf mydestination 2>/dev/null || echo ""');
+      const { stdout } = await execAsync('sudo postconf mydestination 2>/dev/null || echo ""', { timeout: 3000 });
       const domains = stdout.replace('mydestination = ', '').trim().split(/\s+/);
       return domains.filter(d => d && !d.startsWith('$') && d !== 'localhost' && !d.includes('localhost'));
     } catch { return []; }
@@ -254,7 +281,7 @@ class MailService {
 
   async getQueue() {
     try {
-      const { stdout } = await execAsync('mailq 2>/dev/null || echo "Mail queue is empty"');
+      const { stdout } = await execAsync('mailq 2>/dev/null || echo "Mail queue is empty"', { timeout: 4000 });
       const lines = stdout.split('\n').filter(l => l.trim());
       const queue = [];
       let current = null;
@@ -296,13 +323,13 @@ class MailService {
 
   async getSpamConfig() {
     try {
-      const { stdout } = await execAsync('sudo cat /etc/spamassassin/local.cf 2>/dev/null || echo ""');
+      const { stdout } = await execAsync('sudo cat /etc/spamassassin/local.cf 2>/dev/null || echo ""', { timeout: 3000 });
       const config = { requiredScore: 5.0, rewriteSubject: false, reportSafe: true };
       const scoreMatch = stdout.match(/required_score\s+([\d.]+)/);
       if (scoreMatch) config.requiredScore = parseFloat(scoreMatch[1]);
 
       // Check if spamd is running
-      const { stdout: status } = await execAsync('systemctl is-active spamassassin 2>/dev/null || echo "inactive"');
+      const { stdout: status } = await execAsync('systemctl is-active spamassassin 2>/dev/null || echo "inactive"', { timeout: 2500 });
       config.active = status.trim() === 'active';
       return config;
     } catch { return { requiredScore: 5.0, active: false }; }
@@ -351,7 +378,7 @@ class MailService {
     if (!['postfix', 'dovecot', 'spamassassin'].includes(service)) throw new Error('Invalid service');
     try {
       const count = parseInt(lines) || 50;
-      const { stdout } = await execAsync(`sudo journalctl -u ${service} --no-pager -n ${count} 2>/dev/null || sudo tail -${count} /var/log/mail.log 2>/dev/null || echo "No logs found"`);
+      const { stdout } = await execAsync(`sudo journalctl -u ${service} --no-pager -n ${count} 2>/dev/null || sudo tail -${count} /var/log/mail.log 2>/dev/null || echo "No logs found"`, { timeout: 5000 });
       return stdout.trim().split('\n').filter(l => l.trim());
     } catch { return []; }
   }
@@ -362,7 +389,7 @@ class MailService {
     const d = (domain && typeof domain === 'string' && domain.trim()) ? domain.trim() : 'example.com';
     let serverIp = 'YOUR_SERVER_IP';
     try {
-      const { stdout } = await execAsync('hostname -I 2>/dev/null || echo ""');
+      const { stdout } = await execAsync('hostname -I 2>/dev/null || echo ""', { timeout: 2500 });
       const ip = stdout.trim().split(/\s+/)[0];
       if (ip && !ip.startsWith('127.')) serverIp = ip;
     } catch {}
