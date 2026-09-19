@@ -5,6 +5,89 @@ import { successResponse, errorResponse } from '../../src/helpers/response.js';
 
 const execAsync = promisify(exec);
 
+async function fetchRecentLogs(type = 'auth', maxLines = 100) {
+  const safeType = type === 'syslog' ? 'syslog' : 'auth';
+  const candidatePaths = safeType === 'auth'
+    ? ['/var/log/auth.log', '/var/log/secure']
+    : ['/var/log/syslog', '/var/log/messages'];
+
+  // 1. On Linux/Unix: use tail directly (O(1) seek from EOF, fast and avoids OOM on multi-GB syslog files)
+  if (process.platform !== 'win32') {
+    for (const logPath of candidatePaths) {
+      try {
+        const { stdout } = await execAsync(
+          `tail -n ${maxLines} "${logPath}" 2>/dev/null || sudo tail -n ${maxLines} "${logPath}" 2>/dev/null`,
+          { timeout: 5000 }
+        );
+        if (stdout && stdout.trim().length > 0) {
+          return stdout;
+        }
+      } catch {
+        // try next candidate
+      }
+    }
+
+    // 2. Fallback to journalctl (e.g. Ubuntu 24.04+ / systemd distributions without rsyslog)
+    try {
+      const journalFilter = safeType === 'auth' ? '-u ssh -u sshd' : '';
+      const { stdout } = await execAsync(
+        `journalctl ${journalFilter} -n ${maxLines} --no-pager 2>/dev/null || sudo journalctl ${journalFilter} -n ${maxLines} --no-pager 2>/dev/null`,
+        { timeout: 5000 }
+      );
+      if (stdout && stdout.trim().length > 0) {
+        return stdout;
+      }
+    } catch {}
+  }
+
+  // 3. Fallback for Windows or direct file reading without reading the entire file (read last 128KB chunk)
+  for (const logPath of candidatePaths) {
+    try {
+      const stat = await fs.stat(logPath);
+      if (stat.size > 0) {
+        const chunkSize = Math.min(stat.size, 128 * 1024); // max 128 KB
+        const buffer = Buffer.alloc(chunkSize);
+        const fileHandle = await fs.open(logPath, 'r');
+        try {
+          await fileHandle.read(buffer, 0, chunkSize, Math.max(0, stat.size - chunkSize));
+          return buffer.toString('utf8');
+        } finally {
+          await fileHandle.close();
+        }
+      }
+    } catch {
+      // try next candidate
+    }
+  }
+
+  // 4. Graceful fallback to mock data if files are unreadable / non-Linux dev environment
+  if (safeType === 'auth') {
+    return `
+Jul  4 10:24:15 host sshd[1204]: Accepted publickey for admin from 192.168.1.50 port 50431 ssh2
+Jul  4 11:02:11 host sshd[1388]: Invalid user guest from 203.0.113.5 port 39822
+Jul  4 11:02:14 host sshd[1388]: Failed password for invalid user guest from 203.0.113.5 port 39822 ssh2
+Jul  4 11:05:01 host sshd[1410]: Invalid user admin from 198.51.100.12 port 40129
+Jul  4 11:05:04 host sshd[1410]: Failed password for invalid user admin from 198.51.100.12 port 40129 ssh2
+Jul  4 12:44:59 host sshd[1589]: Accepted password for root from 192.168.1.10 port 41200 ssh2
+Jul  4 13:10:02 host sshd[1602]: Failed password for root from 45.227.254.10 port 58921 ssh2
+Jul  4 13:10:05 host sshd[1602]: Failed password for root from 45.227.254.10 port 58921 ssh2
+Jul  4 13:10:09 host sshd[1602]: Failed password for root from 45.227.254.10 port 58921 ssh2
+Jul  4 14:15:32 host systemd-logind[412]: New session 4 of user root.
+`;
+  } else {
+    return `
+Jul  4 10:00:01 host cron[204]: (root) CMD (node /opt/panelku/jobs/monitor.js)
+Jul  4 10:15:02 host systemd[1]: Starting System Monitoring Service...
+Jul  4 10:15:03 host systemd[1]: Started System Monitoring Service.
+Jul  4 11:20:44 host kernel: [ 1042.128491] Docker bridge interface entered forwarding state
+Jul  4 12:00:01 host cron[204]: (root) CMD (node /opt/panelku/jobs/monitor.js)
+Jul  4 12:35:10 host dockerd[891]: Container adguard started successfully
+Jul  4 13:59:12 host systemd[1]: Reloading Nginx Configuration...
+Jul  4 13:59:13 host systemd[1]: Reloaded Nginx Configuration.
+`;
+  }
+}
+
 export default {
   register(app, io) {
     // 1. Dashboard View
@@ -137,44 +220,9 @@ export default {
     // 2. Read Log API
     app.get(['/plugins/log-analyzer-manager/read', '/api/plugins/log-analyzer-manager/read'], async (req, res) => {
       try {
-        const { type = 'auth' } = req.query;
-        let logPath = type === 'auth' ? '/var/log/auth.log' : '/var/log/syslog';
-        let logContent = '';
-
-        try {
-          // Attempt reading native host log via tail or direct file read
-          // To support non-root node execution, try reading directly
-          logContent = await fs.readFile(logPath, 'utf8');
-        } catch (e) {
-          // Graceful fallback to simulated data containing patterns if files are unreadable / on non-Linux
-          if (type === 'auth') {
-            logContent = `
-Jul  4 10:24:15 host sshd[1204]: Accepted publickey for admin from 192.168.1.50 port 50431 ssh2
-Jul  4 11:02:11 host sshd[1388]: Invalid user guest from 203.0.113.5 port 39822
-Jul  4 11:02:14 host sshd[1388]: Failed password for invalid user guest from 203.0.113.5 port 39822 ssh2
-Jul  4 11:05:01 host sshd[1410]: Invalid user admin from 198.51.100.12 port 40129
-Jul  4 11:05:04 host sshd[1410]: Failed password for invalid user admin from 198.51.100.12 port 40129 ssh2
-Jul  4 12:44:59 host sshd[1589]: Accepted password for root from 192.168.1.10 port 41200 ssh2
-Jul  4 13:10:02 host sshd[1602]: Failed password for root from 45.227.254.10 port 58921 ssh2
-Jul  4 13:10:05 host sshd[1602]: Failed password for root from 45.227.254.10 port 58921 ssh2
-Jul  4 13:10:09 host sshd[1602]: Failed password for root from 45.227.254.10 port 58921 ssh2
-Jul  4 14:15:32 host systemd-logind[412]: New session 4 of user root.
-`;
-          } else {
-            logContent = `
-Jul  4 10:00:01 host cron[204]: (root) CMD (node /opt/panelku/jobs/monitor.js)
-Jul  4 10:15:02 host systemd[1]: Starting System Monitoring Service...
-Jul  4 10:15:03 host systemd[1]: Started System Monitoring Service.
-Jul  4 11:20:44 host kernel: [ 1042.128491] Docker bridge interface entered forwarding state
-Jul  4 12:00:01 host cron[204]: (root) CMD (node /opt/panelku/jobs/monitor.js)
-Jul  4 12:35:10 host dockerd[891]: Container adguard started successfully
-Jul  4 13:59:12 host systemd[1]: Reloading Nginx Configuration...
-Jul  4 13:59:13 host systemd[1]: Reloaded Nginx Configuration.
-`;
-          }
-        }
-
-        const lines = logContent.split('\n').filter(l => l.trim().length > 0).slice(-100);
+        const type = req.query.type === 'syslog' ? 'syslog' : 'auth';
+        const logContent = await fetchRecentLogs(type, 100);
+        const lines = logContent.split(/\r?\n/).filter(l => l.trim().length > 0).slice(-100);
 
         // Perform anomaly scans
         let bruteForceCount = 0;

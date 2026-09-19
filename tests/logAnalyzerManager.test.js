@@ -63,4 +63,12 @@ describe('Log Analyzer Manager Plugin', () => {
     expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data.lines)).toBe(true);
   });
+
+  test('GET /api/plugins/log-analyzer-manager/read with invalid/unexpected type should default safely to auth without throwing', async () => {
+    const res = await request(app).get('/api/plugins/log-analyzer-manager/read?type=../../etc/passwd');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data.lines)).toBe(true);
+    expect(res.body.data.lines.length).toBeLessThanOrEqual(100);
+  });
 });
