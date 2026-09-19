@@ -144,8 +144,18 @@ const LP = {
   post: (url, data, opts) => LP.api('POST', url, data, opts),
   put: (url, data, opts) => LP.api('PUT', url, data, opts),
   patch: (url, data, opts) => LP.api('PATCH', url, data, opts),
-  del: (url, opts) => LP.api('DELETE', url, null, opts),
-  delete: (url, opts) => LP.api('DELETE', url, null, opts),
+  del: (url, data = null, opts = {}) => {
+    if (data && (data.headers || data.signal) && !data.domain && !data.email && !data.filename && !data.name && !data.type && !data.username) {
+      return LP.api('DELETE', url, null, data);
+    }
+    return LP.api('DELETE', url, data, opts);
+  },
+  delete: (url, data = null, opts = {}) => {
+    if (data && (data.headers || data.signal) && !data.domain && !data.email && !data.filename && !data.name && !data.type && !data.username) {
+      return LP.api('DELETE', url, null, data);
+    }
+    return LP.api('DELETE', url, data, opts);
+  },
 
   // ── Auth ──────────────────────────────────────────────
   async login(username, password) {

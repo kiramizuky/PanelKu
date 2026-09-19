@@ -400,7 +400,7 @@ const MAIL = (() => {
   async function removeDomain(domain) {
     if (!(await LP.confirm(`Remove virtual domain "${domain}"?`, 'Remove Domain'))) return;
     try {
-      const res = await LP.delete('/mail/domains', { domain });
+      const res = await LP.delete(`/mail/domains?domain=${encodeURIComponent(domain)}`, { domain });
       if (res?.success) {
         LP.toast('Domain removed', 'success');
         loadDomains();
@@ -466,7 +466,7 @@ const MAIL = (() => {
   async function deleteAccount(email) {
     if (!(await LP.confirm(`Delete email account "${email}"? This will remove credentials and authentication.`, 'Delete Account'))) return;
     try {
-      const res = await LP.delete('/mail/accounts', { email });
+      const res = await LP.delete(`/mail/accounts?email=${encodeURIComponent(email)}`, { email });
       if (res?.success) {
         LP.toast('Account deleted', 'success');
         loadAccounts();

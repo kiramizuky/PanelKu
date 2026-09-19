@@ -40,7 +40,7 @@ class MailController {
 
   async deleteAccount(req, res) {
     try {
-      const { email } = req.body;
+      const email = req.body?.email || req.query?.email;
       if (!email) return error(res, 'Email is required', 400);
       return success(res, await mailService.deleteAccount(email), 'Account deleted');
     } catch (err) { return error(res, err.message, 500); }
@@ -61,7 +61,7 @@ class MailController {
 
   async addDomain(req, res) {
     try {
-      const { domain } = req.body;
+      const domain = req.body?.domain || req.query?.domain;
       if (!domain) return error(res, 'Domain is required', 400);
       return success(res, await mailService.addDomain(domain), 'Domain added');
     } catch (err) { return error(res, err.message, 500); }
@@ -69,7 +69,7 @@ class MailController {
 
   async removeDomain(req, res) {
     try {
-      const { domain } = req.body;
+      const domain = req.body?.domain || req.query?.domain;
       if (!domain) return error(res, 'Domain is required', 400);
       return success(res, await mailService.removeDomain(domain), 'Domain removed');
     } catch (err) { return error(res, err.message, 500); }

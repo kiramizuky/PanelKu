@@ -245,9 +245,29 @@ class MailService {
 
   async getDomains() {
     try {
-      const { stdout } = await execAsync('sudo postconf mydestination 2>/dev/null || echo ""', { timeout: 3000 });
-      const domains = stdout.replace('mydestination = ', '').trim().split(/\s+/);
-      return domains.filter(d => d && !d.startsWith('$') && d !== 'localhost' && !d.includes('localhost'));
+      const domainList = new Set();
+
+      // 1. Virtual mailbox domains (primary virtual domains managed by panel)
+      const { stdout: vStdout } = await execAsync('sudo postconf virtual_mailbox_domains 2>/dev/null || echo ""', { timeout: 3000 });
+      const rawVDomains = vStdout.replace(/^virtual_mailbox_domains\s*=\s*/, '').trim();
+      const vTokens = rawVDomains.split(/[,\s]+/).map(d => d.trim().replace(/^,+|,+$/g, '')).filter(Boolean);
+      for (const d of vTokens) {
+        if (d && !d.startsWith('$') && !d.includes('localhost') && d.includes('.')) {
+          domainList.add(d);
+        }
+      }
+
+      // 2. Also check mydestination (legacy or system domains with valid FQDN)
+      const { stdout: mStdout } = await execAsync('sudo postconf mydestination 2>/dev/null || echo ""', { timeout: 3000 });
+      const rawMDomains = mStdout.replace(/^mydestination\s*=\s*/, '').trim();
+      const mTokens = rawMDomains.split(/[,\s]+/).map(d => d.trim().replace(/^,+|,+$/g, '')).filter(Boolean);
+      for (const d of mTokens) {
+        if (d && !d.startsWith('$') && !d.includes('localhost') && d.includes('.')) {
+          domainList.add(d);
+        }
+      }
+
+      return Array.from(domainList);
     } catch { return []; }
   }
 
@@ -258,12 +278,15 @@ class MailService {
       await execAsync('test -f /etc/postfix/main.cf || sudo cp /usr/share/postfix/main.cf.dist /etc/postfix/main.cf 2>/dev/null || sudo touch /etc/postfix/main.cf');
       await execAsync('test -f /etc/postfix/virtual_mailbox || sudo touch /etc/postfix/virtual_mailbox');
 
-      // Add to postfix virtual domains
-      const { stdout: current } = await execAsync('sudo postconf virtual_mailbox_domains 2>/dev/null || echo ""');
-      let domains = current.replace('virtual_mailbox_domains = ', '').trim();
-      if (!domains.includes(domain)) {
-        domains = domains ? `${domains} ${domain}` : domain;
-        await execAsync(`sudo postconf -e "virtual_mailbox_domains=${domains}"`);
+      // Add to postfix virtual domains cleanly
+      const { stdout: current } = await execAsync('sudo postconf virtual_mailbox_domains 2>/dev/null || echo ""', { timeout: 3000 });
+      const rawDomains = current.replace(/^virtual_mailbox_domains\s*=\s*/, '').trim();
+      const existing = rawDomains.split(/[,\s]+/).map(d => d.trim().replace(/^,+|,+$/g, '')).filter(d => d && d.includes('.'));
+
+      if (!existing.includes(domain)) {
+        existing.push(domain);
+        const newDomainsStr = existing.join(' ');
+        await execAsync(`sudo postconf -e "virtual_mailbox_domains=${newDomainsStr}"`);
       }
       await execAsync('sudo systemctl reload postfix 2>/dev/null || sudo systemctl restart postfix 2>/dev/null || true');
       return { success: true, domain };
@@ -273,14 +296,28 @@ class MailService {
   }
 
   async removeDomain(domain) {
-    this._validateDomain(domain);
+    const cleanDomain = String(domain || '').trim().replace(/^["']|["']$/g, '').replace(/^,+|,+$/g, '');
+    if (!cleanDomain) {
+      throw new Error('Domain is required');
+    }
     try {
-      const { stdout: current } = await execAsync('sudo postconf virtual_mailbox_domains 2>/dev/null || echo ""');
-      let domains = current.replace('virtual_mailbox_domains = ', '').trim();
-      domains = domains.split(/\s+/).filter(d => d !== domain).join(' ');
-      await execAsync(`sudo postconf -e "virtual_mailbox_domains=${domains}"`);
+      // 1. Remove from virtual_mailbox_domains
+      const { stdout: current } = await execAsync('sudo postconf virtual_mailbox_domains 2>/dev/null || echo ""', { timeout: 3000 });
+      const rawVDomains = current.replace(/^virtual_mailbox_domains\s*=\s*/, '').trim();
+      const existingV = rawVDomains.split(/[,\s]+/).map(d => d.trim().replace(/^,+|,+$/g, '')).filter(d => d && d !== cleanDomain);
+      const newVDomainsStr = existingV.join(' ');
+      await execAsync(`sudo postconf -e "virtual_mailbox_domains=${newVDomainsStr}"`);
+
+      // 2. Also remove from mydestination if legacy/system domain
+      const { stdout: mCurrent } = await execAsync('sudo postconf mydestination 2>/dev/null || echo ""', { timeout: 3000 });
+      const rawMDomains = mCurrent.replace(/^mydestination\s*=\s*/, '').trim();
+      if (rawMDomains.includes(cleanDomain)) {
+        const existingM = rawMDomains.split(/[,\s]+/).map(d => d.trim().replace(/^,+|,+$/g, '')).filter(d => d && d !== cleanDomain);
+        await execAsync(`sudo postconf -e "mydestination=${existingM.join(', ')}"`);
+      }
+
       await execAsync('sudo systemctl reload postfix 2>/dev/null || sudo systemctl restart postfix 2>/dev/null || true');
-      return { success: true, domain };
+      return { success: true, domain: cleanDomain };
     } catch (err) {
       throw new Error('Failed to remove domain: ' + err.message);
     }
@@ -397,19 +434,37 @@ class MailService {
   async getDnsHelper(domain) {
     const d = (domain && typeof domain === 'string' && domain.trim()) ? domain.trim() : 'example.com';
     let serverIp = 'YOUR_SERVER_IP';
+
+    const isPrivateIp = (ip) => {
+      if (!ip) return true;
+      return /^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.|::1|fe80:)/i.test(ip.trim());
+    };
+
+    // 1. Try public IP resolver first (essential for cloud VPS behind NAT or homeservers)
     try {
-      const { stdout } = await execAsync('hostname -I 2>/dev/null || echo ""', { timeout: 2500 });
-      const ip = stdout.trim().split(/\s+/)[0];
-      if (ip && !ip.startsWith('127.')) serverIp = ip;
+      const { stdout } = await execAsync('curl -s --max-time 3 https://api.ipify.org 2>/dev/null || curl -s --max-time 3 https://ifconfig.me 2>/dev/null || curl -s --max-time 3 https://icanhazip.com 2>/dev/null', { timeout: 3500 });
+      const pubIp = stdout.trim();
+      if (pubIp && !isPrivateIp(pubIp) && /^[0-9a-fA-F:.]+$/.test(pubIp)) {
+        serverIp = pubIp;
+      }
     } catch {}
+
+    // 2. Fallback to network interface IP if public IP lookup is unavailable
+    if (serverIp === 'YOUR_SERVER_IP') {
+      try {
+        const { stdout } = await execAsync('hostname -I 2>/dev/null || echo ""', { timeout: 2500 });
+        const ip = stdout.trim().split(/\s+/)[0];
+        if (ip && !ip.startsWith('127.')) serverIp = ip;
+      } catch {}
+    }
 
     return {
       domain: d,
       serverIp,
       records: [
         { type: 'MX', host: '@', priority: 10, value: `mail.${d}`, note: 'Mail Exchange - routes incoming emails to your server' },
-        { type: 'A', host: 'mail', priority: null, value: serverIp, note: 'Points mail host to your server IP address' },
-        { type: 'TXT (SPF)', host: '@', priority: null, value: `v=spf1 mx a ip4:${serverIp} ~all`, note: 'Sender Policy Framework - authorizes this IP to send emails' },
+        { type: 'A', host: 'mail', priority: null, value: serverIp, note: 'Points mail host to your server public IP address' },
+        { type: 'TXT (SPF)', host: '@', priority: null, value: `v=spf1 mx a ip4:${serverIp} ~all`, note: 'Sender Policy Framework - authorizes this public IP to send emails' },
         { type: 'TXT (DMARC)', host: '_dmarc', priority: null, value: `v=DMARC1; p=quarantine; rua=mailto:postmaster@${d}; pct=100`, note: 'Domain-based Message Authentication policy' },
         { type: 'TXT (DKIM)', host: 'default._domainkey', priority: null, value: 'v=DKIM1; k=rsa; p=<public-key>', note: 'Cryptographic signature validating email authenticity' },
         { type: 'PTR (rDNS)', host: serverIp, priority: null, value: `mail.${d}`, note: 'Reverse DNS - configure at VPS/Hosting provider dashboard' }
