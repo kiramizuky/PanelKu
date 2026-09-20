@@ -58,19 +58,16 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: linux-panel/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ./linux-panel
         run: npm ci --ignore-scripts
 
       - name: Run npm audit (all severity levels)
-        working-directory: ./linux-panel
         run: npm audit --audit-level=moderate
         continue-on-error: true  # Report findings but don't block
 
       - name: Check for known advisories
-        working-directory: ./linux-panel
         run: |
           echo "🔍 Audit Summary"
           npm audit --json 2>/dev/null | node -e "
@@ -110,13 +107,13 @@ jobs:
           config: |
             name: "Panelku Security Queries"
             paths:
-              - linux-panel/src
-              - linux-panel/plugins
+              - src
+              - plugins
             paths-ignore:
-              - linux-panel/node_modules
-              - linux-panel/src/public
-              - linux-panel/src/config/swagger.js
-              - linux-panel/src/config/swagger.fixed.js
+              - node_modules
+              - src/public
+              - src/config/swagger.js
+              - src/config/swagger.fixed.js
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
@@ -141,7 +138,7 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
-          scan-ref: ./linux-panel
+          scan-ref: .
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH

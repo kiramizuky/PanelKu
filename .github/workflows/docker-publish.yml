@@ -41,18 +41,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: linux-panel/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ./linux-panel
         run: npm ci --ignore-scripts
 
       - name: Run ESLint
-        working-directory: ./linux-panel
         run: npm run lint:check
 
       - name: Check plugin imports resolve
-        working-directory: ./linux-panel
         run: npm run check:plugin-imports
         # [R3] BLOCKER — fails if any plugin imports a path that does not exist.
 
@@ -69,14 +66,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: linux-panel/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ./linux-panel
         run: npm ci --ignore-scripts
 
       - name: Run npm audit
-        working-directory: ./linux-panel
         run: npm audit --audit-level=high
         # [R1] BLOCKER — high/critical vulnerabilities block image publication.
         continue-on-error: false
@@ -97,14 +92,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: linux-panel/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ./linux-panel
         run: npm ci --ignore-scripts
 
       - name: Run window assignment check
-        working-directory: ./linux-panel
         run: node scripts/check-window-assignment.js
 
   # ── CSP Security Gate (fast — runs before build) ──────────────
@@ -124,14 +117,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: linux-panel/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ./linux-panel
         run: npm ci --ignore-scripts
 
       - name: Run CSP tests (fast security gate)
-        working-directory: ./linux-panel
         run: npm run test:csp
 
   # ── Stage 2: Build & Push ───────────────────────────────────────
@@ -188,7 +179,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./linux-panel
+          context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
