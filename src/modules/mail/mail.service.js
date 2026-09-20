@@ -66,6 +66,7 @@ class MailService {
       { key: 'postfix', cmd: 'systemctl is-active postfix 2>/dev/null || echo "inactive"' },
       { key: 'dovecot', cmd: 'systemctl is-active dovecot 2>/dev/null || echo "inactive"' },
       { key: 'spamassassin', cmd: '(systemctl is-active --quiet spamassassin 2>/dev/null || systemctl is-active --quiet spamd 2>/dev/null || pgrep -x spamd >/dev/null 2>&1) && echo "active" || echo "inactive"' },
+      { key: 'opendkim', cmd: 'systemctl is-active opendkim 2>/dev/null || echo "inactive"' },
       { key: 'roundcube', cmd: 'systemctl is-active roundcube 2>/dev/null || echo "inactive"' },
     ];
     await Promise.allSettled(
@@ -117,10 +118,18 @@ class MailService {
       await execAsync('echo "postfix postfix/main_mailer_type select Internet Site" | sudo debconf-set-selections 2>/dev/null || true');
       await execAsync('echo "postfix postfix/mailname string $(hostname -f 2>/dev/null || hostname)" | sudo debconf-set-selections 2>/dev/null || true');
 
-      const { stdout } = await execAsync('sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postfix postfix-mysql dovecot-core dovecot-imapd dovecot-pop3d dovecot-mysql spamassassin roundcube roundcube-mysql 2>&1 | tail -5');
+      const { stdout } = await execAsync('sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postfix postfix-mysql dovecot-core dovecot-imapd dovecot-pop3d dovecot-mysql spamassassin roundcube roundcube-mysql opendkim opendkim-tools 2>&1 | tail -5');
 
-      // Ensure basic main.cf and virtual directories exist if not created by package
-      await execAsync('sudo mkdir -p /etc/postfix /var/mail/vhosts 2>/dev/null');
+      // 1. Ensure vmail user & basic directories
+      await execAsync('sudo groupadd -g 5000 vmail 2>/dev/null || true');
+      await execAsync('sudo useradd -u 5000 -g 5000 -s /usr/sbin/nologin -d /var/mail/vhosts vmail 2>/dev/null || true');
+      await execAsync('sudo mkdir -p /etc/postfix /var/mail/vhosts /etc/dovecot/conf.d /etc/opendkim/keys /var/spool/postfix/opendkim /var/spool/postfix/private 2>/dev/null');
+      await execAsync('sudo chown -R 5000:5000 /var/mail/vhosts 2>/dev/null || true');
+      await execAsync('sudo chmod -R 770 /var/mail/vhosts 2>/dev/null || true');
+      await execAsync('test -f /etc/dovecot/users || sudo touch /etc/dovecot/users');
+      await execAsync('sudo chmod 644 /etc/dovecot/users 2>/dev/null || true');
+
+      // 2. Postfix main.cf and virtual map configuration
       await execAsync('test -f /etc/postfix/main.cf || sudo cp /usr/share/postfix/main.cf.dist /etc/postfix/main.cf 2>/dev/null || sudo touch /etc/postfix/main.cf');
       await execAsync('test -f /etc/postfix/virtual_mailbox || sudo touch /etc/postfix/virtual_mailbox');
       await execAsync('sudo postconf -e "virtual_mailbox_maps=hash:/etc/postfix/virtual_mailbox" 2>/dev/null || true');
@@ -130,10 +139,114 @@ class MailService {
       await execAsync('sudo postconf -e "virtual_gid_maps=static:5000" 2>/dev/null || true');
       await execAsync('sudo postmap /etc/postfix/virtual_mailbox 2>/dev/null || true');
 
+      // Postfix SASL Auth via Dovecot
+      await execAsync('sudo postconf -e "smtpd_sasl_type=dovecot" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "smtpd_sasl_path=private/auth" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "smtpd_sasl_auth_enable=yes" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "smtpd_sasl_security_options=noanonymous" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "smtpd_recipient_restrictions=permit_mynetworks,permit_sasl_authenticated,reject_unauth_destination" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "smtpd_relay_restrictions=permit_mynetworks,permit_sasl_authenticated,defer_unauth_destination" 2>/dev/null || true');
+
+      // OpenDKIM Milters & IPv4 routing
+      await execAsync('sudo postconf -e "milter_default_action=accept" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "milter_protocol=6" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "smtpd_milters=local:/opendkim/opendkim.sock" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "non_smtpd_milters=local:/opendkim/opendkim.sock" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "inet_protocols=ipv4" 2>/dev/null || true');
+
+      // Master.cf submission (587) and submissions (465)
+      await execAsync('sudo postconf -M submission/inet="submission inet n - y - - smtpd" 2>/dev/null || true');
+      await execAsync('sudo postconf -P "submission/inet/syslog_name=postfix/submission" 2>/dev/null || true');
+      await execAsync('sudo postconf -P "submission/inet/smtpd_tls_security_level=encrypt" 2>/dev/null || true');
+      await execAsync('sudo postconf -P "submission/inet/smtpd_sasl_auth_enable=yes" 2>/dev/null || true');
+      await execAsync('sudo postconf -P "submission/inet/smtpd_relay_restrictions=permit_sasl_authenticated,reject" 2>/dev/null || true');
+
+      await execAsync('sudo postconf -M submissions/inet="submissions inet n - y - - smtpd" 2>/dev/null || true');
+      await execAsync('sudo postconf -P "submissions/inet/syslog_name=postfix/submissions" 2>/dev/null || true');
+      await execAsync('sudo postconf -P "submissions/inet/smtpd_tls_wrappermode=yes" 2>/dev/null || true');
+      await execAsync('sudo postconf -P "submissions/inet/smtpd_sasl_auth_enable=yes" 2>/dev/null || true');
+      await execAsync('sudo postconf -P "submissions/inet/smtpd_relay_restrictions=permit_sasl_authenticated,reject" 2>/dev/null || true');
+
+      // 3. Dovecot 2.4 Virtual Configuration
+      const dovecotLocal = `
+auth_mechanisms = plain login
+disable_plaintext_auth = yes
+
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+`;
+      const b64Dovecot = Buffer.from(dovecotLocal).toString('base64');
+      await execAsync(`echo "${b64Dovecot}" | base64 -d | sudo tee -a /etc/dovecot/local.conf >/dev/null || true`);
+
+      const dovecotPasswdFile = `
+passdb passwd-file {
+  passwd_file_path = /etc/dovecot/users
+}
+userdb passwd-file {
+  passwd_file_path = /etc/dovecot/users
+}
+`;
+      const b64Passwd = Buffer.from(dovecotPasswdFile).toString('base64');
+      await execAsync(`echo "${b64Passwd}" | base64 -d | sudo tee /etc/dovecot/conf.d/auth-passwdfile.conf.ext >/dev/null || true`);
+      await execAsync('sudo sed -i "s/^auth_mechanisms =.*/auth_mechanisms = plain login/" /etc/dovecot/conf.d/10-auth.conf 2>/dev/null || true');
+      await execAsync('sudo sed -i "s/^!include auth-system.conf.ext/#!include auth-system.conf.ext/" /etc/dovecot/conf.d/10-auth.conf 2>/dev/null || true');
+      await execAsync('sudo sed -i "s/^#!include auth-passwdfile.conf.ext/!include auth-passwdfile.conf.ext/" /etc/dovecot/conf.d/10-auth.conf 2>/dev/null || true');
+      await execAsync('sudo sed -i "s|^mail_location =.*|mail_location = maildir:/var/mail/vhosts/%d/%n|" /etc/dovecot/conf.d/10-mail.conf 2>/dev/null || true');
+
+      // 4. OpenDKIM Base Configuration
+      const opendkimConf = `
+AutoRestart             Yes
+AutoRestartRate         10/1h
+UMask                   002
+Syslog                  yes
+SyslogSuccess           Yes
+LogWhy                  Yes
+Canonicalization        relaxed/simple
+Mode                    sv
+SubDomains              no
+OversignHeaders         From
+KeyTable                refile:/etc/opendkim/key.table
+SigningTable            refile:/etc/opendkim/signing.table
+ExternalIgnoreList      refile:/etc/opendkim/trusted.hosts
+InternalHosts           refile:/etc/opendkim/trusted.hosts
+Socket                  local:/var/spool/postfix/opendkim/opendkim.sock
+PIDFile                 /run/opendkim/opendkim.pid
+SignatureAlgorithm      rsa-sha256
+UserID                  opendkim
+`;
+      const b64Opendkim = Buffer.from(opendkimConf).toString('base64');
+      await execAsync(`echo "${b64Opendkim}" | base64 -d | sudo tee /etc/opendkim.conf >/dev/null || true`);
+      await execAsync('sudo mkdir -p /var/spool/postfix/opendkim 2>/dev/null || true');
+      await execAsync('sudo chown -R opendkim:postfix /var/spool/postfix/opendkim 2>/dev/null || true');
+      await execAsync('sudo chmod 750 /var/spool/postfix/opendkim 2>/dev/null || true');
+      await execAsync('sudo adduser postfix opendkim 2>/dev/null || true');
+      await execAsync('test -f /etc/opendkim/signing.table || sudo touch /etc/opendkim/signing.table');
+      await execAsync('test -f /etc/opendkim/key.table || sudo touch /etc/opendkim/key.table');
+      await execAsync('test -f /etc/opendkim/trusted.hosts || echo -e "127.0.0.1\\nlocalhost\\n::1" | sudo tee /etc/opendkim/trusted.hosts >/dev/null || true');
+
+      // 5. SpamAssassin, services and firewall
       await execAsync('sudo sed -i "s/^ENABLED=0/ENABLED=1/" /etc/default/spamassassin 2>/dev/null || true');
       await execAsync('sudo systemctl unmask spamassassin spamd 2>/dev/null || true');
-      await execAsync('sudo systemctl enable postfix dovecot spamassassin spamd 2>/dev/null').catch(() => {});
-      await execAsync('sudo systemctl start postfix dovecot spamassassin 2>/dev/null || sudo systemctl start spamd 2>/dev/null || true').catch(() => {});
+      await execAsync('sudo systemctl enable postfix dovecot opendkim spamassassin spamd 2>/dev/null').catch(() => {});
+      await execAsync('sudo systemctl restart opendkim postfix dovecot spamassassin 2>/dev/null || sudo systemctl start opendkim postfix dovecot spamd 2>/dev/null || true').catch(() => {});
+
+      // Firewall ports
+      await execAsync('sudo ufw allow 25/tcp 2>/dev/null || true');
+      await execAsync('sudo ufw allow 465/tcp 2>/dev/null || true');
+      await execAsync('sudo ufw allow 587/tcp 2>/dev/null || true');
+      await execAsync('sudo ufw allow 993/tcp 2>/dev/null || true');
+
+      // Generate DKIM for any existing domains
+      const existingDomains = await this.getDomains();
+      for (const dom of existingDomains) {
+        await this._ensureDkim(dom).catch(() => {});
+      }
+
       return { success: true, log: stdout.trim() };
     } catch (err) {
       throw new Error('Mail server install failed: ' + err.message);
@@ -152,7 +265,7 @@ class MailService {
   // ── Service Control ───────────────────────────────────────
 
   async controlService(service, action) {
-    const validSvc = ['postfix', 'dovecot', 'spamassassin'];
+    const validSvc = ['postfix', 'dovecot', 'spamassassin', 'opendkim'];
     if (!validSvc.includes(service)) throw new Error('Invalid service name');
     if (!['start', 'stop', 'restart', 'reload'].includes(action)) throw new Error('Invalid action');
 
@@ -223,11 +336,13 @@ class MailService {
       const mailboxPath = `/var/mail/vhosts/${domain}/${localPart}/`;
 
       await execAsync(`sudo mkdir -p ${mailboxPath} 2>/dev/null`);
+      await execAsync(`sudo sed -i "/^${email.replace(/\\./g, '\\\\.')} /d" /etc/postfix/virtual_mailbox 2>/dev/null || true`);
       await execAsync(`echo "${email} ${mailboxPath}" | sudo tee -a /etc/postfix/virtual_mailbox 2>/dev/null`);
 
       // Create dovecot user
       const { stdout: hash } = await execAsync(`sudo doveadm pw -s SHA512-CRYPT -p '${password.replace(/'/g, "'\\''")}' 2>/dev/null`);
       const userLine = `${email}:${hash.trim()}:5000:5000::${mailboxPath}::`;
+      await execAsync(`sudo sed -i "/^${email.replace(/\\./g, '\\\\.')}:/d" /etc/dovecot/users 2>/dev/null || true`);
       await execAsync(`echo "${userLine}" | sudo tee -a /etc/dovecot/users 2>/dev/null`);
 
       // Apply ownership
@@ -249,9 +364,9 @@ class MailService {
 
     try {
       // Remove from virtual mailbox
-      await execAsync(`sudo sed -i "/^${email.replace(/\./g, '\\.')} /d" /etc/postfix/virtual_mailbox 2>/dev/null`);
+      await execAsync(`sudo sed -i "/^${email.replace(/\\./g, '\\\\.')} /d" /etc/postfix/virtual_mailbox 2>/dev/null`);
       // Remove from dovecot users
-      await execAsync(`sudo sed -i "/^${email.replace(/\./g, '\\.')}:/d" /etc/dovecot/users 2>/dev/null`);
+      await execAsync(`sudo sed -i "/^${email.replace(/\\./g, '\\\\.')}:/d" /etc/dovecot/users 2>/dev/null`);
       // Reload
       await execAsync('sudo postmap /etc/postfix/virtual_mailbox 2>/dev/null');
       await execAsync('sudo systemctl reload postfix dovecot 2>/dev/null');
@@ -351,10 +466,40 @@ class MailService {
         const newDomainsStr = existing.join(' ');
         await execAsync(`sudo postconf -e "virtual_mailbox_domains=${newDomainsStr}"`);
       }
+      await this._ensureDkim(domain).catch(() => {});
       await execAsync('sudo systemctl reload postfix 2>/dev/null || sudo systemctl restart postfix 2>/dev/null || true');
       return { success: true, domain };
     } catch (err) {
       throw new Error('Failed to add domain: ' + err.message);
+    }
+  }
+
+  async _ensureDkim(domain) {
+    if (!domain || !domain.includes('.')) return;
+    try {
+      const d = domain.trim();
+      const keyDir = `/etc/opendkim/keys/${d}`;
+      await execAsync(`sudo mkdir -p ${keyDir} /etc/opendkim 2>/dev/null`);
+      await execAsync(`test -f ${keyDir}/mail.private || sudo opendkim-genkey -b 2048 -d ${d} -D ${keyDir} -s mail 2>/dev/null || true`);
+      await execAsync('sudo chown -R opendkim:opendkim /etc/opendkim/keys 2>/dev/null || true');
+      await execAsync(`sudo chmod 600 ${keyDir}/mail.private 2>/dev/null || true`);
+
+      // Update signing.table: *@domain mail._domainkey.domain
+      await execAsync('test -f /etc/opendkim/signing.table || sudo touch /etc/opendkim/signing.table');
+      await execAsync(`grep -q "^\\*@${d.replace(/\\./g, '\\.')} " /etc/opendkim/signing.table 2>/dev/null || echo "*@${d} mail._domainkey.${d}" | sudo tee -a /etc/opendkim/signing.table >/dev/null`);
+
+      // Update key.table: mail._domainkey.domain domain:mail:/etc/opendkim/keys/domain/mail.private
+      await execAsync('test -f /etc/opendkim/key.table || sudo touch /etc/opendkim/key.table');
+      await execAsync(`grep -q "^mail\\._domainkey\\.${d.replace(/\\./g, '\\.')} " /etc/opendkim/key.table 2>/dev/null || echo "mail._domainkey.${d} ${d}:mail:${keyDir}/mail.private" | sudo tee -a /etc/opendkim/key.table >/dev/null`);
+
+      // Update trusted.hosts
+      await execAsync('test -f /etc/opendkim/trusted.hosts || sudo touch /etc/opendkim/trusted.hosts');
+      await execAsync(`grep -q "^${d.replace(/\\./g, '\\.')}$" /etc/opendkim/trusted.hosts 2>/dev/null || echo "${d}" | sudo tee -a /etc/opendkim/trusted.hosts >/dev/null`);
+      await execAsync(`grep -q "^\\*\\.${d.replace(/\\./g, '\\.')}$" /etc/opendkim/trusted.hosts 2>/dev/null || echo "*.${d}" | sudo tee -a /etc/opendkim/trusted.hosts >/dev/null`);
+
+      await execAsync('sudo systemctl restart opendkim 2>/dev/null || sudo systemctl reload opendkim 2>/dev/null || true');
+    } catch (e) {
+      console.warn(`[_ensureDkim] Warning: Could not generate DKIM for ${domain}:`, e.message);
     }
   }
 
@@ -595,6 +740,29 @@ class MailService {
       } catch {}
     }
 
+    // 3. Extract real DKIM public key from /etc/opendkim/keys/${d}/mail.txt
+    let dkimValue = 'v=DKIM1; k=rsa; p=<public-key>';
+    try {
+      if (d !== 'example.com') {
+        await this._ensureDkim(d).catch(() => {});
+      }
+      const { stdout: dkimTxt } = await execAsync(`sudo cat /etc/opendkim/keys/${d}/mail.txt 2>/dev/null || sudo cat /etc/opendkim/keys/${d}/default.txt 2>/dev/null || echo ""`, { timeout: 2500 });
+      if (dkimTxt) {
+        const match = dkimTxt.match(/\(\s*([\s\S]*?)\s*\)/);
+        if (match) {
+          const joined = match[1].replace(/"\s*"/g, '').replace(/["\r\n\t]/g, '').trim();
+          if (joined.startsWith('v=DKIM1')) {
+            dkimValue = joined;
+          }
+        } else {
+          const cleanTxt = dkimTxt.replace(/^[^(]*\(/, '').replace(/\)[^)]*$/, '').replace(/["\r\n\t]/g, '').trim();
+          if (cleanTxt.includes('v=DKIM1')) {
+            dkimValue = cleanTxt;
+          }
+        }
+      }
+    } catch {}
+
     return {
       domain: d,
       serverIp,
@@ -603,7 +771,7 @@ class MailService {
         { type: 'A', host: 'mail', priority: null, value: serverIp, note: 'Points mail host to your server public IP address' },
         { type: 'TXT (SPF)', host: '@', priority: null, value: `v=spf1 mx a ip4:${serverIp} ~all`, note: 'Sender Policy Framework - authorizes this public IP to send emails' },
         { type: 'TXT (DMARC)', host: '_dmarc', priority: null, value: `v=DMARC1; p=quarantine; rua=mailto:postmaster@${d}; pct=100`, note: 'Domain-based Message Authentication policy' },
-        { type: 'TXT (DKIM)', host: 'default._domainkey', priority: null, value: 'v=DKIM1; k=rsa; p=<public-key>', note: 'Cryptographic signature validating email authenticity' },
+        { type: 'TXT (DKIM)', host: 'mail._domainkey', priority: null, value: dkimValue, note: 'Cryptographic signature validating email authenticity' },
         { type: 'PTR (rDNS)', host: serverIp, priority: null, value: `mail.${d}`, note: 'Reverse DNS - configure at VPS/Hosting provider dashboard' }
       ]
     };

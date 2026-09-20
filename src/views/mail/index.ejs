@@ -180,11 +180,16 @@
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
           <div>
             <h5 style="margin:0 0 4px;font-size:16px;font-weight:600;"><i class="bi bi-shield-check text-success me-2"></i>DNS Records & Deliverability Helper</h5>
-            <p style="color:var(--text-muted);font-size:12px;margin:0;">Essential DNS records required to prevent your emails from going directly to spam or getting rejected by Gmail & Yahoo.</p>
+            <p style="color:var(--text-muted);font-size:12px;margin:0;">Essential DNS records required to prevent your emails from going directly to spam or getting rejected by Gmail &amp; Yahoo.</p>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input type="text" id="mailDnsDomainInput" class="lp-input" placeholder="yourdomain.com" style="width:200px;font-size:12px;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select id="mailDnsDomainSelect" class="lp-input" style="width:160px;font-size:12px;" onchange="MAIL.onDnsDomainSelect(this.value)">
+              <option value="">-- Select Domain --</option>
+            </select>
+            <input type="text" id="mailDnsDomainInput" class="lp-input" placeholder="yourdomain.com" style="width:160px;font-size:12px;">
             <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="MAIL.loadDnsHelper()"><i class="bi bi-arrow-repeat"></i> Generate</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="MAIL.copyAllDnsRecords()" title="Copy all records as text for easy setup"><i class="bi bi-clipboard-check"></i> Copy All DNS</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="MAIL.copyClientConfig()" title="Copy email client IMAP & SMTP setup"><i class="bi bi-gear"></i> Copy Client Settings</button>
           </div>
         </div>
 
@@ -193,10 +198,10 @@
             <thead>
               <tr>
                 <th style="width:110px;">Type</th>
-                <th style="width:140px;">Host / Name</th>
+                <th style="width:170px;">Host / Name</th>
                 <th style="width:70px;">Priority</th>
                 <th>Target Value</th>
-                <th style="width:80px;text-align:right;">Copy</th>
+                <th style="width:110px;text-align:right;">Copy Value</th>
               </tr>
             </thead>
             <tbody id="mailDnsTableBody">
@@ -205,9 +210,24 @@
           </table>
         </div>
 
-        <div style="margin-top:16px;padding:12px 16px;border-radius:8px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);font-size:12px;color:#fef08a;">
-          <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
-          <strong>Don't forget rDNS (Reverse DNS / PTR)!</strong> You must configure a PTR record for your server IP in your cloud hosting provider's dashboard (DigitalOcean, Linode, AWS, Hetzner, etc.) matching your hostname (e.g. <code>mail.yourdomain.com</code>).
+        <div class="row g-3 mt-3">
+          <div class="col-md-7">
+            <div style="padding:12px 16px;border-radius:8px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);font-size:12px;color:#fef08a;">
+              <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+              <strong>Reverse DNS (PTR):</strong> Configure a PTR record for your server IP (<code id="mailDnsServerIpDisplay">—</code>) in your cloud hosting provider dashboard (DigitalOcean, Linode, AWS, Hetzner, etc.) pointing to <code>mail.&lt;yourdomain&gt;</code>.
+            </div>
+          </div>
+          <div class="col-md-5">
+            <div style="padding:12px 16px;border-radius:8px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);font-size:12px;color:#93c5fd;">
+              <i class="bi bi-info-circle-fill text-info me-2"></i>
+              <strong>Email Client Setup (IMAP / SMTP):</strong>
+              <div style="margin-top:4px;font-family:monospace;font-size:11px;">
+                Incoming: <strong>mail.&lt;domain&gt;</strong> (IMAP 993 SSL/TLS)<br>
+                Outgoing: <strong>mail.&lt;domain&gt;</strong> (SMTP 587 STARTTLS / 465 SSL)<br>
+                Username: <em>full email address</em>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

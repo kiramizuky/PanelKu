@@ -161,7 +161,20 @@ const MAIL = (() => {
           return;
         }
 
-        // Pre-fill DNS domain input if empty
+        // Pre-fill and populate DNS domain selector dropdown
+        const dnsSelect = document.getElementById('mailDnsDomainSelect');
+        if (dnsSelect) {
+          const currentVal = dnsSelect.value;
+          dnsSelect.innerHTML = '<option value="">-- Select Domain --</option>' +
+            domains.map(d => `<option value="${LP.escHtml(d)}">${LP.escHtml(d)}</option>`).join('');
+          if (currentVal && domains.includes(currentVal)) {
+            dnsSelect.value = currentVal;
+          } else if (domains.length > 0 && !dnsSelect.value) {
+            dnsSelect.value = domains[0];
+            const dnsInput = document.getElementById('mailDnsDomainInput');
+            if (dnsInput && !dnsInput.value) dnsInput.value = domains[0];
+          }
+        }
         const dnsInput = document.getElementById('mailDnsDomainInput');
         if (dnsInput && !dnsInput.value && domains[0]) {
           dnsInput.value = domains[0];
@@ -220,10 +233,16 @@ const MAIL = (() => {
     }
   }
 
+  let currentDnsRecords = [];
+  let currentDnsDomain = '';
+  let currentDnsServerIp = '';
+
   async function loadDnsHelper() {
     const input = document.getElementById('mailDnsDomainInput');
-    const domain = input?.value?.trim() || 'example.com';
+    const select = document.getElementById('mailDnsDomainSelect');
+    const domain = input?.value?.trim() || select?.value?.trim() || 'example.com';
     const tbody = document.getElementById('mailDnsTableBody');
+    const ipDisplay = document.getElementById('mailDnsServerIpDisplay');
     if (!tbody) return;
 
     tbody.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;">Generating recommended DNS templates...</td></tr>';
@@ -231,18 +250,31 @@ const MAIL = (() => {
     try {
       const res = await LP.get(`/mail/dns-helper?domain=${encodeURIComponent(domain)}`);
       if (res?.success && Array.isArray(res.data?.records)) {
+        currentDnsRecords = res.data.records;
+        currentDnsDomain = res.data.domain || domain;
+        currentDnsServerIp = res.data.serverIp || 'YOUR_SERVER_IP';
+
+        if (ipDisplay) ipDisplay.textContent = currentDnsServerIp;
+
         tbody.innerHTML = res.data.records.map(r => `
           <tr>
             <td><strong class="text-info">${LP.escHtml(r.type)}</strong></td>
-            <td><code>${LP.escHtml(r.host)}</code></td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <code>${LP.escHtml(r.host)}</code>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm" style="padding:2px 6px;font-size:10px;" title="Copy Host" onclick="LP.copy('${LP.escHtml(r.host)}', 'Host copied!')">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </td>
             <td>${r.priority !== null ? `<code>${r.priority}</code>` : '—'}</td>
             <td>
-              <div class="dns-code-badge">${LP.escHtml(r.value)}</div>
+              <div class="dns-code-badge" style="word-break:break-all;font-family:monospace;font-size:11px;background:rgba(255,255,255,0.04);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);">${LP.escHtml(r.value)}</div>
               <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${LP.escHtml(r.note || '')}</div>
             </td>
-            <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" title="Copy Record Value" onclick="LP.copy('${LP.escHtml(r.value)}', 'Record copied to clipboard!')">
-                <i class="bi bi-clipboard"></i>
+            <td style="text-align:right;white-space:nowrap;">
+              <button class="btn-lp btn-lp-primary btn-lp-sm" title="Copy Target Value" onclick="LP.copy('${LP.escHtml(r.value)}', 'Value copied to clipboard!')">
+                <i class="bi bi-clipboard me-1"></i> Copy
               </button>
             </td>
           </tr>
@@ -255,15 +287,68 @@ const MAIL = (() => {
     }
   }
 
+  function onDnsDomainSelect(val) {
+    const input = document.getElementById('mailDnsDomainInput');
+    if (input && val) {
+      input.value = val;
+      loadDnsHelper();
+    }
+  }
+
+  function copyAllDnsRecords() {
+    if (!currentDnsRecords || currentDnsRecords.length === 0) {
+      LP.toast('Please generate DNS records first', 'warning');
+      return;
+    }
+    const lines = [
+      `=== DNS RECORDS FOR ${currentDnsDomain.toUpperCase()} ===`,
+      `Server IP: ${currentDnsServerIp}`,
+      ''
+    ];
+    for (const r of currentDnsRecords) {
+      lines.push(`[${r.type}]`);
+      lines.push(`Host:     ${r.host}`);
+      if (r.priority !== null) lines.push(`Priority: ${r.priority}`);
+      lines.push(`Value:    ${r.value}`);
+      if (r.note) lines.push(`Note:     ${r.note}`);
+      lines.push('----------------------------------------');
+    }
+    LP.copy(lines.join('\n'), 'All DNS records copied to clipboard!');
+  }
+
+  function copyClientConfig() {
+    const domain = currentDnsDomain || document.getElementById('mailDnsDomainInput')?.value?.trim() || 'yourdomain.com';
+    const text = [
+      `=== EMAIL CLIENT CONFIGURATION FOR ${domain.toUpperCase()} ===`,
+      '',
+      'INCOMING MAIL SERVER (IMAP):',
+      `  Server:    mail.${domain}`,
+      '  Port:      993',
+      '  Security:  SSL / TLS',
+      '  Username:  full_email@' + domain,
+      '',
+      'OUTGOING MAIL SERVER (SMTP):',
+      `  Server:    mail.${domain}`,
+      '  Port:      587 (or 465)',
+      '  Security:  STARTTLS (or SSL/TLS on port 465)',
+      '  Require Auth: Yes',
+      '  Username:  full_email@' + domain,
+      '',
+      'WEBMAIL (Roundcube):',
+      `  https://mail.${domain} (or http://YOUR_SERVER_IP/roundcube)`
+    ].join('\n');
+    LP.copy(text, 'Email client configuration copied to clipboard!');
+  }
+
   function selectDomainForDns(domain) {
     const input = document.getElementById('mailDnsDomainInput');
-    if (input) {
-      input.value = domain;
-      loadDnsHelper();
-      const tabLink = document.querySelector('a[href="#mail-dns"]');
-      if (tabLink && window.bootstrap?.Tab) {
-        new bootstrap.Tab(tabLink).show();
-      }
+    const select = document.getElementById('mailDnsDomainSelect');
+    if (input) input.value = domain;
+    if (select) select.value = domain;
+    loadDnsHelper();
+    const tabLink = document.querySelector('a[href="#mail-dns"]');
+    if (tabLink && window.bootstrap?.Tab) {
+      new bootstrap.Tab(tabLink).show();
     }
   }
 
@@ -625,6 +710,9 @@ const MAIL = (() => {
     loadLogs,
     loadSpamConfig,
     loadDnsHelper,
+    onDnsDomainSelect,
+    copyAllDnsRecords,
+    copyClientConfig,
     selectDomainForDns,
     openDnsHelperPreview,
     showAddDomainModal,
