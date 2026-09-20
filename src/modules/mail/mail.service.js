@@ -123,6 +123,11 @@ class MailService {
       await execAsync('sudo mkdir -p /etc/postfix /var/mail/vhosts 2>/dev/null');
       await execAsync('test -f /etc/postfix/main.cf || sudo cp /usr/share/postfix/main.cf.dist /etc/postfix/main.cf 2>/dev/null || sudo touch /etc/postfix/main.cf');
       await execAsync('test -f /etc/postfix/virtual_mailbox || sudo touch /etc/postfix/virtual_mailbox');
+      await execAsync('sudo postconf -e "virtual_mailbox_maps=hash:/etc/postfix/virtual_mailbox" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "virtual_mailbox_base=/" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "virtual_minimum_uid=100" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "virtual_uid_maps=static:5000" 2>/dev/null || true');
+      await execAsync('sudo postconf -e "virtual_gid_maps=static:5000" 2>/dev/null || true');
       await execAsync('sudo postmap /etc/postfix/virtual_mailbox 2>/dev/null || true');
 
       await execAsync('sudo sed -i "s/^ENABLED=0/ENABLED=1/" /etc/default/spamassassin 2>/dev/null || true');
@@ -229,6 +234,7 @@ class MailService {
       await execAsync(`sudo chown -R 5000:5000 ${mailboxPath} 2>/dev/null`);
 
       // Reload maps
+      await execAsync('sudo postconf -e "virtual_mailbox_maps=hash:/etc/postfix/virtual_mailbox" 2>/dev/null || true');
       await execAsync('sudo postmap /etc/postfix/virtual_mailbox 2>/dev/null');
       await execAsync('sudo systemctl reload postfix dovecot 2>/dev/null');
 
