@@ -480,7 +480,21 @@ class DatabaseService {
   async createPgDatabase(name) {
     this._sanitizeDbName(name);
     const client = await this.getPgConnection();
-    await client.query('CREATE DATABASE "' + name + '"');
+    try {
+      await client.query('CREATE DATABASE "' + name + '"');
+    } catch (err) {
+      if (err.message && err.message.toLowerCase().includes('collation version mismatch')) {
+        try {
+          await client.query('ALTER DATABASE template1 REFRESH COLLATION VERSION');
+          try { await client.query('ALTER DATABASE postgres REFRESH COLLATION VERSION'); } catch (_) {}
+          await client.query('CREATE DATABASE "' + name + '"');
+          return true;
+        } catch (retryErr) {
+          throw err;
+        }
+      }
+      throw err;
+    }
     return true;
   }
 
