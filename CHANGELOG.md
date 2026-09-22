@@ -5,12 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.6.0] — 2026-09-11
+## [3.6.0] — 2026-09-22
 
 ### Added
+- **Universal Multi-Module Auto-Healing Engine (AutoHeal 2.0)**: Complete architectural overhaul of Auto-Healing into a modular provider registry covering all 40 modules:
+  - **Web & Proxy Provider**: Automated syntax testing (`nginx -t`), broken configuration rollback (`nginx.conf.bak`), daemon resurrection, and PHP-FPM pool (`php8.x-fpm`) monitoring & restarts.
+  - **Database Provider**: Automated PostgreSQL collation mismatch refresh (`template1`/`postgres`), stale `postmaster.pid` cleanup, MySQL connection check, SQLite WAL checkpointing & integrity check, Redis memory defragmentation (`MEMORY PURGE`), and MongoDB stale socket/lock cleanup.
+  - **Container Provider**: Docker daemon & socket watchdog, CrashLoopBackOff container detection with isolated recovery, and Docker network subnet pruning.
+  - **Storage & OS Provider**: Multi-stage emergency disk cleaner (journalctl vacuum, docker system prune, package cache clean, `/tmp` cleanup > 3d, stale `.tmp` backup purge), inode exhaustion detection, and RAM cache drop (`sync && echo 3 > /proc/sys/vm/drop_caches`).
+  - **Security & Firewall Provider**: UFW firewall auto-enable with SSH (port 22/custom) & Panelku (port 23456) anti-lockout protection, Fail2ban stale socket `/var/run/fail2ban/fail2ban.sock` cleanup, and SSL certificate expiry monitor (<14 days).
+  - **Runtime & Daemons Provider**: Node.js C++ native binary verification (`better-sqlite3`, `node-pty`), WhatsApp Baileys session lock release, Postfix MTA queue flush, Mosquitto MQTT broker restart, and zombie port collision resolution.
+  - **Interactive Matrix UI**: New "All Modules" matrix dashboard tab, 1-Click "Heal All Modules" action, and independent module-level toggle switches.
+- **PostgreSQL Collation Mismatch Auto-Remediation**: Native auto-healing in `createPgDatabase` catching `template database "template1" has a collation version mismatch` caused by OS glibc updates, auto-refreshing collation on `template1` & `postgres`, and retrying creation without failure.
 - **Queue Architecture (BullMQ + In-Memory Fallback)**: Built unified `QueueManager` supporting BullMQ backed by Redis for heavy background operations (backup, restore, git deploy) with seamless in-memory fallback, concurrency control, and EventBus status notifications (`BACKUP_COMPLETE`, `BACKUP_FAILED`, `DEPLOY_COMPLETE`, `DEPLOY_FAILED`).
 - **Asynchronous Queue Operations**: Added `/backup/queue/metrics` and `/backup/queue/:jobId` endpoints, plus non-blocking `?async=true` execution mode for database dumps, file archives, and disaster recovery restores.
-- **Dedicated Test Coverage Expansion**: Added 6 comprehensive test suites covering `queue`, `alerts`, `whatsapp`, `analytics`, `caddy`, `mail`, and `filemanager` (expanding test suites to 37 passed suites and 490 tests).
+- **Dedicated Test Coverage Expansion**: Added comprehensive test suites covering `autoheal`, `queue`, `alerts`, `whatsapp`, `analytics`, `caddy`, `mail`, and `filemanager` (expanding test suites to 38 passed suites and 500+ tests).
 
 ### Fixed
 - **Orphaned Module Routes & Navigation**: Restored `/alerts` page route and desktop/mobile navigation links under Security; restored `/whatsapp` desktop/mobile navigation links under Services.

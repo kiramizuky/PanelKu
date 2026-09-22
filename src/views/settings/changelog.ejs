@@ -48,14 +48,31 @@
         <h5 class="settings-section-title">
           <i class="bi bi-file-earmark-text text-primary"></i> Version Changelog
         </h5>
-        <span class="lp-badge lp-badge-success" style="font-size: 10px;">v3.5.0 Active</span>
+        <span class="lp-badge lp-badge-success" style="font-size: 10px;">v3.6.0 Active</span>
       </div>
       <div class="settings-section-body" style="display: flex; flex-direction: column; gap: 20px;">
         
-        <!-- Release Version 3.5.0 -->
+        <!-- Release Version 3.6.0 -->
         <div style="position: relative; padding-left: 20px; border-left: 2px solid var(--accent-primary);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
-            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v3.5.0 <span class="lp-badge lp-badge-success" style="font-size: 9px; padding: 2px 6px;">Latest Release</span></h6>
+            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v3.6.0 <span class="lp-badge lp-badge-success" style="font-size: 9px; padding: 2px 6px;">Latest Release</span></h6>
+            <span style="font-size: 11px; color: var(--text-muted);">September 22, 2026</span>
+          </div>
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px;">
+            Universal Multi-Module Auto-Healing Engine (AutoHeal 2.0) across all 40 modules, PostgreSQL Collation Mismatch Auto-Remediation, High-Performance Queue Architecture (BullMQ + Redis with in-memory fallback), and Interactive Multi-Module Health Matrix.
+          </p>
+          <ul style="font-size: 12px; color: var(--text-secondary); padding-left: 16px; margin: 0; display: flex; flex-direction: column; gap: 4px;">
+            <li><strong>Universal Multi-Module Auto-Healing Engine (AutoHeal 2.0):</strong> Modular provider architecture covering Web (Nginx config syntax test &amp; auto-rollback, PHP-FPM), Database (Postgres collation fix, MySQL, SQLite WAL, Redis, MongoDB), Containers (Docker daemon &amp; socket watchdog, CrashLoopBackOff detection), Storage (multi-stage emergency disk cleanup, inode checks, RAM drop_caches), Security (UFW anti-lockout, Fail2ban socket purge, SSL expiry check), and Runtime (native C++ binary verification, Baileys lock, zombie port clearance).</li>
+            <li><strong>PostgreSQL Collation Mismatch Auto-Remediation:</strong> Automatic recovery during <code>CREATE DATABASE</code> when encountering glibc / OS collation mismatches on <code>template1</code> &amp; <code>postgres</code> via <code>REFRESH COLLATION VERSION</code> without manual DBA intervention.</li>
+            <li><strong>High-Performance Queue Architecture (BullMQ + Redis):</strong> Unified background task processing for backups, restores, and git deployments with concurrency management, EventBus notifications, and resilient in-memory fallback.</li>
+            <li><strong>Interactive Multi-Module Health Matrix &amp; 1-Click Heal:</strong> Real-time visual matrix dashboard displaying health status across all service categories with 1-click global self-healing and per-module toggle switches.</li>
+          </ul>
+        </div>
+
+        <!-- Release Version 3.5.0 -->
+        <div style="position: relative; padding-left: 20px; border-left: 2px solid var(--accent-success);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+            <h6 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">v3.5.0</h6>
             <span style="font-size: 11px; color: var(--text-muted);">August 31, 2026</span>
           </div>
           <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px;">
