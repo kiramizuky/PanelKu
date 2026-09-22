@@ -98,6 +98,38 @@ class RuntimeProvider {
       }
     } catch (_) {}
 
+    // 5. Node.js / NVM .npmrc Prefix Collision Check
+    try {
+      const homeDir = process.env.HOME || (process.platform === 'win32' ? process.env.USERPROFILE : '/root');
+      const npmrcPaths = [path.join(homeDir, '.npmrc'), '/root/.npmrc'];
+      let hasConflictingPrefix = false;
+      let conflictFile = '';
+
+      for (const p of npmrcPaths) {
+        if (!p) continue;
+        try {
+          await fs.access(p);
+          const raw = await fs.readFile(p, 'utf8');
+          if (/^\s*(prefix|globalconfig)\s*=/m.test(raw)) {
+            hasConflictingPrefix = true;
+            conflictFile = p;
+            break;
+          }
+        } catch (_) {}
+      }
+
+      if (hasConflictingPrefix) {
+        items.push({
+          name: 'NVM & NPM Configuration',
+          serviceName: 'runtime:npmrc_prefix',
+          type: 'runtime',
+          status: 'warning',
+          message: `Incompatible prefix/globalconfig found in ${conflictFile} (conflicts with NVM)`,
+          healable: true,
+        });
+      }
+    } catch (_) {}
+
     return items;
   }
 
@@ -132,6 +164,31 @@ class RuntimeProvider {
         await fs.unlink(lockPath).catch(() => {});
         actionsTaken.push('Cleared stale WhatsApp session lockfile');
       } catch (_) {}
+    }
+
+    // 3. .npmrc Prefix Conflict Remediation
+    if (target === 'all' || target === 'runtime:npmrc_prefix') {
+      try {
+        const homeDir = process.env.HOME || (process.platform === 'win32' ? process.env.USERPROFILE : '/root');
+        const npmrcPaths = [path.join(homeDir, '.npmrc'), '/root/.npmrc'];
+        for (const p of npmrcPaths) {
+          if (!p) continue;
+          try {
+            await fs.access(p);
+            const raw = await fs.readFile(p, 'utf8');
+            if (/^\s*(prefix|globalconfig)\s*=/m.test(raw)) {
+              const cleaned = raw
+                .split('\n')
+                .filter(line => !/^\s*(prefix|globalconfig)\s*=/.test(line))
+                .join('\n');
+              await fs.writeFile(p, cleaned, 'utf8');
+              actionsTaken.push(`Removed conflicting prefix setting from ${p}`);
+            }
+          } catch (_) {}
+        }
+      } catch (err) {
+        logger.warn(`[AutoHeal:Runtime] .npmrc heal error: ${err.message}`);
+      }
     }
 
     if (isWindows) {

@@ -107,23 +107,62 @@ class NodeJSService {
   /**
    * Run an NVM command by sourcing nvm.sh first.
    */
-  async _runNvmCommand(args = []) {
+  async _runNvmCommand(args = [], options = {}) {
     const nvmDir = await this._findNvmDir();
     if (!nvmDir) {
       throw new Error('NVM is not installed. Please install NVM first via the "Install NVM" button.');
     }
 
+    const timeout = options.timeout || 60000;
     // We need to source nvm.sh then run nvm with args
     // NVM doesn't have a direct binary, so we run via bash -c
     const sourceCmd = `. ${nvmDir}/nvm.sh && nvm ${args.join(' ')}`;
-    const { stdout } = await execAsync(sourceCmd, {
-      timeout: 60000,
+    const { stdout, stderr } = await execAsync(sourceCmd, {
+      timeout,
       env: {
         ...process.env,
         NVM_DIR: nvmDir,
       },
     });
-    return stdout.trim();
+    return (stdout || stderr || '').trim();
+  }
+
+  /**
+   * Sanitize .npmrc to remove incompatible `prefix` and `globalconfig` settings.
+   * NVM manages its own node version prefixes, and having static prefix in .npmrc
+   * breaks nvm install and nvm use with an error.
+   */
+  async _sanitizeNpmrc() {
+    try {
+      const homeDir = process.env.HOME || (process.platform === 'win32' ? process.env.USERPROFILE : '/root');
+      const candidates = [
+        path.join(homeDir, '.npmrc'),
+        '/root/.npmrc',
+      ];
+      const checked = new Set();
+
+      for (const targetPath of candidates) {
+        if (!targetPath || checked.has(targetPath)) continue;
+        checked.add(targetPath);
+
+        try {
+          await fs.access(targetPath);
+          const raw = await fs.readFile(targetPath, 'utf8');
+          if (/^\s*(prefix|globalconfig)\s*=/m.test(raw)) {
+            logger.info(`NodeJS: Found conflicting prefix/globalconfig in ${targetPath}. Sanitizing for NVM compatibility...`);
+            const cleaned = raw
+              .split('\n')
+              .filter(line => !/^\s*(prefix|globalconfig)\s*=/.test(line))
+              .join('\n');
+            await fs.writeFile(targetPath, cleaned, 'utf8');
+          }
+        } catch {
+          // File does not exist or inaccessible
+        }
+      }
+    } catch (err) {
+      logger.warn(`NodeJS: _sanitizeNpmrc warning: ${err.message}`);
+    }
   }
 
   // ── NVM Lifecycle ─────────────────────────────────────
@@ -306,16 +345,34 @@ class NodeJSService {
   async installVersion(version) {
     validateVersion(version);
     await this._ensureNvm();
+    await this._sanitizeNpmrc();
 
     logger.info(`NodeJS: Installing Node.js ${version}...`);
 
     try {
-      const output = await this._runNvmCommand(['install', version]);
+      // Allow up to 5 minutes (300,000ms) for downloading and extracting node binary
+      const output = await this._runNvmCommand(['install', version], { timeout: 300000 });
       return {
         message: `Node.js ${version} installed successfully.`,
         output,
       };
     } catch (err) {
+      // Auto-remediation if user has prefix/globalconfig in .npmrc
+      const errStr = (err.message || '') + (err.stderr || '') + (err.stdout || '');
+      if (errStr.includes('delete-prefix') || errStr.includes('prefix') || errStr.includes('globalconfig')) {
+        logger.warn(`NodeJS: Incompatible npmrc prefix detected during installation of ${version}. Running auto-remediation...`);
+        try {
+          await this._sanitizeNpmrc();
+          const cleanVer = version.replace(/^v/, '');
+          const healOutput = await this._runNvmCommand(['use', '--delete-prefix', `v${cleanVer}`], { timeout: 30000 });
+          return {
+            message: `Node.js ${version} installed and activated successfully (incompatible npmrc prefix was automatically resolved).`,
+            output: healOutput,
+          };
+        } catch (healErr) {
+          logger.error(`NodeJS: Auto-remediation with --delete-prefix failed: ${healErr.message}`);
+        }
+      }
       throw new Error(`Failed to install Node.js ${version}: ${err.message}`);
     }
   }
@@ -344,6 +401,7 @@ class NodeJSService {
   async setDefault(version) {
     validateVersion(version);
     await this._ensureNvm();
+    await this._sanitizeNpmrc();
 
     try {
       const output = await this._runNvmCommand(['alias', 'default', version]);
@@ -352,6 +410,21 @@ class NodeJSService {
         output,
       };
     } catch (err) {
+      const errStr = (err.message || '') + (err.stderr || '') + (err.stdout || '');
+      if (errStr.includes('delete-prefix') || errStr.includes('prefix') || errStr.includes('globalconfig')) {
+        try {
+          await this._sanitizeNpmrc();
+          const cleanVer = version.replace(/^v/, '');
+          await this._runNvmCommand(['use', '--delete-prefix', `v${cleanVer}`]);
+          const output = await this._runNvmCommand(['alias', 'default', version]);
+          return {
+            message: `Node.js ${version} set as default.`,
+            output,
+          };
+        } catch (healErr) {
+          logger.error(`NodeJS: Auto-remediation failed: ${healErr.message}`);
+        }
+      }
       throw new Error(`Failed to set default Node.js version: ${err.message}`);
     }
   }
@@ -362,6 +435,7 @@ class NodeJSService {
   async useVersion(version) {
     validateVersion(version);
     await this._ensureNvm();
+    await this._sanitizeNpmrc();
 
     try {
       const output = await this._runNvmCommand(['use', version]);
@@ -370,6 +444,20 @@ class NodeJSService {
         output,
       };
     } catch (err) {
+      const errStr = (err.message || '') + (err.stderr || '') + (err.stdout || '');
+      if (errStr.includes('delete-prefix') || errStr.includes('prefix') || errStr.includes('globalconfig')) {
+        try {
+          await this._sanitizeNpmrc();
+          const cleanVer = version.replace(/^v/, '');
+          const healOutput = await this._runNvmCommand(['use', '--delete-prefix', `v${cleanVer}`]);
+          return {
+            message: `Now using Node.js ${version} (prefix conflict resolved).`,
+            output: healOutput,
+          };
+        } catch (healErr) {
+          logger.error(`NodeJS: Auto-remediation with --delete-prefix failed: ${healErr.message}`);
+        }
+      }
       throw new Error(`Failed to switch to Node.js ${version}: ${err.message}`);
     }
   }
