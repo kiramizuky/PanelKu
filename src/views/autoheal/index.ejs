@@ -17,46 +17,63 @@
   .ah-tab-content { display: none; }
   .ah-tab-content.active { display: block; animation: fadeIn 0.25s ease-out; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .ah-module-card {
+    background: rgba(0,0,0,0.12);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 16px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .ah-module-card:hover {
+    border-color: rgba(99,102,241,0.4);
+    transform: translateY(-2px);
+  }
 </style>
 
 <div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
   <div>
     <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
-      <i class="bi bi-heart-pulse-fill text-danger me-2"></i> Service Mesh &amp; Auto-Healing
+      <i class="bi bi-heart-pulse-fill text-danger me-2"></i> Universal Auto-Healing (AutoHeal 2.0)
     </h1>
     <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
-      Service health monitoring, automatic failure recovery, and incident tracking
+      Continuous proactive diagnostics, multi-module automated remediation, and zero-downtime recovery
     </p>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="AutoHealPage.refresh()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
-    <button class="btn-lp btn-lp-warning btn-lp-sm" onclick="AutoHealPage.runCheck()"><i class="bi bi-play-fill"></i> Run Check Now</button>
+    <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="AutoHealPage.refresh()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
+    <button class="btn-lp btn-lp-warning btn-lp-sm" onclick="AutoHealPage.runCheck()"><i class="bi bi-play-fill me-1"></i> Run Check Now</button>
+    <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="AutoHealPage.healAll()"><i class="bi bi-magic me-1"></i> Heal All Modules</button>
+    <button class="btn-lp btn-lp-danger btn-lp-sm" onclick="AutoHealPage.emergencyClean()"><i class="bi bi-trash3 me-1"></i> Disk Clean</button>
   </div>
 </div>
 
 <!-- Status Summary -->
 <div class="row g-3 mb-4">
-  <div class="col-3 col-md-3">
+  <div class="col-6 col-md-3">
     <div class="lp-glass-card p-3 text-center" style="border-left:3px solid var(--accent-success);">
-      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Healthy</div>
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Healthy Items</div>
       <div id="ahHealthyCount" style="font-size:22px;font-weight:700;color:#10b981;">—</div>
     </div>
   </div>
-  <div class="col-3 col-md-3">
+  <div class="col-6 col-md-3">
     <div class="lp-glass-card p-3 text-center" style="border-left:3px solid var(--accent-warning);">
-      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Warning</div>
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Warnings</div>
       <div id="ahWarningCount" style="font-size:22px;font-weight:700;color:#f59e0b;">—</div>
     </div>
   </div>
-  <div class="col-3 col-md-3">
+  <div class="col-6 col-md-3">
     <div class="lp-glass-card p-3 text-center" style="border-left:3px solid var(--accent-danger);">
       <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Critical</div>
       <div id="ahCriticalCount" style="font-size:22px;font-weight:700;color:#ef4444;">—</div>
     </div>
   </div>
-  <div class="col-3 col-md-3">
+  <div class="col-6 col-md-3">
     <div class="lp-glass-card p-3 text-center" style="border-left:3px solid var(--accent-info);">
-      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Engine</div>
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;">Engine State</div>
       <div id="ahEngineStatus" style="font-size:22px;font-weight:700;color:var(--text-primary);">—</div>
     </div>
   </div>
@@ -65,8 +82,11 @@
 <!-- Tabs -->
 <div class="lp-glass-card mb-4" style="padding:0;overflow:hidden;">
   <div style="display:flex;border-bottom:1px solid var(--glass-border);overflow-x:auto;background:rgba(0,0,0,0.1);">
-    <button class="ah-tab active" data-tab="dashboard" onclick="AutoHealPage.switchTab('dashboard')">
-      <i class="bi bi-speedometer2 me-1"></i> Dashboard
+    <button class="ah-tab active" data-tab="modules" onclick="AutoHealPage.switchTab('modules')">
+      <i class="bi bi-grid-3x3-gap-fill me-1"></i> All Modules
+    </button>
+    <button class="ah-tab" data-tab="dashboard" onclick="AutoHealPage.switchTab('dashboard')">
+      <i class="bi bi-speedometer2 me-1"></i> Core Services
     </button>
     <button class="ah-tab" data-tab="config" onclick="AutoHealPage.switchTab('config')">
       <i class="bi bi-sliders me-1"></i> Configuration
@@ -79,10 +99,30 @@
     </button>
   </div>
 
-  <!-- ════════════ Tab: Dashboard ════════════ -->
-  <div id="tab-dashboard" class="ah-tab-content active" style="padding:20px;">
+  <!-- ════════════ Tab: All Modules (AutoHeal 2.0) ════════════ -->
+  <div id="tab-modules" class="ah-tab-content active" style="padding:20px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h6 style="font-size:14px;font-weight:600;color:var(--text-primary);margin:0;">
+          <i class="bi bi-shield-check text-success me-1"></i> Cross-Module Auto-Healing Matrix
+        </h6>
+        <div style="font-size:11px;color:var(--text-muted);">Self-healing coverage across all web servers, databases, containers, security, runtimes &amp; storage</div>
+      </div>
+      <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="AutoHealPage.loadModulesDiagnosis()">
+        <i class="bi bi-arrow-repeat me-1"></i> Re-scan Matrix
+      </button>
+    </div>
+    <div id="ahModulesGrid" class="row g-3">
+      <div class="col-12 text-center py-4" style="color:var(--text-muted);font-size:13px;">
+        <i class="bi bi-arrow-repeat spin me-2"></i> Loading multi-module diagnostics...
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ Tab: Core Services Dashboard ════════════ -->
+  <div id="tab-dashboard" class="ah-tab-content" style="padding:20px;">
     <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:12px;">
-      <i class="bi bi-hdd-network me-1"></i> Service Health Overview
+      <i class="bi bi-hdd-network me-1"></i> Core Services Telemetry
     </h6>
     <div id="ahServiceGrid" class="row g-2"></div>
   </div>
@@ -124,28 +164,31 @@
       <div class="col-12 col-md-6">
         <div class="lp-glass-card p-4" style="background:rgba(0,0,0,0.08);">
           <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:15px;">
-            <i class="bi bi-shield-exclamation me-1"></i> Alert Thresholds
+            <i class="bi bi-boxes me-1"></i> Module Auto-Heal Toggles
           </h6>
-          <div class="lp-form-group mb-2">
-            <label class="lp-label">CPU Threshold (%)</label>
-            <input type="number" id="ahCpuThreshold" class="lp-input" min="50" max="100" value="90">
-          </div>
-          <div class="lp-form-group mb-2">
-            <label class="lp-label">Memory Threshold (%)</label>
-            <input type="number" id="ahMemThreshold" class="lp-input" min="50" max="100" value="90">
-          </div>
-          <div class="lp-form-group mb-2">
-            <label class="lp-label">Disk Threshold (%)</label>
-            <input type="number" id="ahDiskThreshold" class="lp-input" min="50" max="100" value="90">
-          </div>
-          <hr style="border-color:var(--glass-border);">
           <div class="form-check form-switch mb-2">
-            <input class="form-check-input" type="checkbox" id="ahCheckDocker">
-            <label class="form-check-label text-white" for="ahCheckDocker" style="margin-left:8px;font-size:12px;">Monitor Docker Daemon</label>
+            <input class="form-check-input" type="checkbox" id="ahModWeb">
+            <label class="form-check-label text-white" for="ahModWeb" style="margin-left:8px;font-size:12px;">🌐 Web Servers (Nginx, Apache, Caddy, PHP-FPM)</label>
           </div>
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="ahCheckWebsites">
-            <label class="form-check-label text-white" for="ahCheckWebsites" style="margin-left:8px;font-size:12px;">Monitor Websites Health</label>
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="ahModDatabase">
+            <label class="form-check-label text-white" for="ahModDatabase" style="margin-left:8px;font-size:12px;">🗄️ Databases (PostgreSQL, MySQL, SQLite, Redis, Mongo)</label>
+          </div>
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="ahModContainer">
+            <label class="form-check-label text-white" for="ahModContainer" style="margin-left:8px;font-size:12px;">📦 Containers &amp; Docker Daemon</label>
+          </div>
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="ahModStorage">
+            <label class="form-check-label text-white" for="ahModStorage" style="margin-left:8px;font-size:12px;">💾 Storage, Inodes &amp; Emergency Clean</label>
+          </div>
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="ahModSecurity">
+            <label class="form-check-label text-white" for="ahModSecurity" style="margin-left:8px;font-size:12px;">🛡️ Security, UFW Firewall &amp; Fail2ban</label>
+          </div>
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="ahModRuntime">
+            <label class="form-check-label text-white" for="ahModRuntime" style="margin-left:8px;font-size:12px;">⚙️ Runtimes, Port Conflicts &amp; App Services</label>
           </div>
           <div style="margin-top:15px;">
             <button class="btn-lp btn-lp-primary w-100" onclick="AutoHealPage.saveConfig()">
@@ -161,7 +204,7 @@
   <div id="tab-services" class="ah-tab-content" style="padding:20px;">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h6 style="font-size:13px;font-weight:600;color:var(--text-muted);margin:0;">
-        <i class="bi bi-list-check me-1"></i> Monitored Services
+        <i class="bi bi-list-check me-1"></i> Monitored Core Services
       </h6>
     </div>
     <div id="ahServiceManagerList" style="font-size:13px;">

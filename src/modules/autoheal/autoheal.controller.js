@@ -22,7 +22,7 @@ class AutoHealController {
     }
   }
 
-  // ── Status ──
+  // ── Status & Providers ──
 
   async getStatus(req, res) {
     try {
@@ -33,7 +33,27 @@ class AutoHealController {
     }
   }
 
-  // ── Manual Check ──
+  async getProviders(req, res) {
+    try {
+      const providers = autohealService.getProviders();
+      return successResponse(res, { providers });
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  // ── Universal Diagnostics ──
+
+  async diagnoseAll(req, res) {
+    try {
+      const diagnosis = await autohealService.diagnoseAll();
+      return successResponse(res, { diagnosis }, 'Full multi-module diagnosis completed');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  // ── Manual Checks & Healing ──
 
   async runCheck(req, res) {
     try {
@@ -44,13 +64,31 @@ class AutoHealController {
     }
   }
 
-  // ── Heal Service ──
-
   async healService(req, res) {
     try {
       const { name } = req.body;
       if (!name) return errorResponse(res, 'Service name is required', 400);
       const result = await autohealService.healService(name);
+      return successResponse(res, result, result.message);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async healModule(req, res) {
+    try {
+      const { module: moduleKey, target = 'all' } = req.body;
+      if (!moduleKey) return errorResponse(res, 'Module key is required', 400);
+      const result = await autohealService.healModule(moduleKey, target);
+      return successResponse(res, result, result.message);
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async healAll(req, res) {
+    try {
+      const result = await autohealService.healAll();
       return successResponse(res, result, result.message);
     } catch (error) {
       return errorResponse(res, error.message, 500);

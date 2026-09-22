@@ -1,6 +1,6 @@
 /**
  * Panelku — autoheal.js
- * Auto-Healing Dashboard frontend
+ * Auto-Healing Dashboard & Multi-Module Diagnostics Frontend
  */
 
 const AutoHealPage = {
@@ -13,6 +13,7 @@ const AutoHealPage = {
   async refresh() {
     await Promise.all([
       this.loadStatus(),
+      this.loadModulesDiagnosis(),
       this.loadConfig(),
       this.loadIncidents(),
     ]);
@@ -28,12 +29,99 @@ const AutoHealPage = {
     const tabContent = document.getElementById(`tab-${tabId}`);
     if (tabContent) tabContent.classList.add('active');
 
+    if (tabId === 'modules') this.loadModulesDiagnosis();
     if (tabId === 'services') this.loadServiceManager();
     if (tabId === 'incidents') this.loadIncidents();
   },
 
   // ══════════════════════════════════════════════════════
-  //  STATUS
+  //  MULTI-MODULE DIAGNOSIS (AutoHeal 2.0)
+  // ══════════════════════════════════════════════════════
+
+  async loadModulesDiagnosis() {
+    const grid = document.getElementById('ahModulesGrid');
+    if (!grid) return;
+
+    try {
+      const res = await LP.post('/autoheal/diagnose-all');
+      if (!res?.success) throw new Error(res?.message);
+
+      const modules = res.data?.diagnosis || {};
+      const moduleKeys = Object.keys(modules);
+
+      if (moduleKeys.length === 0) {
+        grid.innerHTML = '<div class="col-12 text-center py-4 text-muted">No module providers registered</div>';
+        return;
+      }
+
+      const icons = {
+        web: 'bi-globe text-primary',
+        database: 'bi-database text-warning',
+        container: 'bi-box-seam text-info',
+        storage: 'bi-hdd-network text-success',
+        security: 'bi-shield-check text-danger',
+        runtime: 'bi-gear-wide-connected text-purple',
+      };
+
+      grid.innerHTML = moduleKeys.map(key => {
+        const mod = modules[key];
+        const icon = icons[key] || 'bi-cpu text-info';
+        const items = mod.items || [];
+        const hasCritical = items.some(i => i.status === 'critical');
+        const hasWarning = items.some(i => i.status === 'warning');
+        const statusBadge = !mod.enabled
+          ? '<span class="badge bg-secondary">Disabled</span>'
+          : hasCritical
+          ? '<span class="badge bg-danger">Issues Detected</span>'
+          : hasWarning
+          ? '<span class="badge bg-warning text-dark">Warning</span>'
+          : '<span class="badge bg-success">Healthy</span>';
+
+        return `
+          <div class="col-12 col-md-6 col-lg-4">
+            <div class="ah-module-card">
+              <div>
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi ${icon}" style="font-size:20px;"></i>
+                    <strong style="font-size:14px;color:var(--text-primary);">${LP.escHtml(mod.name || key)}</strong>
+                  </div>
+                  <div>${statusBadge}</div>
+                </div>
+
+                <div class="py-2" style="font-size:12px;display:flex;flex-direction:column;gap:6px;">
+                  ${items.map(i => {
+                    const stColor = i.status === 'healthy' ? '#10b981' : i.status === 'warning' ? '#f59e0b' : i.status === 'critical' ? '#ef4444' : '#6b7280';
+                    return `
+                      <div class="p-2 rounded" style="background:rgba(255,255,255,0.03);border-left:2px solid ${stColor};">
+                        <div class="d-flex justify-content-between">
+                          <span style="font-weight:600;color:var(--text-primary);">${LP.escHtml(i.name)}</span>
+                          <span style="font-size:10px;text-transform:uppercase;color:${stColor};">${LP.escHtml(i.status)}</span>
+                        </div>
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${LP.escHtml(i.message || '')}</div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+
+              <div class="pt-3 mt-2 border-top" style="border-color:var(--glass-border) !important;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:11px;color:var(--text-muted);">${items.length} items verified</span>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('AutoHealPage.healModule', '${LP.encJsArg(key)}')">
+                  <i class="bi bi-arrow-repeat me-1"></i> Heal Module
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      grid.innerHTML = `<div class="col-12 text-center py-4 text-danger">Error: ${LP.escHtml(err.message)}</div>`;
+    }
+  },
+
+  // ══════════════════════════════════════════════════════
+  //  STATUS (Legacy Overview & Engine Counts)
   // ══════════════════════════════════════════════════════
 
   async loadStatus() {
@@ -42,30 +130,26 @@ const AutoHealPage = {
       if (!res?.success) throw new Error(res?.message);
 
       const services = res.data?.status || [];
-      let healthy = 0, warning = 0, critical = 0, _disabled = 0;
+      let healthy = 0, warning = 0, critical = 0;
 
       services.forEach(s => {
         if (s.status === 'healthy' || s.status === 'running') healthy++;
         else if (s.status === 'warning') warning++;
         else if (s.status === 'critical') critical++;
-        else if (s.status === 'disabled') _disabled++;
       });
 
       document.getElementById('ahHealthyCount').textContent = healthy;
       document.getElementById('ahWarningCount').textContent = warning;
       document.getElementById('ahCriticalCount').textContent = critical;
 
-      // Engine status card
       const engineEl = document.getElementById('ahEngineStatus');
-      const engineRunning = services.length > 0;
-      engineEl.innerHTML = engineRunning
-        ? '<span style="color:#10b981;">● Active</span>'
-        : '<span style="color:#6b7280;">● Idle</span>';
+      engineEl.innerHTML = '<span style="color:#10b981;">● Active (2.0)</span>';
 
-      // Dashboard grid
       const grid = document.getElementById('ahServiceGrid');
+      if (!grid) return;
+
       if (services.length === 0) {
-        grid.innerHTML = '<div class="col-12" style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">No services monitored</div>';
+        grid.innerHTML = '<div class="col-12 text-center py-4 text-muted font-sm">No services monitored</div>';
         return;
       }
 
@@ -103,7 +187,7 @@ const AutoHealPage = {
     try {
       const res = await LP.get('/autoheal/config');
       if (!res?.success) return;
-      const cfg = res.data?.config;
+      const cfg = res.data?.config || {};
 
       document.getElementById('ahEnabled').checked = cfg.enabled !== false;
       document.getElementById('ahInterval').value = cfg.checkInterval || 180;
@@ -114,13 +198,19 @@ const AutoHealPage = {
       document.getElementById('ahCpuThreshold').value = cfg.cpuThreshold || 90;
       document.getElementById('ahMemThreshold').value = cfg.memoryThreshold || 90;
       document.getElementById('ahDiskThreshold').value = cfg.diskThreshold || 90;
-      document.getElementById('ahCheckDocker').checked = cfg.docker !== false;
-      document.getElementById('ahCheckWebsites').checked = cfg.websites !== false;
+
+      // Multi-module toggles
+      const mods = cfg.modules || {};
+      if (document.getElementById('ahModWeb')) document.getElementById('ahModWeb').checked = mods.web !== false;
+      if (document.getElementById('ahModDatabase')) document.getElementById('ahModDatabase').checked = mods.database !== false;
+      if (document.getElementById('ahModContainer')) document.getElementById('ahModContainer').checked = mods.container !== false;
+      if (document.getElementById('ahModStorage')) document.getElementById('ahModStorage').checked = mods.storage !== false;
+      if (document.getElementById('ahModSecurity')) document.getElementById('ahModSecurity').checked = mods.security !== false;
+      if (document.getElementById('ahModRuntime')) document.getElementById('ahModRuntime').checked = mods.runtime !== false;
     } catch { /* ignore */ }
   },
 
   async toggleEngine() {
-    // Auto-save when toggle changes
     this.saveConfig();
   },
 
@@ -135,14 +225,21 @@ const AutoHealPage = {
       cpuThreshold: parseInt(document.getElementById('ahCpuThreshold').value) || 90,
       memoryThreshold: parseInt(document.getElementById('ahMemThreshold').value) || 90,
       diskThreshold: parseInt(document.getElementById('ahDiskThreshold').value) || 90,
-      docker: document.getElementById('ahCheckDocker').checked,
-      websites: document.getElementById('ahCheckWebsites').checked,
+      modules: {
+        web: document.getElementById('ahModWeb')?.checked !== false,
+        database: document.getElementById('ahModDatabase')?.checked !== false,
+        container: document.getElementById('ahModContainer')?.checked !== false,
+        storage: document.getElementById('ahModStorage')?.checked !== false,
+        security: document.getElementById('ahModSecurity')?.checked !== false,
+        runtime: document.getElementById('ahModRuntime')?.checked !== false,
+      },
     };
 
     try {
       const res = await LP.post('/autoheal/config', config);
       if (res?.success) {
-        LP.toast('Auto-Healing config saved!', 'success');
+        LP.toast('Auto-Healing configuration saved!', 'success');
+        this.refresh();
       } else {
         LP.toast(res?.message || 'Failed to save config', 'error');
       }
@@ -164,7 +261,7 @@ const AutoHealPage = {
       const container = document.getElementById('ahServiceManagerList');
 
       if (services.length === 0) {
-        container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No services configured</div>';
+        container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No core services configured</div>';
         return;
       }
 
@@ -213,15 +310,15 @@ const AutoHealPage = {
   },
 
   // ══════════════════════════════════════════════════════
-  //  ACTIONS
+  //  ACTIONS (Multi-Module Execution)
   // ══════════════════════════════════════════════════════
 
   async runCheck() {
-    LP.toast('Running health check...', 'info');
+    LP.toast('Running multi-module diagnostics...', 'info');
     try {
       const res = await LP.post('/autoheal/check');
       if (res?.success) {
-        LP.toast('Health check complete', 'success');
+        LP.toast('Diagnostics & auto-healing complete', 'success');
         this.refresh();
       } else {
         LP.toast(res?.message || 'Check failed', 'error');
@@ -229,6 +326,38 @@ const AutoHealPage = {
     } catch (err) {
       LP.toast('Error: ' + err.message, 'error');
     }
+  },
+
+  async healModule(moduleKey, target = 'all') {
+    LP.toast(`Executing remediation for [${moduleKey}]...`, 'info');
+    try {
+      const res = await LP.post('/autoheal/heal-module', { module: moduleKey, target });
+      if (res?.success) {
+        LP.toast(res.message || `Module [${moduleKey}] healed`, 'success');
+        this.loadModulesDiagnosis();
+      } else {
+        LP.toast(res?.message || `Failed to heal module [${moduleKey}]`, 'error');
+      }
+    } catch (err) {
+      LP.toast('Error: ' + err.message, 'error');
+    }
+  },
+
+  async healAll() {
+    LP.confirm('Run Auto-Healing across all modules now? This will inspect and safely resolve issues on web, databases, containers, security, runtimes, and storage.', async () => {
+      LP.toast('Healing all modules in sequence...', 'info');
+      try {
+        const res = await LP.post('/autoheal/heal-all');
+        if (res?.success) {
+          LP.toast(res.message || 'Universal healing completed!', 'success');
+          this.refresh();
+        } else {
+          LP.toast(res?.message || 'Healing failed', 'error');
+        }
+      } catch (err) {
+        LP.toast('Error: ' + err.message, 'error');
+      }
+    });
   },
 
   async healService(serviceName) {
@@ -250,17 +379,33 @@ const AutoHealPage = {
   async checkService(serviceName) {
     LP.toast(`Checking ${serviceName}...`, 'info');
     try {
-      const _statusEl = document.querySelector(`[onclick*="healService('${serviceName}')"]`)?.closest('.d-flex');
       const res = await LP.get('/autoheal/status');
       const svc = res.data?.status?.find(s => s.serviceName === serviceName || s.name === serviceName);
       if (svc) {
         LP.toast(`${serviceName}: ${svc.status} — ${svc.message}`, svc.status === 'healthy' ? 'success' : 'warning');
       } else {
-        LP.toast(`${serviceName}: Unknown`, 'info');
+        LP.toast(`${serviceName}: Unknown status`, 'info');
       }
     } catch (err) {
       LP.toast('Error: ' + err.message, 'error');
     }
+  },
+
+  async emergencyClean() {
+    LP.confirm('Execute Emergency Multi-Stage Disk Clean? This will prune Docker layers, vacuum journalctl logs, and clean package caches.', async () => {
+      LP.toast('Executing emergency disk cleanup...', 'info');
+      try {
+        const res = await LP.post('/autoheal/emergency-clean');
+        if (res?.success) {
+          LP.toast(res.message || 'Disk cleanup executed successfully!', 'success');
+          this.refresh();
+        } else {
+          LP.toast(res?.message || 'Cleanup failed', 'error');
+        }
+      } catch (err) {
+        LP.toast('Error: ' + err.message, 'error');
+      }
+    });
   },
 
   // ══════════════════════════════════════════════════════
@@ -276,7 +421,7 @@ const AutoHealPage = {
       const container = document.getElementById('ahIncidentList');
 
       if (incidents.length === 0) {
-        container.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:13px;">No incidents recorded. The system is healthy! <i class="bi bi-emoji-smile ms-1"></i></div>';
+        container.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-muted);font-size:13px;">No incidents recorded. All systems healthy! <i class="bi bi-emoji-smile ms-1"></i></div>';
         return;
       }
 

@@ -303,4 +303,52 @@ describe('AutoHealController — API Endpoints', () => {
     await autohealController.resurrectServices(req, resResurrect);
     expect(resResurrect.statusCode).toBe(200);
   });
+
+  test('AutoHeal 2.0 — getProviders, diagnoseAll, healModule, healAll', async () => {
+    // 1. Providers list
+    const providers = autohealService.getProviders();
+    expect(Array.isArray(providers)).toBe(true);
+    expect(providers.map(p => p.key)).toEqual(
+      expect.arrayContaining(['web', 'database', 'container', 'storage', 'security', 'runtime'])
+    );
+
+    // 2. Multi-module diagnosis
+    const diagnosis = await autohealService.diagnoseAll();
+    expect(diagnosis.web).toBeDefined();
+    expect(diagnosis.database).toBeDefined();
+    expect(diagnosis.container).toBeDefined();
+    expect(diagnosis.storage).toBeDefined();
+    expect(diagnosis.security).toBeDefined();
+    expect(diagnosis.runtime).toBeDefined();
+
+    // 3. Module healing
+    const healDb = await autohealService.healModule('database');
+    expect(healDb).toBeDefined();
+
+    // 4. Universal heal all
+    const healAllRes = await autohealService.healAll();
+    expect(healAllRes.success).toBe(true);
+    expect(healAllRes.summary).toBeDefined();
+
+    // 5. Controller Endpoints
+    const resProv = createMockRes();
+    await autohealController.getProviders({}, resProv);
+    expect(resProv.statusCode).toBe(200);
+    expect(resProv.body.data.providers.length).toBe(6);
+
+    const resDiag = createMockRes();
+    await autohealController.diagnoseAll({}, resDiag);
+    expect(resDiag.statusCode).toBe(200);
+    expect(resDiag.body.data.diagnosis).toBeDefined();
+
+    const resHealMod = createMockRes();
+    await autohealController.healModule({ body: { module: 'storage' } }, resHealMod);
+    expect(resHealMod.statusCode).toBe(200);
+
+    const resHealAll = createMockRes();
+    await autohealController.healAll({}, resHealAll);
+    expect(resHealAll.statusCode).toBe(200);
+    expect(resHealAll.body.success).toBe(true);
+  });
 });
+

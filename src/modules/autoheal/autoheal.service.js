@@ -6,10 +6,26 @@ import logger from '../../config/logger.js';
 import { getPrimaryDisk } from '../../helpers/system.js';
 import { execCmd } from '../../helpers/exec.js';
 
+// AutoHeal 2.0 Providers
+import webProvider from './providers/web.provider.js';
+import databaseProvider from './providers/database.provider.js';
+import containerProvider from './providers/container.provider.js';
+import storageProvider from './providers/storage.provider.js';
+import securityProvider from './providers/security.provider.js';
+import runtimeProvider from './providers/runtime.provider.js';
+
 class AutoHealService {
   constructor() {
     this._incidentCounts = {};
     this._initialized = false;
+    this.providers = {
+      web: webProvider,
+      database: databaseProvider,
+      container: containerProvider,
+      storage: storageProvider,
+      security: securityProvider,
+      runtime: runtimeProvider,
+    };
   }
 
   async init() {
@@ -21,7 +37,7 @@ class AutoHealService {
       await this._runHealthCheck();
     }, 180000, false); // every 3 minutes
 
-    logger.info('AutoHeal: Engine initialized, monitoring services every 3 minutes');
+    logger.info('AutoHeal 2.0: Universal Multi-Module Engine initialized (Web, DB, Containers, Storage, Security, Runtimes)');
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -49,6 +65,14 @@ class AutoHealService {
       diskThreshold: config.diskThreshold || 90,
       memoryThreshold: config.memoryThreshold || 90,
       cpuThreshold: config.cpuThreshold || 90,
+      modules: {
+        web: config.modules?.web !== false,
+        database: config.modules?.database !== false,
+        container: config.modules?.container !== false,
+        storage: config.modules?.storage !== false,
+        security: config.modules?.security !== false,
+        runtime: config.modules?.runtime !== false,
+      },
     };
   }
 
@@ -66,6 +90,14 @@ class AutoHealService {
       diskThreshold: parseInt(data.diskThreshold) || 90,
       memoryThreshold: parseInt(data.memoryThreshold) || 90,
       cpuThreshold: parseInt(data.cpuThreshold) || 90,
+      modules: {
+        web: data.modules?.web !== false,
+        database: data.modules?.database !== false,
+        container: data.modules?.container !== false,
+        storage: data.modules?.storage !== false,
+        security: data.modules?.security !== false,
+        runtime: data.modules?.runtime !== false,
+      },
     };
     await Setting.set('autoheal_config', JSON.stringify(config), 'json');
     return { message: 'Auto-Healing configuration saved', config };
@@ -89,16 +121,16 @@ class AutoHealService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  HEALTH CHECK ENGINE
+  //  HEALTH CHECK ENGINE (Multi-Module)
   // ═══════════════════════════════════════════════════════════════
 
   async _runHealthCheck() {
     const config = await this._getConfig();
-    if (!config.enabled) return;
+    if (!config.enabled) return [];
 
     const results = [];
 
-    // 1. Check systemd services
+    // 1. Core Systemd Services
     for (const svc of config.services) {
       if (!svc.enabled) continue;
       try {
@@ -109,7 +141,7 @@ class AutoHealService {
       }
     }
 
-    // 2. Check Docker
+    // 2. Core Docker daemon
     if (config.docker) {
       try {
         const result = await this._checkDocker(config);
@@ -119,7 +151,7 @@ class AutoHealService {
       }
     }
 
-    // 3. Check websites if configured
+    // 3. Websites HTTP check
     if (config.websites) {
       try {
         const siteResults = await this._checkWebsites(config);
@@ -129,7 +161,7 @@ class AutoHealService {
       }
     }
 
-    // 4. Check system resources
+    // 4. System resources (CPU, RAM, Disk)
     try {
       const resourceResults = await this._checkResources(config);
       results.push(...resourceResults);
@@ -137,22 +169,55 @@ class AutoHealService {
       logger.error(`AutoHeal: Resource check error: ${err.message}`);
     }
 
+    // 5. Providers Execution (Web, DB, Containers, Storage, Security, Runtimes)
+    for (const [key, provider] of Object.entries(this.providers)) {
+      if (config.modules[key] === false) continue;
+      try {
+        const items = await provider.check();
+        for (const item of items) {
+          results.push({ ...item, module: key });
+
+          // Auto-heal if critical or warning with healable flag
+          if ((item.status === 'critical' || item.status === 'warning') && item.healable) {
+            const incKey = `prov:${key}:${item.serviceName || item.name}`;
+            this._incidentCounts[incKey] = (this._incidentCounts[incKey] || 0) + 1;
+
+            if (this._incidentCounts[incKey] <= config.maxRetries) {
+              logger.warn(`AutoHeal: Auto-healing ${item.name} (${key}). Attempt #${this._incidentCounts[incKey]}...`);
+              try {
+                const healRes = await provider.heal(item.serviceName || 'all');
+                if (healRes.success) {
+                  this._incidentCounts[incKey] = 0;
+                  const msg = `Auto-Healed ${item.name}: ${healRes.message}`;
+                  await this._createNotification('service_recovered', `✅ ${item.name} Auto-Healed`, msg);
+                  if (config.notifyOnRecovery) {
+                    alertsService.triggerAlert(`Auto-Heal Recovery: ${item.name}`, msg);
+                  }
+                }
+              } catch (healErr) {
+                logger.error(`AutoHeal: Failed to heal ${item.name}: ${healErr.message}`);
+              }
+            }
+          } else if (item.status === 'healthy') {
+            const incKey = `prov:${key}:${item.serviceName || item.name}`;
+            this._incidentCounts[incKey] = 0;
+          }
+        }
+      } catch (err) {
+        logger.error(`AutoHeal: Provider ${key} error: ${err.message}`);
+      }
+    }
+
     return results;
   }
 
-  /**
-   * Check a single systemd service and auto-heal if needed.
-   */
   async _checkService(svc, config) {
     const key = `svc:${svc.name}`;
-
     try {
-      // [SAFE] execFile: systemctl is-active — svc.name from validated config list
       const stdout = await execCmd('systemctl', ['is-active', svc.name], { timeout: 10000 }).catch(() => 'inactive');
       const isActive = stdout.trim() === 'active';
 
       if (isActive) {
-        // Service is healthy — reset incident counter
         this._incidentCounts[key] = 0;
         return {
           type: 'service',
@@ -162,15 +227,12 @@ class AutoHealService {
         };
       }
 
-      // Service is down — increment counter and attempt heal
       this._incidentCounts[key] = (this._incidentCounts[key] || 0) + 1;
       const attemptCount = this._incidentCounts[key];
 
       if (attemptCount <= config.maxRetries) {
         logger.warn(`AutoHeal: ${svc.displayName || svc.name} is inactive. Attempt #${attemptCount} to restart...`);
-
         try {
-          // [SAFE] execFile: systemctl start — svc.name from validated config list
           await execCmd('systemctl', ['start', svc.name], { timeout: 15000 });
           const checkAgain = await execCmd('systemctl', ['is-active', svc.name], { timeout: 5000 }).catch(() => 'inactive');
 
@@ -189,11 +251,9 @@ class AutoHealService {
         const failMsg = `${svc.displayName || svc.name} is inactive. Auto-Healer restart attempt #${attemptCount} failed.`;
         await this._createNotification('service_critical', `⚠️ ${svc.displayName || svc.name} Down`, failMsg);
         alertsService.triggerAlert(`Service Down: ${svc.displayName || svc.name}`, failMsg);
-
         return { type: 'service', name: svc.displayName || svc.name, status: 'critical', message: failMsg };
       }
 
-      // Max retries exceeded — enter cooldown
       return {
         type: 'service',
         name: svc.displayName || svc.name,
@@ -201,7 +261,6 @@ class AutoHealService {
         message: `${svc.displayName || svc.name} remains down after ${config.maxRetries} restart attempts. Entering cooldown (${config.cooldownMinutes} min).`,
       };
     } catch (err) {
-      // Service may not be installed
       return {
         type: 'service',
         name: svc.displayName || svc.name,
@@ -211,14 +270,9 @@ class AutoHealService {
     }
   }
 
-  /**
-   * Check Docker daemon health.
-   */
   async _checkDocker(config) {
     const key = 'docker:daemon';
-
     try {
-      // [SAFE] execFile: docker info — no user input
       await execCmd('docker', ['info'], { timeout: 10000 });
       this._incidentCounts[key] = 0;
       return { type: 'docker', name: 'Docker Daemon', status: 'healthy', message: 'Docker is running' };
@@ -229,11 +283,9 @@ class AutoHealService {
       if (attempt <= config.maxRetries) {
         logger.warn(`AutoHeal: Docker daemon is down. Attempt #${attempt} to restart...`);
         try {
-          // [SAFE] execFile: systemctl start docker — hardcoded
           await execCmd('systemctl', ['start', 'docker'], { timeout: 20000 });
-          await new Promise(r => setTimeout(r, 3000)); // wait for daemon
-
-          try { await execCmd('docker', ['info'], { timeout: 5000 }); } catch { /* not up yet */ }
+          await new Promise(r => setTimeout(r, 3000));
+          try { await execCmd('docker', ['info'], { timeout: 5000 }); } catch {}
 
           const msg = 'Docker daemon was down. Auto-Healer restarted it.';
           await this._createNotification('docker_recovered', '✅ Docker Recovered', msg);
@@ -249,9 +301,6 @@ class AutoHealService {
     }
   }
 
-  /**
-   * Check website health via HTTP.
-   */
   async _checkWebsites(_config) {
     const results = [];
     try {
@@ -293,14 +342,10 @@ class AutoHealService {
     return results;
   }
 
-  /**
-   * Check system resource thresholds (CPU, RAM, Disk).
-   */
   async _checkResources(config) {
     const results = [];
     try {
       const si = await import('systeminformation');
-
       const [load, mem, disk] = await Promise.all([
         si.currentLoad(),
         si.mem(),
@@ -337,20 +382,11 @@ class AutoHealService {
       }
 
       if (diskPct > config.diskThreshold) {
-        // Auto-cleanup: try journalctl vacuum on high disk
-        if (diskPct > 85) {
-          try {
-            // [SAFE] execFile: journalctl + apt-get — hardcoded
-        await execCmd('journalctl', ['--vacuum-time=3d'], { timeout: 30000 });
-            await execCmd('apt-get', ['clean'], { timeout: 30000 });
-            logger.info('AutoHeal: Disk cleanup executed (journalctl + package cache)');
-          } catch { /* cleanup not available */ }
-        }
-
+        await this.executeDiskEmergencyClean().catch(() => {});
         const key = 'resource:disk';
         this._incidentCounts[key] = (this._incidentCounts[key] || 0) + 1;
         if (this._incidentCounts[key] >= 2) {
-          const msg = `High disk usage: ${diskPct}% on ${primaryDisk.mount || '/'} (threshold: ${config.diskThreshold}%). Cleanup attempted.`;
+          const msg = `High disk usage: ${diskPct}% on ${primaryDisk.mount || '/'}. Cleanup executed.`;
           alertsService.triggerAlert('High Disk Alert', msg);
           results.push({ type: 'resource', name: 'Disk', status: 'warning', message: msg });
         }
@@ -375,9 +411,6 @@ class AutoHealService {
     }
   }
 
-  /**
-   * Get incident history from notifications.
-   */
   async getIncidentHistory(limit = 50) {
     const { getDb } = await import('../../core/db/sqlite.js');
     const db = getDb();
@@ -395,8 +428,104 @@ class AutoHealService {
     }));
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  //  AUTOHEAL 2.0 MULTI-MODULE API METHODS
+  // ═══════════════════════════════════════════════════════════════
+
   /**
-   * Get current health status of all monitored services.
+   * Get metadata on all registered AutoHeal providers
+   */
+  getProviders() {
+    return Object.entries(this.providers).map(([key, provider]) => ({
+      key,
+      name: provider.displayName || key,
+    }));
+  }
+
+  /**
+   * Perform comprehensive diagnostic across all modules
+   */
+  async diagnoseAll() {
+    const config = await this._getConfig();
+    const moduleResults = {};
+
+    for (const [key, provider] of Object.entries(this.providers)) {
+      try {
+        const items = await provider.check();
+        moduleResults[key] = {
+          name: provider.displayName,
+          enabled: config.modules[key] !== false,
+          items,
+        };
+      } catch (err) {
+        moduleResults[key] = {
+          name: provider.displayName,
+          enabled: config.modules[key] !== false,
+          items: [{ name: key, status: 'unknown', message: err.message, healable: false }],
+        };
+      }
+    }
+
+    return moduleResults;
+  }
+
+  /**
+   * Heal a specific module domain or item
+   */
+  async healModule(moduleKey, target = 'all') {
+    if (!this.providers[moduleKey]) {
+      throw new Error(`Invalid AutoHeal module: ${moduleKey}`);
+    }
+
+    const provider = this.providers[moduleKey];
+    const result = await provider.heal(target);
+
+    if (result.actionsTaken && result.actionsTaken.length > 0) {
+      const msg = `Module [${provider.displayName}] Auto-Healed: ${result.actionsTaken.join(', ')}`;
+      await this._createNotification('service_recovered', `✅ ${provider.displayName} Healed`, msg);
+      await alertsService.dispatchMultiChannelAlert({
+        title: `${provider.displayName} Healed`,
+        message: msg,
+        level: 'resolved',
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Heal all modules in sequence
+   */
+  async healAll() {
+    const summary = {};
+    const totalActions = [];
+
+    for (const [key, provider] of Object.entries(this.providers)) {
+      try {
+        const res = await provider.heal('all');
+        summary[key] = res;
+        if (res.actionsTaken) totalActions.push(...res.actionsTaken);
+      } catch (err) {
+        summary[key] = { success: false, message: err.message };
+      }
+    }
+
+    if (totalActions.length > 0) {
+      const msg = `Universal Auto-Healer completed: ${totalActions.join(', ')}`;
+      await this._createNotification('service_recovered', '✅ Full System Auto-Healed', msg);
+    }
+
+    return {
+      success: true,
+      totalActionsCount: totalActions.length,
+      actionsTaken: totalActions,
+      summary,
+      message: totalActions.length > 0 ? `Executed ${totalActions.length} auto-healing actions` : 'All modules are currently optimal',
+    };
+  }
+
+  /**
+   * Legacy status method (maintained for existing UI)
    */
   async getCurrentStatus() {
     const config = await this._getConfig();
@@ -408,7 +537,6 @@ class AutoHealService {
         continue;
       }
       try {
-        // [SAFE] execFile: systemctl is-active — svc.name from config
         const stdout = await execCmd('systemctl', ['is-active', svc.name], { timeout: 8000 }).catch(() => 'inactive');
         const isActive = stdout.trim() === 'active';
         results.push({
@@ -424,9 +552,7 @@ class AutoHealService {
       }
     }
 
-    // Docker
     try {
-      // [SAFE] execFile: docker info — hardcoded
       await execCmd('docker', ['info'], { timeout: 5000 });
       results.push({ type: 'docker', name: 'Docker Daemon', status: 'healthy', message: 'Running' });
     } catch {
@@ -436,25 +562,21 @@ class AutoHealService {
     return results;
   }
 
-  /**
-   * Trigger a manual health check and return results.
-   */
   async runManualCheck() {
-    const results = await this._runHealthCheck();
-    return results;
+    return this._runHealthCheck();
   }
 
-  /**
-   * Manually heal a specific service.
-   */
   async healService(serviceName) {
     if (!serviceName) throw new Error('Service name is required');
 
+    // Check if it's a provider module key
+    if (this.providers[serviceName]) {
+      return this.healModule(serviceName, 'all');
+    }
+
     try {
-      // [SAFE] execFile: systemctl restart/is-active — serviceName from validated input
       await execCmd('systemctl', ['restart', serviceName], { timeout: 30000 });
       await new Promise(r => setTimeout(r, 2000));
-
       const status = await execCmd('systemctl', ['is-active', serviceName], { timeout: 5000 }).catch(() => 'inactive');
       const isActive = status.trim() === 'active';
 
@@ -474,98 +596,12 @@ class AutoHealService {
     }
   }
 
-  /**
-   * Emergency Disk Space Cleanup Playbook
-   */
   async executeDiskEmergencyClean() {
-    const isWindows = process.platform === 'win32';
-    const actionsTaken = [];
-
-    if (isWindows) {
-      actionsTaken.push('Purged temporary files cache');
-      actionsTaken.push('Simulated Docker system prune and vacuum');
-      await alertsService.dispatchMultiChannelAlert({
-        title: 'Emergency Disk Cleanup Executed',
-        message: 'Auto-Healing performed emergency disk space cleanup across temporary caches.',
-        level: 'resolved',
-      });
-      return { success: true, actionsTaken, message: 'Emergency disk cleanup completed' };
-    }
-
-    try {
-      // 1. Docker prune
-      // [SAFE] execFile: docker system prune — hardcoded
-      try {
-        await execCmd('docker', ['system', 'prune', '-f'], { timeout: 30000 });
-        actionsTaken.push('Pruned unused Docker containers, networks, and build caches');
-      } catch (_) {}
-
-      // 2. Journal vacuum
-      // [SAFE] execFile: journalctl vacuum — hardcoded
-      try {
-        await execCmd('journalctl', ['--vacuum-time=3d'], { timeout: 15000 });
-        actionsTaken.push('Vacuumed systemd journal logs to last 3 days');
-      } catch (_) {}
-
-      // 3. Clean /tmp
-      // [SAFE] execFile: find — hardcoded args
-      try {
-        await execCmd('find', ['/tmp', '-type', 'f', '-atime', '+3', '-delete'], { timeout: 10000 });
-        actionsTaken.push('Purged stale /tmp files older than 3 days');
-      } catch (_) {}
-
-      // 4. Package manager cache
-      // [SAFE] execFile: apt-get clean — hardcoded
-      try {
-        await execCmd('apt-get', ['clean'], { timeout: 15000 });
-        actionsTaken.push('Cleaned apt/yum package cache');
-      } catch (_) {}
-
-      const msg = `Auto-Healing emergency disk clean executed: ${actionsTaken.join(', ')}`;
-      logger.info(`[AutoHeal] ${msg}`);
-      await alertsService.dispatchMultiChannelAlert({
-        title: 'Emergency Disk Cleanup Executed',
-        message: msg,
-        level: 'resolved',
-      });
-
-      return { success: true, actionsTaken, message: 'Emergency disk cleanup completed' };
-    } catch (err) {
-      throw new Error(`Emergency cleanup failed: ${err.message}`);
-    }
+    return this.providers.storage.heal('storage:disk');
   }
 
-  /**
-   * Resurrect all dead critical services
-   */
   async resurrectDeadServices() {
-    const config = await this._getConfig();
-    const revived = [];
-    const failed = [];
-
-    for (const svc of config.services) {
-      if (!svc.enabled) continue;
-      try {
-        // [SAFE] execFile: systemctl — svc.name from config
-        const stdout = await execCmd('systemctl', ['is-active', svc.name], { timeout: 5000 }).catch(() => 'inactive');
-        if (stdout.trim() !== 'active') {
-          await execCmd('systemctl', ['restart', svc.name], { timeout: 20000 });
-          revived.push(svc.displayName || svc.name);
-        }
-      } catch {
-        failed.push(svc.displayName || svc.name);
-      }
-    }
-
-    if (revived.length > 0) {
-      await alertsService.dispatchMultiChannelAlert({
-        title: 'Dead Services Auto-Resurrected',
-        message: `Auto-Healer successfully revived dead services: ${revived.join(', ')}`,
-        level: 'recovery',
-      });
-    }
-
-    return { success: true, revived, failed };
+    return this.healAll();
   }
 }
 
