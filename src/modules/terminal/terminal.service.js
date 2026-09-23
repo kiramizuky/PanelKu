@@ -1,8 +1,18 @@
-import pty from 'node-pty';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
 import logger from '../../config/logger.js';
+
+let pty = null;
+let ptyLoadError = null;
+
+try {
+  const ptyModule = await import('node-pty');
+  pty = ptyModule.default || ptyModule;
+} catch (err) {
+  ptyLoadError = err;
+  logger.warn(`Failed to load native module "node-pty": ${err.message}. Web terminal will be unavailable until rebuilt.`);
+}
 
 /**
  * Terminal Service — manages PTY instances per user/session.
@@ -14,9 +24,21 @@ class TerminalService {
   }
 
   /**
+   * Check if native PTY is available.
+   */
+  isAvailable() {
+    return pty !== null;
+  }
+
+  /**
    * Create a new PTY session.
    */
   create(userId, shell = 'bash', cols = 80, rows = 24, osUser = 'root', cwd = null) {
+    if (!pty) {
+      const hint = ptyLoadError ? `: ${ptyLoadError.message}` : '';
+      throw new Error(`Web terminal is unavailable because native module "node-pty" failed to load${hint}. Run "npm rebuild node-pty" in /opt/panelku to fix.`);
+    }
+
     if (this._sessions.size >= this._MAX_SESSIONS) {
       throw new Error('Maximum terminal sessions reached');
     }

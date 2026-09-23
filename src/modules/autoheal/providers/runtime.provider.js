@@ -253,10 +253,18 @@ class RuntimeProvider {
       const testDb = new bs(':memory:');
       testDb.prepare('SELECT 1').get();
       testDb.close();
-      return true;
     } catch {
       return false;
     }
+
+    try {
+      const ptyMod = (await import('node-pty')).default || (await import('node-pty'));
+      if (!ptyMod || typeof ptyMod.spawn !== 'function') return false;
+    } catch {
+      return false;
+    }
+
+    return true;
   }
 
   async _isServiceActive(serviceName) {
