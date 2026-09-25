@@ -143,4 +143,15 @@ describe('UpdaterController', () => {
     expect(res.statusCode).toBe(400);
     expect(res.body.success).toBe(false);
   });
+
+  test('rebuildNative calls rebuildNativeModules and returns 200', async () => {
+    const req = {};
+    const res = createMockRes();
+
+    await updaterController.rebuildNative(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty('log');
+  });
 });
+

@@ -26,6 +26,9 @@ router.post('/restart', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), updaterControll
 // ── Health Check ──
 router.get('/health', rbac(RESOURCES.SYSTEM, ACTIONS.READ), updaterController.runHealthCheck.bind(updaterController));
 
+// ── Native Modules ──
+router.post('/rebuild-native', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), updaterController.rebuildNative.bind(updaterController));
+
 // ── History ──
 router.get('/history', rbac(RESOURCES.SYSTEM, ACTIONS.READ), updaterController.getUpdateHistory.bind(updaterController));
 router.delete('/history', rbac(RESOURCES.SYSTEM, ACTIONS.DELETE), updaterController.clearUpdateHistory.bind(updaterController));

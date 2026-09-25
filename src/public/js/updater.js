@@ -197,6 +197,42 @@ const UpdaterPage = (() => {
     LP.toast('Health check completed', 'success');
   }
 
+  // ── Native Modules Rebuild ──────────────────────────────────────
+  async function rebuildNative() {
+    const btn1 = document.getElementById('btnRebuildNativeSidebar');
+    const btn2 = document.getElementById('btnRebuildNativeTab');
+    const setBtnState = (loading) => {
+      [btn1, btn2].forEach(btn => {
+        if (!btn) return;
+        btn.disabled = loading;
+        btn.innerHTML = loading
+          ? '<span class="spinner-border spinner-border-sm me-1"></span> Rebuilding...'
+          : '<i class="bi bi-tools me-1"></i> Rebuild Native Addons';
+      });
+    };
+
+    setBtnState(true);
+    LP.toast('Rebuilding native addons (node-pty, better-sqlite3)...', 'info');
+
+    try {
+      const res = await LP.post('/updater/rebuild-native');
+      if (res?.success) {
+        if (res.data?.success) {
+          LP.toast('Native modules rebuilt and verified successfully!', 'success');
+        } else {
+          LP.toast('Rebuild finished with warnings. Check server logs.', 'warning');
+        }
+        await loadHealth();
+      } else {
+        LP.toast(res?.message || 'Failed to rebuild native modules', 'error');
+      }
+    } catch (err) {
+      LP.toast('Error rebuilding native modules: ' + err.message, 'error');
+    } finally {
+      setBtnState(false);
+    }
+  }
+
   // ── History ────────────────────────────────────────────────────
   async function loadHistory() {
     try {
@@ -657,6 +693,7 @@ const UpdaterPage = (() => {
     showDiffPreview,
     saveSchedule,
     createBackup,
+    rebuildNative,
     toggleHistoryLog,
     createPreUpdateBackup: createBackup,
   };

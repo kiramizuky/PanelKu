@@ -122,6 +122,9 @@
                   <span style="color:var(--text-muted);">Last Restart</span>
                   <span id="ovLastRestart" style="color:var(--text-primary);font-family:monospace;">—</span>
                 </div>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm w-100 mt-3" id="btnRebuildNativeSidebar" onclick="UpdaterPage.rebuildNative()" style="font-size:11px;" title="Rebuild native C++ modules (node-pty, better-sqlite3)">
+                  <i class="bi bi-tools me-1"></i> Rebuild Native Addons
+                </button>
               </div>
             </div>
           </div>
@@ -338,13 +341,18 @@ Ready. Configure options above and click "Update Panel".
           <!-- Health Check Details -->
           <div class="col-12 col-lg-6">
             <div class="lp-glass-card mb-3">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
                 <div class="lp-card-title" style="font-size:14px;margin:0;">
                   <i class="bi bi-heart-pulse text-danger me-1"></i> Health Check
                 </div>
-                <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="UpdaterPage.refreshHealth()">
-                  <i class="bi bi-arrow-repeat me-1"></i> Run Now
-                </button>
+                <div style="display:flex;gap:8px;">
+                  <button class="btn-lp btn-lp-ghost btn-lp-sm" id="btnRebuildNativeTab" onclick="UpdaterPage.rebuildNative()" style="font-size:11px;" title="Rebuild native C++ modules (node-pty, better-sqlite3)">
+                    <i class="bi bi-tools me-1"></i> Rebuild Native Addons
+                  </button>
+                  <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="UpdaterPage.refreshHealth()">
+                    <i class="bi bi-arrow-repeat me-1"></i> Run Now
+                  </button>
+                </div>
               </div>
               <div id="schHealthResults">
                 <div style="text-align:center;padding:20px;color:var(--text-muted);">

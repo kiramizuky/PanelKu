@@ -36,6 +36,7 @@ const mockUpdaterService = {
   createPreUpdateBackup: jest.fn(),
   getScheduleConfig: jest.fn(),
   setScheduleConfig: jest.fn(),
+  rebuildNativeModules: jest.fn(),
 };
 
 const mockAuditRepo = {
@@ -598,5 +599,24 @@ describe('UpdaterController', () => {
     const res2 = createMockRes();
     await updaterController.setScheduleConfig(req2, res2);
     expect(res2.statusCode).toBe(500);
+  });
+
+  test('rebuildNative triggers native addons rebuild and returns 200', async () => {
+    mockUpdaterService.rebuildNativeModules.mockResolvedValue({ success: true, log: 'Compilation done' });
+    const req = {};
+    const res = createMockRes();
+    await updaterController.rebuildNative(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.success).toBe(true);
+  });
+
+  test('rebuildNative handles error with 500', async () => {
+    mockUpdaterService.rebuildNativeModules.mockRejectedValue(new Error('Compilation failed'));
+    const req = {};
+    const res = createMockRes();
+    await updaterController.rebuildNative(req, res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body.success).toBe(false);
   });
 });

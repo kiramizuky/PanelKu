@@ -80,6 +80,10 @@ class UpdaterService {
     if (cmd.includes('git diff')) return 'diff --git a/package.json b/package.json\nindex abc..def 100644\n--- a/package.json\n+++ b/package.json\n@@ -1,5 +1,5 @@\n {\n   "name": "panelku",\n-  "version": "1.9.0",\n+  "version": "2.0.0",\n';
     if (cmd.includes('npm install')) return 'added 0 packages, removed 0 packages, changed 0 packages\n';
     if (cmd.includes('node --check')) return '';
+    if (cmd.includes('npm rebuild')) return 'rebuilt better-sqlite3 node-pty successfully\n';
+    if (cmd.includes('--build-from-source')) return 'built from source successfully\n';
+    if (cmd.includes('which make')) return '/usr/bin/make\n';
+    if (cmd.includes('which apt-get')) return '/usr/bin/apt-get\n';
     if (cmd.includes('systemctl restart panelku')) return '';
     if (cmd.includes('ls -la')) return 'total 8\ndrwxr-xr-x 2 root root 4096 Jul 17 10:00 .\ndrwxr-xr-x 4 root root 4096 Jul 17 09:00 ..\n';
     if (cmd.includes('tail -n')) return 'Jul 17 10:00:01 server panelku[1234]: Panel started successfully\n';
@@ -121,6 +125,141 @@ class UpdaterService {
     if (!/^[a-zA-Z0-9._\-\s]+$/.test(name)) throw new Error('Invalid backup name');
     if (name.length > 200) throw new Error('Backup name too long');
     return name.trim();
+  }
+
+  // ── Native Modules (node-pty & better-sqlite3) ───────────────────
+  /**
+   * Verify native C++ addons (better-sqlite3 & node-pty).
+   */
+  async _checkNativeModules() {
+    let sqliteOk = false;
+    let sqliteError = null;
+    let ptyOk = false;
+    let ptyError = null;
+
+    try {
+      const bs = (await import('better-sqlite3')).default;
+      const testDb = new bs(':memory:');
+      testDb.prepare('SELECT 1').get();
+      testDb.close();
+      sqliteOk = true;
+    } catch (err) {
+      sqliteError = err.message;
+    }
+
+    try {
+      const ptyMod = (await import('node-pty')).default || (await import('node-pty'));
+      if (ptyMod && typeof ptyMod.spawn === 'function') {
+        ptyOk = true;
+      } else {
+        ptyError = 'spawn function not available';
+      }
+    } catch (err) {
+      ptyError = err.message;
+    }
+
+    return { sqliteOk, sqliteError, ptyOk, ptyError };
+  }
+
+  /**
+   * Ensure build tools (make, gcc/g++, python3) exist on Linux servers.
+   */
+  async _ensureBuildTools(log = []) {
+    if (process.platform === 'win32') return true;
+
+    try {
+      const checkTools = await this._runCommand('which make && (which g++ || which gcc) && (which python3 || which python)');
+      if (!checkTools.includes('[ERROR]') && checkTools.trim()) {
+        return true;
+      }
+
+      log.push('   ⚠️ Compiler or Python missing on server. Attempting automatic installation...');
+      const checkApt = await this._runCommand('which apt-get');
+      if (!checkApt.includes('[ERROR]') && checkApt.trim()) {
+        log.push('   📦 Installing build-essential, python3, make, g++ via apt-get...');
+        await this._runCommand('DEBIAN_FRONTEND=noninteractive apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential python3 make g++ 2>&1');
+      } else {
+        const checkDnf = await this._runCommand('which dnf || which yum');
+        if (!checkDnf.includes('[ERROR]') && checkDnf.trim()) {
+          log.push('   📦 Installing make, gcc-c++, python3 via dnf/yum...');
+          await this._runCommand('dnf install -y make gcc-c++ python3 2>&1 || yum install -y make gcc-c++ python3 2>&1');
+        } else {
+          const checkApk = await this._runCommand('which apk');
+          if (!checkApk.includes('[ERROR]') && checkApk.trim()) {
+            log.push('   📦 Installing build-base, python3, make, g++ via apk...');
+            await this._runCommand('apk add --no-cache build-base python3 make g++ 2>&1');
+          }
+        }
+      }
+    } catch (err) {
+      log.push(`   ⚠️ Build tools verification: ${err.message}`);
+    }
+    return true;
+  }
+
+  /**
+   * Rebuild native dependencies (better-sqlite3 and node-pty) with fallback to --build-from-source.
+   */
+  async rebuildNativeModules(customLog = null) {
+    const log = Array.isArray(customLog) ? customLog : [];
+    log.push('🔨 [Native Modules] Verifying and rebuilding C++ addons...');
+
+    await this._ensureBuildTools(log);
+
+    // 1. Run npm rebuild
+    log.push('   ⚙️ Executing npm rebuild better-sqlite3 node-pty...');
+    const rebuildOut = await this._runCommand('npm rebuild better-sqlite3 node-pty 2>&1');
+    if (rebuildOut && !rebuildOut.includes('[ERROR]')) {
+      const summary = rebuildOut.trim().split('\n').slice(0, 3).join('\n   ');
+      if (summary) log.push(`   ${summary}`);
+    } else if (rebuildOut.includes('[ERROR]')) {
+      log.push(`   ⚠️ npm rebuild warning: ${rebuildOut.replace('[ERROR]', '').trim().split('\n')[0]}`);
+    }
+
+    // 2. Check status
+    let check = await this._checkNativeModules();
+
+    // 3. Fallback for node-pty if not working
+    if (!check.ptyOk) {
+      log.push('   ⚠️ node-pty still unverified. Attempting fallback: npm install node-pty --build-from-source...');
+      const ptySourceOut = await this._runCommand('npm install node-pty --build-from-source 2>&1');
+      if (ptySourceOut && !ptySourceOut.includes('[ERROR]')) {
+        const ptySummary = ptySourceOut.trim().split('\n').slice(0, 2).join('\n   ');
+        if (ptySummary) log.push(`   ${ptySummary}`);
+      }
+    }
+
+    // 4. Fallback for better-sqlite3 if not working
+    if (!check.sqliteOk) {
+      log.push('   ⚠️ better-sqlite3 unverified. Attempting fallback: npm install better-sqlite3 --build-from-source...');
+      const bsSourceOut = await this._runCommand('npm install better-sqlite3 --build-from-source 2>&1');
+      if (bsSourceOut && !bsSourceOut.includes('[ERROR]')) {
+        const bsSummary = bsSourceOut.trim().split('\n').slice(0, 2).join('\n   ');
+        if (bsSummary) log.push(`   ${bsSummary}`);
+      }
+    }
+
+    // 5. Final re-verification
+    check = await this._checkNativeModules();
+    if (check.ptyOk) {
+      log.push('   ✅ node-pty loaded successfully (Web Terminal available)');
+    } else {
+      log.push(`   ❌ node-pty failed to load: ${check.ptyError || 'unknown error'}`);
+    }
+
+    if (check.sqliteOk) {
+      log.push('   ✅ better-sqlite3 verified successfully');
+    } else {
+      log.push(`   ❌ better-sqlite3 failed to load: ${check.sqliteError || 'unknown error'}`);
+    }
+
+    const success = check.sqliteOk && check.ptyOk;
+    return {
+      success,
+      sqliteOk: check.sqliteOk,
+      ptyOk: check.ptyOk,
+      log: log.join('\n'),
+    };
   }
 
   // ── Version Info ─────────────────────────────────────────────────
@@ -387,14 +526,14 @@ class UpdaterService {
         log.push('📦 Installing npm dependencies...');
         const npmOut = await this._runCommand('npm install --omit=dev 2>&1');
         log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
-        log.push('🔨 Rebuilding native dependencies...');
-        await this._runCommand('npm rebuild better-sqlite3 node-pty 2>&1').catch(() => {});
+        log.push('🔨 Rebuilding native dependencies (better-sqlite3, node-pty)...');
+        await this.rebuildNativeModules(log);
       } else if (method === 'npm') {
         log.push('📦 Running npm install only...');
         const npmOut = await this._runCommand('npm install --omit=dev 2>&1');
         log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
-        log.push('🔨 Rebuilding native dependencies...');
-        await this._runCommand('npm rebuild better-sqlite3 node-pty 2>&1').catch(() => {});
+        log.push('🔨 Rebuilding native dependencies (better-sqlite3, node-pty)...');
+        await this.rebuildNativeModules(log);
       }
 
       // 3. Syntax check (health check before restart)
@@ -551,6 +690,8 @@ class UpdaterService {
       log.push('📦 Re-installing npm dependencies...');
       const npmOut = await this._runCommand('npm install --omit=dev 2>&1');
       log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
+      log.push('🔨 Rebuilding native dependencies after rollback (better-sqlite3, node-pty)...');
+      await this.rebuildNativeModules(log);
 
       // Syntax check
       log.push('🔍 Running syntax check after rollback...');
@@ -685,6 +826,20 @@ class UpdaterService {
       results.push({ name: 'Database', status: 'ok', detail: 'SQLite responsive' });
     } catch {
       results.push({ name: 'Database', status: 'fail', detail: 'SQLite not responsive' });
+    }
+
+    // 2b. Check Native Modules (node-pty, better-sqlite3)
+    try {
+      const native = await this._checkNativeModules();
+      if (native.sqliteOk && native.ptyOk) {
+        results.push({ name: 'Native Modules', status: 'ok', detail: 'better-sqlite3 & node-pty loaded' });
+      } else if (!native.sqliteOk) {
+        results.push({ name: 'Native Modules', status: 'fail', detail: `better-sqlite3: ${native.sqliteError || 'error'}` });
+      } else {
+        results.push({ name: 'Native Modules', status: 'warn', detail: 'node-pty native binary missing — Web Terminal unavailable' });
+      }
+    } catch (err) {
+      results.push({ name: 'Native Modules', status: 'warn', detail: `Native check: ${err.message}` });
     }
 
     // 3. Check port listening

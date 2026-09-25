@@ -155,6 +155,16 @@ class UpdaterController {
       return errorResponse(res, error.message, 500);
     }
   }
+
+  // ── Rebuild Native Modules ──────────────────────────────────────
+  async rebuildNative(req, res) {
+    try {
+      const result = await updaterService.rebuildNativeModules();
+      return success(res, result, result.success ? 'Native modules rebuilt successfully' : 'Native modules rebuilt with warnings');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
 }
 
 export default new UpdaterController();
