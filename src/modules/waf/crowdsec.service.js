@@ -3,12 +3,12 @@
  * Manages collaborative intrusion detection, community threat intelligence,
  * and automated remediation bouncers via `cscli`.
  */
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import logger from '../../config/logger.js';
 import { getDb, generateId, now } from '../../core/db/sqlite.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class CrowdSecService {
   constructor() {
@@ -47,14 +47,23 @@ export class CrowdSecService {
     }
 
     try {
-      const { stdout: versionOut } = await execAsync('cscli version 2>/dev/null || crowdsec -version', { timeout: 5000 });
-      const versionMatch = versionOut.match(/version:\s*([^\s]+)/i) || versionOut.match(/([v0-9.]+)/);
-      const version = versionMatch ? versionMatch[1] : 'installed';
+      let version = 'installed';
+      try {
+        const { stdout: versionOut } = await execFileAsync('cscli', ['version'], { timeout: 5000 });
+        const versionMatch = versionOut.match(/version:\s*([^\s]+)/i) || versionOut.match(/([v0-9.]+)/);
+        if (versionMatch) version = versionMatch[1];
+      } catch {
+        try {
+          const { stdout: altOut } = await execFileAsync('crowdsec', ['-version'], { timeout: 5000 });
+          const altMatch = altOut.match(/version:\s*([^\s]+)/i) || altOut.match(/([v0-9.]+)/);
+          if (altMatch) version = altMatch[1];
+        } catch (_) {}
+      }
 
       // Check bouncers
       let bouncers = [];
       try {
-        const { stdout: bouncerOut } = await execAsync('cscli bouncers list -o json 2>/dev/null', { timeout: 5000 });
+        const { stdout: bouncerOut } = await execFileAsync('cscli', ['bouncers', 'list', '-o', 'json'], { timeout: 5000 });
         bouncers = JSON.parse(bouncerOut).map(b => ({
           name: b.name,
           type: b.type || 'firewall',
@@ -68,7 +77,7 @@ export class CrowdSecService {
       // Check decision count
       let activeDecisions = 0;
       try {
-        const { stdout: decisionsOut } = await execAsync('cscli decisions list -o json 2>/dev/null', { timeout: 5000 });
+        const { stdout: decisionsOut } = await execFileAsync('cscli', ['decisions', 'list', '-o', 'json'], { timeout: 5000 });
         const parsed = JSON.parse(decisionsOut);
         activeDecisions = Array.isArray(parsed) ? parsed.length : 0;
       } catch {
@@ -112,7 +121,7 @@ export class CrowdSecService {
     }
 
     try {
-      const { stdout } = await execAsync('cscli decisions list -o json 2>/dev/null', { timeout: 10000 });
+      const { stdout } = await execFileAsync('cscli', ['decisions', 'list', '-o', 'json'], { timeout: 10000 });
       const parsed = JSON.parse(stdout);
       if (!Array.isArray(parsed)) return [];
 
@@ -153,7 +162,8 @@ export class CrowdSecService {
     if (!this._isWindows) {
       try {
         const safeDuration = /^[0-9]+[smhd]$/.test(duration) ? duration : '24h';
-        await execAsync(`cscli decisions add --ip "${cleanIp}" --duration "${safeDuration}" --reason "${reason.replace(/["$`\\]/g, '')}"`, { timeout: 10000 });
+        const safeReason = typeof reason === 'string' ? reason.replace(/[\r\n]/g, ' ').substring(0, 100) : 'Manual Administrator Ban';
+        await execFileAsync('cscli', ['decisions', 'add', '--ip', cleanIp, '--duration', safeDuration, '--reason', safeReason], { timeout: 10000 });
       } catch (err) {
         logger.warn(`cscli decision add failed: ${err.message}. Falling back to WAF rule.`);
       }
@@ -182,7 +192,7 @@ export class CrowdSecService {
 
     if (!this._isWindows) {
       try {
-        await execAsync(`cscli decisions delete --ip "${cleanIp}"`, { timeout: 10000 });
+        await execFileAsync('cscli', ['decisions', 'delete', '--ip', cleanIp], { timeout: 10000 });
       } catch (err) {
         logger.warn(`cscli decision delete failed: ${err.message}`);
       }
@@ -203,8 +213,9 @@ export class CrowdSecService {
     }
 
     try {
-      const { stdout } = await execAsync('cscli hub update && cscli collections upgrade', { timeout: 60000 });
-      logger.info(`[CrowdSec] Hub synced: ${stdout}`);
+      const { stdout: hubOut } = await execFileAsync('cscli', ['hub', 'update'], { timeout: 30000 });
+      const { stdout: collOut } = await execFileAsync('cscli', ['collections', 'upgrade'], { timeout: 60000 });
+      logger.info(`[CrowdSec] Hub synced: ${hubOut || ''} ${collOut || ''}`.trim());
       return { success: true, message: 'CrowdSec Hub and community blocklists updated successfully' };
     } catch (err) {
       throw new Error(`Failed to sync CrowdSec hub: ${err.message}`);

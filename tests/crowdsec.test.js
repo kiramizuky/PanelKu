@@ -18,13 +18,18 @@ jest.unstable_mockModule('child_process', () => ({
     if (typeof cb !== 'function') return;
     cb(null, { stdout: 'version: 1.6.0', stderr: '' });
   }),
+  execFile: jest.fn((file, args, ...rest) => {
+    const cb = rest.pop();
+    if (typeof cb !== 'function') return;
+    cb(null, { stdout: 'version: 1.6.0', stderr: '' });
+  }),
 }));
 
 const { default: crowdsecService } = await import('../src/modules/waf/crowdsec.service.js');
 const { default: wafService } = await import('../src/modules/waf/waf.service.js');
 const { default: wafController } = await import('../src/modules/waf/waf.controller.js');
 const { wafMiddleware, refreshWafCache } = await import('../src/middleware/waf.middleware.js');
-const { exec } = await import('child_process');
+const { exec, execFile } = await import('child_process');
 
 function fakeRes() {
   const res = {

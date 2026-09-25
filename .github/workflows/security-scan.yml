@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────
 # Panelku — Weekly Security Scan
 # Runs every Monday at 07:00 UTC and on-demand via workflow_dispatch.
-# Stages: Dependency Review → npm Audit → CodeQL Full Analysis → Trivy FS Scan
+# Stages: Dependency Review → npm Audit → CodeQL Full Analysis → Trivy FS Scan → Secrets Scan
 # ─────────────────────────────────────────────────────────────────────
 
 name: 🔒 Weekly Security Scan
@@ -71,7 +71,7 @@ jobs:
         run: |
           echo "🔍 Audit Summary"
           npm audit --json 2>/dev/null | node -e "
-            const d = require('fs').readFileSync('/dev/stdin','utf8');
+            const d = require('fs').readFileSync(0, 'utf8');
             const r = JSON.parse(d);
             const v = r.vulnerabilities || {};
             const counts = { critical: 0, high: 0, moderate: 0, low: 0 };
@@ -115,15 +115,13 @@ jobs:
               - src/config/swagger.js
               - src/config/swagger.fixed.js
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      - name: Build project (none required for Node.js)
+        run: echo "No build step required for JavaScript/Node.js"
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:javascript"
-          output: codeql-results
-          upload: true
 
   # ── Trivy Filesystem Security Scan ──────────────────────────────
   trivy-scan:
@@ -135,7 +133,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner (filesystem)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.29.0
         with:
           scan-type: fs
           scan-ref: .
@@ -165,6 +163,6 @@ jobs:
           fetch-depth: 0  # Full history for git-based scanning
 
       - name: truffleHog Secrets Scan
-        uses: trufflesecurity/trufflehog@v3
+        uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --results=verified,unknown --no-verification

@@ -1,6 +1,6 @@
 import si from 'systeminformation';
 import MonitorHistory from '../../models/MonitorHistory.js';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
@@ -8,12 +8,20 @@ import logger from '../../config/logger.js';
 import { normalizeDisks } from '../../helpers/system.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
-/** Read last N lines of a file safely */
+/** Read last N lines of a file safely using execFile or fs fallback */
 async function tailFile(filepath, lines = 100) {
   try {
     await fs.access(filepath);
-    const { stdout } = await execAsync(`tail -n ${Math.min(Math.max(lines, 10), 500)} "${filepath}" 2>/dev/null`);
+    const lineCount = Math.min(Math.max(parseInt(lines, 10) || 100, 10), 500);
+
+    if (process.platform === 'win32') {
+      const content = await fs.readFile(filepath, 'utf8');
+      return content.split(/\r?\n/).filter(Boolean).slice(-lineCount);
+    }
+
+    const { stdout } = await execFileAsync('tail', ['-n', String(lineCount), filepath]);
     return stdout.split('\n').filter(Boolean);
   } catch {
     return [];

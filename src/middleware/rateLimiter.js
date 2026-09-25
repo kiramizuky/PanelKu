@@ -11,7 +11,10 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please slow down.' },
   skip: (req) => {
-    // 1. Exempt all authenticated requests (logged in panel users should never be rate limited)
+    // [HIGH-5 FIX] Never skip requests using programmatic API keys (enforce rate limiting)
+    if (req.headers && req.headers['x-api-key']) return false;
+
+    // 1. Exempt all authenticated session requests (logged in panel users should never be rate limited)
     // [MED-3 FIX] Only check Authorization header — cookies are not checked to prevent
     // CSRF-based bypass of rate limiting via cookie injection.
     if (req.user || req.headers?.authorization) return true;
@@ -67,7 +70,7 @@ export const apiKeyLimiter = rateLimit({
 
 /**
  * Download token rate limiter — prevent brute-force on generate-download-token endpoint.
- * Limits per-user (via req.user.id) to avoid IP-based bypass across shared networks.
+ * Limits per-user and per-IP to avoid bypass across shared networks or multi-session misuse.
  * 20 requests/minute gives headroom for legitimate multi-file downloads while stopping brute force.
  */
 export const downloadTokenLimiter = rateLimit({
@@ -75,7 +78,11 @@ export const downloadTokenLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || req.ip,
+  keyGenerator: (req) => {
+    const userId = req.user?.id || 'anonymous';
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    return `${userId}:${ip}`;
+  },
   message: { success: false, message: 'Too many download token requests. Please slow down.' },
 });
 

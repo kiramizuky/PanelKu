@@ -95,7 +95,9 @@ export const refreshWafCache = async () => {
 };
 
 export const wafMiddleware = async (req, res, next) => {
-  const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+  const forwarded = req.headers['x-forwarded-for'];
+  const rawIp = req.ip || (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : null) || req.socket?.remoteAddress || '127.0.0.1';
+  const clientIp = rawIp.replace(/^::ffff:/, '');
   const rawPath = (req.path || req.originalUrl || '').toLowerCase();
   const userAgent = req.headers['user-agent'] || '';
 
@@ -145,7 +147,8 @@ export const wafMiddleware = async (req, res, next) => {
   }
 
   // 5. GeoIP Country Blocking
-  if (globalRulesCache.blockedCountries.length > 0 && clientIp !== '127.0.0.1' && !clientIp.startsWith('192.168.') && !clientIp.startsWith('10.')) {
+  const isLocalIp = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === 'localhost' || clientIp.startsWith('192.168.') || clientIp.startsWith('10.') || clientIp.startsWith('172.16.') || clientIp.startsWith('172.17.') || clientIp.startsWith('172.18.') || clientIp.startsWith('172.19.') || clientIp.startsWith('172.2') || clientIp.startsWith('172.3');
+  if (globalRulesCache.blockedCountries.length > 0 && !isLocalIp) {
     try {
       const geo = await geoipService.resolveIp(clientIp);
       if (geo && geo.countryCode && globalRulesCache.blockedCountries.includes(geo.countryCode.toUpperCase())) {

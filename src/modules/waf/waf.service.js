@@ -27,14 +27,33 @@ class WafService {
   }
 
   async addRule(type, value, action, description) {
-    if (type === 'ip' && !/^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/.test(value)) {
-      throw new Error('Invalid IP address or CIDR range');
+    if (!type || !value || !action) {
+      throw new Error('type, value, and action are required');
     }
 
-    const existing = await WafRule.findOne({ type, value });
+    if (!['allow', 'block'].includes(action)) {
+      throw new Error('Invalid action: must be allow or block');
+    }
+
+    const cleanVal = typeof value === 'string' ? value.trim() : '';
+
+    if (type === 'ip') {
+      const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
+      const ipv6Regex = /^([0-9a-fA-F]{1,4}:){1,7}[0-9a-fA-F]{1,4}(\/\d{1,3})?$/;
+      if (!ipv4Regex.test(cleanVal) && !ipv6Regex.test(cleanVal) && cleanVal !== '::1') {
+        throw new Error('Invalid IP address or CIDR range');
+      }
+    } else if (type === 'country') {
+      if (!/^[a-zA-Z]{2}$/.test(cleanVal)) {
+        throw new Error('Invalid country code: must be a 2-letter ISO code');
+      }
+    }
+
+    const targetVal = type === 'country' ? cleanVal.toUpperCase() : cleanVal;
+    const existing = await WafRule.findOne({ type, value: targetVal });
     if (existing) throw new Error('Rule already exists for this value');
 
-    const rule = await WafRule.create({ type, value, action, description });
+    const rule = await WafRule.create({ type, value: targetVal, action, description });
     await refreshWafCache();
     return rule;
   }
