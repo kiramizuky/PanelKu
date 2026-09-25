@@ -298,6 +298,62 @@ class UsersService {
   async revokeApiKey(userId) {
     await userRepository.updateById(userId, { apiKeyEnabled: false });
   }
+
+  /**
+   * Get active sessions for a user
+   */
+  async getUserSessions(userId) {
+    const sessions = await sessionRepository.findUserSessions(userId);
+    return sessions.map(s => ({
+      id: s._id || s.id,
+      userId: s.userId,
+      deviceInfo: s.deviceInfo || 'Desktop Browser',
+      userAgent: s.userAgent || '-',
+      ip: s.ip || '127.0.0.1',
+      isActive: s.isActive,
+      lastActive: s.lastActive,
+      createdAt: s.createdAt,
+    }));
+  }
+
+  /**
+   * Revoke a single active session
+   */
+  async revokeSession(userId, sessionId, requestingUser = null) {
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) {
+      throw Object.assign(new Error('Session not found'), { statusCode: 404 });
+    }
+
+    if (requestingUser) {
+      const isAdmin = requestingUser.isSuperAdmin || requestingUser.role?.slug === 'super-admin' || requestingUser.role?.slug === 'admin';
+      const reqId = requestingUser._id || requestingUser.id;
+      if (session.userId !== userId && !isAdmin && reqId !== userId) {
+        throw Object.assign(new Error('Forbidden: Cannot revoke session belonging to another user'), { statusCode: 403 });
+      }
+    }
+
+    await sessionRepository.deactivate(sessionId);
+    return true;
+  }
+
+  /**
+   * Revoke all active sessions for a user (optional skip current)
+   */
+  async revokeAllUserSessions(userId, exceptSessionId = null) {
+    if (exceptSessionId) {
+      const sessions = await sessionRepository.findUserSessions(userId);
+      for (const s of sessions) {
+        const sid = s._id || s.id;
+        if (sid !== exceptSessionId) {
+          await sessionRepository.deactivate(sid);
+        }
+      }
+    } else {
+      await sessionRepository.deactivateAll(userId);
+    }
+    return true;
+  }
 }
 
 const usersService = new UsersService();

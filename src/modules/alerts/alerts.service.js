@@ -123,11 +123,20 @@ class AlertsService {
     if (!config.whatsapp?.enabled || !config.whatsapp?.phoneNumber) return;
     try {
       const whatsappService = (await import('../whatsapp/whatsapp.service.js')).default;
-      const sessionName = 'default'; 
+      let sessionName = config.whatsapp.sessionName || 'default';
+
+      try {
+        const WhatsappSession = (await import('../../models/WhatsappSession.js')).default;
+        const activeSessions = await WhatsappSession.find({ status: 'connected' });
+        if (activeSessions.length > 0 && !activeSessions.some(s => s.session_name === sessionName)) {
+          sessionName = activeSessions[0].session_name;
+        }
+      } catch (_) {}
+
       await whatsappService.sendMessage(sessionName, config.whatsapp.phoneNumber, `🚨 *Panelku Alert*\n\n${message}`);
-      logger.info('WhatsApp alert sent.');
+      logger.info(`WhatsApp alert sent via session [${sessionName}] to ${config.whatsapp.phoneNumber}`);
     } catch (error) {
-      logger.error('Failed to send WhatsApp alert:', error.message);
+      logger.error('Failed to send WhatsApp alert: ' + error.message);
     }
   }
 

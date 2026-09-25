@@ -4,6 +4,8 @@
 
 const UsersPage = (() => {
   let userModal = null;
+  let sessionsModal = null;
+  let currentSessionsUserId = null;
   let allRoles = [];
 
   async function init() {
@@ -12,6 +14,11 @@ const UsersPage = (() => {
     const modalEl = document.getElementById('userModal');
     if (modalEl) {
       userModal = new bootstrap.Modal(modalEl);
+    }
+
+    const sessModalEl = document.getElementById('userSessionsModal');
+    if (sessModalEl) {
+      sessionsModal = new bootstrap.Modal(sessModalEl);
     }
     
     await fetchRoles();
@@ -69,6 +76,7 @@ const UsersPage = (() => {
               <td>${statusBadge}</td>
               <td class="text-end" style="white-space:nowrap">
                 ${toggleBtn}
+                <button class="btn-lp btn-lp-ghost text-info me-1" onclick="UsersPage.showSessionsModal('${LP.escHtml(userId)}', '${LP.escHtml(u.username)}')" title="Active Sessions"><i class="bi bi-shield-check"></i></button>
                 <button class="btn-lp btn-lp-ghost text-primary me-1" onclick="UsersPage.editUser('${LP.escHtml(userId)}')" title="Edit"><i class="bi bi-pencil"></i> Edit</button>
                 ${u.isSuperAdmin ? '' : `<button class="btn-lp btn-lp-ghost text-danger" onclick="UsersPage.deleteUser('${LP.escHtml(userId)}')" title="Delete"><i class="bi bi-trash"></i> Delete</button>`}
               </td>
@@ -267,6 +275,107 @@ const UsersPage = (() => {
     }
   }
 
+  // ── Session Management ───────────────────────────────
+
+  function showSessionsModal(userId, username) {
+    currentSessionsUserId = userId;
+    const titleEl = document.getElementById('sessionsModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<i class="bi bi-shield-check text-info me-1"></i> Active Sessions: <span class="text-primary">${LP.escHtml(username)}</span>`;
+    }
+    if (sessionsModal) {
+      sessionsModal.show();
+    }
+    loadSessions(userId);
+  }
+
+  async function loadSessions(userId) {
+    const tbody = document.getElementById('userSessionsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Loading active sessions...</td></tr>';
+
+    try {
+      const res = await LP.get(`/users/${userId}/sessions`);
+      if (!res?.success) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger);">Failed to load sessions: ${LP.escHtml(res?.message || 'Error')}</td></tr>`;
+        return;
+      }
+
+      const sessions = res.data?.sessions || [];
+      if (sessions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">No active sessions found for this user.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = sessions.map(s => {
+        const createdDate = s.createdAt ? new Date(s.createdAt).toLocaleString() : '-';
+        const lastActiveDate = s.lastActive ? new Date(s.lastActive).toLocaleString() : '-';
+
+        return `
+          <tr>
+            <td>
+              <i class="bi bi-laptop text-info me-1"></i>
+              <strong>${LP.escHtml(s.deviceInfo)}</strong>
+              <div class="text-muted" style="font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${LP.escHtml(s.userAgent)}</div>
+            </td>
+            <td><code class="font-mono text-warning">${LP.escHtml(s.ip)}</code></td>
+            <td style="font-size:12px;color:var(--text-muted);">${LP.escHtml(createdDate)}</td>
+            <td style="font-size:12px;color:var(--text-secondary);">${LP.escHtml(lastActiveDate)}</td>
+            <td style="text-align:right;">
+              <button class="btn-lp btn-lp-danger btn-lp-sm" onclick="UsersPage.revokeSession('${LP.escHtml(s.id)}')">
+                <i class="bi bi-x-circle me-1"></i> Revoke
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } catch {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--accent-danger);">Connection error loading sessions.</td></tr>';
+    }
+  }
+
+  function refreshSessions() {
+    if (currentSessionsUserId) {
+      loadSessions(currentSessionsUserId);
+    }
+  }
+
+  async function revokeSession(sessionId) {
+    if (!await LP.confirm('Revoke this active session? The user will be logged out on that device.', 'Revoke Session')) {
+      return;
+    }
+
+    try {
+      const res = await LP.delete(`/users/${currentSessionsUserId}/sessions/${sessionId}`);
+      if (res?.success) {
+        LP.toast('Session revoked successfully', 'success');
+        refreshSessions();
+      } else {
+        LP.toast(res?.message || 'Failed to revoke session', 'error');
+      }
+    } catch {
+      LP.toast('Error revoking session', 'error');
+    }
+  }
+
+  async function revokeAllSessions() {
+    if (!await LP.confirm('Revoke ALL active sessions for this user? All their logged in devices will be terminated.', 'Revoke All Sessions')) {
+      return;
+    }
+
+    try {
+      const res = await LP.delete(`/users/${currentSessionsUserId}/sessions`);
+      if (res?.success) {
+        LP.toast('All sessions revoked successfully', 'success');
+        refreshSessions();
+      } else {
+        LP.toast(res?.message || 'Failed to revoke sessions', 'error');
+      }
+    } catch {
+      LP.toast('Error revoking sessions', 'error');
+    }
+  }
+
   return { 
     init, 
     showCreateModal, 
@@ -275,7 +384,11 @@ const UsersPage = (() => {
     deleteUser, 
     toggleStatus, 
     generatePassword, 
-    togglePasswordVisibility 
+    togglePasswordVisibility,
+    showSessionsModal,
+    refreshSessions,
+    revokeSession,
+    revokeAllSessions
   };
 })();
 

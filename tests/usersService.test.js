@@ -40,6 +40,8 @@ jest.unstable_mockModule('../src/repositories/session.repository.js', () => ({
   default: {
     deactivateAll: jest.fn(async () => {}),
     deactivate: jest.fn(async () => {}),
+    findUserSessions: jest.fn(async () => []),
+    findById: jest.fn(async () => null),
   },
 }));
 
@@ -499,5 +501,54 @@ describe('UsersService — API Key Management', () => {
 
     await usersService.revokeApiKey('u1');
     expect(userRepository.updateById).toHaveBeenCalledWith('u1', { apiKeyEnabled: false });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  ACTIVE SESSIONS MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+
+describe('UsersService — Active Sessions Management', () => {
+  test('getUserSessions returns formatted session list', async () => {
+    sessionRepository.findUserSessions.mockResolvedValue([
+      {
+        id: 'sess-1',
+        userId: 'u1',
+        deviceInfo: 'Chrome on Windows',
+        userAgent: 'Mozilla/5.0',
+        ip: '192.168.1.50',
+        isActive: true,
+        lastActive: new Date('2026-09-25T10:00:00Z'),
+        createdAt: new Date('2026-09-25T08:00:00Z'),
+      },
+    ]);
+
+    const sessions = await usersService.getUserSessions('u1');
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].deviceInfo).toBe('Chrome on Windows');
+    expect(sessions[0].ip).toBe('192.168.1.50');
+  });
+
+  test('revokeSession deactivates session when valid', async () => {
+    sessionRepository.findById.mockResolvedValue({
+      id: 'sess-1',
+      userId: 'u1',
+    });
+
+    const result = await usersService.revokeSession('u1', 'sess-1', { id: 'u1' });
+    expect(result).toBe(true);
+    expect(sessionRepository.deactivate).toHaveBeenCalledWith('sess-1');
+  });
+
+  test('revokeSession rejects if session does not exist', async () => {
+    sessionRepository.findById.mockResolvedValue(null);
+
+    await expect(usersService.revokeSession('u1', 'sess-nonexistent', { id: 'u1' })).rejects.toThrow('Session not found');
+  });
+
+  test('revokeAllUserSessions deactivates all sessions', async () => {
+    const result = await usersService.revokeAllUserSessions('u1');
+    expect(result).toBe(true);
+    expect(sessionRepository.deactivateAll).toHaveBeenCalledWith('u1');
   });
 });

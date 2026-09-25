@@ -144,6 +144,58 @@ class UsersController {
       return error(res, err.message, 500);
     }
   }
+
+  async getUserSessions(req, res) {
+    try {
+      const userId = cleanId(req.params.id);
+      const sessions = await usersService.getUserSessions(userId);
+      return success(res, { sessions });
+    } catch (err) {
+      return error(res, err.message, err.statusCode || 500);
+    }
+  }
+
+  async revokeUserSession(req, res) {
+    try {
+      const userId = cleanId(req.params.id);
+      const sessionId = cleanId(req.params.sessionId);
+      await usersService.revokeSession(userId, sessionId, req.user);
+      return success(res, null, 'Session revoked successfully');
+    } catch (err) {
+      return error(res, err.message, err.statusCode || 500);
+    }
+  }
+
+  async getMySessions(req, res) {
+    try {
+      const userId = cleanId(req.user._id || req.user.id);
+      const sessions = await usersService.getUserSessions(userId);
+      return success(res, { sessions });
+    } catch (err) {
+      return error(res, err.message, err.statusCode || 500);
+    }
+  }
+
+  async revokeMySession(req, res) {
+    try {
+      const userId = cleanId(req.user._id || req.user.id);
+      const sessionId = cleanId(req.params.sessionId);
+      await usersService.revokeSession(userId, sessionId, req.user);
+      return success(res, null, 'Session revoked successfully');
+    } catch (err) {
+      return error(res, err.message, err.statusCode || 500);
+    }
+  }
+
+  async revokeAllUserSessions(req, res) {
+    try {
+      const userId = cleanId(req.params.id || req.user._id || req.user.id);
+      await usersService.revokeAllUserSessions(userId);
+      return success(res, null, 'All sessions revoked successfully');
+    } catch (err) {
+      return error(res, err.message, err.statusCode || 500);
+    }
+  }
 }
 
 const usersController = new UsersController();

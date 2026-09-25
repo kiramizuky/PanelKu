@@ -23,4 +23,14 @@ router.delete('/me/api-key', usersController.revokeApiKey.bind(usersController))
 router.get('/me/ai', usersController.getAiSettings.bind(usersController));
 router.put('/me/ai', usersController.updateAiSettings.bind(usersController));
 
+// Self-service sessions
+router.get('/me/sessions', usersController.getMySessions.bind(usersController));
+router.delete('/me/sessions/:sessionId', usersController.revokeMySession.bind(usersController));
+router.delete('/me/sessions', usersController.revokeAllUserSessions.bind(usersController));
+
+// Admin user sessions
+router.get('/:id/sessions', rbac(RESOURCES.USERS, ACTIONS.READ), usersController.getUserSessions.bind(usersController));
+router.delete('/:id/sessions/:sessionId', rbac(RESOURCES.USERS, ACTIONS.UPDATE), usersController.revokeUserSession.bind(usersController));
+router.delete('/:id/sessions', rbac(RESOURCES.USERS, ACTIONS.UPDATE), usersController.revokeAllUserSessions.bind(usersController));
+
 export default router;
