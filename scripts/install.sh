@@ -274,10 +274,71 @@ setup_panel() {
 
   info "Installing npm packages..."
   npm install --production -q
-  # [LOW-1 FIX] Rebuild native addons after npm install.
-  # node-pty and better-sqlite3 are native modules that must match the running Node.js ABI.
-  npm rebuild better-sqlite3 2>/dev/null || true
-  npm rebuild node-pty 2>/dev/null || true
+
+  # [NATIVE ADDONS] Rebuild and verify native C++ addons (better-sqlite3 & node-pty).
+  # Native modules MUST be compiled to match the host Linux kernel and Node.js ABI,
+  # otherwise better-sqlite3 (database) and node-pty (Web Terminal) will fail to load.
+  info "Building and verifying native addons (better-sqlite3, node-pty)..."
+
+  # Temporary swap check: low-spec VPS (<=2GB RAM without swap) can trigger OOM during g++ linking
+  local created_temp_swap=false
+  if [ -f /proc/meminfo ]; then
+    local mem_total_kb=$(grep -i MemTotal /proc/meminfo | awk '{print $2}')
+    local swap_total_kb=$(grep -i SwapTotal /proc/meminfo | awk '{print $2}')
+    local mem_total_mb=$((mem_total_kb / 1024))
+    if [ "$mem_total_mb" -gt 0 ] && [ "$mem_total_mb" -le 2048 ] && [ "$swap_total_kb" -le 262144 ]; then
+      info "Low memory detected (${mem_total_mb}MB RAM without swap). Creating temporary 1GB swap to prevent compiler OOM..."
+      if command -v fallocate &>/dev/null; then
+        fallocate -l 1G /swapfile_panelku_install 2>/dev/null || dd if=/dev/zero of=/swapfile_panelku_install bs=1M count=1024 2>/dev/null || true
+      else
+        dd if=/dev/zero of=/swapfile_panelku_install bs=1M count=1024 2>/dev/null || true
+      fi
+      if [ -f /swapfile_panelku_install ]; then
+        chmod 600 /swapfile_panelku_install
+        mkswap /swapfile_panelku_install 2>/dev/null && swapon /swapfile_panelku_install 2>/dev/null && created_temp_swap=true
+      fi
+    fi
+  fi
+
+  # 1. better-sqlite3 build & verify
+  info "Building better-sqlite3..."
+  npm rebuild better-sqlite3 2>&1 || {
+    warn "npm rebuild better-sqlite3 had warnings, attempting build-from-source..."
+    npm install better-sqlite3 --build-from-source 2>&1 || warn "better-sqlite3 build-from-source failed"
+  }
+
+  if node -e "import('better-sqlite3').then(m => { const db = new (m.default || m)(':memory:'); db.prepare('SELECT 1').get(); db.close(); })" 2>/dev/null; then
+    log "better-sqlite3 verified successfully"
+  else
+    warn "better-sqlite3 verification failed — SQLite operations may fail"
+  fi
+
+  # 2. node-pty build & verify
+  info "Building node-pty (Web Terminal engine)..."
+  npm rebuild node-pty 2>&1 || {
+    info "npm rebuild node-pty triggered fallback, compiling from source..."
+    npm install node-pty --build-from-source 2>&1 || warn "node-pty build-from-source failed"
+  }
+
+  if ! node -e "import('node-pty').then(m => { const pty = m.default || m; if (typeof pty.spawn !== 'function') process.exit(1); })" 2>/dev/null; then
+    info "node-pty not yet verified. Forcing source compilation with node-gyp..."
+    npm install node-pty --build-from-source 2>&1 || true
+  fi
+
+  if node -e "import('node-pty').then(m => { const pty = m.default || m; if (typeof pty.spawn !== 'function') process.exit(1); })" 2>/dev/null; then
+    log "node-pty verified successfully (Web Terminal ready)"
+  else
+    warn "node-pty could not be verified. Web Terminal may require 'npm rebuild node-pty' after installation."
+  fi
+
+  # Remove temporary swap if created
+  if [ "$created_temp_swap" = true ] && [ -f /swapfile_panelku_install ]; then
+    swapoff /swapfile_panelku_install 2>/dev/null || true
+    rm -f /swapfile_panelku_install 2>/dev/null || true
+    info "Temporary build swapfile cleaned up"
+  fi
+
+  log "NPM packages and native addons ready"
 
   # Create systemd service so 'systemctl restart panelku' works
   # [HIGH-4 FIX] Service name 'panelku' matches system.service.js restartPanel()

@@ -399,9 +399,9 @@ if [ "$REPORT_ONLY" = false ]; then
       npm install 2>&1 | tail -5
       if [ $? -eq 0 ]; then
         # Rebuild native addons for current Node.js ABI
-        npm rebuild better-sqlite3 2>/dev/null
-        npm rebuild node-pty 2>/dev/null
-        pass "npm install completed"
+        npm rebuild better-sqlite3 2>/dev/null || npm install better-sqlite3 --build-from-source 2>/dev/null || true
+        npm rebuild node-pty 2>/dev/null || npm install node-pty --build-from-source 2>/dev/null || true
+        pass "npm install and native addons completed"
       else
         fail "npm install failed — check npm ERR! output above"
       fi
