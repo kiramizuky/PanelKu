@@ -4,6 +4,7 @@
     <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage MySQL, PostgreSQL, SQLite — Browse, Query, Export & Import</p>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button class="btn-lp btn-lp-ghost text-warning" onclick="DB.showMigrationsModal()"><i class="bi bi-stack me-1"></i> Schema Migrations</button>
     <button class="btn-lp btn-lp-ghost text-info" onclick="DB.showVersionModal()"><i class="bi bi-arrow-left-right me-1"></i> Version &amp; Upgrade</button>
     <button class="btn-lp btn-lp-ghost" onclick="DB.showAutoBackupModal()"><i class="bi bi-clock-history me-1"></i> Auto-Backup</button>
     <button class="btn-lp btn-lp-ghost" onclick="DB.showCredentialsModal()"><i class="bi bi-gear-fill me-1"></i> DB Credentials</button>
@@ -612,6 +613,48 @@ services:
           </div>
         </div>
 
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Database Schema Migrations Modal -->
+<div class="modal fade" id="dbMigrationsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content" style="background:#0b0f19;border:1px solid var(--glass-border);color:#fff;">
+      <div class="modal-header" style="border-bottom:1px solid var(--glass-border);">
+        <h5 class="modal-title font-mono" style="font-size:14px;"><i class="bi bi-stack text-warning me-2"></i>SQLite Schema Migrations</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <p class="mb-0 text-muted" style="font-size:12px;">Track and execute structured database schema migrations with automated versioning and rollback.</p>
+          <div class="d-flex gap-2">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="DB.loadMigrations()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
+            <button class="btn-lp btn-lp-danger btn-lp-sm" id="btnRollbackMigration" onclick="DB.rollbackLastMigration()"><i class="bi bi-arrow-counterclockwise me-1"></i> Rollback</button>
+            <button class="btn-lp btn-lp-primary btn-lp-sm" id="btnRunMigrations" onclick="DB.runPendingMigrations()"><i class="bi bi-play-fill me-1"></i> Run Pending</button>
+          </div>
+        </div>
+
+        <div class="lp-glass-card p-0 mb-3" style="max-height:350px;overflow-y:auto;">
+          <table class="lp-table mb-0">
+            <thead>
+              <tr>
+                <th style="width:90px;">Version</th>
+                <th>Migration Name</th>
+                <th style="width:120px;text-align:center;">Status</th>
+                <th style="width:160px;text-align:right;">Applied At</th>
+              </tr>
+            </thead>
+            <tbody id="dbMigrationsTableBody">
+              <tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">Loading migrations...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="migrationAlertContainer"></div>
       </div>
       <div class="modal-footer border-0 pt-0">
         <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Tutup</button>

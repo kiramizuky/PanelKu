@@ -11,6 +11,7 @@ const DB = (() => {
   let _historyModal;
   let cachedEnvironments = null;
   let versionModal = null;
+  let migrationsModal = null;
 
   // ── Initialization ───────────────────────────────────
 
@@ -1160,6 +1161,119 @@ const DB = (() => {
     }
   }
 
+  // ── Database Schema Migrations ───────────────────────
+
+  function showMigrationsModal() {
+    if (!migrationsModal) migrationsModal = new bootstrap.Modal(document.getElementById('dbMigrationsModal'));
+    loadMigrations();
+    migrationsModal.show();
+  }
+
+  async function loadMigrations() {
+    const tbody = document.getElementById('dbMigrationsTableBody');
+    const alertBox = document.getElementById('migrationAlertContainer');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">Loading migrations...</td></tr>';
+    if (alertBox) alertBox.innerHTML = '';
+
+    try {
+      const res = await LP.get('/database/migrations');
+      if (!res?.success) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--accent-danger);">Failed to load migrations: ${LP.escHtml(res?.message || 'Error')}</td></tr>`;
+        return;
+      }
+
+      const { applied = [], pending = [] } = res.data || {};
+      const allRows = [];
+
+      applied.forEach(m => {
+        allRows.push(`
+          <tr>
+            <td><code class="text-success font-mono">${LP.escHtml(m.version)}</code></td>
+            <td style="font-weight:500;">${LP.escHtml(m.name)}</td>
+            <td style="text-align:center;"><span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="bi bi-check2-circle me-1"></i>Applied</span></td>
+            <td style="text-align:right;color:var(--text-muted);font-size:12px;">${LP.escHtml(m.applied_at || 'Installed')}</td>
+          </tr>
+        `);
+      });
+
+      pending.forEach(m => {
+        allRows.push(`
+          <tr>
+            <td><code class="text-warning font-mono">${LP.escHtml(m.version)}</code></td>
+            <td style="font-weight:500;">${LP.escHtml(m.name)}</td>
+            <td style="text-align:center;"><span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1"><i class="bi bi-hourglass-split me-1"></i>Pending</span></td>
+            <td style="text-align:right;color:var(--text-muted);font-size:12px;">Not yet run</td>
+          </tr>
+        `);
+      });
+
+      if (allRows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted);">No migrations found.</td></tr>';
+      } else {
+        tbody.innerHTML = allRows.join('');
+      }
+
+      const btnRun = document.getElementById('btnRunMigrations');
+      const btnRollback = document.getElementById('btnRollbackMigration');
+      if (btnRun) btnRun.disabled = pending.length === 0;
+      if (btnRollback) btnRollback.disabled = applied.length === 0;
+
+      if (pending.length > 0 && alertBox) {
+        alertBox.innerHTML = `
+          <div class="alert alert-warning py-2 px-3 mb-0" style="font-size:12px;background:rgba(234,179,8,0.1);border-color:rgba(234,179,8,0.2);color:#fef08a;">
+            <i class="bi bi-exclamation-triangle me-1"></i> Terdapat <strong>${pending.length}</strong> migrasi skema yang belum dijalankan. Klik <strong>Run Pending</strong> untuk memperbarui skema database SQLite.
+          </div>
+        `;
+      }
+    } catch {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--accent-danger);">Connection error loading migrations.</td></tr>';
+    }
+  }
+
+  async function runPendingMigrations() {
+    const btn = document.getElementById('btnRunMigrations');
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await LP.post('/database/migrations/run');
+      if (res?.success) {
+        LP.toast(res.message || 'Migrations applied successfully', 'success');
+        await loadMigrations();
+      } else {
+        LP.toast(res?.message || 'Failed to apply migrations', 'error');
+      }
+    } catch {
+      LP.toast('Error running migrations', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function rollbackLastMigration() {
+    if (!await LP.confirm('Apakah Anda yakin ingin membatalkan (rollback) migrasi skema database terakhir?', 'Rollback Migration')) {
+      return;
+    }
+
+    const btn = document.getElementById('btnRollbackMigration');
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await LP.post('/database/migrations/rollback');
+      if (res?.success) {
+        LP.toast(res.message || 'Migration rolled back', 'success');
+        await loadMigrations();
+      } else {
+        LP.toast(res?.message || 'Failed to rollback migration', 'error');
+      }
+    } catch {
+      LP.toast('Error rolling back migration', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   // ── Keyboard Shortcut ────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -1179,7 +1293,8 @@ const DB = (() => {
     makeCellEditable, deleteRow, showInsertRowModal, submitInsertRow,
     backupDatabase, showRestoreModal, executeRestore,
     showAutoBackupModal, saveAutoBackup, runAutoBackupNow,
-    showVersionModal, quickConnectDocker, quickConnectPanel, toggleEnvDetails
+    showVersionModal, quickConnectDocker, quickConnectPanel, toggleEnvDetails,
+    showMigrationsModal, loadMigrations, runPendingMigrations, rollbackLastMigration
   };
 })();
 

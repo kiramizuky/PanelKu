@@ -417,6 +417,33 @@ class DatabaseController {
       return error(res, err.message, 500);
     }
   }
+
+  async getMigrations(req, res) {
+    try {
+      const status = await databaseService.getMigrations();
+      return success(res, status, 'Migration status retrieved');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async runMigrations(req, res) {
+    try {
+      const result = await databaseService.runMigrations();
+      return success(res, result, `Successfully applied ${result.applied.length} pending migrations`);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async rollbackMigration(req, res) {
+    try {
+      const result = await databaseService.rollbackMigration();
+      return success(res, result, result.rolledBack ? `Successfully rolled back migration ${result.rolledBack}` : 'No migrations to rollback');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
 }
 
 export default new DatabaseController();

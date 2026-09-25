@@ -1977,6 +1977,33 @@ class DatabaseService {
 
     return results;
   }
+
+  /**
+   * Get SQLite schema migration status (applied and pending)
+   */
+  async getMigrations() {
+    const { getMigrationStatus } = await import('../../core/db/Migrator.js');
+    const { getDb } = await import('../../core/db/sqlite.js');
+    return getMigrationStatus(getDb());
+  }
+
+  /**
+   * Apply all pending SQLite schema migrations
+   */
+  async runMigrations() {
+    const { runMigrations } = await import('../../core/db/Migrator.js');
+    const { getDb } = await import('../../core/db/sqlite.js');
+    return runMigrations(getDb());
+  }
+
+  /**
+   * Rollback the latest SQLite schema migration
+   */
+  async rollbackMigration() {
+    const { rollbackMigration } = await import('../../core/db/Migrator.js');
+    const { getDb } = await import('../../core/db/sqlite.js');
+    return rollbackMigration(getDb());
+  }
 }
 
 export default new DatabaseService();

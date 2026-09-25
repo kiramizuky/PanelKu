@@ -74,4 +74,9 @@ router.get('/pg-config', requirePermission('database:read'), databaseController.
 router.post('/pg-config/save', requirePermission('database:write'), databaseController.savePgConfig.bind(databaseController));
 router.post('/pg-config/enable-remote', requirePermission('database:write'), databaseController.enablePgRemoteAccess.bind(databaseController));
 
+// Database Schema Migrations
+router.get('/migrations', requirePermission('database:read'), databaseController.getMigrations.bind(databaseController));
+router.post('/migrations/run', requirePermission('database:write'), databaseController.runMigrations.bind(databaseController));
+router.post('/migrations/rollback', requirePermission('database:write'), databaseController.rollbackMigration.bind(databaseController));
+
 export default router;

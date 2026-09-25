@@ -45,6 +45,9 @@ const mockDatabaseService = {
   getAutoBackupConfig: jest.fn(),
   saveAutoBackupConfig: jest.fn(),
   runAutoBackup: jest.fn(),
+  getMigrations: jest.fn(),
+  runMigrations: jest.fn(),
+  rollbackMigration: jest.fn(),
 };
 
 jest.unstable_mockModule('../src/modules/database/database.service.js', () => ({
@@ -441,5 +444,42 @@ describe('DatabaseController — Backups & Auto-Backup Management', () => {
     await databaseController.triggerAutoBackupNow({}, res3);
     expect(res3.statusCode).toBe(200);
     expect(res3.body.data.backupsCreated).toBe(3);
+  });
+
+  describe('Schema Migrations', () => {
+    test('getMigrations returns migration status', async () => {
+      mockDatabaseService.getMigrations.mockResolvedValue({
+        applied: [{ version: '001', name: 'initial' }],
+        pending: [],
+      });
+      const res = mockRes();
+      await databaseController.getMigrations({}, res);
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.applied).toHaveLength(1);
+    });
+
+    test('runMigrations applies pending migrations', async () => {
+      mockDatabaseService.runMigrations.mockResolvedValue({
+        applied: ['003'],
+        skipped: ['001', '002'],
+      });
+      const res = mockRes();
+      await databaseController.runMigrations({}, res);
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.applied).toContain('003');
+    });
+
+    test('rollbackMigration rolls back latest migration', async () => {
+      mockDatabaseService.rollbackMigration.mockResolvedValue({
+        rolledBack: '002',
+      });
+      const res = mockRes();
+      await databaseController.rollbackMigration({}, res);
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.rolledBack).toBe('002');
+    });
   });
 });
