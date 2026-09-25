@@ -7,23 +7,29 @@ import eventBus, { EVENTS } from '../events/EventBus.js';
  * In-memory representation of a queued job when Redis/BullMQ is unavailable.
  */
 class MemoryJob {
-  constructor(queueName, id, name, data, opts = {}) {
+  constructor(queueName, id, name, data, opts = {}, queueManager = null) {
     this.id = id;
     this.name = name;
     this.data = data || {};
     this.opts = opts;
     this.queueName = queueName;
     this.progress = 0;
-    this.status = 'waiting'; // waiting | active | completed | failed
+    this.progressMessage = '';
+    this.status = 'waiting'; // waiting | active | completed | failed | cancelled
     this.timestamp = Date.now();
     this.processedOn = null;
     this.finishedOn = null;
     this.returnvalue = null;
     this.failedReason = null;
+    this._queueManager = queueManager;
   }
 
-  async updateProgress(progress) {
+  async updateProgress(progress, message = '') {
     this.progress = progress;
+    this.progressMessage = message;
+    if (this._queueManager) {
+      this._queueManager._emitProgress(this.queueName, this, progress, message);
+    }
     return progress;
   }
 
@@ -44,6 +50,14 @@ class QueueManager {
     this._inMemoryQueues = new Map();
     this._useBullMQ = false;
     this._redisClient = null;
+    this._io = null;
+  }
+
+  /**
+   * Set Socket.IO server reference for broadcasting task updates
+   */
+  setIo(io) {
+    this._io = io;
   }
 
   /**
@@ -132,6 +146,12 @@ class QueueManager {
         }
       );
 
+      worker.on('progress', (job, progress) => {
+        const message = typeof progress === 'object' ? (progress.message || '') : '';
+        const numericProgress = typeof progress === 'object' ? (progress.percent ?? progress.progress ?? 0) : progress;
+        this._emitProgress(queueName, job, numericProgress, message);
+      });
+
       worker.on('completed', (job, result) => {
         this._emitCompleted(queueName, job, result);
       });
@@ -200,7 +220,7 @@ class QueueManager {
   _addMemoryJob(queueName, jobName, data, opts) {
     const memQueue = this._getMemoryQueue(queueName);
     const id = `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const job = new MemoryJob(queueName, id, jobName, data, opts);
+    const job = new MemoryJob(queueName, id, jobName, data, opts, this);
 
     memQueue.waiting.push(job);
     memQueue.history.set(id, job);
@@ -342,22 +362,178 @@ class QueueManager {
     };
   }
 
+  _emitProgress(queueName, job, progress, message = '') {
+    const payload = {
+      queueName,
+      jobId: String(job.id),
+      name: job.name,
+      progress,
+      message,
+      timestamp: Date.now(),
+    };
+    eventBus.publish(EVENTS.TASK_PROGRESS, payload);
+    if (this._io) {
+      this._io.emit('task:progress', payload);
+    }
+  }
+
   _emitCompleted(queueName, job, result) {
     logger.info(`Queue [${queueName}] job [${job.id}:${job.name}] completed`);
+    const payload = {
+      queueName,
+      jobId: String(job.id),
+      name: job.name,
+      result,
+      timestamp: Date.now(),
+    };
     if (queueName === 'backup') {
       eventBus.publish(EVENTS.BACKUP_COMPLETE, { jobId: job.id, name: job.name, result });
     } else if (queueName === 'deploy') {
       eventBus.publish(EVENTS.DEPLOY_COMPLETE, { jobId: job.id, name: job.name, result });
     }
+    eventBus.publish(EVENTS.TASK_COMPLETED, payload);
+    if (this._io) {
+      this._io.emit('task:completed', payload);
+    }
   }
 
   _emitFailed(queueName, job, err) {
     logger.error(`Queue [${queueName}] job [${job?.id}:${job?.name}] failed: ${err.message}`);
+    const payload = {
+      queueName,
+      jobId: String(job?.id),
+      name: job?.name,
+      error: err.message,
+      timestamp: Date.now(),
+    };
     if (queueName === 'backup') {
       eventBus.publish(EVENTS.BACKUP_FAILED, { jobId: job?.id, name: job?.name, error: err.message });
     } else if (queueName === 'deploy') {
       eventBus.publish(EVENTS.DEPLOY_FAILED, { jobId: job?.id, name: job?.name, error: err.message });
     }
+    eventBus.publish(EVENTS.TASK_FAILED, payload);
+    if (this._io) {
+      this._io.emit('task:failed', payload);
+    }
+  }
+
+  /**
+   * Get list of all registered queue names
+   */
+  getRegisteredQueueNames() {
+    const names = new Set([
+      ...this._queues.keys(),
+      ...this._inMemoryQueues.keys(),
+      ...this._processors.keys(),
+    ]);
+    return Array.from(names);
+  }
+
+  /**
+   * Get operational metrics across all registered queues
+   */
+  async getAllQueueMetrics() {
+    const queueNames = this.getRegisteredQueueNames();
+    const result = {};
+    for (const name of queueNames) {
+      result[name] = await this.getQueueMetrics(name);
+    }
+    return result;
+  }
+
+  /**
+   * Get all recent & active jobs across all queues
+   */
+  async getAllRecentJobs(limit = 50) {
+    const allJobs = [];
+
+    // 1. In-memory jobs
+    for (const [queueName, memQueue] of this._inMemoryQueues.entries()) {
+      for (const j of memQueue.history.values()) {
+        allJobs.push({
+          id: j.id,
+          name: j.name,
+          queueName,
+          data: j.data,
+          progress: j.progress || 0,
+          progressMessage: j.progressMessage || '',
+          status: j.status,
+          timestamp: j.timestamp,
+          processedOn: j.processedOn,
+          finishedOn: j.finishedOn,
+          returnvalue: j.returnvalue,
+          failedReason: j.failedReason,
+          isFallback: true,
+        });
+      }
+    }
+
+    // 2. BullMQ jobs
+    if (this._useBullMQ) {
+      for (const [queueName, queue] of this._queues.entries()) {
+        try {
+          const bullJobs = await queue.getJobs(['active', 'waiting', 'completed', 'failed', 'delayed'], 0, limit);
+          for (const bj of bullJobs) {
+            const state = await bj.getState();
+            allJobs.push({
+              id: String(bj.id),
+              name: bj.name,
+              queueName,
+              data: bj.data,
+              progress: bj.progress || 0,
+              progressMessage: bj.data?.progressMessage || '',
+              status: state,
+              timestamp: bj.timestamp,
+              processedOn: bj.processedOn,
+              finishedOn: bj.finishedOn,
+              returnvalue: bj.returnvalue,
+              failedReason: bj.failedReason,
+              isFallback: false,
+            });
+          }
+        } catch (err) {
+          logger.warn(`Failed reading BullMQ jobs for [${queueName}]: ${err.message}`);
+        }
+      }
+    }
+
+    // Sort descending by timestamp
+    allJobs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    return allJobs.slice(0, limit);
+  }
+
+  /**
+   * Cancel or remove a queued job
+   */
+  async cancelJob(queueName, jobId) {
+    if (this._useBullMQ) {
+      try {
+        const queue = this.getOrCreateQueue(queueName);
+        const job = await queue.getJob(jobId);
+        if (job) {
+          await job.remove();
+          return { success: true, message: `Job ${jobId} removed from queue ${queueName}` };
+        }
+      } catch (err) {
+        logger.warn(`BullMQ cancelJob [${queueName}:${jobId}] error: ${err.message}`);
+      }
+    }
+
+    const memQueue = this._inMemoryQueues.get(queueName);
+    if (memQueue) {
+      const job = memQueue.history.get(jobId);
+      if (job) {
+        if (job.status === 'waiting') {
+          const idx = memQueue.waiting.indexOf(job);
+          if (idx !== -1) memQueue.waiting.splice(idx, 1);
+        }
+        job.status = 'cancelled';
+        job.finishedOn = Date.now();
+        return { success: true, message: `Job ${jobId} cancelled` };
+      }
+    }
+
+    return { success: false, message: 'Job not found' };
   }
 
   /**

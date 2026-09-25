@@ -69,6 +69,7 @@ export const bootstrap = async (app, httpServer) => {
   const io = new SocketIO(httpServer, socketConfig);
   initWebSocket(io);
   app.set('io', io);
+  queueManager.setIo(io);
   logger.info('Socket.IO initialized');
 
   // 4.5 Initialize Agent Terminal WebSocket upgrade listener

@@ -1,9 +1,11 @@
 /**
- * Prometheus / OpenMetrics Metrics Exporter Service (Fase 5)
+ * Prometheus / OpenMetrics Metrics Exporter Service (Fase 5 & Sprint 4)
  */
 import os from 'os';
 import { getDb } from '../../core/db/sqlite.js';
 import dockerService from '../docker/docker.service.js';
+import queueManager from '../../core/queue/QueueManager.js';
+import httpMetrics from '../../middleware/metrics.middleware.js';
 
 class PrometheusService {
   /**
@@ -53,6 +55,24 @@ class PrometheusService {
     lines.push('# TYPE node_uptime_seconds counter');
     lines.push(`node_uptime_seconds ${Math.floor(uptimeSec)}`);
 
+    // ── Node.js Process Telemetry ──
+    const mem = process.memoryUsage();
+    lines.push('# HELP panelku_process_uptime_seconds Node process uptime in seconds');
+    lines.push('# TYPE panelku_process_uptime_seconds counter');
+    lines.push(`panelku_process_uptime_seconds ${Math.floor(process.uptime())}`);
+
+    lines.push('# HELP panelku_process_memory_heap_used_bytes Node heap memory used in bytes');
+    lines.push('# TYPE panelku_process_memory_heap_used_bytes gauge');
+    lines.push(`panelku_process_memory_heap_used_bytes ${mem.heapUsed}`);
+
+    lines.push('# HELP panelku_process_memory_heap_total_bytes Node heap memory allocated in bytes');
+    lines.push('# TYPE panelku_process_memory_heap_total_bytes gauge');
+    lines.push(`panelku_process_memory_heap_total_bytes ${mem.heapTotal}`);
+
+    lines.push('# HELP panelku_process_memory_rss_bytes Node resident set size in bytes');
+    lines.push('# TYPE panelku_process_memory_rss_bytes gauge');
+    lines.push(`panelku_process_memory_rss_bytes ${mem.rss}`);
+
     // ── Panelku Application Metrics ──
     const db = getDb();
 
@@ -96,6 +116,43 @@ class PrometheusService {
       }
     } catch {
       // Docker may not be installed/reachable
+    }
+
+    // ── Queue Metrics (BullMQ / In-Memory Worker) ──
+    try {
+      const queueMetrics = await queueManager.getAllQueueMetrics();
+      lines.push('# HELP panelku_queue_jobs Background queue jobs count by state');
+      lines.push('# TYPE panelku_queue_jobs gauge');
+
+      for (const [qName, counts] of Object.entries(queueMetrics)) {
+        lines.push(`panelku_queue_jobs{queue="${qName}",status="waiting"} ${counts.waiting || 0}`);
+        lines.push(`panelku_queue_jobs{queue="${qName}",status="active"} ${counts.active || 0}`);
+        lines.push(`panelku_queue_jobs{queue="${qName}",status="completed"} ${counts.completed || 0}`);
+        lines.push(`panelku_queue_jobs{queue="${qName}",status="failed"} ${counts.failed || 0}`);
+      }
+    } catch {
+      // Queue metrics collection fallback
+    }
+
+    // ── HTTP Traffic & Latency Metrics ──
+    try {
+      const httpSummary = httpMetrics.getMetricsSummary();
+      lines.push('# HELP panelku_http_requests_total Total HTTP requests handled');
+      lines.push('# TYPE panelku_http_requests_total counter');
+
+      for (const req of httpSummary.requests) {
+        lines.push(`panelku_http_requests_total{method="${req.method}",route="${req.route}",status="${req.status}"} ${req.count}`);
+      }
+
+      lines.push('# HELP panelku_http_request_duration_seconds HTTP request latency percentiles in seconds');
+      lines.push('# TYPE panelku_http_request_duration_seconds summary');
+      lines.push(`panelku_http_request_duration_seconds{quantile="0.5"} ${httpSummary.p50.toFixed(4)}`);
+      lines.push(`panelku_http_request_duration_seconds{quantile="0.9"} ${httpSummary.p90.toFixed(4)}`);
+      lines.push(`panelku_http_request_duration_seconds{quantile="0.99"} ${httpSummary.p99.toFixed(4)}`);
+      lines.push(`panelku_http_request_duration_seconds_count ${httpSummary.count}`);
+      lines.push(`panelku_http_request_duration_seconds_sum ${httpSummary.sum.toFixed(4)}`);
+    } catch {
+      // HTTP telemetry fallback
     }
 
     lines.push('');

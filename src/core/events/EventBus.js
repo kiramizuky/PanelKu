@@ -79,6 +79,9 @@ export const EVENTS = {
   WEBSITE_UPDATED: 'website.updated',
   WEBSITE_DELETED: 'website.deleted',
   WEBSITE_DEPLOY_STARTED: 'website.deploy_started',
+  TASK_PROGRESS: 'task.progress',
+  TASK_COMPLETED: 'task.completed',
+  TASK_FAILED: 'task.failed',
 };
 
 export default eventBus;

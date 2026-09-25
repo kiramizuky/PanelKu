@@ -13,6 +13,7 @@ import { requestLogger } from './middleware/requestLogger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { wafMiddleware } from './middleware/waf.middleware.js';
 import { nonceMiddleware, nonceInjector } from './middleware/nonce.js';
+import { metricsMiddleware } from './middleware/metrics.middleware.js';
 
 import expressEjsLayouts from 'express-ejs-layouts';
 import pluginLoader from './core/plugin-loader/PluginLoader.js';
@@ -124,6 +125,9 @@ const createApp = () => {
 
   // Audit logging
   app.use(requestLogger);
+
+  // Prometheus HTTP telemetry
+  app.use(metricsMiddleware);
 
   // Static assets — disable cache for JS/CSS so code updates are immediate
   const publicDir = join(__dirname, 'public');

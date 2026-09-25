@@ -109,6 +109,11 @@
         <i class="bi bi-arrow-up-circle-fill" style="font-size:18px;"></i>
         <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" style="width:10px; height:10px; margin-left:-6px; margin-top:6px;"></span>
       </a>
+      <!-- Background Task Drawer Trigger -->
+      <button class="btn-lp btn-lp-ghost btn-lp-sm position-relative" id="taskDrawerBtn" onclick="LP.TaskDrawer.toggle()" title="Background Tasks & Queue" style="border-radius:50%;width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;">
+        <i class="bi bi-stack" id="taskDrawerIcon" style="font-size:16px;"></i>
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary d-none" id="taskDrawerBadge" style="font-size:10px;padding:3px 6px;margin-left:-8px;margin-top:6px;">0</span>
+      </button>
       <button class="btn-lp btn-lp-ghost btn-lp-sm" id="themeToggleBtn" onclick="LP.toggleTheme()" title="Toggle Dark/Light Mode" style="border-radius:50%;width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;">
         <i class="bi bi-moon-fill" id="themeIcon"></i>
       </button>
@@ -210,6 +215,56 @@
     </div>
   </div>
 
+  <!-- Global Background Task Drawer Offcanvas -->
+  <div class="offcanvas offcanvas-end lp-glass-card" tabindex="-1" id="globalTaskDrawer" aria-labelledby="globalTaskDrawerLabel" style="width: 400px; border-left: 1px solid var(--glass-border); background: rgba(15, 20, 32, 0.95); backdrop-filter: blur(25px); color: #fff; z-index: 1060;">
+    <div class="offcanvas-header" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding: 16px 20px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:34px; height:34px; border-radius:8px; background:rgba(99,102,241,0.15); display:flex; align-items:center; justify-content:center; color:var(--accent-primary);">
+          <i class="bi bi-layers-fill" style="font-size:18px;"></i>
+        </div>
+        <div>
+          <h5 class="offcanvas-title font-mono" id="globalTaskDrawerLabel" style="color:var(--text-primary); font-size:15px; font-weight:600; margin:0;">Background Tasks</h5>
+          <span style="font-size:11px; color:var(--text-muted);" id="globalTaskDrawerSubtitle">Workers & BullMQ Queue</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.TaskDrawer.loadTasks()" title="Refresh Tasks" style="width:30px; height:30px; padding:0; display:flex; align-items:center; justify-content:center;">
+          <i class="bi bi-arrow-clockwise"></i>
+        </button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+    </div>
+    <div class="offcanvas-body" style="padding: 16px; overflow-y: auto;">
+      <!-- Queue Summary Stats Bar -->
+      <div id="taskQueueSummary" style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 16px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
+        <div>
+          <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Waiting</div>
+          <div style="font-size:13px; font-weight:700; color:var(--accent-warning);" id="taskStatWaiting">0</div>
+        </div>
+        <div>
+          <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Active</div>
+          <div style="font-size:13px; font-weight:700; color:var(--accent-primary);" id="taskStatActive">0</div>
+        </div>
+        <div>
+          <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Done</div>
+          <div style="font-size:13px; font-weight:700; color:var(--accent-success);" id="taskStatCompleted">0</div>
+        </div>
+        <div>
+          <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Failed</div>
+          <div style="font-size:13px; font-weight:700; color:var(--accent-danger);" id="taskStatFailed">0</div>
+        </div>
+      </div>
+
+      <!-- Task Items Container -->
+      <div id="taskListContainer" style="display:flex; flex-direction:column; gap:10px;">
+        <div style="text-align:center; padding: 40px 20px; color:var(--text-muted);">
+          <i class="bi bi-inbox" style="font-size:32px; opacity:0.4; display:block; margin-bottom:8px;"></i>
+          <span style="font-size:13px;">No background tasks found</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Main Content Area -->
   <div class="lp-container">
     <%- body %>
@@ -284,6 +339,7 @@
     })();
   </script>
   <script src="/js/app.js"></script>
+  <script src="/js/task-drawer.js"></script>
   <%- typeof script !== 'undefined' ? script : '' %>
   
   <script>

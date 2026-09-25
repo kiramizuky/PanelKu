@@ -2,10 +2,27 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
+import queueManager from '../../core/queue/QueueManager.js';
 
 const execAsync = promisify(exec);
 
 class MailService {
+  constructor() {
+    this._registerQueueWorker();
+  }
+
+  _registerQueueWorker() {
+    queueManager.registerWorker('mail', async (job) => {
+      const { action } = job.data || {};
+      if (action === 'install') {
+        return await this._runInstallTask(job);
+      }
+      if (action === 'uninstall') {
+        return await this._runUninstallTask(job);
+      }
+      throw new Error(`Unknown mail task action: ${action}`);
+    }, { concurrency: 1 });
+  }
   /**
    * Validate an email address format.
    */
@@ -113,13 +130,24 @@ class MailService {
   }
 
   async install() {
+    return await this._runInstallTask(null);
+  }
+
+  async queueInstall() {
+    return await queueManager.addJob('mail', 'install_mail_server', { action: 'install' });
+  }
+
+  async _runInstallTask(job = null) {
     try {
+      await job?.updateProgress(10, 'Pre-seeding mail package selections...');
       // Pre-seed debconf so Postfix creates /etc/postfix/main.cf properly during install
       await execAsync('echo "postfix postfix/main_mailer_type select Internet Site" | sudo debconf-set-selections 2>/dev/null || true');
       await execAsync('echo "postfix postfix/mailname string $(hostname -f 2>/dev/null || hostname)" | sudo debconf-set-selections 2>/dev/null || true');
 
+      await job?.updateProgress(25, 'Installing Postfix, Dovecot, SpamAssassin & OpenDKIM...');
       const { stdout } = await execAsync('sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postfix postfix-mysql dovecot-core dovecot-imapd dovecot-pop3d dovecot-mysql spamassassin roundcube roundcube-mysql opendkim opendkim-tools 2>&1 | tail -5');
 
+      await job?.updateProgress(50, 'Configuring vmail system user and directories...');
       // 1. Ensure vmail user & basic directories
       await execAsync('sudo groupadd -g 5000 vmail 2>/dev/null || true');
       await execAsync('sudo useradd -u 5000 -g 5000 -s /usr/sbin/nologin -d /var/mail/vhosts vmail 2>/dev/null || true');
@@ -229,6 +257,8 @@ UserID                  opendkim
       await execAsync('test -f /etc/opendkim/key.table || sudo touch /etc/opendkim/key.table');
       await execAsync('test -f /etc/opendkim/trusted.hosts || echo -e "127.0.0.1\\nlocalhost\\n::1" | sudo tee /etc/opendkim/trusted.hosts >/dev/null || true');
 
+      await job?.updateProgress(75, 'Configuring Postfix SASL, Dovecot and OpenDKIM milters...');
+
       // 5. SpamAssassin, services and firewall
       await execAsync('sudo sed -i "s/^ENABLED=0/ENABLED=1/" /etc/default/spamassassin 2>/dev/null || true');
       await execAsync('sudo systemctl unmask spamassassin spamd 2>/dev/null || true');
@@ -247,6 +277,7 @@ UserID                  opendkim
         await this._ensureDkim(dom).catch(() => {});
       }
 
+      await job?.updateProgress(100, 'Mail stack installed and running');
       return { success: true, log: stdout.trim() };
     } catch (err) {
       throw new Error('Mail server install failed: ' + err.message);
@@ -254,12 +285,34 @@ UserID                  opendkim
   }
 
   async uninstall() {
+    return await this._runUninstallTask(null);
+  }
+
+  async queueUninstall() {
+    return await queueManager.addJob('mail', 'uninstall_mail_server', { action: 'uninstall' });
+  }
+
+  async _runUninstallTask(job = null) {
     try {
+      await job?.updateProgress(30, 'Stopping mail daemons...');
+      await execAsync('sudo systemctl stop postfix dovecot spamassassin opendkim 2>/dev/null || true');
+
+      await job?.updateProgress(60, 'Removing mail packages...');
       const { stdout } = await execAsync('sudo DEBIAN_FRONTEND=noninteractive apt-get remove -y postfix dovecot-core spamassassin roundcube 2>&1 | tail -3');
+
+      await job?.updateProgress(100, 'Mail server removed');
       return { success: true, log: stdout.trim() };
     } catch (err) {
       throw new Error('Uninstall failed: ' + err.message);
     }
+  }
+
+  async getQueueJobStatus(jobId) {
+    return await queueManager.getJob('mail', jobId);
+  }
+
+  async getQueueMetrics() {
+    return await queueManager.getQueueMetrics('mail');
   }
 
   // ── Service Control ───────────────────────────────────────
