@@ -374,7 +374,14 @@ class DockerService {
         await this.docker.getImage(data.image).inspect();
         imageExists = true;
       } catch (err) {
-        // Image not found locally
+        try {
+          const images = await this.docker.listImages();
+          imageExists = images.some(img =>
+            (img.RepoTags || []).some(tag => tag === data.image || tag.endsWith(`/${data.image}`) || tag === `${data.image}:latest`)
+          );
+        } catch (_listErr) {
+          // Image not found locally
+        }
       }
 
       if (!imageExists) {

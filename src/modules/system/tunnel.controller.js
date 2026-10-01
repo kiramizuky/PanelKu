@@ -38,9 +38,13 @@ class TunnelAndAppsController {
       const imageName = 'cloudflare/cloudflared:latest';
       let imageExists = false;
       try {
-        await docker.getImage(imageName).inspect();
-        imageExists = true;
-      } catch (err) {}
+        const images = await docker.listImages();
+        imageExists = images.some(img =>
+          (img.RepoTags || []).some(tag => tag === imageName || tag === `docker.io/${imageName}` || tag.includes('cloudflare/cloudflared'))
+        );
+      } catch (err) {
+        console.warn('Failed to check local image:', err.message);
+      }
 
       if (!imageExists) {
         await new Promise((resolve, reject) => {
@@ -137,9 +141,13 @@ class TunnelAndAppsController {
       const imageName = 'docker.n8n.io/n8nio/n8n:latest';
       let imageExists = false;
       try {
-        await docker.getImage(imageName).inspect();
-        imageExists = true;
-      } catch (err) {}
+        const images = await docker.listImages();
+        imageExists = images.some(img =>
+          (img.RepoTags || []).some(tag => tag === imageName || tag.includes('n8n'))
+        );
+      } catch (err) {
+        console.warn('Failed to check local n8n image:', err.message);
+      }
 
       if (!imageExists) {
         await new Promise((resolve, reject) => {
