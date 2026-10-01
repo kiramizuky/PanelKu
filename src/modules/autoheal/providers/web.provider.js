@@ -58,6 +58,8 @@ class WebProvider {
       }
     } catch (_) {}
 
+    const nginxActive = await this._isServiceActive('nginx');
+
     // 2. Apache2 / httpd
     try {
       const apacheSvc = await this._findFirstActive(['apache2', 'httpd']);
@@ -70,15 +72,19 @@ class WebProvider {
           message: `${apacheSvc} is running`,
           healable: true,
         });
-      } else if (await this._isInstalled('apache2') || await this._isInstalled('httpd')) {
-        items.push({
-          name: 'Apache HTTP Server',
-          serviceName: 'apache2',
-          type: 'web',
-          status: 'critical',
-          message: 'Apache is installed but inactive',
-          healable: true,
-        });
+      } else if (!nginxActive && (await this._isInstalled('apache2') || await this._isInstalled('httpd'))) {
+        const svc = (await this._isInstalled('apache2')) ? 'apache2' : 'httpd';
+        const isEnabled = await this._isServiceEnabled(svc);
+        if (isEnabled) {
+          items.push({
+            name: 'Apache HTTP Server',
+            serviceName: svc,
+            type: 'web',
+            status: 'critical',
+            message: 'Apache is installed and enabled but inactive',
+            healable: true,
+          });
+        }
       }
     } catch (_) {}
 
@@ -94,15 +100,18 @@ class WebProvider {
           message: 'Caddy daemon is active',
           healable: true,
         });
-      } else if (await this._isInstalled('caddy')) {
-        items.push({
-          name: 'Caddy Web Server',
-          serviceName: 'caddy',
-          type: 'web',
-          status: 'critical',
-          message: 'Caddy service is inactive',
-          healable: true,
-        });
+      } else if (!nginxActive && await this._isInstalled('caddy')) {
+        const isEnabled = await this._isServiceEnabled('caddy');
+        if (isEnabled) {
+          items.push({
+            name: 'Caddy Web Server',
+            serviceName: 'caddy',
+            type: 'web',
+            status: 'critical',
+            message: 'Caddy service is enabled but inactive',
+            healable: true,
+          });
+        }
       }
     } catch (_) {}
 
@@ -135,6 +144,8 @@ class WebProvider {
       return { success: true, actionsTaken: ['Web healing simulated for Windows'] };
     }
 
+    let nginxOk = false;
+
     // Nginx healing
     if (target === 'all' || target === 'nginx') {
       try {
@@ -148,17 +159,20 @@ class WebProvider {
           }
           await execCmd('systemctl', ['restart', 'nginx'], { timeout: 15000 });
           actionsTaken.push('Restarted Nginx web server');
+          nginxOk = await this._isServiceActive('nginx');
         }
       } catch (err) {
         logger.warn(`[AutoHeal:Web] Nginx heal error: ${err.message}`);
       }
+    } else {
+      nginxOk = await this._isServiceActive('nginx');
     }
 
     // Apache healing
-    if (target === 'all' || target === 'apache2' || target === 'httpd') {
+    if (target === 'apache2' || target === 'httpd' || (target === 'all' && !nginxOk)) {
       try {
         const svc = (await this._isInstalled('apache2')) ? 'apache2' : ((await this._isInstalled('httpd')) ? 'httpd' : null);
-        if (svc) {
+        if (svc && (target === svc || await this._isServiceEnabled(svc))) {
           await execCmd('systemctl', ['restart', svc], { timeout: 15000 });
           actionsTaken.push(`Restarted ${svc} server`);
         }
@@ -168,9 +182,9 @@ class WebProvider {
     }
 
     // Caddy healing
-    if (target === 'all' || target === 'caddy') {
+    if (target === 'caddy' || (target === 'all' && !nginxOk)) {
       try {
-        if (await this._isInstalled('caddy')) {
+        if (await this._isInstalled('caddy') && (target === 'caddy' || await this._isServiceEnabled('caddy'))) {
           await execCmd('systemctl', ['restart', 'caddy'], { timeout: 15000 });
           actionsTaken.push('Restarted Caddy server');
         }
@@ -220,6 +234,15 @@ class WebProvider {
     try {
       const out = await execCmd('systemctl', ['list-unit-files', `${binOrService}.service`], { timeout: 4000 });
       return out.includes(`${binOrService}.service`);
+    } catch {
+      return false;
+    }
+  }
+
+  async _isServiceEnabled(binOrService) {
+    try {
+      const out = await execCmd('systemctl', ['is-enabled', binOrService], { timeout: 4000 });
+      return out.trim() === 'enabled';
     } catch {
       return false;
     }
