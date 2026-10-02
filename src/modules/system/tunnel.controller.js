@@ -73,6 +73,7 @@ class TunnelAndAppsController {
         name: 'cloudflare-tunnel',
         Cmd: ['tunnel', '--no-autoupdate', 'run', '--token', token],
         HostConfig: {
+          NetworkMode: 'host',
           RestartPolicy: { Name: 'unless-stopped' }
         }
       });
