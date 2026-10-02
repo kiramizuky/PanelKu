@@ -294,23 +294,32 @@ class DockerService {
     }
   }
 
-  async removeContainer(id, force = false) {
+  async removeContainer(id, _force = false) {
     try {
       const container = this.docker.getContainer(id);
-      await container.remove({ force });
+      try {
+        await container.remove({ force: true, v: true });
+      } catch (err) {
+        // If container is running or conflict, attempt stop & kill first
+        if (err.statusCode === 409 || (err.message && (err.message.includes('running') || err.message.includes('conflict')))) {
+          try { await container.stop({ t: 2 }); } catch (_) {}
+          try { await container.kill(); } catch (_) {}
+          await container.remove({ force: true, v: true });
+        } else {
+          throw err;
+        }
+      }
       await cache.delPattern('docker:*');
       return true;
     } catch (error) {
-      if (error.message && error.message.toLowerCase().includes('permission denied')) {
-        try {
-          const { exec } = await import('child_process');
-          const { promisify } = await import('util');
-          const execAsync = promisify(exec);
-          await execAsync(`sudo docker rm ${force ? '-f' : ''} ${id}`);
-          await cache.delPattern('docker:*');
-          return true;
-        } catch (_) {}
-      }
+      try {
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+        await execAsync(`docker rm -f ${id} 2>/dev/null || sudo docker rm -f ${id}`);
+        await cache.delPattern('docker:*');
+        return true;
+      } catch (_) {}
       throw new Error(`Failed to remove container: ${error.message}`);
     }
   }

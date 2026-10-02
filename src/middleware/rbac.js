@@ -32,7 +32,11 @@ export const rbac = (resource, action) => {
       }
     }
 
-    const allowed = permissionManager.can(roleId, resource, action);
+    let allowed = permissionManager.can(roleId, resource, action);
+    if (!allowed && resource.endsWith('_manage')) {
+      const baseResource = resource.replace(/_manage$/, '');
+      allowed = permissionManager.can(roleId, baseResource, action);
+    }
 
     if (!allowed) {
       logger.warn(`RBAC denied: user=${user.username} role=${role.slug} resource=${resource} action=${action}`);
@@ -57,7 +61,12 @@ export const hasPermission = async (user, resource, action) => {
     if (fullRole) permissionManager.loadRole(roleId, fullRole.permissions || []);
   }
 
-  return permissionManager.can(roleId, resource, action);
+  let allowed = permissionManager.can(roleId, resource, action);
+  if (!allowed && resource.endsWith('_manage')) {
+    const baseResource = resource.replace(/_manage$/, '');
+    allowed = permissionManager.can(roleId, baseResource, action);
+  }
+  return allowed;
 };
 
 export const requirePermission = (resource, action) => {
