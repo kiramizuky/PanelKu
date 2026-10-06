@@ -15,6 +15,51 @@ const TerminalPage = (() => {
   let initialCwd = null;
   let lastOutputBuffer = []; // Shared buffer for AI analysis (uses active tab)
 
+  let heartbeatTimer = null;
+  let pendingTabsQueue = [];
+
+  function startHeartbeat() {
+    stopHeartbeat();
+    heartbeatTimer = setInterval(() => {
+      if (socket && socket.connected) {
+        socket.emit('terminal:ping');
+      }
+    }, 20000);
+  }
+
+  function stopHeartbeat() {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+
+  function updateStatusUI(status, customMsg = null) {
+    const badge = document.getElementById('terminalStatusBadge');
+    const textEl = document.getElementById('terminalStatusText');
+    const reconnectBtn = document.getElementById('terminalReconnectBtn');
+    if (!badge || !textEl) return;
+
+    badge.className = 'badge d-inline-flex align-items-center gap-1 ' +
+      (status === 'connected' ? 'bg-success-subtle text-success border border-success-subtle' :
+       status === 'reconnecting' ? 'bg-warning-subtle text-warning border border-warning-subtle' :
+       'bg-danger-subtle text-danger border border-danger-subtle');
+
+    textEl.textContent = customMsg || (
+      status === 'connected' ? 'Connected' :
+      status === 'reconnecting' ? 'Reconnecting...' :
+      'Disconnected'
+    );
+
+    if (reconnectBtn) {
+      if (status === 'connected') {
+        reconnectBtn.classList.add('d-none');
+      } else {
+        reconnectBtn.classList.remove('d-none');
+      }
+    }
+  }
+
   async function init() {
     await LP.init();
     if (!LP.state.accessToken) return;
@@ -49,37 +94,66 @@ const TerminalPage = (() => {
       });
     }
 
-    // Init Socket
+    // Init Socket with dynamic auth token and polling fallback
     socket = io('/terminal', {
-      auth: { token: LP.state.accessToken },
-      transports: ['websocket'],
+      auth: (cb) => {
+        const token = LP.state.accessToken || localStorage.getItem('lp_token');
+        cb({ token });
+      },
+      transports: ['websocket', 'polling'],
       reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
 
     socket.on('connect', () => {
+      updateStatusUI('connected');
+      startHeartbeat();
+
+      // Check all tabs and recreate any disconnected or missing sessions
       Object.keys(tabs).forEach(id => {
         const tab = tabs[id];
-        if (tab.term && !tab.sessionId) {
-          socket.emit('terminal:create', {
-            cols: tab.term.cols,
-            rows: tab.term.rows,
-            shell: 'bash',
-            osUser: tab.osUser,
-            nodeId: nodeId,
-            cwd: initialCwd
-          }, (ack) => {
-            if (ack && ack.sessionId) tab.sessionId = ack.sessionId; // fallback if needed, relying on terminal:created
-          });
+        if (tab && tab.term) {
+          if (!tab.sessionId || tab.needsRecreate) {
+            tab.needsRecreate = false;
+            tab.sessionId = null;
+            pendingTabsQueue.push(id);
+            tab.term.write('\r\n\x1b[32m[Koneksi tersambung. Menginisialisasi sesi shell...]\x1b[0m\r\n');
+            socket.emit('terminal:create', {
+              cols: tab.term.cols || 80,
+              rows: tab.term.rows || 24,
+              shell: 'bash',
+              osUser: tab.osUser || selectedOsUser,
+              nodeId: nodeId,
+              cwd: initialCwd
+            });
+          }
         }
       });
+
+      if (activeTabId && tabs[activeTabId]) {
+        setTimeout(() => {
+          try {
+            tabs[activeTabId].fitAddon.fit();
+            tabs[activeTabId].term.focus();
+          } catch (_) {}
+        }, 50);
+      }
     });
 
     socket.on('terminal:created', (data) => {
       // Find a tab that is waiting for a session id
-      const pendingTabId = Object.keys(tabs).find(id => !tabs[id].sessionId);
-      if (pendingTabId) {
+      const pendingTabId = pendingTabsQueue.shift() || Object.keys(tabs).find(id => !tabs[id].sessionId);
+      if (pendingTabId && tabs[pendingTabId]) {
         tabs[pendingTabId].sessionId = data.sessionId;
+        tabs[pendingTabId].needsRecreate = false;
       }
+    });
+
+    socket.on('terminal:pong', () => {
+      // Heartbeat acknowledged
     });
 
     socket.on('terminal:data', (data) => {
@@ -110,18 +184,81 @@ const TerminalPage = (() => {
         const tab = tabs[tabId];
         tab.term.write(`\r\n\x1b[33m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
         tab.sessionId = null;
+        tab.needsRecreate = true;
       }
     });
 
     socket.on('terminal:error', (data) => {
       console.error('Terminal Error:', data);
-      const tabId = Object.keys(tabs).find(id => tabs[id].sessionId === data.sessionId);
-      if (tabId) {
+      if (data && data.code === 'SESSION_NOT_FOUND') {
+        const targetTabId = Object.keys(tabs).find(id => tabs[id].sessionId === data.sessionId) || activeTabId;
+        if (targetTabId && tabs[targetTabId]) {
+          const tab = tabs[targetTabId];
+          tab.sessionId = null;
+          tab.needsRecreate = false;
+          pendingTabsQueue.push(targetTabId);
+          tab.term.write('\r\n\x1b[33m[Sesi lama kedaluwarsa. Memulai sesi baru...]\x1b[0m\r\n');
+          if (socket && socket.connected) {
+            socket.emit('terminal:create', {
+              cols: tab.term.cols || 80,
+              rows: tab.term.rows || 24,
+              shell: 'bash',
+              osUser: tab.osUser || selectedOsUser,
+              nodeId: nodeId,
+              cwd: initialCwd
+            });
+          }
+        }
+        return;
+      }
+      const tabId = Object.keys(tabs).find(id => tabs[id].sessionId === data.sessionId) || activeTabId;
+      if (tabId && tabs[tabId]) {
         tabs[tabId].term.write(`\r\n\x1b[31mTerminal Error: ${data.message || 'Unknown error'}\x1b[0m\r\n`);
       }
     });
 
-    socket.on('disconnect', () => {});
+    socket.on('disconnect', (reason) => {
+      stopHeartbeat();
+      updateStatusUI('reconnecting', `Terputus (${reason})`);
+      Object.keys(tabs).forEach(id => {
+        const tab = tabs[id];
+        if (tab) {
+          tab.needsRecreate = true;
+          tab.sessionId = null;
+          tab.term.write('\r\n\x1b[33m[Koneksi terputus. Menunggu koneksi kembali...]\x1b[0m\r\n');
+        }
+      });
+    });
+
+    socket.on('connect_error', async (err) => {
+      console.warn('Terminal WS Connect Error:', err.message);
+      updateStatusUI('reconnecting', 'Otentikasi / Reconnecting...');
+      if (err.message && (err.message.includes('Authentication') || err.message.includes('token') || err.message.includes('Unauthorized'))) {
+        try {
+          const refreshed = await LP.refreshToken();
+          if (refreshed && socket) {
+            socket.auth = { token: LP.state.accessToken || localStorage.getItem('lp_token') };
+            socket.connect();
+          }
+        } catch (_) {}
+      }
+    });
+
+    // Handle tab wake / visibility change
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        if (socket && !socket.connected) {
+          updateStatusUI('reconnecting', 'Membangunkan koneksi...');
+          socket.auth = { token: LP.state.accessToken || localStorage.getItem('lp_token') };
+          socket.connect();
+        } else if (activeTabId && tabs[activeTabId]) {
+          try {
+            tabs[activeTabId].fitAddon.fit();
+            tabs[activeTabId].term.focus();
+          } catch (_) {}
+        }
+      }
+    });
 
     if (savedUser) {
       connect(savedUser);
@@ -193,6 +330,7 @@ const TerminalPage = (() => {
       }
     });
 
+    pendingTabsQueue.push(tabId);
     if (socket && socket.connected) {
       socket.emit('terminal:create', {
         cols: term.cols,
@@ -561,9 +699,26 @@ const TerminalPage = (() => {
     }
   }
 
+  async function reconnect() {
+    updateStatusUI('reconnecting', 'Menghubungkan ulang...');
+    LP.toast('Menghubungkan ulang sesi terminal...', 'info');
+    try {
+      await LP.refreshToken();
+    } catch (_) {}
+
+    if (socket) {
+      socket.auth = { token: LP.state.accessToken || localStorage.getItem('lp_token') };
+      if (socket.connected) {
+        socket.disconnect();
+      }
+      socket.connect();
+    }
+  }
+
   return {
     init,
     connect,
+    reconnect,
     askAIFix,
     openCopilotModal,
     setQuickPrompt,

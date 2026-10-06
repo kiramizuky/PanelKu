@@ -136,10 +136,22 @@ export const registerTerminalSocket = (namespace) => {
       }
     });
 
+    // Application-level heartbeat ping to prevent TCP / reverse-proxy idle timeouts
+    socket.on('terminal:ping', () => {
+      socket.emit('terminal:pong', { timestamp: Date.now() });
+    });
+
     // Send input to PTY
     socket.on('terminal:input', ({ sessionId, data }) => {
       try {
-        if (!activeSessions.has(sessionId)) return;
+        if (!activeSessions.has(sessionId)) {
+          socket.emit('terminal:error', {
+            sessionId,
+            code: 'SESSION_NOT_FOUND',
+            message: 'Terminal session expired or not found. Re-initializing...',
+          });
+          return;
+        }
 
         // Check if remote node socket exists
         const agentWs = remoteSockets.get(sessionId);

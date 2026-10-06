@@ -44,7 +44,14 @@ const TaskDrawer = {
 
   attachSocket() {
     if (this.socketAttached) return;
-    const socket = window.LP?.socket || (window.io ? window.io() : null);
+    const token = window.LP?.state?.accessToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('lp_token') : null);
+    if (!token && !window.LP?.socket) return;
+
+    const socket = window.LP?.socket || (window.io ? window.io('/', {
+      auth: (cb) => cb({ token: window.LP?.state?.accessToken || localStorage.getItem('lp_token') }),
+      transports: ['websocket', 'polling'],
+      reconnection: true
+    }) : null);
     if (!socket) return;
 
     this.socketAttached = true;
@@ -278,8 +285,17 @@ const TaskDrawer = {
   startPeriodicSync() {
     if (this.pollTimer) clearInterval(this.pollTimer);
     this.pollTimer = setInterval(() => {
+      // Skip background polling when tab is inactive / hidden
+      if (document.hidden) return;
       this.loadTasks().catch(() => {});
     }, 5000);
+
+    // Sync immediately when tab becomes visible again
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        this.loadTasks().catch(() => {});
+      }
+    });
   },
 };
 

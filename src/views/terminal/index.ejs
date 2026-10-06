@@ -34,7 +34,13 @@
     <div id="tabList" class="d-flex gap-1"></div>
     <button class="btn btn-sm btn-outline-secondary ms-2" onclick="TerminalPage.addTab()" style="font-size:12px; flex-shrink:0;"><i class="bi bi-plus-lg"></i> New Tab</button>
     
-    <div class="ms-auto d-flex gap-2">
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <span id="terminalStatusBadge" class="badge bg-secondary-subtle text-secondary border border-secondary-subtle d-inline-flex align-items-center gap-1" style="font-size:11px; font-weight:500;">
+        <i class="bi bi-circle-fill" style="font-size:7px;"></i><span id="terminalStatusText">Connecting...</span>
+      </span>
+      <button id="terminalReconnectBtn" class="btn btn-sm btn-outline-warning d-none" onclick="TerminalPage.reconnect()" style="font-size:11px; padding:2px 8px;" title="Hubungkan ulang koneksi terminal">
+        <i class="bi bi-arrow-clockwise me-1"></i>Reconnect
+      </button>
       <div class="dropdown">
         <button class="btn btn-sm btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" style="font-size:12px;">
           <i class="bi bi-code-slash"></i> Snippets

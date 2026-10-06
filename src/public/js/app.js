@@ -36,6 +36,7 @@ const LP = {
           await this.fetchProfile();
           this.updateUserUI();
           this.startSessionKeepAlive();
+          this.initGlobalSocket();
           this.checkPanelUpdateDaily().catch(() => {});
         } catch {
           this.logout();
@@ -242,9 +243,39 @@ const LP = {
     }, 10 * 60 * 1000);
   },
 
+  initGlobalSocket() {
+    if (this.socket || typeof io === 'undefined') return;
+    const token = this.state.accessToken || (typeof localStorage !== 'undefined' ? localStorage.getItem('lp_token') : null);
+    if (!token) return;
+
+    this.socket = io('/', {
+      auth: (cb) => {
+        cb({ token: this.state.accessToken || localStorage.getItem('lp_token') });
+      },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 10000,
+    });
+
+    this.socket.on('connect_error', async (err) => {
+      if (err?.message && (err.message.includes('Authentication') || err.message.includes('token') || err.message.includes('Unauthorized'))) {
+        const refreshed = await this.refreshToken();
+        if (refreshed && this.socket) {
+          this.socket.auth = { token: this.state.accessToken };
+          this.socket.connect();
+        }
+      }
+    });
+  },
+
   logout() {
     this._initPromise = null;
     if (this._sessionKeepAliveTimer) clearInterval(this._sessionKeepAliveTimer);
+    if (this.socket) {
+      try { this.socket.disconnect(); } catch (_) {}
+      this.socket = null;
+    }
     this.post('/auth/logout').catch(() => {});
     localStorage.removeItem('lp_token');
     this.state.accessToken = null;

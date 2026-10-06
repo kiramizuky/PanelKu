@@ -250,6 +250,31 @@ describe('Terminal WebSocket Namespace', () => {
     socket.trigger('terminal:kill', { sessionId: 'sess-123' });
     expect(mockTerminalService.kill).toHaveBeenCalledWith('sess-123');
   });
+
+  test('responds to terminal:ping with terminal:pong', () => {
+    const ns = createMockNamespace();
+    registerTerminalSocket(ns);
+
+    const socket = createMockSocket();
+    ns.trigger('connection', socket);
+
+    socket.trigger('terminal:ping');
+    expect(socket.emit).toHaveBeenCalledWith('terminal:pong', expect.objectContaining({ timestamp: expect.any(Number) }));
+  });
+
+  test('emits SESSION_NOT_FOUND error when input sent for non-existent session', () => {
+    const ns = createMockNamespace();
+    registerTerminalSocket(ns);
+
+    const socket = createMockSocket();
+    ns.trigger('connection', socket);
+
+    socket.trigger('terminal:input', { sessionId: 'unknown-sess', data: 'whoami\n' });
+    expect(socket.emit).toHaveBeenCalledWith('terminal:error', expect.objectContaining({
+      sessionId: 'unknown-sess',
+      code: 'SESSION_NOT_FOUND',
+    }));
+  });
 });
 
 describe('Docker WebSocket Namespace', () => {
