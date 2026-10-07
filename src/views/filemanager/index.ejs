@@ -125,10 +125,61 @@
         <i class="bi bi-file-code-fill text-primary"></i>
         <span id="fmEditorPath" class="font-mono">No file selected</span>
         <span id="fmEditorUnsaved" class="fm-unsaved-badge" style="display:none;">● unsaved</span>
-        <button class="btn-lp btn-lp-ghost btn-lp-sm" id="fmThemeToggle" onclick="FM.toggleEditorTheme()" title="Toggle Editor Theme" style="padding:2px 8px; font-size:13px; margin-left:auto;">
-          <i class="bi bi-sun-fill" id="fmThemeIcon"></i>
-        </button>
+        <div class="ms-auto d-flex align-items-center gap-1">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FM.openSearchBar(false)" title="Find in file (Ctrl+F)" style="padding:2px 8px; font-size:12px;">
+            <i class="bi bi-search me-1"></i>Find
+          </button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FM.openSearchBar(true)" title="Replace in file (Ctrl+H)" style="padding:2px 8px; font-size:12px;">
+            <i class="bi bi-arrow-left-right me-1"></i>Replace
+          </button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="FM.jumpToLinePrompt()" title="Jump to Line (Ctrl+G)" style="padding:2px 8px; font-size:12px;">
+            <i class="bi bi-arrow-return-right me-1"></i>Go to Line
+          </button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" id="fmThemeToggle" onclick="FM.toggleEditorTheme()" title="Toggle Editor Theme" style="padding:2px 8px; font-size:13px;">
+            <i class="bi bi-sun-fill" id="fmThemeIcon"></i>
+          </button>
+        </div>
       </div>
+      
+      <!-- Modern Find & Replace Bar -->
+      <div id="fmSearchBar" class="fm-search-bar" style="display: none;">
+        <div class="fm-search-row">
+          <button class="fm-search-toggle-btn" id="fmSearchToggleReplace" onclick="FM.toggleReplaceMode()" title="Toggle Replace (Ctrl+H)">
+            <i class="bi bi-chevron-right" id="fmSearchToggleReplaceIcon"></i>
+          </button>
+          <div class="fm-search-input-wrap">
+            <input type="text" id="fmFindInput" class="fm-search-input" placeholder="Find (Ctrl+F)..." autocomplete="off" spellcheck="false">
+            <div class="fm-search-options">
+              <button class="fm-search-opt-btn" id="fmOptCase" onclick="FM.toggleSearchOption('case')" title="Match Case (Alt+C)">Aa</button>
+              <button class="fm-search-opt-btn" id="fmOptWord" onclick="FM.toggleSearchOption('word')" title="Match Whole Word (Alt+W)">\b</button>
+              <button class="fm-search-opt-btn" id="fmOptRegex" onclick="FM.toggleSearchOption('regex')" title="Use Regular Expression (Alt+R)">.*</button>
+            </div>
+          </div>
+          <span class="fm-search-count" id="fmSearchCount">No results</span>
+          <div class="fm-search-nav-btns">
+            <button class="fm-search-action-btn" onclick="FM.findPrev()" title="Previous Match (Shift+Enter / Shift+F3)">
+              <i class="bi bi-arrow-up"></i>
+            </button>
+            <button class="fm-search-action-btn" onclick="FM.findNext()" title="Next Match (Enter / F3)">
+              <i class="bi bi-arrow-down"></i>
+            </button>
+            <button class="fm-search-action-btn" onclick="FM.closeSearchBar()" title="Close (Esc)">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+        <div class="fm-search-row fm-replace-row" id="fmReplaceRow" style="display: none;">
+          <span style="width: 18px; flex-shrink: 0;"></span>
+          <div class="fm-search-input-wrap">
+            <input type="text" id="fmReplaceInput" class="fm-search-input" placeholder="Replace (Ctrl+H)..." autocomplete="off" spellcheck="false">
+          </div>
+          <div class="fm-replace-actions">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm py-0 px-2" style="font-size: 11px; height: 26px;" onclick="FM.replaceCurrent()" title="Replace current match">Replace</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm py-0 px-2" style="font-size: 11px; height: 26px;" onclick="FM.replaceAll()" title="Replace all occurrences (Ctrl+Alt+Enter)">Replace All</button>
+          </div>
+        </div>
+      </div>
+
       <div class="fm-editor-body">
         <!-- CodeMirror replaces this textarea with its own editor widget -->
         <textarea class="fm-editor-textarea" id="fmEditorTextarea" wrap="off" spellcheck="false"></textarea>
@@ -160,8 +211,11 @@
       <div class="fm-editor-footer" id="fmEditorFooter">
         <span class="fm-editor-stats" id="fmEditorStats"></span>
         <div class="fm-editor-footer-right">
-          <small class="d-none d-sm-inline text-muted" style="font-size:11px;">
-            <kbd style="background:rgba(255,255,255,0.14); color:var(--text-secondary); font-size:10px; padding:2px 5px; border-radius:3px;">Ctrl+S</kbd> Save
+          <small class="d-none d-md-inline text-muted" style="font-size:11px;">
+            <kbd style="background:rgba(255,255,255,0.14); color:var(--text-secondary); font-size:10px; padding:2px 5px; border-radius:3px;">Ctrl+F</kbd> Find
+            <kbd style="background:rgba(255,255,255,0.14); color:var(--text-secondary); font-size:10px; padding:2px 5px; border-radius:3px; margin-left:4px;">Ctrl+H</kbd> Replace
+            <kbd style="background:rgba(255,255,255,0.14); color:var(--text-secondary); font-size:10px; padding:2px 5px; border-radius:3px; margin-left:4px;">Ctrl+G</kbd> Line
+            <kbd style="background:rgba(255,255,255,0.14); color:var(--text-secondary); font-size:10px; padding:2px 5px; border-radius:3px; margin-left:4px;">Ctrl+S</kbd> Save
           </small>
           <button class="btn-lp btn-lp-primary btn-lp-sm" id="fmEditorSaveBtn" onclick="FM.saveSplitEditor()">
             <i class="bi bi-floppy me-1"></i> Save
@@ -1047,6 +1101,171 @@
   }
   .fm-editor-light .fm-unsaved-badge {
     color: #d97706;
+  }
+  
+  /* ── Find & Replace Bar ─────────────────────────────── */
+  .fm-search-bar {
+    background: rgba(18, 22, 34, 0.96);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--glass-border);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 10;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    animation: fmSlideDown 0.15s ease-out;
+  }
+  @keyframes fmSlideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fm-search-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+  .fm-search-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s, color 0.15s;
+  }
+  .fm-search-toggle-btn:hover {
+    color: var(--text-primary);
+  }
+  .fm-search-toggle-btn.expanded i {
+    transform: rotate(90deg);
+  }
+  .fm-search-input-wrap {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .fm-search-input {
+    width: 100%;
+    height: 28px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    padding: 2px 75px 2px 10px;
+    color: #fff;
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .fm-search-input:focus {
+    border-color: var(--accent-primary, #6366f1);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+  }
+  .fm-search-options {
+    position: absolute;
+    right: 4px;
+    display: flex;
+    gap: 2px;
+  }
+  .fm-search-opt-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 5px;
+    cursor: pointer;
+    line-height: 1.2;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .fm-search-opt-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+  }
+  .fm-search-opt-btn.active {
+    background: rgba(99, 102, 241, 0.35);
+    border-color: rgba(99, 102, 241, 0.6);
+    color: #a5b4fc;
+  }
+  .fm-search-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono, monospace);
+    white-space: nowrap;
+    min-width: 75px;
+    text-align: center;
+  }
+  .fm-search-count.has-matches {
+    color: #38bdf8;
+  }
+  .fm-search-count.no-matches {
+    color: #f87171;
+  }
+  .fm-search-nav-btns {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .fm-search-action-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.15s;
+  }
+  .fm-search-action-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+  .fm-replace-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .cm-searching {
+    background-color: rgba(234, 179, 8, 0.38) !important;
+    outline: 1px solid rgba(234, 179, 8, 0.7);
+    border-radius: 2px;
+  }
+  .cm-searching-current {
+    background-color: rgba(249, 115, 22, 0.65) !important;
+    outline: 2px solid #f97316 !important;
+    border-radius: 2px;
+  }
+  /* Light theme overrides for search bar */
+  .fm-editor-light .fm-search-bar {
+    background: rgba(245, 247, 250, 0.98);
+    border-bottom-color: #e2e4e8;
+  }
+  .fm-editor-light .fm-search-input {
+    background: #fff;
+    border-color: #cbd5e1;
+    color: #1e293b;
+  }
+  .fm-editor-light .fm-search-input:focus {
+    border-color: #6366f1;
+  }
+  .fm-editor-light .fm-search-action-btn {
+    color: #475569;
+  }
+  .fm-editor-light .fm-search-action-btn:hover {
+    background: #e2e4e8;
+    color: #0f172a;
   }
   
   .fm-editor-footer {

@@ -780,6 +780,7 @@ const FMPage = (() => {
   }
 
   function renderPreview(path, type) {
+    closeSearchBar();
     const container = document.getElementById('fmPreviewContent');
     const loading = document.getElementById('fmPreviewLoading');
     const headerPath = document.getElementById('fmEditorPath');
@@ -1347,6 +1348,354 @@ const FMPage = (() => {
     return map[ext] || 'text';
   }
 
+  // ── Find & Replace & Editor Shortcuts ──────────────
+  let _searchState = {
+    isOpen: false,
+    isReplace: false,
+    query: '',
+    replaceText: '',
+    caseSensitive: false,
+    wholeWord: false,
+    isRegex: false,
+    matches: [],
+    currentIndex: -1,
+    markedSpans: [],
+  };
+
+  function clearSearchMarks() {
+    if (_searchState.markedSpans && _searchState.markedSpans.length) {
+      _searchState.markedSpans.forEach(m => {
+        try { m.clear(); } catch (_) {}
+      });
+    }
+    _searchState.markedSpans = [];
+  }
+
+  function openSearchBar(showReplace = false) {
+    if (!_cm) return;
+    const bar = document.getElementById('fmSearchBar');
+    const findInput = document.getElementById('fmFindInput');
+    const replaceRow = document.getElementById('fmReplaceRow');
+    const toggleReplaceIcon = document.getElementById('fmSearchToggleReplaceIcon');
+    const toggleBtn = document.getElementById('fmSearchToggleReplace');
+    if (!bar || !findInput) return;
+
+    _searchState.isOpen = true;
+    _searchState.isReplace = showReplace;
+    bar.style.display = 'flex';
+
+    if (replaceRow) {
+      replaceRow.style.display = showReplace ? 'flex' : 'none';
+    }
+    if (toggleBtn) {
+      toggleBtn.classList.toggle('expanded', showReplace);
+    }
+    if (toggleReplaceIcon) {
+      toggleReplaceIcon.className = showReplace ? 'bi bi-chevron-down' : 'bi bi-chevron-right';
+    }
+
+    // Auto-fill selected text from editor if any
+    const selection = _cm.getSelection();
+    if (selection && !selection.includes('\n') && selection.length < 100) {
+      findInput.value = selection;
+      _searchState.query = selection;
+    }
+
+    setTimeout(() => {
+      if (showReplace && findInput.value) {
+        const replaceInput = document.getElementById('fmReplaceInput');
+        if (replaceInput) {
+          replaceInput.focus();
+          replaceInput.select();
+        }
+      } else {
+        findInput.focus();
+        findInput.select();
+      }
+      runSearch();
+    }, 50);
+  }
+
+  function closeSearchBar() {
+    const bar = document.getElementById('fmSearchBar');
+    if (bar) bar.style.display = 'none';
+    _searchState.isOpen = false;
+    clearSearchMarks();
+    if (_cm) _cm.focus();
+  }
+
+  function toggleReplaceMode() {
+    openSearchBar(!_searchState.isReplace);
+  }
+
+  function toggleSearchOption(opt) {
+    if (opt === 'case') _searchState.caseSensitive = !_searchState.caseSensitive;
+    if (opt === 'word') _searchState.wholeWord = !_searchState.wholeWord;
+    if (opt === 'regex') _searchState.isRegex = !_searchState.isRegex;
+
+    document.getElementById('fmOptCase')?.classList.toggle('active', _searchState.caseSensitive);
+    document.getElementById('fmOptWord')?.classList.toggle('active', _searchState.wholeWord);
+    document.getElementById('fmOptRegex')?.classList.toggle('active', _searchState.isRegex);
+
+    runSearch();
+  }
+
+  function runSearch() {
+    if (!_cm) return;
+    const findInput = document.getElementById('fmFindInput');
+    const countEl = document.getElementById('fmSearchCount');
+    const query = findInput ? findInput.value : '';
+    _searchState.query = query;
+
+    clearSearchMarks();
+    _searchState.matches = [];
+    _searchState.currentIndex = -1;
+
+    if (!query) {
+      if (countEl) {
+        countEl.textContent = 'No results';
+        countEl.className = 'fm-search-count';
+      }
+      return;
+    }
+
+    let regex = null;
+    try {
+      if (_searchState.isRegex) {
+        regex = new RegExp(query, _searchState.caseSensitive ? 'g' : 'gi');
+      } else if (_searchState.wholeWord) {
+        const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        regex = new RegExp('\\b' + escaped + '\\b', _searchState.caseSensitive ? 'g' : 'gi');
+      }
+    } catch (_) {
+      if (countEl) {
+        countEl.textContent = 'Invalid regex';
+        countEl.className = 'fm-search-count no-matches';
+      }
+      return;
+    }
+
+    const matches = [];
+    const lineCount = _cm.lineCount();
+    const cursor = _cm.getCursor();
+
+    for (let i = 0; i < lineCount; i++) {
+      const lineText = _cm.getLine(i);
+      if (!lineText) continue;
+
+      if (regex) {
+        regex.lastIndex = 0;
+        let match;
+        while ((match = regex.exec(lineText)) !== null) {
+          matches.push({
+            from: { line: i, ch: match.index },
+            to: { line: i, ch: match.index + match[0].length }
+          });
+          if (!match[0].length) break;
+        }
+      } else {
+        const target = _searchState.caseSensitive ? lineText : lineText.toLowerCase();
+        const q = _searchState.caseSensitive ? query : query.toLowerCase();
+        let start = 0;
+        let idx;
+        while ((idx = target.indexOf(q, start)) !== -1) {
+          matches.push({
+            from: { line: i, ch: idx },
+            to: { line: i, ch: idx + query.length }
+          });
+          start = idx + (query.length || 1);
+        }
+      }
+    }
+
+    _searchState.matches = matches;
+
+    // Mark all matches in CodeMirror
+    matches.forEach((m) => {
+      const mark = _cm.markText(m.from, m.to, { className: 'cm-searching' });
+      _searchState.markedSpans.push(mark);
+    });
+
+    if (matches.length === 0) {
+      if (countEl) {
+        countEl.textContent = 'No results';
+        countEl.className = 'fm-search-count no-matches';
+      }
+      return;
+    }
+
+    // Find closest match after current cursor position
+    let targetIndex = matches.findIndex(m => m.from.line > cursor.line || (m.from.line === cursor.line && m.from.ch >= cursor.ch));
+    if (targetIndex === -1) targetIndex = 0;
+
+    jumpToMatch(targetIndex);
+  }
+
+  function jumpToMatch(index) {
+    const matches = _searchState.matches;
+    if (!matches || !matches.length) return;
+
+    if (index < 0) index = matches.length - 1;
+    if (index >= matches.length) index = 0;
+    _searchState.currentIndex = index;
+
+    const m = matches[index];
+
+    // Highlight current match uniquely
+    clearSearchMarks();
+    matches.forEach((matchItem, idx) => {
+      const isCurrent = idx === index;
+      const mark = _cm.markText(matchItem.from, matchItem.to, {
+        className: isCurrent ? 'cm-searching-current' : 'cm-searching'
+      });
+      _searchState.markedSpans.push(mark);
+    });
+
+    _cm.setSelection(m.from, m.to);
+    _cm.scrollIntoView(m, 80);
+
+    const countEl = document.getElementById('fmSearchCount');
+    if (countEl) {
+      countEl.textContent = `${index + 1} of ${matches.length}`;
+      countEl.className = 'fm-search-count has-matches';
+    }
+  }
+
+  function findNext() {
+    if (!_searchState.matches.length) {
+      runSearch();
+      return;
+    }
+    jumpToMatch(_searchState.currentIndex + 1);
+  }
+
+  function findPrev() {
+    if (!_searchState.matches.length) {
+      runSearch();
+      return;
+    }
+    jumpToMatch(_searchState.currentIndex - 1);
+  }
+
+  function replaceCurrent() {
+    if (!_cm || _searchState.currentIndex === -1 || !_searchState.matches.length) return;
+    const replaceInput = document.getElementById('fmReplaceInput');
+    const replacement = replaceInput ? replaceInput.value : '';
+    const m = _searchState.matches[_searchState.currentIndex];
+
+    _cm.replaceRange(replacement, m.from, m.to);
+    runSearch();
+  }
+
+  function replaceAll() {
+    if (!_cm || !_searchState.matches.length) return;
+    const replaceInput = document.getElementById('fmReplaceInput');
+    const replacement = replaceInput ? replaceInput.value : '';
+    const matches = _searchState.matches;
+    const count = matches.length;
+
+    _cm.operation(() => {
+      // Replace in reverse order so line/ch don't shift
+      for (let i = matches.length - 1; i >= 0; i--) {
+        const m = matches[i];
+        _cm.replaceRange(replacement, m.from, m.to);
+      }
+    });
+
+    LP.toast(`Replaced ${count} occurrences`, 'success');
+    runSearch();
+  }
+
+  function jumpToLinePrompt() {
+    if (!_cm) return;
+    const lineCount = _cm.lineCount();
+    const current = _cm.getCursor().line + 1;
+    const target = window.prompt(`Jump to line (1 - ${lineCount}):`, current);
+    if (!target) return;
+    const lineNum = parseInt(target, 10);
+    if (!isNaN(lineNum) && lineNum >= 1 && lineNum <= lineCount) {
+      _cm.setCursor({ line: lineNum - 1, ch: 0 });
+      _cm.scrollIntoView({ line: lineNum - 1, ch: 0 }, 100);
+      _cm.focus();
+    } else {
+      LP.toast(`Line must be between 1 and ${lineCount}`, 'warning');
+    }
+  }
+
+  function initSearchEvents() {
+    const findInput = document.getElementById('fmFindInput');
+    const replaceInput = document.getElementById('fmReplaceInput');
+
+    if (findInput) {
+      findInput.addEventListener('input', () => runSearch());
+      findInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (e.shiftKey) findPrev();
+          else findNext();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          closeSearchBar();
+        } else if (e.altKey && (e.key === 'c' || e.key === 'C')) {
+          e.preventDefault();
+          toggleSearchOption('case');
+        } else if (e.altKey && (e.key === 'w' || e.key === 'W')) {
+          e.preventDefault();
+          toggleSearchOption('word');
+        } else if (e.altKey && (e.key === 'r' || e.key === 'R')) {
+          e.preventDefault();
+          toggleSearchOption('regex');
+        }
+      });
+    }
+
+    if (replaceInput) {
+      replaceInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (e.ctrlKey || e.altKey) replaceAll();
+          else replaceCurrent();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          closeSearchBar();
+        }
+      });
+    }
+
+    // Global keyboard shortcuts for editor
+    window.addEventListener('keydown', (e) => {
+      const splitView = document.getElementById('fmSplitView');
+      if (!splitView || splitView.style.display === 'none') return;
+      if (_previewTabs[_activeTab]) return;
+
+      const activeModal = document.querySelector('.modal.show');
+      if (activeModal) return;
+
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+      if (cmdOrCtrl && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        openSearchBar(false);
+      } else if (cmdOrCtrl && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        openSearchBar(true);
+      } else if ((cmdOrCtrl && (e.key === 'g' || e.key === 'G')) || (e.altKey && (e.key === 'g' || e.key === 'G'))) {
+        e.preventDefault();
+        jumpToLinePrompt();
+      } else if (e.key === 'F3') {
+        e.preventDefault();
+        if (e.shiftKey) findPrev();
+        else findNext();
+      } else if (e.key === 'Escape') {
+        if (_searchState.isOpen) {
+          e.preventDefault();
+          closeSearchBar();
+        }
+      }
+    });
+  }
+
   function initCodeMirror() {
     if (_cmInitialized) return;
     const textarea = document.getElementById('fmEditorTextarea');
@@ -1366,6 +1715,16 @@ const FMPage = (() => {
       extraKeys: {
         'Ctrl-S': () => saveSplitEditor(),
         'Cmd-S': () => saveSplitEditor(),
+        'Ctrl-F': () => openSearchBar(false),
+        'Cmd-F': () => openSearchBar(false),
+        'Ctrl-H': () => openSearchBar(true),
+        'Cmd-H': () => openSearchBar(true),
+        'Ctrl-G': () => jumpToLinePrompt(),
+        'Cmd-G': () => jumpToLinePrompt(),
+        'Alt-G': () => jumpToLinePrompt(),
+        'F3': () => findNext(),
+        'Shift-F3': () => findPrev(),
+        'Esc': () => closeSearchBar(),
         Tab: (cm) => {
           // Custom 2-space tab
           cm.replaceSelection('  ');
@@ -1426,6 +1785,12 @@ const FMPage = (() => {
       setTimeout(() => _cm.refresh(), 50);
 
       updateCodeMirrorStats();
+
+      if (_searchState.isOpen) {
+        runSearch();
+      } else {
+        clearSearchMarks();
+      }
     }
 
     // Highlight in tree
@@ -1453,6 +1818,7 @@ const FMPage = (() => {
   }
 
   function closeSplitView() {
+    closeSearchBar();
     document.getElementById('fmSplitView').style.display = 'none';
     document.getElementById('fmFileArea').style.display = 'block';
     _editingPath = null;
@@ -1974,6 +2340,7 @@ const FMPage = (() => {
       if (!LP.state.accessToken) return;
       initDragDrop();
       initCodeMirror();
+      initSearchEvents();
       initSplitDivider();
       applyEditorTheme();
 
@@ -2056,6 +2423,17 @@ const FMPage = (() => {
     zoomReset,
     zoomFitWidth,
     zoomFitPage,
+
+    // Editor Search & Navigation
+    openSearchBar,
+    closeSearchBar,
+    toggleReplaceMode,
+    toggleSearchOption,
+    findNext,
+    findPrev,
+    replaceCurrent,
+    replaceAll,
+    jumpToLinePrompt,
   };
 })();
 
