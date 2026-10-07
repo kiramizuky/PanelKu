@@ -1,21 +1,35 @@
 node_modules/
 .env
-storage/logs/*.log
+
+# Storage runtime data
+storage/logs/*
 storage/uploads/*
 storage/backups/*
 storage/temp/*
+storage/panel-backups/*
+storage/databases/*
+storage/snapshots/*
+storage/whatsapp-sessions/*
+storage/*.json
+!storage/panel.json.example
 !storage/uploads/.gitkeep
 !storage/backups/.gitkeep
 !storage/logs/.gitkeep
 !storage/temp/.gitkeep
+
+# Databases & SQLite
 *.sqlite
 storage/*.db
 storage/*.db-shm
 storage/*.db-wal
 storage/mock_*
+
+# Build, test & temporary files
 dist/
 coverage/
 .nyc_output/
 landing/
 index.html
-install.sh
+install.sh
+tmp-*
+*.tmp

@@ -681,7 +681,7 @@ class SystemService {
     const currentCommit = this._validateCommitHash(rawCommit);
 
     if (method === 'git') {
-      const PANEL_DIR = '/opt/panelku';
+      const PANEL_DIR = process.env.PANEL_DIR || process.cwd();
       
       const rawLocalBranch = (await this._execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: PANEL_DIR }).catch(async () => {
         return await this._execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
@@ -692,12 +692,18 @@ class SystemService {
 
       // [HIGH-3 FIX] All git commands use execFile with cwd and args array
       log += await this._execFile('git', ['config', '--global', '--add', 'safe.directory', PANEL_DIR]).catch(() => '') + '\n';
-      log += await this._execFile('git', ['checkout', 'package-lock.json'], { cwd: PANEL_DIR }).catch(() => '') + '\n';
-      log += await this._execFile('git', ['pull', 'origin', targetBranch], { cwd: PANEL_DIR }).catch(e => `[git pull error] ${e.message}`) + '\n';
-      log += await this._execFile('npm', ['install', '--production'], { cwd: PANEL_DIR }).catch(e => `[npm install error] ${e.message}`) + '\n';
+      log += await this._execFile('git', ['checkout', 'HEAD', '--', '.'], { cwd: PANEL_DIR }).catch(() => '') + '\n';
+      const pullResult = await this._execFile('git', ['pull', 'origin', targetBranch], { cwd: PANEL_DIR }).catch(e => `[git pull error] ${e.message}`);
+      log += pullResult + '\n';
+      if (pullResult.includes('error') || pullResult.includes('fatal') || pullResult.includes('Aborting')) {
+        await this._execFile('git', ['fetch', 'origin', targetBranch], { cwd: PANEL_DIR }).catch(() => {});
+        log += await this._execFile('git', ['reset', '--hard', `origin/${targetBranch}`], { cwd: PANEL_DIR }).catch(e => `[git reset error] ${e.message}`) + '\n';
+      }
+      log += await this._execFile('npm', ['install', '--omit=dev'], { cwd: PANEL_DIR }).catch(e => `[npm install error] ${e.message}`) + '\n';
+      await this._execFile('git', ['checkout', 'HEAD', '--', 'package-lock.json'], { cwd: PANEL_DIR }).catch(() => {});
     } else if (method === 'npm') {
-      const PANEL_DIR = '/opt/panelku';
-      log += await this._execFile('npm', ['install', '--production'], { cwd: PANEL_DIR }).catch(e => `[npm install error] ${e.message}`) + '\n';
+      const PANEL_DIR = process.env.PANEL_DIR || process.cwd();
+      log += await this._execFile('npm', ['install', '--omit=dev'], { cwd: PANEL_DIR }).catch(e => `[npm install error] ${e.message}`) + '\n';
     }
 
     // Verify syntax

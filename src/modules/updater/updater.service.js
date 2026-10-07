@@ -306,6 +306,9 @@ class UpdaterService {
     try {
       const safeBranch = this._validateGitRef(info.branch);
 
+      // Ensure safe directory is configured
+      await this._runCommand(`git config --global --add safe.directory "${PANEL_DIR}" 2>&1`).catch(() => {});
+
       // Fetch remote
       await this._runCommand('git fetch origin 2>&1');
 
@@ -481,32 +484,47 @@ class UpdaterService {
         await this._runCommand(`git config --global --add safe.directory "${PANEL_DIR}" 2>&1`).catch(() => {});
         await this._runCommand('git config --global --add safe.directory "*" 2>&1').catch(() => {});
 
-        // Backup runtime storage/panel.json and temporarily remove it to prevent untracked merge conflicts
+        // Backup runtime configs in storage to prevent untracked / overwrite merge conflicts
         const panelJsonPath = path.join(STORAGE_DIR, 'panel.json');
+        const systemJsonPath = path.join(STORAGE_DIR, 'system.json');
         let savedPanelConfig = null;
-        try {
-          savedPanelConfig = await fs.readFile(panelJsonPath, 'utf8');
-          await fs.unlink(panelJsonPath).catch(() => {});
-        } catch {}
+        let savedSystemConfig = null;
+        try { savedPanelConfig = await fs.readFile(panelJsonPath, 'utf8'); } catch {}
+        try { savedSystemConfig = await fs.readFile(systemJsonPath, 'utf8'); } catch {}
 
-        // Stash local changes to avoid merge conflicts
-        log.push('📝 Stashing local changes...');
-        await this._runCommand('git -c user.name="Panelku" -c user.email="updater@panelku.local" stash --include-untracked 2>&1').catch(() => {});
-        await this._runCommand('git checkout package-lock.json 2>&1').catch(() => {});
-        await this._runCommand('git checkout package.json 2>&1').catch(() => {});
+        // Abort any lingering merge or rebase state
+        await this._runCommand('git merge --abort 2>&1').catch(() => {});
+        await this._runCommand('git rebase --abort 2>&1').catch(() => {});
+
+        // Ignore local changes to tracked runtime config files if present in git index
+        await this._runCommand('git update-index --skip-worktree storage/panel.json 2>&1').catch(() => {});
+        await this._runCommand('git update-index --assume-unchanged storage/panel.json 2>&1').catch(() => {});
+
+        // Discard any accidental local modifications to tracked source files (e.g. package-lock.json modified by npm)
+        log.push('🧹 Preparing clean working directory for git pull...');
+        await this._runCommand('git checkout HEAD -- . 2>&1').catch(() => {});
 
         // Pull latest code
         log.push(`⬇️ Pulling from origin/${branch}...`);
         let pullOut = await this._runCommand(`git pull origin ${branch} 2>&1`);
 
-        // If git pull failed or encountered merge/overwrite errors, fallback to git fetch + reset --hard
-        if (pullOut.includes('[ERROR]') || pullOut.toLowerCase().includes('error:') || pullOut.toLowerCase().includes('fatal:') || pullOut.includes('Aborting')) {
+        // If git pull failed or encountered merge/overwrite/untracked conflicts, fallback to robust git fetch + reset --hard
+        if (
+          pullOut.includes('[ERROR]') ||
+          pullOut.toLowerCase().includes('error:') ||
+          pullOut.toLowerCase().includes('fatal:') ||
+          pullOut.includes('Aborting') ||
+          pullOut.includes('would be overwritten by merge') ||
+          pullOut.includes('untracked working tree')
+        ) {
           log.push(`   ${pullOut.trim().split('\n').join('\n   ')}`);
-          log.push('   ⚠️ Standard git pull encountered an issue. Falling back to git fetch and reset...');
+          log.push('   ⚠️ Standard git pull encountered an issue. Falling back to robust git fetch and reset...');
           const fetchOut = await this._runCommand(`git fetch origin ${branch} 2>&1`);
           if (fetchOut.includes('[ERROR]') || fetchOut.toLowerCase().includes('fatal:')) {
             throw new Error(`Git update failed during fetch: ${fetchOut.replace('[ERROR]', '').trim()}`);
           }
+          // Ensure branch is checked out or set to origin/branch
+          await this._runCommand(`git checkout -B ${branch} origin/${branch} 2>&1`).catch(() => {});
           const resetOut = await this._runCommand(`git reset --hard origin/${branch} 2>&1`);
           if (resetOut.includes('[ERROR]') || resetOut.toLowerCase().includes('fatal:')) {
             throw new Error(`Git update failed during reset: ${resetOut.replace('[ERROR]', '').trim()}`);
@@ -515,17 +533,26 @@ class UpdaterService {
         }
         log.push(`   ${pullOut.trim().split('\n').join('\n   ')}`);
 
-        // Restore runtime panel.json config
+        // Restore runtime configs
         if (savedPanelConfig) {
-          try {
-            await fs.writeFile(panelJsonPath, savedPanelConfig, 'utf8');
-          } catch {}
+          try { await fs.writeFile(panelJsonPath, savedPanelConfig, 'utf8'); } catch {}
         }
+        if (savedSystemConfig) {
+          try { await fs.writeFile(systemJsonPath, savedSystemConfig, 'utf8'); } catch {}
+        }
+
+        // Re-apply skip-worktree to avoid git dirty index
+        await this._runCommand('git update-index --skip-worktree storage/panel.json 2>&1').catch(() => {});
+        await this._runCommand('git update-index --assume-unchanged storage/panel.json 2>&1').catch(() => {});
 
         // Install dependencies
         log.push('📦 Installing npm dependencies...');
         const npmOut = await this._runCommand('npm install --omit=dev 2>&1');
         log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
+
+        // Ensure package-lock.json doesn't remain dirty after npm install
+        await this._runCommand('git checkout HEAD -- package-lock.json 2>&1').catch(() => {});
+
         log.push('🔨 Rebuilding native dependencies (better-sqlite3, node-pty)...');
         await this.rebuildNativeModules(log);
       } else if (method === 'npm') {
