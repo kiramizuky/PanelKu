@@ -9,7 +9,7 @@ class MailController {
 
   async install(req, res) {
     try {
-      const isAsync = req.query.async === 'true' || req.body?.async === true;
+      const isAsync = req.query?.async === 'true' || req.body?.async === true;
       if (isAsync) {
         const job = await mailService.queueInstall();
         return success(res, { queued: true, job }, 'Mail server installation queued');
@@ -20,7 +20,7 @@ class MailController {
 
   async uninstall(req, res) {
     try {
-      const isAsync = req.query.async === 'true' || req.body?.async === true;
+      const isAsync = req.query?.async === 'true' || req.body?.async === true;
       if (isAsync) {
         const job = await mailService.queueUninstall();
         return success(res, { queued: true, job }, 'Mail server uninstallation queued');
@@ -31,7 +31,7 @@ class MailController {
 
   async getQueueJobStatus(req, res) {
     try {
-      const job = await mailService.getQueueJobStatus(req.params.jobId);
+      const job = await mailService.getQueueJobStatus(req.params?.jobId);
       if (!job) return error(res, 'Queue job not found', 404);
       return success(res, job);
     } catch (err) { return error(res, err.message, 500); }

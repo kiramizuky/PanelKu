@@ -12,6 +12,8 @@ const DB = (() => {
   let cachedEnvironments = null;
   let versionModal = null;
   let migrationsModal = null;
+  let jsonViewerModal = null;
+  let _activeJsonData = { raw: null, jsonStr: '', compactStr: '', isPretty: true, colName: '' };
 
   // ── Initialization ───────────────────────────────────
 
@@ -466,29 +468,133 @@ const DB = (() => {
     } catch { LP.toast('Failed to load data', 'error'); }
   }
 
-  function renderTableData(rows) {
-    const head = document.getElementById('browseDataHead');
-    const body = document.getElementById('browseDataBody');
-
-    if (!Array.isArray(rows) || rows.length === 0) {
-      head.innerHTML = '<tr><th>No Data</th></tr>';
-      body.innerHTML = '<tr><td class="text-muted">Table is empty.</td></tr>';
-      return;
+  function formatCellValue(val, colName = '') {
+    if (val === null || val === undefined) {
+      return '<span class="text-muted font-mono" style="font-size:11px;">NULL</span>';
     }
 
-    const columns = Object.keys(rows[0]);
-    head.innerHTML = `<tr>${columns.map(c => `<th class="sortable${currentSort.column === c ? ' ' + currentSort.dir.toLowerCase() : ''}" onclick="LP.call('DB.sortColumn', '${LP.encJsArg(c)}')">${LP.escHtml(c)}</th>`).join('')}</tr>`;
+    let isJson = false;
+    let parsed = null;
+    let rawJsonStr = '';
 
-    body.innerHTML = rows.map(row => `
-      <tr>${columns.map(col => `<td>${formatCellValue(row[col])}</td>`).join('')}</tr>
-    `).join('');
+    if (typeof val === 'object') {
+      isJson = true;
+      parsed = val;
+      try {
+        rawJsonStr = JSON.stringify(val);
+      } catch (_) {
+        rawJsonStr = String(val);
+      }
+    } else if (typeof val === 'string' && (val.trim().startsWith('{') || val.trim().startsWith('['))) {
+      try {
+        const p = JSON.parse(val);
+        if (p && typeof p === 'object') {
+          isJson = true;
+          parsed = p;
+          rawJsonStr = val.trim();
+        }
+      } catch (_) {}
+    }
+
+    if (isJson && parsed !== null) {
+      const isArray = Array.isArray(parsed);
+      const badgeIcon = isArray ? 'bi-brackets' : 'bi-braces';
+      const badgeText = isArray ? `Array(${parsed.length})` : 'JSON';
+      const badgeClass = isArray
+        ? 'badge bg-primary-subtle text-primary border border-primary-subtle'
+        : 'badge bg-info-subtle text-info border border-info-subtle';
+
+      const compact = rawJsonStr.length > 45 ? (rawJsonStr.substring(0, 45) + '...') : rawJsonStr;
+      const encData = encodeURIComponent(rawJsonStr);
+      const encCol = encodeURIComponent(colName || 'data');
+
+      return `
+        <div class="d-inline-flex align-items-center gap-1 font-mono" style="max-width:100%;">
+          <span class="${badgeClass} px-1 py-0 font-mono" style="font-size:10px;">
+            <i class="bi ${badgeIcon} me-1"></i>${badgeText}
+          </span>
+          <code class="text-secondary text-truncate" style="max-width:150px;font-size:11px;" title="${LP.escHtml(rawJsonStr)}">${LP.escHtml(compact)}</code>
+          <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0 px-1 text-info border-0" 
+            onclick="event.stopPropagation(); DB.openJsonModal('${encCol}', '${encData}')" 
+            title="Lihat Detail JSON / Object" style="font-size:11px;height:20px;line-height:1;">
+            <i class="bi bi-arrows-fullscreen"></i>
+          </button>
+        </div>
+      `;
+    }
+
+    const str = String(val);
+    if (str.length > 200) {
+      return '<span class="font-mono" title="' + LP.escHtml(str) + '">' + LP.escHtml(str.substring(0, 200)) + '...</span>';
+    }
+    return '<span class="font-mono">' + LP.escHtml(str) + '</span>';
   }
 
-  function formatCellValue(val) {
-    if (val === null || val === undefined) return '<span class="text-muted">NULL</span>';
-    const str = String(val);
-    if (str.length > 200) return '<span title="' + LP.escHtml(str) + '">' + LP.escHtml(str.substring(0, 200)) + '...</span>';
-    return LP.escHtml(str);
+  function openJsonModal(encCol, encData) {
+    const col = decodeURIComponent(encCol || 'JSON Data');
+    const jsonStr = decodeURIComponent(encData || '{}');
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (_) {
+      parsed = jsonStr;
+    }
+
+    const pretty = typeof parsed === 'object' ? JSON.stringify(parsed, null, 2) : String(parsed);
+    const compact = typeof parsed === 'object' ? JSON.stringify(parsed) : String(parsed);
+
+    _activeJsonData = {
+      raw: parsed,
+      jsonStr: pretty,
+      compactStr: compact,
+      isPretty: true,
+      colName: col,
+    };
+
+    const modalEl = document.getElementById('dbJsonViewerModal');
+    if (!modalEl) return;
+    if (!jsonViewerModal) {
+      jsonViewerModal = new bootstrap.Modal(modalEl);
+    }
+
+    const titleEl = document.getElementById('dbJsonModalTitle');
+    if (titleEl) titleEl.textContent = `JSON Object Viewer: ${col}`;
+    const subEl = document.getElementById('dbJsonModalSubtitle');
+    if (subEl) {
+      subEl.textContent = Array.isArray(parsed)
+        ? `Array (${parsed.length} items)`
+        : (typeof parsed === 'object' && parsed !== null ? `Object (${Object.keys(parsed).length} keys)` : 'Value');
+    }
+
+    const codeEl = document.getElementById('dbJsonModalCode');
+    if (codeEl) codeEl.textContent = _activeJsonData.jsonStr;
+
+    const statsEl = document.getElementById('dbJsonModalStats');
+    if (statsEl) {
+      const sizeBytes = new Blob([_activeJsonData.jsonStr]).size;
+      statsEl.textContent = `Size: ${sizeBytes} bytes`;
+    }
+
+    jsonViewerModal.show();
+  }
+
+  function copyJsonFromModal() {
+    if (!_activeJsonData?.jsonStr) return;
+    navigator.clipboard.writeText(_activeJsonData.jsonStr).then(() => {
+      LP.toast('JSON berhasil disalin ke clipboard!', 'success');
+    }).catch(() => {
+      LP.toast('Gagal menyalin JSON', 'error');
+    });
+  }
+
+  function toggleJsonModalFormat() {
+    if (!_activeJsonData?.raw) return;
+    _activeJsonData.isPretty = !_activeJsonData.isPretty;
+    const codeEl = document.getElementById('dbJsonModalCode');
+    if (codeEl) {
+      codeEl.textContent = _activeJsonData.isPretty ? _activeJsonData.jsonStr : _activeJsonData.compactStr;
+    }
   }
 
   function goToPage(page) {
@@ -555,7 +661,7 @@ const DB = (() => {
         const body = document.getElementById('queryResultsBody');
         if (columns && columns.length > 0) {
           head.innerHTML = `<tr>${columns.map(c => `<th>${LP.escHtml(c)}</th>`).join('')}</tr>`;
-          body.innerHTML = rows.map(row => `<tr>${columns.map(c => `<td>${formatCellValue(row[c])}</td>`).join('')}</tr>`).join('');
+          body.innerHTML = rows.map(row => `<tr>${columns.map(c => `<td>${formatCellValue(row[c], c)}</td>`).join('')}</tr>`).join('');
         } else {
           head.innerHTML = '<tr><th>Result</th></tr>';
           body.innerHTML = `<tr><td class="text-muted">${affected} row(s) affected</td></tr>`;
@@ -686,7 +792,7 @@ const DB = (() => {
           <td style="text-align:center;color:var(--text-muted);font-size:11px;">${(currentPage - 1) * parseInt(document.getElementById('browseLimit')?.value || 50) + idx + 1}</td>
           ${currentColumns.map(col => `
             <td ondblclick="DB.makeCellEditable(this, '${LP.escHtml(col)}', '${LP.escHtml(pkCol)}', '${LP.escHtml(String(pkVal))}')" title="Double click to edit" style="cursor:pointer;">
-              ${formatCellValue(row[col])}
+              ${formatCellValue(row[col], col)}
             </td>
           `).join('')}
           <td style="text-align:center;">
@@ -700,19 +806,37 @@ const DB = (() => {
   }
 
   function makeCellEditable(td, colName, pkCol, pkVal) {
-    if (td.querySelector('input')) return;
-    const oldText = td.textContent.trim();
-    const isNull = oldText === 'NULL';
-    const initialVal = isNull ? '' : oldText;
+    if (td.querySelector('input, textarea')) return;
 
-    td.innerHTML = `<input type="text" class="lp-input" value="${LP.escHtml(initialVal)}" style="padding:2px 6px;font-size:11px;width:100%;margin:0;">`;
-    const input = td.querySelector('input');
+    // Check if cell has JSON data button
+    const btn = td.querySelector('button[onclick*="openJsonModal"]');
+    let initialVal = '';
+    let isJson = false;
+    if (btn) {
+      isJson = true;
+      const match = btn.getAttribute('onclick')?.match(/openJsonModal\('[^']*',\s*'([^']*)'\)/);
+      if (match && match[1]) {
+        try { initialVal = decodeURIComponent(match[1]); } catch (_) { initialVal = match[1]; }
+      }
+    } else {
+      const oldText = td.textContent.trim();
+      const isNull = oldText === 'NULL';
+      initialVal = isNull ? '' : oldText;
+    }
+
+    const isLong = initialVal.length > 50 || isJson;
+    td.innerHTML = isLong
+      ? `<textarea class="lp-input font-mono" style="padding:4px 6px;font-size:11px;width:100%;margin:0;min-height:60px;" rows="3">${LP.escHtml(initialVal)}</textarea>`
+      : `<input type="text" class="lp-input font-mono" value="${LP.escHtml(initialVal)}" style="padding:2px 6px;font-size:11px;width:100%;margin:0;">`;
+
+    const input = td.querySelector('input, textarea');
     input.focus();
+    if (input.select) input.select();
 
     async function commit() {
       const newVal = input.value;
       if (newVal === initialVal) {
-        td.innerHTML = formatCellValue(isNull ? null : initialVal);
+        td.innerHTML = formatCellValue(initialVal, colName);
         return;
       }
       try {
@@ -729,21 +853,21 @@ const DB = (() => {
         });
         if (res?.success) {
           LP.toast('Cell updated', 'success');
-          td.innerHTML = formatCellValue(newVal);
+          td.innerHTML = formatCellValue(newVal, colName);
         } else {
           LP.toast(res?.message || 'Update failed', 'error');
-          td.innerHTML = formatCellValue(isNull ? null : initialVal);
+          td.innerHTML = formatCellValue(initialVal, colName);
         }
       } catch (err) {
         LP.toast(err.message || 'Error updating cell', 'error');
-        td.innerHTML = formatCellValue(isNull ? null : initialVal);
+        td.innerHTML = formatCellValue(initialVal, colName);
       }
     }
 
     input.addEventListener('blur', commit);
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { input.removeEventListener('blur', commit); commit(); }
-      if (e.key === 'Escape') { input.removeEventListener('blur', commit); td.innerHTML = formatCellValue(isNull ? null : initialVal); }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); input.removeEventListener('blur', commit); commit(); }
+      if (e.key === 'Escape') { input.removeEventListener('blur', commit); td.innerHTML = formatCellValue(initialVal, colName); }
     });
   }
 
@@ -867,7 +991,7 @@ const DB = (() => {
 
         if (columns && columns.length > 0) {
           head.innerHTML = `<tr>${columns.map(c => `<th>${LP.escHtml(c)}</th>`).join('')}</tr>`;
-          body.innerHTML = rows.map(row => `<tr>${columns.map(c => `<td>${formatCellValue(row[c])}</td>`).join('')}</tr>`).join('');
+          body.innerHTML = rows.map(row => `<tr>${columns.map(c => `<td>${formatCellValue(row[c], c)}</td>`).join('')}</tr>`).join('');
         } else {
           head.innerHTML = '<tr><th>Plan</th></tr>';
           body.innerHTML = `<tr><td class="font-mono">${JSON.stringify(rows, null, 2)}</td></tr>`;
@@ -1294,7 +1418,8 @@ const DB = (() => {
     backupDatabase, showRestoreModal, executeRestore,
     showAutoBackupModal, saveAutoBackup, runAutoBackupNow,
     showVersionModal, quickConnectDocker, quickConnectPanel, toggleEnvDetails,
-    showMigrationsModal, loadMigrations, runPendingMigrations, rollbackLastMigration
+    showMigrationsModal, loadMigrations, runPendingMigrations, rollbackLastMigration,
+    openJsonModal, copyJsonFromModal, toggleJsonModalFormat, formatCellValue
   };
 })();
 

@@ -28,6 +28,8 @@ jest.unstable_mockModule('systeminformation', () => ({
   ...mockSi,
 }));
 
+let mockFileContent = '';
+
 jest.unstable_mockModule('child_process', () => ({
   exec: jest.fn((cmd, opts, cb) => {
     const callback = typeof opts === 'function' ? opts : cb;
@@ -40,10 +42,26 @@ jest.unstable_mockModule('child_process', () => ({
     }
     return callback(null, { stdout: '', stderr: '' });
   }),
+  execFile: jest.fn((file, args, opts, cb) => {
+    const callback = typeof args === 'function' ? args : (typeof opts === 'function' ? opts : cb);
+    const cmdStr = `${file} ${Array.isArray(args) ? args.join(' ') : ''}`;
+    for (const handler of mockExecHandlers) {
+      const match = handler(cmdStr);
+      if (match !== undefined) {
+        if (match instanceof Error) return callback ? callback(match) : undefined;
+        return callback ? callback(null, match) : undefined;
+      }
+    }
+    if (file === 'tail' && mockFileContent) {
+      return callback ? callback(null, { stdout: mockFileContent, stderr: '' }) : undefined;
+    }
+    if (callback) callback(null, { stdout: '', stderr: '' });
+  }),
 }));
 
 const mockFs = {
   access: jest.fn().mockResolvedValue(undefined),
+  readFile: jest.fn(async () => mockFileContent),
 };
 
 jest.unstable_mockModule('fs/promises', () => ({
@@ -72,6 +90,7 @@ function mockRes() {
 
 beforeEach(() => {
   mockExecHandlers.length = 0;
+  mockFileContent = '';
   jest.clearAllMocks();
 });
 
@@ -192,13 +211,13 @@ describe('AnalyticsService — Service Health & Logs', () => {
   });
 
   test('getWebLogs parses common log format and identifies error levels', async () => {
+    const rawLogs =
+      '192.168.1.50 - - [14/Sep/2026:12:00:00 +0000] "GET /index.html HTTP/1.1" 200 1024\n' +
+      '192.168.1.51 - - [14/Sep/2026:12:00:01 +0000] "POST /api/login HTTP/1.1" 401 256\n';
+    mockFileContent = rawLogs;
     mockExecHandlers.push(cmd => {
-      if (cmd.includes('tail -n')) {
-        return {
-          stdout:
-            '192.168.1.50 - - [14/Sep/2026:12:00:00 +0000] "GET /index.html HTTP/1.1" 200 1024\n' +
-            '192.168.1.51 - - [14/Sep/2026:12:00:01 +0000] "POST /api/login HTTP/1.1" 401 256\n'
-        };
+      if (cmd.includes('tail')) {
+        return { stdout: rawLogs };
       }
     });
 
@@ -213,13 +232,13 @@ describe('AnalyticsService — Service Health & Logs', () => {
   });
 
   test('getSystemLogs parses structured lines with level and service names', async () => {
+    const rawLogs =
+      'Sep 14 10:00:00 server sshd[1234]: Accepted publickey for admin\n' +
+      'Sep 14 10:01:00 server kernel: [123.456] Error: disk timeout warning\n';
+    mockFileContent = rawLogs;
     mockExecHandlers.push(cmd => {
-      if (cmd.includes('tail -n')) {
-        return {
-          stdout:
-            'Sep 14 10:00:00 server sshd[1234]: Accepted publickey for admin\n' +
-            'Sep 14 10:01:00 server kernel: [123.456] Error: disk timeout warning\n'
-        };
+      if (cmd.includes('tail')) {
+        return { stdout: rawLogs };
       }
     });
 

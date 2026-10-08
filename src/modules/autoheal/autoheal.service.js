@@ -601,7 +601,11 @@ class AutoHealService {
   }
 
   async resurrectDeadServices() {
-    return this.healAll();
+    const healRes = await this.healAll();
+    return {
+      ...healRes,
+      revived: healRes.actionsTaken || [],
+    };
   }
 }
 

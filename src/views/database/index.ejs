@@ -663,4 +663,37 @@ services:
   </div>
 </div>
 
+<!-- JSON / Object Viewer Modal -->
+<div class="modal fade" id="dbJsonViewerModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content" style="background:#0b0f19;border:1px solid var(--glass-border);color:#fff;">
+      <div class="modal-header" style="border-bottom:1px solid var(--glass-border);">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-braces text-info" style="font-size:18px;"></i>
+          <div>
+            <h5 class="modal-title font-mono" style="font-size:14px;margin:0;" id="dbJsonModalTitle">JSON / Object Viewer</h5>
+            <small class="text-muted" id="dbJsonModalSubtitle" style="font-size:11px;">Column preview</small>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" id="btnCopyJsonModal" onclick="DB.copyJsonFromModal()">
+            <i class="bi bi-clipboard me-1"></i> Copy JSON
+          </button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" id="btnToggleFormatJsonModal" onclick="DB.toggleJsonModalFormat()">
+            <i class="bi bi-code-slash me-1"></i> Toggle Compact/Pretty
+          </button>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+      </div>
+      <div class="modal-body p-3" style="background:#070a13;">
+        <pre id="dbJsonModalCode" class="font-mono mb-0 p-3 rounded" style="background:#03050a;border:1px solid rgba(255,255,255,0.08);max-height:65vh;overflow:auto;font-size:12px;line-height:1.6;color:#38bdf8;white-space:pre-wrap;word-break:break-word;"></pre>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <span class="text-muted me-auto" id="dbJsonModalStats" style="font-size:11px;"></span>
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/js/database.js"></script>

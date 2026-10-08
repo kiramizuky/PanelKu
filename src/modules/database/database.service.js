@@ -922,7 +922,7 @@ class DatabaseService {
         csv += columns.map(c => {
           const val = row[c];
           if (val === null || val === undefined) return '';
-          const str = String(val);
+          const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
           return str.includes(',') || str.includes('"') || str.includes('\n') ? '"' + str.replace(/"/g, '""') + '"' : str;
         }).join(',') + '\n';
       }
@@ -936,6 +936,7 @@ class DatabaseService {
         const vals = columns.map(c => {
           const v = row[c];
           if (v === null || v === undefined) return 'NULL';
+          if (typeof v === 'object') return "'" + JSON.stringify(v).replace(/'/g, "''") + "'";
           return typeof v === 'string' ? "'" + v.replace(/'/g, "''") + "'" : String(v);
         }).join(', ');
         sql += `INSERT INTO \`${tableName}\` (\`${columns.join('`, `')}\`) VALUES (${vals});\n`;
@@ -1136,7 +1137,8 @@ class DatabaseService {
     const valList = keys.map(k => {
       const v = rowData[k];
       if (v === null || v === undefined) return 'NULL';
-      return "'" + String(v).replace(/'/g, "''") + "'";
+      const rawStr = typeof v === 'object' ? JSON.stringify(v) : String(v);
+      return "'" + rawStr.replace(/'/g, "''") + "'";
     }).join(', ');
 
     const sql = `INSERT INTO ${tableRef} (${colList}) VALUES (${valList})`;
@@ -1157,8 +1159,8 @@ class DatabaseService {
 
     const setClauses = keys.map(k => {
       const v = updatedFields[k];
-      const valStr = (v === null || v === undefined) ? 'NULL' : ("'" + String(v).replace(/'/g, "''") + "'");
-      return `${this._quoteIdentifier(k, norm)} = ${valStr}`;
+      const rawStr = (v === null || v === undefined) ? 'NULL' : ("'" + (typeof v === 'object' ? JSON.stringify(v) : String(v)).replace(/'/g, "''") + "'");
+      return `${this._quoteIdentifier(k, norm)} = ${rawStr}`;
     }).join(', ');
 
     const pkValStr = typeof pkValue === 'number' ? pkValue : ("'" + String(pkValue).replace(/'/g, "''") + "'");
@@ -1453,7 +1455,8 @@ class DatabaseService {
               const v = d[c];
               if (v === null || v === undefined) return 'NULL';
               if (typeof v === 'number') return v;
-              return "'" + String(v).replace(/'/g, "''") + "'";
+              const rawStr = typeof v === 'object' ? JSON.stringify(v) : String(v);
+              return "'" + rawStr.replace(/'/g, "''") + "'";
             }).join(', ');
             dump += `INSERT INTO "${tbl}" (${colList}) VALUES (${valList});\n`;
           }
