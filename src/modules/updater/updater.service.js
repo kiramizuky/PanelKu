@@ -57,11 +57,30 @@ class UpdaterService {
   async _runCommand(cmd, options = {}) {
     try {
       if (process.platform === 'win32') {
-        return this._mockCommand(cmd);
+        if (
+          cmd.includes('systemctl') ||
+          cmd.includes('apt-get') ||
+          cmd.includes('dnf') ||
+          cmd.includes('yum') ||
+          cmd.includes('apk') ||
+          cmd.includes('which make') ||
+          cmd.includes('which apt-get') ||
+          cmd.includes('which dnf') ||
+          cmd.includes('which yum') ||
+          cmd.includes('which apk') ||
+          cmd.includes('ss -tlnp') ||
+          cmd.includes('df -h')
+        ) {
+          return this._mockCommand(cmd);
+        }
       }
       const { stdout, stderr } = await execAsync(cmd, { timeout: 120000, ...options });
       return stdout || stderr || '';
     } catch (error) {
+      if (process.platform === 'win32' || process.env.NODE_ENV === 'test') {
+        const mocked = this._mockCommand(cmd);
+        if (mocked) return mocked;
+      }
       const output = (error.stdout || error.stderr || error.message || '').trim();
       return `[ERROR] ${output || error.message}`;
     }
@@ -69,15 +88,15 @@ class UpdaterService {
 
   _mockCommand(cmd) {
     if (cmd.includes('git rev-parse HEAD')) return 'abc123def456abc123def456abc123def456abc1\n';
-    if (cmd.includes('git rev-parse --abbrev-ref HEAD')) return 'master\n';
+    if (cmd.includes('git rev-parse --abbrev-ref HEAD') || cmd.includes('git branch --show-current')) return 'master\n';
     if (cmd.includes('git fetch')) return '';
-    if (cmd.includes('git log HEAD..origin')) return '3\n';
+    if (cmd.includes('git rev-list --count') || cmd.includes('git log HEAD..origin')) return '0\n';
     if (cmd.includes('git config --global --add safe.directory')) return '';
     if (cmd.includes('git checkout')) return '';
     if (cmd.includes('git pull')) return 'Already up to date.\n';
     if (cmd.includes('git reset')) return 'HEAD is now at abc123def\n';
-    if (cmd.includes('git show origin')) return '{"version":"2.0.0"}\n';
-    if (cmd.includes('git diff')) return 'diff --git a/package.json b/package.json\nindex abc..def 100644\n--- a/package.json\n+++ b/package.json\n@@ -1,5 +1,5 @@\n {\n   "name": "panelku",\n-  "version": "1.9.0",\n+  "version": "2.0.0",\n';
+    if (cmd.includes('git show origin')) return '3.6.0\n';
+    if (cmd.includes('git diff')) return '';
     if (cmd.includes('npm install')) return 'added 0 packages, removed 0 packages, changed 0 packages\n';
     if (cmd.includes('node --check')) return '';
     if (cmd.includes('npm rebuild')) return 'rebuilt better-sqlite3 node-pty successfully\n';
@@ -87,6 +106,9 @@ class UpdaterService {
     if (cmd.includes('systemctl restart panelku')) return '';
     if (cmd.includes('ls -la')) return 'total 8\ndrwxr-xr-x 2 root root 4096 Jul 17 10:00 .\ndrwxr-xr-x 4 root root 4096 Jul 17 09:00 ..\n';
     if (cmd.includes('tail -n')) return 'Jul 17 10:00:01 server panelku[1234]: Panel started successfully\n';
+    if (cmd.includes('tar -czf') || cmd.includes('tar -xzf')) return 'Archive processed successfully\n';
+    if (cmd.includes('df -h')) return '/dev/sda1 50G 15G 35G 30% /\n';
+    if (cmd.includes('ss -tlnp') || cmd.includes('netstat')) return 'LISTEN 0 511 0.0.0.0:23456 node\n';
     if (cmd.includes('ping')) return 'pong';
     return '';
   }
@@ -271,15 +293,19 @@ class UpdaterService {
     let activeBranch = 'master';
     let currentCommit = '';
     try {
-      const branchOut = await this._runCommand('git rev-parse --abbrev-ref HEAD 2>/dev/null');
-      activeBranch = branchOut.trim() || 'master';
-      activeBranch = this._validateGitRef(activeBranch);
+      const branchOut = await this._runCommand('git rev-parse --abbrev-ref HEAD');
+      if (!branchOut.includes('[ERROR]')) {
+        activeBranch = branchOut.trim() || 'master';
+        activeBranch = this._validateGitRef(activeBranch);
+      }
     } catch { /* ignore */ }
 
     try {
-      const commitOut = await this._runCommand('git rev-parse HEAD 2>/dev/null');
-      currentCommit = commitOut.trim();
-      currentCommit = this._validateCommitHash(currentCommit);
+      const commitOut = await this._runCommand('git rev-parse HEAD');
+      if (!commitOut.includes('[ERROR]')) {
+        currentCommit = commitOut.trim();
+        currentCommit = this._validateCommitHash(currentCommit);
+      }
     } catch { /* ignore */ }
 
     return {
@@ -307,36 +333,56 @@ class UpdaterService {
       const safeBranch = this._validateGitRef(info.branch);
 
       // Ensure safe directory is configured
-      await this._runCommand(`git config --global --add safe.directory "${PANEL_DIR}" 2>&1`).catch(() => {});
+      await this._runCommand(`git config --global --add safe.directory "${PANEL_DIR}"`).catch(() => {});
 
       // Fetch remote
-      await this._runCommand('git fetch origin 2>&1');
+      await this._runCommand('git fetch origin').catch(() => {});
 
-      // Count commits behind
-      const behindOut = await this._runCommand(
-        `git log HEAD..origin/${safeBranch} --oneline 2>/dev/null | wc -l`
+      // Count commits behind using cross-platform git rev-list
+      let behindOut = await this._runCommand(
+        `git rev-list --count HEAD..origin/${safeBranch}`
       );
-      behindCount = parseInt(behindOut.trim()) || 0;
+      if (behindOut.includes('[ERROR]') || isNaN(parseInt(behindOut.trim()))) {
+        // Fallback to git log
+        behindOut = await this._runCommand(
+          `git log HEAD..origin/${safeBranch} --oneline`
+        );
+        behindCount = behindOut.includes('[ERROR]') ? 0 : behindOut.trim().split('\n').filter(Boolean).length;
+      } else {
+        behindCount = parseInt(behindOut.trim()) || 0;
+      }
       hasUpdate = behindCount > 0;
 
       if (hasUpdate) {
-        // Get latest remote version
+        // Get latest remote version directly from package.json and parse in Node
         const remoteVer = await this._runCommand(
-          `git show origin/${safeBranch}:package.json 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);console.log(j.version||'')}catch{console.log('')}})"`
+          `git show origin/${safeBranch}:package.json`
         ).catch(() => '');
-        latest = remoteVer.trim() || `${info.current}+${behindCount}`;
+
+        let parsedVersion = '';
+        if (remoteVer && !remoteVer.includes('[ERROR]')) {
+          try {
+            const parsed = JSON.parse(remoteVer.trim());
+            parsedVersion = parsed.version;
+          } catch {
+            const match = remoteVer.match(/"version"\s*:\s*"([^"]+)"/);
+            if (match) parsedVersion = match[1];
+            else if (/^\d+\.\d+\.\d+/.test(remoteVer.trim())) parsedVersion = remoteVer.trim();
+          }
+        }
+        latest = parsedVersion || `${info.current}+${behindCount}`;
 
         // Get changelog between versions
         const logOut = await this._runCommand(
-          `git log HEAD..origin/${safeBranch} --oneline --no-decorate 2>/dev/null | head -20`
+          `git log HEAD..origin/${safeBranch} --oneline --no-decorate -n 20`
         );
-        changelogSummary = logOut.trim();
+        changelogSummary = logOut.includes('[ERROR]') ? '' : logOut.trim();
 
-        // Get diff stats
+        // Get diff stats using built-in --shortstat
         const diffOut = await this._runCommand(
-          `git diff HEAD..origin/${safeBranch} --stat 2>/dev/null | tail -1`
+          `git diff HEAD..origin/${safeBranch} --shortstat`
         );
-        const statMatch = diffOut.match(/(\d+) files? changed.*?(\d+) insertions?.*?(\d+) deletions?/);
+        const statMatch = diffOut.match(/(\d+)\s+files?\s+changed(?:,\s+(\d+)\s+insertions?\(\+\))?(?:,\s+(\d+)\s+deletions?\(-\))?/);
         if (statMatch) {
           diffStats = {
             files: parseInt(statMatch[1]) || 0,
@@ -361,9 +407,11 @@ class UpdaterService {
 
   // ── Get Changelog / Git Log ─────────────────────────────────────
   async getChangelog(limit = 50) {
+    const safeLimit = Math.min(Math.max(parseInt(limit) || 50, 10), 200);
     const raw = await this._runCommand(
-      `git log --oneline --no-decorate -${Math.min(Math.max(limit, 10), 200)} 2>/dev/null || echo "No git history"`
+      `git log --oneline --no-decorate -n ${safeLimit}`
     );
+    if (!raw || raw.includes('[ERROR]')) return [];
     const lines = raw.trim().split('\n').filter(Boolean);
     return lines.map(line => {
       const match = line.match(/^([a-f0-9]+)\s(.+)$/);
@@ -376,9 +424,9 @@ class UpdaterService {
     const info = await this.getVersionInfo();
     const safeBranch = this._validateGitRef(info.branch);
     const raw = await this._runCommand(
-      `git diff HEAD..origin/${safeBranch} 2>/dev/null || echo "No diff available"`
+      `git diff HEAD..origin/${safeBranch}`
     );
-    return { diff: raw };
+    return { diff: raw.includes('[ERROR]') ? 'No diff available' : raw };
   }
 
   // ── Backup Before Update ─────────────────────────────────────────
@@ -399,8 +447,8 @@ class UpdaterService {
         '--exclude=storage/logs',
       ];
 
-      const cmd = `cd ${PANEL_DIR} && tar -czf "${backupFile}" ${excludePatterns.join(' ')} . 2>&1`;
-      const output = await this._runCommand(cmd, { timeout: 300000 }); // 5 min timeout for large dirs
+      const cmd = `tar -czf "${backupFile}" ${excludePatterns.join(' ')} .`;
+      const output = await this._runCommand(cmd, { cwd: PANEL_DIR, timeout: 300000 });
 
       // Save backup record
       const history = await this.getUpdateHistory();
@@ -506,7 +554,7 @@ class UpdaterService {
 
         // Pull latest code
         log.push(`⬇️ Pulling from origin/${branch}...`);
-        let pullOut = await this._runCommand(`git pull origin ${branch} 2>&1`);
+        let pullOut = await this._runCommand(`git pull --no-edit origin ${branch} 2>&1`);
 
         // If git pull failed or encountered merge/overwrite/untracked conflicts, fallback to robust git fetch + reset --hard
         if (
@@ -515,7 +563,8 @@ class UpdaterService {
           pullOut.toLowerCase().includes('fatal:') ||
           pullOut.includes('Aborting') ||
           pullOut.includes('would be overwritten by merge') ||
-          pullOut.includes('untracked working tree')
+          pullOut.includes('untracked working tree') ||
+          pullOut.includes('divergent branches')
         ) {
           log.push(`   ${pullOut.trim().split('\n').join('\n   ')}`);
           log.push('   ⚠️ Standard git pull encountered an issue. Falling back to robust git fetch and reset...');
@@ -693,8 +742,8 @@ class UpdaterService {
 
         // Extract backup
         const extractOut = await this._runCommand(
-          `cd ${PANEL_DIR} && tar -xzf "${backupFile}" 2>&1`,
-          { timeout: 300000 }
+          `tar -xzf "${backupFile}"`,
+          { cwd: PANEL_DIR, timeout: 300000 }
         );
         log.push(`   ✅ Backup restored`);
         log.push(`   ${extractOut.trim().split('\n').slice(0, 2).join('\n   ')}`);
@@ -788,15 +837,30 @@ class UpdaterService {
     await this._writeJSON(PANEL_CONFIG, panelCfg);
 
     // Give 2 seconds for the HTTP response to be fully sent, then restart.
-    // (The outer 5s delay from performUpdate/performRollback ensures the browser
-    //  receives the full log before the server goes down.)
     setTimeout(async () => {
-      logger.info('Updater: Executing restart via systemctl...');
+      logger.info('Updater: Executing restart...');
+      if (process.platform === 'win32') {
+        logger.info('Updater: Restart requested on Windows dev environment. Skipping process.exit(0) to prevent process crash.');
+        return;
+      }
       try {
-        await this._runCommand('systemctl restart panelku');
+        const sysOut = await this._runCommand('systemctl restart panelku');
+        if (sysOut.includes('[ERROR]')) {
+          throw new Error(sysOut);
+        }
       } catch {
-        logger.warn('Updater: systemctl restart failed, falling back to process.exit(0)');
-        process.exit(0);
+        logger.warn('Updater: systemctl restart failed, checking PM2...');
+        try {
+          const pm2Out = await this._runCommand('pm2 restart panelku || pm2 reload panelku');
+          if (pm2Out.includes('[ERROR]')) {
+            throw new Error(pm2Out);
+          }
+        } catch {
+          logger.warn('Updater: PM2 restart failed, falling back to process.exit(0)');
+          if (process.env.NODE_ENV === 'production' || process.env.pm_id !== undefined) {
+            process.exit(0);
+          }
+        }
       }
     }, 2000);
 

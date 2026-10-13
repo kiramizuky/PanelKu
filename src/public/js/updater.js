@@ -481,20 +481,23 @@ const UpdaterPage = (() => {
 
     try {
       const res = await LP.post('/updater/update', { method, branch, channel });
-      if (res?.success) {
+      if (res?.success && res.data?.success) {
         logEl.textContent += res.data?.log || 'Update completed.\n';
+        logEl.textContent += '\n✅ Update completed! Waiting for panel to restart...';
+        LP.toast('Update completed! Panel restarting...', 'success');
+        startReconnectPolling(logEl);
+      } else {
+        const errLog = res?.data?.log || '';
+        const errMsg = res?.message || res?.data?.error || 'Update encountered issues';
+        if (errLog) logEl.textContent += errLog + '\n';
+        logEl.textContent += `\n❌ ${errMsg}`;
 
-        if (res.data?.rollback) {
+        if (res?.data?.rollback) {
           logEl.textContent += '\n⚠️ Update failed and was rolled back automatically.';
           LP.toast('Update failed, rolled back', 'warning');
         } else {
-          logEl.textContent += '\n✅ Update completed! Waiting for panel to restart...';
-          LP.toast('Update completed! Panel restarting...', 'success');
-          startReconnectPolling(logEl);
+          LP.toast(errMsg, 'error');
         }
-      } else {
-        logEl.textContent += `\n❌ Error: ${res?.message || 'Unknown error'}`;
-        LP.toast(res?.message || 'Update failed', 'error');
         btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i> Update Panel';
         btn.disabled = false;
       }
@@ -594,13 +597,13 @@ const UpdaterPage = (() => {
     try {
       const payload = method === 'commit' ? { commit } : { restoreBackup: backup };
       const res = await LP.post('/updater/rollback', payload);
-      if (res?.success) {
+      if (res?.success && res.data?.success) {
         logEl.textContent += res.data?.log || 'Rollback completed.\n';
         logEl.textContent += '\n✅ Panel restarting...';
         LP.toast('Rollback completed! Panel restarting...', 'success');
         startReconnectPolling(logEl);
       } else {
-        logEl.textContent += `\n❌ ${res?.message || 'Rollback failed'}`;
+        logEl.textContent += `\n❌ ${res?.message || res?.data?.error || 'Rollback failed'}`;
         LP.toast(res?.message || 'Rollback failed', 'error');
       }
     } catch (err) {
@@ -633,37 +636,55 @@ const UpdaterPage = (() => {
 
   // ── Reconnect Polling ───────────────────────────────────────────
   function startReconnectPolling(logEl) {
-    const maxWait = 60000;
-    const interval = 2000;
-    const start = Date.now();
-    let _dots = 0;
+    const maxWait = 90000;
+    const interval = 2500;
+    const initialDelay = 5000; // Wait 5s for the server to initiate restart before polling
+    let poll = null;
 
-    const poll = setInterval(async () => {
-      _dots++;
-      const elapsed = Math.round((Date.now() - start) / 1000);
+    if (logEl) {
+      logEl.textContent += '\n⏳ Waiting for server restart sequence to begin...';
+    }
 
-      if (Date.now() - start > maxWait) {
-        clearInterval(poll);
-        if (logEl) logEl.textContent += `\n❌ Server did not come back online after ${maxWait / 1000}s. Please check PM2/server logs.`;
-        return;
-      }
+    setTimeout(() => {
+      const start = Date.now();
+      let hasSeenOffline = false;
 
-      try {
-        const r = await fetch('/api/health', { signal: AbortSignal.timeout(3000) });
-        if (r.ok) {
+      poll = setInterval(async () => {
+        const elapsed = Math.round((Date.now() - start) / 1000);
+
+        if (Date.now() - start > maxWait) {
           clearInterval(poll);
-          if (logEl) logEl.textContent += `\n✅ Panel is back online after ${elapsed}s! Reloading...`;
-          setTimeout(() => window.location.reload(), 800);
+          if (logEl) logEl.textContent += `\n❌ Server did not come back online after ${maxWait / 1000}s. Please check server logs.`;
+          const btn = document.getElementById('btnUpdate');
+          if (btn) {
+            btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i> Update Panel';
+            btn.disabled = false;
+          }
+          return;
         }
-      } catch {
-        if (logEl) {
-          const lastNl = logEl.textContent.lastIndexOf('\n');
-          const base = logEl.textContent.substring(0, lastNl + 1);
-          logEl.textContent = base + `🔄 Waiting for restart... ${elapsed}s`;
-          logEl.scrollTop = logEl.scrollHeight;
+
+        try {
+          const r = await fetch('/api/health', { signal: AbortSignal.timeout(3000) });
+          if (r.ok) {
+            if (hasSeenOffline || elapsed >= 8) {
+              clearInterval(poll);
+              if (logEl) logEl.textContent += `\n✅ Panel is back online! Reloading...`;
+              setTimeout(() => window.location.reload(), 1000);
+            }
+          } else {
+            hasSeenOffline = true;
+          }
+        } catch {
+          hasSeenOffline = true;
+          if (logEl) {
+            const lastNl = logEl.textContent.lastIndexOf('\n');
+            const base = logEl.textContent.substring(0, lastNl + 1);
+            logEl.textContent = base + `🔄 Waiting for restart... ${elapsed}s`;
+            logEl.scrollTop = logEl.scrollHeight;
+          }
         }
-      }
-    }, interval);
+      }, interval);
+    }, initialDelay);
   }
 
   // ── Helpers ─────────────────────────────────────────────────────
