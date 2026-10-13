@@ -2,25 +2,30 @@ import si from 'systeminformation';
 import MonitorHistory from '../../models/MonitorHistory.js';
 import logger from '../../config/logger.js';
 import { getPrimaryDisk } from '../../helpers/system.js';
+import cache from '../../helpers/cache.js';
 
 class MonitorService {
   /**
    * Get current realtime metrics (for polling fallback).
    */
   async getCurrent() {
-    const [cpu, mem, disk, net, temp, diskIO] = await Promise.allSettled([
-      si.currentLoad(),
-      si.mem(),
-      si.fsSize(),
-      si.networkStats('*'),
-      si.cpuTemperature(),
-      si.disksIO(),
-    ]);
+    // 3-second dedup cache: both the WS broadcast and the HTTP polling endpoint
+    // call getCurrent(), so without this they race to call si.currentLoad() etc. simultaneously.
+    return cache.remember('monitor:current', 3, async () => {
+      const [cpu, mem, disk, net, temp, diskIO] = await Promise.allSettled([
+        si.currentLoad(),
+        si.mem(),
+        si.fsSize(),
+        si.networkStats('*'),
+        si.cpuTemperature(),
+        si.disksIO(),
+      ]);
 
-    return this._buildMetrics(
-      cpu.value, mem.value, disk.value,
-      net.value, temp.value, diskIO.value
-    );
+      return this._buildMetrics(
+        cpu.value, mem.value, disk.value,
+        net.value, temp.value, diskIO.value
+      );
+    });
   }
 
   /**
@@ -78,35 +83,41 @@ class MonitorService {
    * Get SMART disk health data.
    */
   async getDiskHealth() {
-    try {
-      const [disks, smart] = await Promise.allSettled([
-        si.diskLayout(),
-        si.disksIO(),
-      ]);
-      return {
-        disks: disks.value || [],
-        io: smart.value || {},
-      };
-    } catch (err) {
-      logger.error('MonitorService.getDiskHealth error:', err);
-      return { disks: [], io: {} };
-    }
+    // si.diskLayout() interrogates physical drives (slow on some hardware)
+    return cache.remember('monitor:disk_health', 30, async () => {
+      try {
+        const [disks, smart] = await Promise.allSettled([
+          si.diskLayout(),
+          si.disksIO(),
+        ]);
+        return {
+          disks: disks.value || [],
+          io: smart.value || {},
+        };
+      } catch (err) {
+        logger.error('MonitorService.getDiskHealth error:', err);
+        return { disks: [], io: {} };
+      }
+    });
   }
 
   /**
    * Get network interface stats.
    */
   async getNetworkStats() {
-    const [ifaces, stats, connections] = await Promise.allSettled([
-      si.networkInterfaces(),
-      si.networkStats('*'),
-      si.networkConnections(),
-    ]);
-    return {
-      interfaces: (ifaces.value || []).filter((i) => (!i.virtual || (i.ip4 && i.ip4 !== '127.0.0.1')) && i.iface !== 'lo'),
-      stats: stats.value || [],
-      connections: (connections.value || []).length,
-    };
+    // si.networkConnections() enumerates all kernel socket table entries — can be slow.
+    return cache.remember('monitor:network_stats', 5, async () => {
+      const [ifaces, stats, connections] = await Promise.allSettled([
+        si.networkInterfaces(),
+        si.networkStats('*'),
+        si.networkConnections(),
+      ]);
+      return {
+        interfaces: (ifaces.value || []).filter((i) => (!i.virtual || (i.ip4 && i.ip4 !== '127.0.0.1')) && i.iface !== 'lo'),
+        stats: stats.value || [],
+        connections: (connections.value || []).length,
+      };
+    });
   }
 
   /**
@@ -124,23 +135,27 @@ class MonitorService {
    * Get running system processes with detailed memory footprint.
    */
   async getProcesses() {
-    try {
-      const data = await si.processes();
-      return (data.list || []).map(p => ({
-        pid: p.pid,
-        name: p.name,
-        cpu: p.cpu,
-        mem: p.mem,
-        memRss: p.memRss ? Math.round(p.memRss / 1024 / 1024) : 0, // MB
-        user: p.user,
-        state: p.state,
-        priority: p.priority ?? 0,
-        command: p.command || p.name
-      }));
-    } catch (err) {
-      logger.error('MonitorService.getProcesses error:', err);
-      return [];
-    }
+    // si.processes() is essentially 'ps aux' for all processes — cache briefly to
+    // absorb rapid repeated requests from the UI.
+    return cache.remember('monitor:processes', 5, async () => {
+      try {
+        const data = await si.processes();
+        return (data.list || []).map(p => ({
+          pid: p.pid,
+          name: p.name,
+          cpu: p.cpu,
+          mem: p.mem,
+          memRss: p.memRss ? Math.round(p.memRss / 1024 / 1024) : 0, // MB
+          user: p.user,
+          state: p.state,
+          priority: p.priority ?? 0,
+          command: p.command || p.name
+        }));
+      } catch (err) {
+        logger.error('MonitorService.getProcesses error:', err);
+        return [];
+      }
+    });
   }
 
   /**

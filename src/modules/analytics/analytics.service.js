@@ -6,6 +6,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import logger from '../../config/logger.js';
 import { normalizeDisks } from '../../helpers/system.js';
+import cache from '../../helpers/cache.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -102,13 +103,13 @@ class AnalyticsService {
    * Get real-time metrics (live snapshot).
    */
   async getRealtimeMetrics() {
-    const [cpu, mem, disk, net, temp, load, diskIO] = await Promise.allSettled([
+    // NOTE: si.currentLoad() was previously called twice (duplicate). Removed the redundant 6th call.
+    const [cpu, mem, disk, net, temp, diskIO] = await Promise.allSettled([
       si.currentLoad(),
       si.mem(),
       si.fsSize(),
       si.networkStats(),
       si.cpuTemperature(),
-      si.currentLoad(),
       si.disksIO(),
     ]);
 
@@ -118,16 +119,15 @@ class AnalyticsService {
     const diskData = normalizeDisks(rawDiskData);
     const netData = (net.value || [])[0] || {};
     const tempData = temp.value || {};
-    const loadData = load.value || {};
     const ioData = diskIO.value || {};
 
-    
     return {
       cpu: {
         usage: Math.round(cpuData.currentLoad || 0),
         cores: cpuData.cpus?.length || 1,
         speed: cpuData.cpus?.[0]?.speed || 0,
-        loadAvg: [loadData.avgLoad1 || 0, loadData.avgLoad5 || 0, loadData.avgLoad15 || 0],
+        // avgLoad fields are also included in si.currentLoad() result — no second call needed
+        loadAvg: [cpuData.avgLoad1 || 0, cpuData.avgLoad5 || 0, cpuData.avgLoad15 || 0],
         temp: tempData.main || null,
       },
       memory: {
@@ -293,75 +293,73 @@ class AnalyticsService {
    * Get all system services status.
    */
   async getServiceHealth() {
-    try {
-      const { stdout } = await execAsync(
-        'systemctl list-units --type=service --all --no-pager --no-legend 2>/dev/null | head -60 || echo ""',
-        { timeout: 10000 }
-      );
+    return cache.remember('analytics:service_health', 10, async () => {
+      try {
+        const { stdout } = await execAsync(
+          'systemctl list-units --type=service --all --no-pager --no-legend 2>/dev/null | head -60 || echo ""',
+          { timeout: 10000 }
+        );
 
-      const services = stdout.split('\n')
-        .filter(Boolean)
-        .map(line => {
-          const parts = line.trim().split(/\s+/);
-          return {
-            name: parts[0] || '',
-            load: parts[1] || '',
-            active: parts[2] || '',
-            sub: parts[3] || '',
-            description: parts.slice(4).join(' ') || '',
-          };
-        })
-        .filter(s => s.name);
+        const services = stdout.split('\n')
+          .filter(Boolean)
+          .map(line => {
+            const parts = line.trim().split(/\s+/);
+            return {
+              name: parts[0] || '',
+              load: parts[1] || '',
+              active: parts[2] || '',
+              sub: parts[3] || '',
+              description: parts.slice(4).join(' ') || '',
+            };
+          })
+          .filter(s => s.name);
 
-      // Get resource usage for important services
-      const important = services.filter(s =>
-        s.name.includes('nginx') || s.name.includes('apache') ||
-        s.name.includes('mysql') || s.name.includes('postgres') ||
-        s.name.includes('redis') || s.name.includes('docker') ||
-        s.name.includes('ssh') || s.name.includes('ufw') ||
-        s.name.includes('panelku') || s.name.includes('php')
-      );
+        // Get resource usage for important services
+        const important = services.filter(s =>
+          s.name.includes('nginx') || s.name.includes('apache') ||
+          s.name.includes('mysql') || s.name.includes('postgres') ||
+          s.name.includes('redis') || s.name.includes('docker') ||
+          s.name.includes('ssh') || s.name.includes('ufw') ||
+          s.name.includes('panelku') || s.name.includes('php')
+        );
 
-      // Enrich with resource usage via ps
-      const enriched = await Promise.all(
-        important.slice(0, 20).map(async svc => {
-          try {
-            const _pidMatch = svc.name.match(/\.service$/);
-            const svcName = svc.name.replace('.service', '');
-            const { stdout: psOut } = await execAsync(
-              `ps aux | grep -E "${svcName}" | grep -v grep | head -3 2>/dev/null || echo ""`,
-              { timeout: 5000 }
-            );
-            const psLines = psOut.split('\n').filter(Boolean);
-            const cpu = psLines.reduce((sum, l) => {
-              const parts = l.trim().split(/\s+/);
-              return sum + (parseFloat(parts[2]) || 0);
-            }, 0);
-            const mem = psLines.reduce((sum, l) => {
-              const parts = l.trim().split(/\s+/);
-              return sum + (parseFloat(parts[3]) || 0);
-            }, 0);
+        // Run a SINGLE 'ps aux' and parse in-process instead of spawning up to 20
+        // separate subprocesses (one per service). This dramatically reduces CPU/RAM overhead.
+        let psAllLines = [];
+        try {
+          const { stdout: psOut } = await execAsync('ps aux 2>/dev/null || true', { timeout: 8000 });
+          psAllLines = psOut.split('\n').filter(Boolean);
+        } catch { /* ps unavailable */ }
 
-            const uptimeSla = svc.active === 'active' ? (98 + Math.random() * 1.9).toFixed(2) + '%' : 'N/A';
-            return { ...svc, cpu: Math.round(cpu * 10) / 10, mem: Math.round(mem * 10) / 10, uptimeSla };
-          } catch {
-            return { ...svc, cpu: 0, mem: 0, uptimeSla: 'N/A' };
-          }
-        })
-      );
+        const enriched = important.slice(0, 20).map(svc => {
+          const svcName = svc.name.replace('.service', '');
+          const pattern = new RegExp(svcName, 'i');
+          const matching = psAllLines.filter(l => pattern.test(l) && !l.includes(' grep '));
+          const cpu = matching.reduce((sum, l) => {
+            const parts = l.trim().split(/\s+/);
+            return sum + (parseFloat(parts[2]) || 0);
+          }, 0);
+          const mem = matching.reduce((sum, l) => {
+            const parts = l.trim().split(/\s+/);
+            return sum + (parseFloat(parts[3]) || 0);
+          }, 0);
+          const uptimeSla = svc.active === 'active' ? (98 + Math.random() * 1.9).toFixed(2) + '%' : 'N/A';
+          return { ...svc, cpu: Math.round(cpu * 10) / 10, mem: Math.round(mem * 10) / 10, uptimeSla };
+        });
 
-      const stats = {
-        total: services.length,
-        running: services.filter(s => s.active === 'active').length,
-        failed: services.filter(s => s.active === 'failed').length,
-        inactive: services.filter(s => s.active === 'inactive').length,
-      };
+        const stats = {
+          total: services.length,
+          running: services.filter(s => s.active === 'active').length,
+          failed: services.filter(s => s.active === 'failed').length,
+          inactive: services.filter(s => s.active === 'inactive').length,
+        };
 
-      return { services: enriched, all: services, stats };
-    } catch (err) {
-      logger.error('Failed to get service health:', err.message);
-      return { services: [], all: [], stats: { total: 0, running: 0, failed: 0, inactive: 0 } };
-    }
+        return { services: enriched, all: services, stats };
+      } catch (err) {
+        logger.error('Failed to get service health:', err.message);
+        return { services: [], all: [], stats: { total: 0, running: 0, failed: 0, inactive: 0 } };
+      }
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -450,64 +448,68 @@ class AnalyticsService {
   // ═══════════════════════════════════════════════════════════════
 
   async getDockerAnalytics() {
-    try {
-      const { stdout: ps } = await execAsync(
-        'docker ps --format "{{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}\t{{.Ports}}" 2>/dev/null || echo ""',
-        { timeout: 10000 }
-      );
+    // Cache for 30s — 'docker stats --no-stream' blocks until all container
+    // stats are collected, making it one of the slowest shell calls in the app.
+    return cache.remember('analytics:docker', 30, async () => {
+      try {
+        const { stdout: ps } = await execAsync(
+          'docker ps --format "{{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}\t{{.Ports}}" 2>/dev/null || echo ""',
+          { timeout: 10000 }
+        );
 
-      const containers = ps.split('\n')
-        .filter(Boolean)
-        .map(line => {
-          const parts = line.split('\t');
-          return {
-            id: parts[0]?.substring(0, 12) || '',
-            image: parts[1] || '',
-            status: parts[2] || '',
-            name: parts[3] || '',
-            ports: parts[4] || '',
-          };
-        });
+        const containers = ps.split('\n')
+          .filter(Boolean)
+          .map(line => {
+            const parts = line.split('\t');
+            return {
+              id: parts[0]?.substring(0, 12) || '',
+              image: parts[1] || '',
+              status: parts[2] || '',
+              name: parts[3] || '',
+              ports: parts[4] || '',
+            };
+          });
 
-      const { stdout: stats } = await execAsync(
-        'docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemPerc}}\t{{.MemUsage}}" 2>/dev/null || echo ""',
-        { timeout: 10000 }
-      );
+        const { stdout: stats } = await execAsync(
+          'docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemPerc}}\t{{.MemUsage}}" 2>/dev/null || echo ""',
+          { timeout: 15000 }
+        );
 
-      const containerStats = stats.split('\n')
-        .filter(Boolean)
-        .map(line => {
-          const parts = line.split('\t');
-          return {
-            name: parts[0] || '',
-            cpu: parts[1] || '0%',
-            memPerc: parts[2] || '0%',
-            memUsage: parts[3] || '',
-          };
-        });
+        const containerStats = stats.split('\n')
+          .filter(Boolean)
+          .map(line => {
+            const parts = line.split('\t');
+            return {
+              name: parts[0] || '',
+              cpu: parts[1] || '0%',
+              memPerc: parts[2] || '0%',
+              memUsage: parts[3] || '',
+            };
+          });
 
-      const { stdout: info } = await execAsync('docker info --format "{{.Containers}}\t{{.Images}}\t{{.ServerVersion}}" 2>/dev/null || echo "0\t0\t0"', { timeout: 5000 });
-      const infoParts = info.split('\t');
+        const { stdout: info } = await execAsync('docker info --format "{{.Containers}}\t{{.Images}}\t{{.ServerVersion}}" 2>/dev/null || echo "0\t0\t0"', { timeout: 5000 });
+        const infoParts = info.split('\t');
 
-      return {
-        installed: true,
-        containers,
-        containerStats,
-        summary: {
-          total: parseInt(infoParts[0]) || containers.length,
-          images: parseInt(infoParts[1]) || 0,
-          version: infoParts[2] || 'N/A',
-          running: containers.filter(c => c.status.toLowerCase().includes('up')).length,
-        },
-      };
-    } catch {
-      return {
-        installed: false,
-        containers: [],
-        containerStats: [],
-        summary: { total: 0, images: 0, version: 'N/A', running: 0 },
-      };
-    }
+        return {
+          installed: true,
+          containers,
+          containerStats,
+          summary: {
+            total: parseInt(infoParts[0]) || containers.length,
+            images: parseInt(infoParts[1]) || 0,
+            version: infoParts[2] || 'N/A',
+            running: containers.filter(c => c.status.toLowerCase().includes('up')).length,
+          },
+        };
+      } catch {
+        return {
+          installed: false,
+          containers: [],
+          containerStats: [],
+          summary: { total: 0, images: 0, version: 'N/A', running: 0 },
+        };
+      }
+    });
   }
 
   convertToCsv(series) {

@@ -1,5 +1,6 @@
 import monitorService from './monitor.service.js';
 import dashboardService from '../dashboard/dashboard.service.js';
+import cache from '../../helpers/cache.js';
 import { success, error } from '../../helpers/response.js';
 
 class MonitorController {
@@ -23,12 +24,16 @@ class MonitorController {
 
   async getSysInfo(req, res) {
     try {
-      const si = (await import('systeminformation')).default;
-      const [os, cpu] = await Promise.all([
-        si.osInfo(),
-        si.cpu()
-      ]);
-      return success(res, { os, cpu });
+      // osInfo and cpu data are static hardware metadata — cache for 5 minutes
+      const data = await cache.remember('monitor:sys_info', 300, async () => {
+        const si = (await import('systeminformation')).default;
+        const [os, cpu] = await Promise.all([
+          si.osInfo(),
+          si.cpu()
+        ]);
+        return { os, cpu };
+      });
+      return success(res, data);
     } catch (err) {
       return error(res, err.message, 500);
     }

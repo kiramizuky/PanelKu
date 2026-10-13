@@ -169,7 +169,8 @@ class FileManagerService {
     const out = this._resolvePath(outputPath);
     return new Promise((resolve, reject) => {
       const output = createWriteStream(out);
-      const archive = archiver('zip', { zlib: { level: 9 } });
+      // level 6 = zlib default: good compression with far lower CPU cost than level 9
+      const archive = archiver('zip', { zlib: { level: 6 } });
       output.on('close', resolve);
       archive.on('error', reject);
       archive.pipe(output);
