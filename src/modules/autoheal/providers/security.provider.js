@@ -3,7 +3,7 @@
  * Handles UFW Firewall (with SSH anti-lockout), Fail2ban socket healing, and SSL certificate expiry.
  */
 
-import { execCmd } from '../../../helpers/exec.js';
+import { execCmd, isBinaryInstalled } from '../../../helpers/exec.js';
 import logger from '../../../config/logger.js';
 import fs from 'fs/promises';
 
@@ -173,12 +173,7 @@ class SecurityProvider {
   // ── Helpers ──────────────────────────────────────────────────────────
 
   async _isInstalled(bin) {
-    try {
-      const out = await execCmd('which', [bin], { timeout: 3000 });
-      return !!out.trim();
-    } catch {
-      return false;
-    }
+    return isBinaryInstalled(bin);
   }
 
   async _detectSshPort() {

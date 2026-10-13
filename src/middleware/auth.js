@@ -4,6 +4,7 @@ import userRepository from '../repositories/user.repository.js';
 import { unauthorized } from '../helpers/response.js';
 import logger from '../config/logger.js';
 import { apiKeyLimiter } from './rateLimiter.js';
+import cache from '../helpers/cache.js';
 
 /**
  * JWT Authentication Middleware.
@@ -41,8 +42,10 @@ export const authenticate = async (req, res, next) => {
       return unauthorized(res, 'Invalid token');
     }
 
-    const user = await userRepository.findById(decoded.sub, {
-      populate: 'role',
+    const user = await cache.remember(`user:${decoded.sub}`, 30, async () => {
+      return userRepository.findById(decoded.sub, {
+        populate: 'role',
+      });
     });
 
     if (!user || !user.isActive) {

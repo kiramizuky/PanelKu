@@ -3,7 +3,7 @@
  * Handles disk space exhaustion, inode pressure, RAM pressure, and temporary files cleanup.
  */
 
-import { execCmd, execShell } from '../../../helpers/exec.js';
+import { execCmd, execShell, isBinaryInstalled } from '../../../helpers/exec.js';
 import { getPrimaryDisk } from '../../../helpers/system.js';
 import logger from '../../../config/logger.js';
 import fs from 'fs/promises';
@@ -180,12 +180,7 @@ class StorageProvider {
   }
 
   async _hasCmd(cmd) {
-    try {
-      const out = await execCmd('which', [cmd], { timeout: 3000 });
-      return !!out.trim();
-    } catch {
-      return false;
-    }
+    return isBinaryInstalled(cmd);
   }
 }
 

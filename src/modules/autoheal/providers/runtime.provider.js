@@ -3,7 +3,7 @@
  * Handles Node.js native binary integrity, port collision resolution, Mail queues, MQTT, and WhatsApp sessions.
  */
 
-import { execCmd } from '../../../helpers/exec.js';
+import { execCmd, isBinaryInstalled } from '../../../helpers/exec.js';
 import logger from '../../../config/logger.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -277,12 +277,7 @@ class RuntimeProvider {
   }
 
   async _isInstalled(bin) {
-    try {
-      const out = await execCmd('which', [bin], { timeout: 3000 });
-      return !!out.trim();
-    } catch {
-      return false;
-    }
+    return isBinaryInstalled(bin);
   }
 }
 

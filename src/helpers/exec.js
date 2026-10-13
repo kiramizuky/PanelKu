@@ -68,3 +68,30 @@ export async function execShell(cmd, opts = {}) {
     throw err;
   }
 }
+
+const binaryInstalledCache = new Map();
+
+/**
+ * Check if a system binary is installed and executable (cached in memory).
+ * Prevents redundant process forks on repeated health/provider checks.
+ *
+ * @param {string} bin - Name of binary, e.g. 'nginx', 'postgresql'
+ * @returns {Promise<boolean>}
+ */
+export async function isBinaryInstalled(bin) {
+  if (binaryInstalledCache.has(bin)) {
+    return binaryInstalledCache.get(bin);
+  }
+  try {
+    const isWindows = process.platform === 'win32';
+    const whichCmd = isWindows ? 'where' : 'which';
+    const out = await execCmd(whichCmd, [bin], { timeout: 3000 });
+    const installed = !!out && out.trim().length > 0;
+    binaryInstalledCache.set(bin, installed);
+    return installed;
+  } catch {
+    binaryInstalledCache.set(bin, false);
+    return false;
+  }
+}
+

@@ -3,7 +3,7 @@
  * Handles Nginx, Apache2, Caddy, PHP-FPM pools, and Reverse Proxy health.
  */
 
-import { execCmd } from '../../../helpers/exec.js';
+import { execCmd, isBinaryInstalled } from '../../../helpers/exec.js';
 import logger from '../../../config/logger.js';
 import fs from 'fs/promises';
 
@@ -227,10 +227,7 @@ class WebProvider {
   }
 
   async _isInstalled(binOrService) {
-    try {
-      const out = await execCmd('which', [binOrService], { timeout: 4000 });
-      if (out.trim()) return true;
-    } catch {}
+    if (await isBinaryInstalled(binOrService)) return true;
     try {
       const out = await execCmd('systemctl', ['list-unit-files', `${binOrService}.service`], { timeout: 4000 });
       return out.includes(`${binOrService}.service`);
