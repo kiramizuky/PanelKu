@@ -8,6 +8,11 @@ import logger from '../../config/logger.js';
 import { normalizeDisks } from '../../helpers/system.js';
 import cache from '../../helpers/cache.js';
 
+const _remember = (key, ttl, fn) => {
+  if (process.env.NODE_ENV === 'test') return fn();
+  return cache.remember(key, ttl, fn);
+};
+
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
@@ -293,7 +298,7 @@ class AnalyticsService {
    * Get all system services status.
    */
   async getServiceHealth() {
-    return cache.remember('analytics:service_health', 10, async () => {
+    return _remember('analytics:service_health', 10, async () => {
       try {
         const { stdout } = await execAsync(
           'systemctl list-units --type=service --all --no-pager --no-legend 2>/dev/null | head -60 || echo ""',
@@ -450,7 +455,7 @@ class AnalyticsService {
   async getDockerAnalytics() {
     // Cache for 30s — 'docker stats --no-stream' blocks until all container
     // stats are collected, making it one of the slowest shell calls in the app.
-    return cache.remember('analytics:docker', 30, async () => {
+    return _remember('analytics:docker', 30, async () => {
       try {
         const { stdout: ps } = await execAsync(
           'docker ps --format "{{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}\t{{.Ports}}" 2>/dev/null || echo ""',

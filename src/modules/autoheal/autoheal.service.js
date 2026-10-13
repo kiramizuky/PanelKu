@@ -3,6 +3,7 @@ import Notification from '../../models/Notification.js';
 import Setting from '../../models/Setting.js';
 import alertsService from '../alerts/alerts.service.js';
 import logger from '../../config/logger.js';
+import { getPrimaryDisk } from '../../helpers/system.js';
 import { execCmd } from '../../helpers/exec.js';
 import cache from '../../helpers/cache.js';
 
@@ -345,12 +346,17 @@ class AutoHealService {
   async _checkResources(config) {
     const results = [];
     try {
-      const { default: monitorService } = await import('../monitor/monitor.service.js');
-      const metrics = await monitorService.getCurrent();
+      const si = await import('systeminformation');
+      const [load, mem, disk] = await Promise.all([
+        si.currentLoad(),
+        si.mem(),
+        si.fsSize(),
+      ]);
 
-      const cpuPct = Math.round(metrics.cpu || 0);
-      const ramPct = metrics.ramTotal ? Math.round((metrics.ramUsed / metrics.ramTotal) * 100) : 0;
-      const diskPct = metrics.diskTotal ? Math.round((metrics.diskUsed / metrics.diskTotal) * 100) : 0;
+      const cpuPct = Math.round(load.currentLoad || 0);
+      const ramPct = mem.total ? Math.round((mem.used / mem.total) * 100) : 0;
+      const primaryDisk = getPrimaryDisk(disk || []);
+      const diskPct = primaryDisk.use || (primaryDisk.size ? Math.round((primaryDisk.used / primaryDisk.size) * 100) : 0);
 
       if (cpuPct > config.cpuThreshold) {
         const key = 'resource:cpu';
@@ -381,7 +387,7 @@ class AutoHealService {
         const key = 'resource:disk';
         this._incidentCounts[key] = (this._incidentCounts[key] || 0) + 1;
         if (this._incidentCounts[key] >= 2) {
-          const msg = `High disk usage: ${diskPct}% on ${metrics.diskMount || '/'}. Cleanup executed.`;
+          const msg = `High disk usage: ${diskPct}% on ${primaryDisk.mount || '/'}. Cleanup executed.`;
           alertsService.triggerAlert('High Disk Alert', msg);
           results.push({ type: 'resource', name: 'Disk', status: 'warning', message: msg });
         }

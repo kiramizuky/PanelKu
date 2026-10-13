@@ -25,6 +25,7 @@ jest.unstable_mockModule('../src/helpers/exec.js', () => ({
     return '';
   }),
   execShell: jest.fn(async () => ''),
+  isBinaryInstalled: jest.fn(async () => true),
 }));
 
 const mockDb = {

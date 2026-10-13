@@ -14,6 +14,7 @@ let mockExecCmdHandler = jest.fn(async () => 'active');
 jest.unstable_mockModule('../src/helpers/exec.js', () => ({
   execCmd: jest.fn(async (...args) => mockExecCmdHandler(...args)),
   execShell: jest.fn(async () => ''),
+  isBinaryInstalled: jest.fn(async () => true),
 }));
 
 const mockSettingsStore = {};

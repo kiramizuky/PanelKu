@@ -21,6 +21,7 @@ import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globa
 jest.unstable_mockModule('../src/helpers/exec.js', () => ({
   execCmd: jest.fn(async () => ''),
   execShell: jest.fn(async () => ''),
+  isBinaryInstalled: jest.fn(async () => true),
 }));
 jest.unstable_mockModule('../src/config/logger.js', () => ({
   default: { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() },

@@ -4,6 +4,11 @@ import logger from '../../config/logger.js';
 import { getPrimaryDisk } from '../../helpers/system.js';
 import cache from '../../helpers/cache.js';
 
+const _remember = (key, ttl, fn) => {
+  if (process.env.NODE_ENV === 'test') return fn();
+  return cache.remember(key, ttl, fn);
+};
+
 class MonitorService {
   /**
    * Get current realtime metrics (for polling fallback).
@@ -11,7 +16,7 @@ class MonitorService {
   async getCurrent() {
     // 3-second dedup cache: both the WS broadcast and the HTTP polling endpoint
     // call getCurrent(), so without this they race to call si.currentLoad() etc. simultaneously.
-    return cache.remember('monitor:current', 3, async () => {
+    return _remember('monitor:current', 3, async () => {
       const [cpu, mem, disk, net, temp, diskIO] = await Promise.allSettled([
         si.currentLoad(),
         si.mem(),
@@ -84,7 +89,7 @@ class MonitorService {
    */
   async getDiskHealth() {
     // si.diskLayout() interrogates physical drives (slow on some hardware)
-    return cache.remember('monitor:disk_health', 30, async () => {
+    return _remember('monitor:disk_health', 30, async () => {
       try {
         const [disks, smart] = await Promise.allSettled([
           si.diskLayout(),
@@ -106,7 +111,7 @@ class MonitorService {
    */
   async getNetworkStats() {
     // si.networkConnections() enumerates all kernel socket table entries — can be slow.
-    return cache.remember('monitor:network_stats', 5, async () => {
+    return _remember('monitor:network_stats', 5, async () => {
       const [ifaces, stats, connections] = await Promise.allSettled([
         si.networkInterfaces(),
         si.networkStats('*'),
@@ -137,7 +142,7 @@ class MonitorService {
   async getProcesses() {
     // si.processes() is essentially 'ps aux' for all processes — cache briefly to
     // absorb rapid repeated requests from the UI.
-    return cache.remember('monitor:processes', 5, async () => {
+    return _remember('monitor:processes', 5, async () => {
       try {
         const data = await si.processes();
         return (data.list || []).map(p => ({
