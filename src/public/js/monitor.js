@@ -290,7 +290,7 @@ const MonitorPage = (() => {
   }
 
   let _pollInterval = null;
-  let currentInterval = 3000;
+  let currentInterval = 5000;
   let isPaused = false;
 
   function setRefreshInterval(val) {

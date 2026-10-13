@@ -74,7 +74,7 @@ export const SOCKET_EVENTS = {
 
 // Monitor intervals (ms)
 export const MONITOR_INTERVALS = {
-  METRICS: 3000,
+  METRICS: 5000,
   NETWORK: 5000,
   DISK: 10000,
   HISTORY_SAVE: 60000,

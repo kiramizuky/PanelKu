@@ -274,14 +274,17 @@ const Dashboard = (() => {
 
   // ── Socket Connection ────────────────────────────────
   function connectSocket() {
-    const token = localStorage.getItem('lp_token');
+    const token = LP.state.accessToken || localStorage.getItem('lp_token');
     if (!token) return;
 
     monitorSocket = io('/monitor', {
-      auth: { token },
-      transports: ['websocket'],
+      auth: (cb) => {
+        cb({ token: LP.state.accessToken || localStorage.getItem('lp_token') });
+      },
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 2000,
+      reconnectionDelayMax: 10000,
     });
 
     monitorSocket.on('connect', () => {
@@ -308,8 +311,16 @@ const Dashboard = (() => {
       updateConnectionStatus(false);
     });
 
-    monitorSocket.on('connect_error', (err) => {
-      console.error('Monitor socket error:', err.message);
+    monitorSocket.on('connect_error', async (err) => {
+      console.warn('Monitor socket error:', err?.message);
+      if (err?.message && (err.message.includes('Authentication') || err.message.includes('token') || err.message.includes('Unauthorized'))) {
+        const refreshed = await LP.refreshToken();
+        if (refreshed && monitorSocket) {
+          monitorSocket.auth = { token: LP.state.accessToken };
+          monitorSocket.connect();
+          return;
+        }
+      }
       updateConnectionStatus(false);
     });
   }

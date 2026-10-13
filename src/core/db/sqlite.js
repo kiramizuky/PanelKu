@@ -46,6 +46,7 @@ export function getDb() {
     _db.pragma('journal_mode = WAL');
     _db.pragma('foreign_keys = ON');
     _db.pragma('synchronous = NORMAL');
+    _db.pragma('busy_timeout = 5000');
     initSchema(_db);
     logger.info(`SQLite database initialized at ${dbPath}`);
   }

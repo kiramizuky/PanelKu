@@ -14,7 +14,7 @@ class DashboardService {
   async getMetrics() {
     return cache.remember('dashboard:metrics', 2, async () => {
       try {
-        const [cpu, mem, disk, osInfo, time, network, temp, load, ifaces] = await Promise.allSettled([
+        const [cpu, mem, disk, osInfo, time, network, temp, ifaces] = await Promise.allSettled([
           si.currentLoad(),
           si.mem(),
           si.fsSize(),
@@ -22,7 +22,6 @@ class DashboardService {
           si.time(),
           si.networkStats('*'),
           si.cpuTemperature(),
-          si.currentLoad(),
           si.networkInterfaces(),
         ]);
 
@@ -35,7 +34,7 @@ class DashboardService {
         const netStats = network.value || [];
         const netInterfaces = ifaces.value || [];
         const tempData = temp.value || {};
-        const loadData = load.value || {};
+        const loadData = cpuData;
 
         const ifacesList = Array.isArray(netInterfaces) ? netInterfaces : [];
         const statsList = Array.isArray(netStats) ? netStats : [];
@@ -149,12 +148,14 @@ class DashboardService {
   }
 
   async _getPublicIp() {
-    try {
-      const { stdout } = await execAsync('curl -s --max-time 3 ifconfig.me 2>/dev/null');
-      return stdout.trim() || 'unknown';
-    } catch {
-      return 'unknown';
-    }
+    return cache.remember('system:public_ip', 3600, async () => {
+      try {
+        const { stdout } = await execAsync('curl -s --max-time 3 ifconfig.me 2>/dev/null');
+        return stdout.trim() || 'unknown';
+      } catch {
+        return 'unknown';
+      }
+    });
   }
 
   async _getRunningServices() {

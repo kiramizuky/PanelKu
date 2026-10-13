@@ -129,14 +129,12 @@ const createApp = () => {
   // Prometheus HTTP telemetry
   app.use(metricsMiddleware);
 
-  // Static assets — disable cache for JS/CSS so code updates are immediate
+  // Static assets — enable conditional caching (ETag / 304 Not Modified)
   const publicDir = join(__dirname, 'public');
   app.use(express.static(publicDir, {
     setHeaders(res, filePath) {
       if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
+        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
       }
     }
   }));
