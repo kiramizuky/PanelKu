@@ -29,7 +29,7 @@
     "@simplewebauthn/server": "^13.3.3",
     "@whiskeysockets/baileys": "^7.0.0-rc13",
     "archiver": "^7.0.1",
-    "axios": "^1.7.9",
+    "axios": "^1.20.0",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.7.0",
     "bullmq": "^5.33.1",
@@ -111,12 +111,17 @@
     "ssh2": true
   },
   "overrides": {
+    "@grpc/grpc-js": "^1.14.6",
     "baseline-browser-mapping": "^2.11.23",
-    "brace-expansion": "5.0.9",
+    "brace-expansion": "^5.0.12",
+    "braces": "^3.0.3",
     "browserslist": "^4.28.7",
-    "fast-uri": "^3.1.6",
+    "engine.io": "^6.6.11",
+    "fast-uri": "^3.1.8",
     "js-yaml": "^4.3.2",
+    "music-metadata": "^11.16.1",
+    "proxy-addr": "^2.0.8",
     "qs": "^6.16.0",
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.5"
   }
 }
