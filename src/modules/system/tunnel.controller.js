@@ -67,11 +67,11 @@ class TunnelAndAppsController {
         try { await container.remove(); } catch (e) {}
       }
 
-      // Create & start cloudflared container
+      // Create & start cloudflared container with http2 protocol for reliable home ISP tunneling
       const container = await docker.createContainer({
         Image: imageName,
         name: 'cloudflare-tunnel',
-        Cmd: ['tunnel', '--no-autoupdate', 'run', '--token', token],
+        Cmd: ['tunnel', '--no-autoupdate', 'run', '--protocol', 'http2', '--token', token],
         HostConfig: {
           NetworkMode: 'host',
           RestartPolicy: { Name: 'unless-stopped' }

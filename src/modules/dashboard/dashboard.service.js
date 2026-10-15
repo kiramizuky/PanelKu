@@ -7,22 +7,34 @@ import cache from '../../helpers/cache.js';
 
 const execAsync = promisify(exec);
 
+let _cachedOsInfo = null;
+async function getCachedOsInfo() {
+  if (!_cachedOsInfo) {
+    try {
+      _cachedOsInfo = await si.osInfo();
+    } catch {
+      _cachedOsInfo = {};
+    }
+  }
+  return _cachedOsInfo;
+}
+
 class DashboardService {
   /**
    * Get all realtime system metrics for dashboard.
    */
   async getMetrics() {
-    return cache.remember('dashboard:metrics', 2, async () => {
+    return cache.remember('dashboard:metrics', 5, async () => {
       try {
         const [cpu, mem, disk, osInfo, time, network, temp, ifaces] = await Promise.allSettled([
           si.currentLoad(),
           si.mem(),
           si.fsSize(),
-          si.osInfo(),
+          getCachedOsInfo(),
           si.time(),
           si.networkStats('*'),
           si.cpuTemperature(),
-          si.networkInterfaces(),
+          cache.remember('system:net_interfaces', 30, () => si.networkInterfaces()),
         ]);
 
         const cpuData = cpu.value || {};
@@ -110,13 +122,13 @@ class DashboardService {
    * Get additional info: Docker status, firewall, public IP, services.
    */
   async getServerInfo() {
-    return cache.remember('dashboard:server_info', 5, async () => {
+    return cache.remember('dashboard:server_info', 15, async () => {
       const results = await Promise.allSettled([
         this._getDockerStatus(),
         this._getFirewallStatus(),
         this._getPublicIp(),
         this._getRunningServices(),
-        si.networkInterfaces(),
+        cache.remember('system:net_interfaces', 30, () => si.networkInterfaces()),
       ]);
 
       return {

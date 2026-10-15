@@ -505,7 +505,19 @@
     fetchWebserverStatus();
     checkSyncthingStatus();
     initAppSorting();
-    setInterval(loadDashboardData, 3000); // Poll every 3s
-    setInterval(fetchWebserverStatus, 10000); // Poll every 10s
+    // Optimized polling: 5s interval, automatically paused when browser tab is hidden
+    setInterval(() => {
+      if (!document.hidden) loadDashboardData();
+    }, 5000);
+    setInterval(() => {
+      if (!document.hidden) fetchWebserverStatus();
+    }, 15000);
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        loadDashboardData();
+        fetchWebserverStatus();
+      }
+    });
   });
 </script>

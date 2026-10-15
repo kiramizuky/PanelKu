@@ -228,6 +228,30 @@ class AutoHealService {
         };
       }
 
+      // Prevent webserver port conflicts: do not start Apache if Nginx is active, and vice versa
+      if (svc.name === 'apache2') {
+        const nginxStatus = await execCmd('systemctl', ['is-active', 'nginx'], { timeout: 5000 }).catch(() => 'inactive');
+        if (nginxStatus.trim() === 'active') {
+          return {
+            type: 'service',
+            name: svc.displayName || svc.name,
+            status: 'healthy',
+            message: 'Apache2 is inactive (Nginx is active webserver)',
+          };
+        }
+      }
+      if (svc.name === 'nginx') {
+        const apacheStatus = await execCmd('systemctl', ['is-active', 'apache2'], { timeout: 5000 }).catch(() => 'inactive');
+        if (apacheStatus.trim() === 'active') {
+          return {
+            type: 'service',
+            name: svc.displayName || svc.name,
+            status: 'healthy',
+            message: 'Nginx is inactive (Apache2 is active webserver)',
+          };
+        }
+      }
+
       this._incidentCounts[key] = (this._incidentCounts[key] || 0) + 1;
       const attemptCount = this._incidentCounts[key];
 
