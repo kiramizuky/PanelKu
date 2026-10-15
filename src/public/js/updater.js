@@ -489,6 +489,16 @@ const UpdaterPage = (() => {
       } else {
         const errLog = res?.data?.log || '';
         const errMsg = res?.message || res?.data?.error || 'Update encountered issues';
+
+        // If connection was cut (e.g. Cloudflare 100s timeout or socket reset during compile/restart)
+        if (!res || !res.success) {
+          logEl.textContent += '\n⚠️ Connection to panel was interrupted (likely proxy/Cloudflare timeout during C++ module compilation, or server is restarting).';
+          logEl.textContent += '\n⏳ Checking server status and waiting for panel to come back online...';
+          LP.toast('Waiting for server update & restart...', 'info');
+          startReconnectPolling(logEl);
+          return;
+        }
+
         if (errLog) logEl.textContent += errLog + '\n';
         logEl.textContent += `\n❌ ${errMsg}`;
 
@@ -502,10 +512,10 @@ const UpdaterPage = (() => {
         btn.disabled = false;
       }
     } catch (err) {
-      logEl.textContent += `\n❌ Connection error: ${err.message}`;
-      LP.toast('Connection error during update', 'error');
-      btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i> Update Panel';
-      btn.disabled = false;
+      logEl.textContent += `\n⚠️ Connection interrupted (${err.message}). The update or restart is likely still running on the server.`;
+      logEl.textContent += '\n⏳ Waiting for server to complete restart sequence...';
+      LP.toast('Checking server status...', 'info');
+      startReconnectPolling(logEl);
     } finally {
       document.getElementById('btnConfirmUpdate').disabled = false;
       document.getElementById('btnConfirmUpdate').innerHTML = '<i class="bi bi-cloud-download me-1"></i> Start Update';
@@ -636,7 +646,7 @@ const UpdaterPage = (() => {
 
   // ── Reconnect Polling ───────────────────────────────────────────
   function startReconnectPolling(logEl) {
-    const maxWait = 90000;
+    const maxWait = 180000; // 3 minutes timeout for compilation and restart
     const interval = 2500;
     const initialDelay = 5000; // Wait 5s for the server to initiate restart before polling
     let poll = null;
