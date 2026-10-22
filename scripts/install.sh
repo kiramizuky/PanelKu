@@ -462,10 +462,11 @@ setup_panel() {
   # own real path, so a copy in /usr/local/bin would look for package.json and
   # .env in /usr/local.
   if [ -f "$PANEL_DIR/bin/panelku.js" ]; then
-    mkdir -p /usr/local/bin
+    mkdir -p /usr/local/bin /usr/bin
     chmod 0755 "$PANEL_DIR/bin/panelku.js"
     ln -sfn "$PANEL_DIR/bin/panelku.js" /usr/local/bin/panelku
-    log "CLI installed: /usr/local/bin/panelku -> $PANEL_DIR/bin/panelku.js"
+    ln -sfn "$PANEL_DIR/bin/panelku.js" /usr/bin/panelku
+    log "CLI installed: panelku -> $PANEL_DIR/bin/panelku.js (/usr/bin & /usr/local/bin)"
   fi
 
   # Opt-in systemd hardening. Keep the default root unit behaviour intact so
