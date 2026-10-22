@@ -97,7 +97,9 @@ error() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 info() { echo -e "${BLUE}[→]${NC} $1"; }
 
 check_root() {
-  [[ $EUID -ne 0 ]] && error "Run as root: sudo bash install.sh"
+  if [ "$EUID" -ne 0 ]; then
+    error "Run as root: sudo bash install.sh"
+  fi
 }
 
 detect_os() {
