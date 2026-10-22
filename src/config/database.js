@@ -1,6 +1,5 @@
-import 'dotenv/config';
-import { resolve } from 'path';
+import { getDbPath } from './paths.js';
 
 export default {
-  path: resolve(process.cwd(), 'storage', 'panelku.db'),
+  path: getDbPath(),
 };

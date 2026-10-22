@@ -1,6 +1,7 @@
 import monitorService from './monitor.service.js';
 import dashboardService from '../dashboard/dashboard.service.js';
 import cache from '../../helpers/cache.js';
+import { siCall } from '../../helpers/withTimeout.js';
 import { success, error } from '../../helpers/response.js';
 
 class MonitorController {
@@ -28,8 +29,8 @@ class MonitorController {
       const data = await cache.remember('monitor:sys_info', 300, async () => {
         const si = (await import('systeminformation')).default;
         const [os, cpu] = await Promise.all([
-          si.osInfo(),
-          si.cpu()
+          siCall(() => si.osInfo(), 'si.osInfo'),
+          siCall(() => si.cpu(), 'si.cpu'),
         ]);
         return { os, cpu };
       });

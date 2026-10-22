@@ -114,7 +114,8 @@ const FirewallPage = {
         </td>
         <td style="color:var(--text-secondary)">${LP.escHtml(r.from)}</td>
         <td style="text-align:right">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('FirewallPage.deleteRule', '${LP.encJsArg(r.id)}')" style="color:var(--accent-danger)">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('FirewallPage.deleteRule', (LP.encJsArg(r.id)))
+    })}" style="color:var(--accent-danger)">
             <i class="bi bi-trash"></i> Delete
           </button>
         </td>

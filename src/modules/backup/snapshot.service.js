@@ -7,12 +7,13 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { getDb, generateId, now } from '../../core/db/sqlite.js';
 import logger from '../../config/logger.js';
+import { getStorageDir } from '../../config/paths.js';
 
 const execAsync = promisify(exec);
 
 class SnapshotService {
   constructor() {
-    this.storageDir = path.resolve(process.cwd(), 'storage', 'snapshots');
+    this.storageDir = path.join(getStorageDir(), 'snapshots');
     if (!fs.existsSync(this.storageDir)) {
       fs.mkdirSync(this.storageDir, { recursive: true, mode: 0o750 });
     }

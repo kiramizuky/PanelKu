@@ -13,6 +13,7 @@ router.get('/config',             autohealController.getConfig.bind(autohealCont
 router.post('/config',            autohealController.saveConfig.bind(autohealController));
 router.get('/status',             autohealController.getStatus.bind(autohealController));
 router.get('/providers',          autohealController.getProviders.bind(autohealController));
+router.get('/services',           autohealController.getAvailableServices.bind(autohealController));
 router.post('/diagnose-all',      autohealController.diagnoseAll.bind(autohealController));
 router.post('/check',             autohealController.runCheck.bind(autohealController));
 router.post('/heal',              autohealController.healService.bind(autohealController));

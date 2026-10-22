@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import appConfig from '../config/app.js';
 import userRepository from '../repositories/user.repository.js';
-import { unauthorized } from '../helpers/response.js';
+import { unauthorized, forbidden } from '../helpers/response.js';
 import logger from '../config/logger.js';
 import { apiKeyLimiter } from './rateLimiter.js';
 import cache from '../helpers/cache.js';
@@ -54,6 +54,23 @@ export const authenticate = async (req, res, next) => {
 
     req.user = user;
     req.tokenPayload = decoded;
+
+    // [SEC] A user still using the default/expired password may only read data
+    // and change credentials. Mutating APIs are blocked until the change happens.
+    // API keys are exempt so existing automations do not break.
+    if (user.mustChangePassword && !req.isApiKey) {
+      const allowed = [
+        /^\/api\/users\/me\/password$/,
+        /^\/api\/auth\/(logout|logout-all|refresh|profile)$/,
+        /^\/api\/auth\/(2fa|passkey)\//,
+      ];
+      const isRead = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
+      const pathname = req.originalUrl.split('?')[0];
+      if (!isRead && !allowed.some((re) => re.test(pathname))) {
+        return forbidden(res, 'Password change required before using this feature');
+      }
+    }
+
     next();
   } catch (err) {
     logger.error('Auth middleware error:', err);

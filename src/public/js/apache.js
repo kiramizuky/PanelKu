@@ -179,15 +179,18 @@ const ApachePage = {
               ${LP.escHtml(v.documentRoot || '—')}
             </td>
             <td>
-              <span class="lp-badge ${v.enabled ? 'lp-badge-success' : 'lp-badge-warning'}" style="cursor:pointer;" onclick="LP.call('ApachePage.toggleVhost', '${LP.encJsArg(v.serverName)}', ${!v.enabled})">
+              <span class="lp-badge ${v.enabled ? 'lp-badge-success' : 'lp-badge-warning'}" style="cursor:pointer;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ApachePage.toggleVhost', (LP.encJsArg(v.serverName)), (!v.enabled))
+    })}">
                 <span class="lp-badge-dot"></span> ${v.enabled ? 'Enabled' : 'Disabled'}
               </span>
             </td>
             <td style="text-align:right">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('ApachePage.viewVhostConfig', '${LP.encJsArg(v.serverName)}')" title="View Config">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ApachePage.viewVhostConfig', (LP.encJsArg(v.serverName)))
+    })}" title="View Config">
                 <i class="bi bi-file-earmark-text"></i>
               </button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('ApachePage.deleteVhost', '${LP.encJsArg(v.serverName)}')" title="Delete Vhost">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ApachePage.deleteVhost', (LP.encJsArg(v.serverName)))
+    })}" title="Delete Vhost">
                 <i class="bi bi-trash"></i>
               </button>
             </td>
@@ -348,8 +351,10 @@ const ApachePage = {
                   <span style="font-size:12px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${LP.escHtml(mod)}</span>
                 </div>
                 ${isEnabled
-                  ? `<button class="btn-lp btn-lp-ghost btn-lp-sm" style="padding:2px 6px;font-size:10px;" onclick="LP.call('ApachePage.disableModule', '${LP.encJsArg(mod)}')">Disable</button>`
-                  : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" style="padding:2px 6px;font-size:10px;" onclick="LP.call('ApachePage.enableModule', '${LP.encJsArg(mod)}')">Enable</button>`
+                  ? `<button class="btn-lp btn-lp-ghost btn-lp-sm" style="padding:2px 6px;font-size:10px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ApachePage.disableModule', (LP.encJsArg(mod)))
+    })}">Disable</button>`
+                  : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" style="padding:2px 6px;font-size:10px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ApachePage.enableModule', (LP.encJsArg(mod)))
+    })}">Enable</button>`
                 }
               </div>
             </div>

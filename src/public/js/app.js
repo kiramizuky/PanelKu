@@ -18,6 +18,72 @@ const LP = {
     refreshPromise: null,
   },
 
+  // ── CSP-safe dynamic handlers ─────────────────────────
+  // Dynamic HTML built with template literals cannot use onclick attributes
+  // under script-src-attr 'none'. Templates call registerInlineHandler() to
+  // store a real function in memory and emit only an opaque data-lp-on-* id.
+  _inlineHandlers: new Map(),
+  _inlineHandlerSeq: 0,
+  _inlineDelegationBound: false,
+
+  registerInlineHandler(eventName, fn) {
+    if (typeof fn !== 'function') return '';
+    this._bindInlineDelegation();
+    const id = `d${++this._inlineHandlerSeq}`;
+    this._inlineHandlers.set(id, { eventName: String(eventName || 'click'), fn });
+
+    // Bound the registry for long-lived tabs that render many tables.
+    if (this._inlineHandlers.size > 10000) {
+      const oldest = this._inlineHandlers.keys().next().value;
+      this._inlineHandlers.delete(oldest);
+    }
+    return id;
+  },
+
+  _bindInlineDelegation() {
+    if (this._inlineDelegationBound || typeof document === 'undefined') return;
+    this._inlineDelegationBound = true;
+
+    const bubblingEvents = [
+      'click', 'dblclick', 'change', 'submit', 'input', 'keydown', 'keyup',
+      'keypress', 'mouseover', 'mouseout', 'mousedown', 'mouseup',
+      'contextmenu', 'dragstart', 'dragover', 'drop',
+    ];
+    const captureEvents = ['focus', 'blur', 'load', 'error'];
+
+    for (const eventName of bubblingEvents) {
+      document.addEventListener(eventName, (event) => this._dispatchInline(event), false);
+    }
+    for (const eventName of captureEvents) {
+      document.addEventListener(eventName, (event) => this._dispatchInline(event), true);
+    }
+  },
+
+  _dispatchInline(event) {
+    if (!this._inlineHandlers.size) return;
+    const attr = `data-lp-on-${event.type}`;
+
+    const elements = [];
+    let el = event.target;
+    while (el && el !== document) {
+      if (el.getAttribute && el.getAttribute(attr)) elements.push(el);
+      el = el.parentElement;
+    }
+
+    // Bubble order (closest element first), matching native inline handlers.
+    for (const element of elements) {
+      const handler = this._inlineHandlers.get(element.getAttribute(attr));
+      if (!handler) continue;
+      if (handler.eventName !== event.type) continue;
+      try {
+        const result = handler.fn.call(element, event);
+        if (result === false) event.preventDefault();
+      } catch (err) {
+        console.error('[LP handler]', err);
+      }
+    }
+  },
+
   // ── Init ──────────────────────────────────────────────
   async init() {
     if (this._initPromise) return this._initPromise;
@@ -363,7 +429,8 @@ const LP = {
         <div class="lp-toast-title">${safeTitle}</div>
         <div class="lp-toast-msg">${safeMessage}</div>
       </div>
-      <button class="lp-toast-close" onclick="this.closest('.lp-toast').remove()">✕</button>
+      <button class="lp-toast-close" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { this.closest('.lp-toast').remove()
+    })}">✕</button>
     `;
 
     container.appendChild(el);
@@ -432,10 +499,10 @@ const LP = {
   },
 
   /**
-   * Safe string for inclusion in single-quoted JS strings inside onclick attributes.
+   * Safe string for inclusion in single-quoted JS strings inside data-lp-on-* handlers.
    * Uses URI encoding which escapes ' " \ and all other special chars as %XX.
    * The handler must decode via decodeURIComponent().
-   * Example: onclick="handler(decodeURIComponent('${LP.escJsStr(val)}'))"
+   * Example: data-lp-on-click="${LP.registerInlineHandler('click', function (event) { handler(decodeURIComponent('${LP.escJsStr(val)}')) })}"
    */
   /**
    * Helper to clean any accidental %22 or outer quotes from string values
@@ -485,10 +552,11 @@ const LP = {
   },
 
   /**
-   * Encode a value for safe injection into a JS single-quoted string inside onclick.
-   * Uses JSON.stringify + encodeURIComponent so output contains NO raw single-quotes,
-   * double-quotes, backslashes, or other JS/HTML-special characters.
-   * Decode with decodeURIComponent(JSON.parse(...)) — handled automatically by LP.call().
+   * Encode a value for safe injection into a JS single-quoted string inside a
+   * data-lp-on-* handler. Uses JSON.stringify + encodeURIComponent so output
+   * contains NO raw single-quotes, double-quotes, backslashes, or other
+   * JS/HTML-special characters. Decode with decodeURIComponent(JSON.parse(...))
+   * — handled automatically by LP.call().
    */
   encJsArg(val) {
     return encodeURIComponent(JSON.stringify(val));
@@ -498,12 +566,24 @@ const LP = {
    * Call a namespaced function with URI-encoded JSON arguments.
    * Automatically decodes and parses all arguments.
    * Usage in template literal:
-   *   onclick="LP.call('Module.method', '${LP.encJsArg(val1)}', '${LP.encJsArg(val2)}')"
+   *   data-lp-on-click="${LP.registerInlineHandler('click', function (event) { LP.call('Module.method', '${LP.encJsArg(val1)}', '${LP.encJsArg(val2)}') })}"
    * The module method receives the decoded values directly — no changes needed to handlers.
    */
   call(fnPath, ...args) {
-    let fn = null;
-    try { fn = (0, eval)(fnPath); } catch (_) {}
+    const resolvePath = (path) => {
+      const parts = String(path || '').split('.');
+      let owner = window;
+      let value = window;
+      for (const part of parts) {
+        if (!value || (typeof value !== 'object' && typeof value !== 'function')) return null;
+        owner = value;
+        value = value[part];
+      }
+      return typeof value === 'function' ? { fn: value, owner } : null;
+    };
+
+    const resolved = resolvePath(fnPath);
+    let fn = resolved ? resolved.fn.bind(resolved.owner) : null;
 
     // Fallback resolution for aliases & underscored method names
     if (typeof fn !== 'function') {
@@ -785,7 +865,8 @@ const LP = {
             </div>
             <div class="modal-footer" style="border-top: 1px solid var(--glass-border, rgba(255,255,255,0.1)); padding: 14px 24px;">
               <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Tutup</button>
-              <button type="button" class="btn-lp btn-lp-primary" onclick="location.reload()">
+              <button type="button" class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { location.reload()
+    })}">
                 <i class="bi bi-arrow-clockwise me-1"></i>Refresh Halaman
               </button>
             </div>
@@ -857,8 +938,10 @@ const LP = {
               <div class="lp-pagination mt-3 d-flex justify-content-between align-items-center">
                 <span class="text-muted" style="font-size:12px">Showing ${start + 1} to ${Math.min(end, data.length)} of ${data.length}</span>
                 <div class="btn-group">
-                  <button class="btn-lp btn-lp-sm btn-lp-ghost" ${state.currentPage === 1 ? 'disabled' : ''} onclick="LP._pageChange('${paginationContainerId}', -1)"><i class="bi bi-chevron-left"></i></button>
-                  <button class="btn-lp btn-lp-sm btn-lp-ghost" ${state.currentPage === state.totalPages ? 'disabled' : ''} onclick="LP._pageChange('${paginationContainerId}', 1)"><i class="bi bi-chevron-right"></i></button>
+                  <button class="btn-lp btn-lp-sm btn-lp-ghost" ${state.currentPage === 1 ? 'disabled' : ''} data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP._pageChange((paginationContainerId), -1)
+    })}"><i class="bi bi-chevron-left"></i></button>
+                  <button class="btn-lp btn-lp-sm btn-lp-ghost" ${state.currentPage === state.totalPages ? 'disabled' : ''} data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP._pageChange((paginationContainerId), 1)
+    })}"><i class="bi bi-chevron-right"></i></button>
                 </div>
               </div>
             `;

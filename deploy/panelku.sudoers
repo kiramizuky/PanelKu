@@ -1,0 +1,29 @@
+# Panelku sudo policy (opt-in, for PANELKU_HARDENED=1)
+#
+# The panel invokes privileged host tools as `sudo <command>`. This policy is
+# intentionally explicit but still broad: the panel is a server control panel,
+# so treat the panelku account as root-equivalent and protect its web login.
+#
+# Install with:
+#   install -m 0440 deploy/panelku.sudoers /etc/sudoers.d/panelku
+#   visudo -cf /etc/sudoers.d/panelku
+#
+# If NoNewPrivileges=true is enabled in the unit, sudo cannot elevate; remove
+# this file and use polkit / a privileged helper instead.
+
+Defaults:panelku !requiretty
+Defaults:panelku secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+Cmnd_Alias PANELKU_SYSTEMCTL = /bin/systemctl, /usr/bin/systemctl
+Cmnd_Alias PANELKU_JOURNAL  = /bin/journalctl, /usr/bin/journalctl
+Cmnd_Alias PANELKU_PACKAGES = /usr/bin/apt, /usr/bin/apt-get, /usr/bin/dnf, /usr/bin/yum, /usr/bin/pacman, /usr/sbin/apk
+Cmnd_Alias PANELKU_FIREWALL = /usr/bin/ufw, /usr/sbin/ufw, /usr/sbin/iptables, /usr/sbin/nft
+Cmnd_Alias PANELKU_NETWORK  = /usr/bin/tailscale, /usr/sbin/tailscale
+Cmnd_Alias PANELKU_DOCKER   = /usr/bin/docker, /usr/local/bin/docker, /usr/bin/docker-compose, /usr/local/bin/docker-compose
+Cmnd_Alias PANELKU_DB       = /usr/bin/psql, /usr/bin/mysql, /usr/bin/redis-cli
+Cmnd_Alias PANELKU_FILES    = /bin/rm, /usr/bin/rm, /bin/mv, /usr/bin/mv, /bin/cp, /usr/bin/cp, /bin/chmod, /usr/bin/chmod, /usr/bin/tee
+Cmnd_Alias PANELKU_POWER    = /usr/bin/reboot, /sbin/reboot, /usr/sbin/reboot, /usr/bin/shutdown, /sbin/shutdown, /usr/sbin/shutdown
+
+panelku ALL=(root) NOPASSWD: PANELKU_SYSTEMCTL, PANELKU_JOURNAL, PANELKU_PACKAGES, \
+    PANELKU_FIREWALL, PANELKU_NETWORK, PANELKU_DOCKER, PANELKU_DB, \
+    PANELKU_FILES, PANELKU_POWER

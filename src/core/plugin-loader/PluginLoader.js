@@ -1,11 +1,12 @@
 import { readdir, readFile } from 'fs/promises';
-import { join, resolve } from 'path';
+import { join } from 'path';
 import { pathToFileURL, parse as parseUrl } from 'url';
 import { Router } from 'express';
 import http from 'http';
 import https from 'https';
 import { isIP } from 'net';
 import logger from '../../config/logger.js';
+import { getPluginsDir } from '../../config/paths.js';
 
 /**
  * Plugin Loader SDK.
@@ -17,7 +18,7 @@ class PluginLoader {
     this._plugins = new Map();
     this._proxies = new Map();
     this._routedPlugins = new Set(); // plugins that registered at least 1 route
-    this._pluginsDir = resolve('./plugins');
+    this._pluginsDir = getPluginsDir();
     this.router = Router();
   }
 

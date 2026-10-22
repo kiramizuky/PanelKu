@@ -40,6 +40,7 @@ import cdnRoutes from '../modules/cdn/cdn.routes.js';
 import iotRoutes from '../modules/iot/iot.routes.js';
 import lvmManagerRoutes from '../modules/lvm-manager/lvm-manager.routes.js';
 import tasksRoutes from '../modules/tasks/tasks.routes.js';
+import cache from '../helpers/cache.js';
 
 const router = Router();
 
@@ -47,11 +48,15 @@ const router = Router();
 // Health check — public endpoint, no auth required
 // Used by monitoring tools and cluster master panels for basic ping
 router.get('/health', (req, res) => {
+  const redis = cache.getRedisHealth();
   res.json({
     success: true,
     status: 'ok',
     panel: 'Panelku',
     version: process.env.npm_package_version || '1.0.0',
+    // Optional dependency: don't fail the endpoint when Redis is down, but
+    // make the real state visible instead of pretending everything is fine.
+    redis,
     timestamp: new Date().toISOString(),
   });
 });

@@ -282,7 +282,8 @@ const TerminalPage = (() => {
     const btn = document.createElement('button');
     btn.className = 'btn btn-sm btn-outline-secondary';
     btn.id = `btn-${tabId}`;
-    btn.innerHTML = `Tab ${tabCounter} <i class="bi bi-x" onclick="event.stopPropagation(); TerminalPage.closeTab('${tabId}')"></i>`;
+    btn.innerHTML = `Tab ${tabCounter} <i class="bi bi-x" data-lp-on-click="${LP.registerInlineHandler('click', function (event) { event.stopPropagation(); TerminalPage.closeTab((tabId))
+    })}"></i>`;
     btn.onclick = () => switchTab(tabId);
     btn.style.fontSize = '12px';
     tabList.appendChild(btn);
@@ -658,7 +659,8 @@ const TerminalPage = (() => {
           return `<div class="position-relative my-2">
             <div class="d-flex justify-content-between align-items-center mb-1 px-1">
               <span class="text-muted" style="font-size:11px; font-family:monospace;">bash</span>
-              <button class="btn btn-sm btn-primary py-0 px-2" style="font-size:11px;" onclick="TerminalPage.insertCodeFromB64('${b64}')"><i class="bi bi-play-fill"></i> Run in Terminal</button>
+              <button class="btn btn-sm btn-primary py-0 px-2" style="font-size:11px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { TerminalPage.insertCodeFromB64((b64))
+    })}"><i class="bi bi-play-fill"></i> Run in Terminal</button>
             </div>
             <pre style="background:#05070d; padding:10px; border-radius:6px; font-family:'JetBrains Mono', monospace; font-size:12.5px; border:1px solid rgba(255,255,255,0.08); white-space:pre-wrap; margin:0;">${code}</pre>
           </div>`;

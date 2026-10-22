@@ -4,6 +4,13 @@
 
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
+// Isolate notification rows from the other autoheal suite (Jest workers share
+// storage/panelku.db and both cleanup notifications in beforeEach).
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+const TEST_DB_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'panelku-snapshot-autoheal-test-'));
+process.env.PANELKU_DB_PATH = path.join(TEST_DB_DIR, 'panelku.db');
 
 import { jest, describe, test, expect, beforeEach } from '@jest/globals';
 

@@ -1,0 +1,55 @@
+# Panelku systemd unit (hardened example)
+#
+# This unit is opt-in. Install it only after creating the `panelku` user,
+# granting storage ownership, and installing deploy/panelku.sudoers.
+#
+# Important trade-offs:
+#   - ProtectSystem=strict + ReadWritePaths keeps /etc, /usr and /var read-only
+#     for the panel process. The repo itself is writable because the built-in
+#     updater performs git/npm operations in place.
+#   - NoNewPrivileges=true prevents sudo from gaining privileges. If the panel
+#     still needs sudo (package management, tailscale, psql, reboot), set it to
+#     false or move those actions to a privileged helper / polkit rule.
+#
+# Adjust paths if PANEL_DIR is not /opt/panelku.
+
+[Unit]
+Description=Panelku Linux Control Panel
+After=network.target redis.service redis-server.service
+Wants=redis.service redis-server.service
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=panelku
+Group=panelku
+WorkingDirectory=/opt/panelku
+ExecStart=/usr/bin/node --max-old-space-size=512 src/server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PANELKU_HOME=/opt/panelku
+Environment=PANELKU_UPDATE_SUPERVISOR=true
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/panelku/storage /opt/panelku
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+
+MemoryHigh=1024M
+MemoryMax=1536M
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

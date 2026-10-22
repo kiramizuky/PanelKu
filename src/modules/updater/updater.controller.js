@@ -47,8 +47,28 @@ class UpdaterController {
   async performUpdate(req, res) {
     try {
       const { method = 'git', branch = 'master', channel = 'stable', skipBackup = false, dryRun = false } = req.body;
-      const result = await updaterService.performUpdate({ method, branch, channel, skipBackup, dryRun });
-      return success(res, result, result.success ? 'Update completed successfully' : 'Update encountered issues');
+
+      // Dry run stays synchronous (read-only, fast).
+      if (dryRun) {
+        const result = await updaterService.performUpdate({ method, branch, channel, skipBackup, dryRun: true });
+        return success(res, result, 'Dry run completed');
+      }
+
+      // Real updates run as a background job: proxy timeouts and double clicks
+      // can no longer kill a multi-minute git/npm/native build.
+      const job = await updaterService.startUpdateJob({ method, branch, channel, skipBackup });
+      return success(res, job, 'Update started', 202);
+    } catch (error) {
+      const status = error.statusCode || (error.code === 'UPDATE_IN_PROGRESS' ? 409 : 500);
+      return errorResponse(res, error.message, status);
+    }
+  }
+
+  // ── Update Job Status ──────────────────────────────────────────
+  async getUpdateStatus(req, res) {
+    try {
+      const status = await updaterService.getUpdateStatus();
+      return success(res, status);
     } catch (error) {
       return errorResponse(res, error.message, 500);
     }

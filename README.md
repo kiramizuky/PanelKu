@@ -3,7 +3,7 @@
 > Lightweight, modern, realtime Linux server control panel — a blend of aaPanel, Portainer, CasaOS, and Cockpit, but far lighter and feature-packed.
 
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green)](https://nodejs.org)
-[![Version](https://img.shields.io/badge/version-3.5.0-blue)](CHANGELOG)
+[![Version](https://img.shields.io/badge/version-3.7.0-blue)](CHANGELOG)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
 ## Core Features
@@ -49,16 +49,24 @@ Or clone and run locally:
 sudo bash scripts/install.sh
 ```
 
+The installer installs into `/opt/panelku` as a real git clone (the updater depends
+on it). If `/opt/panelku` already exists without a `.git` directory it refuses to
+delete it, because that directory can contain the SQLite database, SSL
+certificates and uploads; move it aside before reinstalling.
+
 ### With Docker Compose
 
 ```bash
 cp .env.example .env
-# Edit .env and set your secrets
+# IMPORTANT: replace APP_SECRET, JWT_SECRET and JWT_REFRESH_SECRET with random values.
+# The app refuses to start in production if the example placeholders are still set.
+# Optional: set ADMIN_PASSWORD to choose the first super-admin password.
 docker compose up -d
 ```
 
 Open: `http://<your-server-ip>:23456`  
-Default Login: `admin` / `Admin@123456` (**Change password upon first login!**)
+Login: `admin` — use the `ADMIN_PASSWORD` you set, or the generated password printed by the installer.
+A password change is forced on first login.
 
 ### With Docker CLI
 
@@ -66,6 +74,10 @@ Default Login: `admin` / `Admin@123456` (**Change password upon first login!**)
 docker pull mastarom/panelku:latest
 
 docker run -d -p 23456:3000 --name panelku \
+  -e NODE_ENV=production \
+  -e JWT_SECRET="$(openssl rand -hex 32)" \
+  -e JWT_REFRESH_SECRET="$(openssl rand -hex 32)" \
+  -e APP_SECRET="$(openssl rand -hex 32)" \
   -v $(pwd)/storage:/app/storage \
   mastarom/panelku:latest
 ```
@@ -85,6 +97,45 @@ npm run dev
 # 4. Production start with PM2
 pm2 start ecosystem.config.cjs
 ```
+
+---
+
+## Operations CLI & Hardening
+
+The installer links `panelku` to `/usr/local/bin/panelku`:
+
+```bash
+panelku status                 # service, health endpoint, version
+panelku doctor                 # Node, .env, storage, SQLite, Docker, Redis, disk
+panelku check-update           # current/latest commit, never fakes "up to date"
+panelku rollback --commit <sha> --yes
+panelku reset-password --user admin   # prints a temporary password
+```
+
+`doctor --json` and `status --json` are safe for monitoring scripts. `rollback`
+refuses to run without `--yes`.
+
+### Opt-in systemd hardening
+
+The default installer keeps the service running as `root` so existing package,
+service, firewall and database actions keep working. To run as the dedicated
+`panelku` user with `ProtectSystem=strict`:
+
+```bash
+sudo PANELKU_HARDENED=1 bash scripts/install.sh
+```
+
+This creates the user, installs `deploy/panelku.sudoers`, and limits writes to
+`/opt/panelku/storage` plus the panel directory (required by the in-place
+updater). Set `PANELKU_USER=<name>` to use a different account; the installer
+validates the name, creates the matching group required by systemd, and scopes
+the sudoers policy to that user. `PANELKU_NNP=1` additionally sets
+`NoNewPrivileges=true`; that is stronger, but **disables sudo-based panel
+features**. See `deploy/systemd/panelku.service` and
+`deploy/panelku.polkit.rules`.
+
+Docker Compose runs the app through `tecnativa/docker-socket-proxy`; the raw
+Docker socket is never mounted into the app container.
 
 ---
 

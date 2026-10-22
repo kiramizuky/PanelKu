@@ -25,7 +25,8 @@ const WAFPage = {
             </td>
             <td style="color:var(--text-secondary);font-size:12px;">${LP.escHtml(r.description || '-')}</td>
             <td style="text-align:right">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WAFPage.deleteRule', '${LP.encJsArg(r._id)}')" style="color:var(--accent-danger)">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WAFPage.deleteRule', (LP.encJsArg(r._id)))
+    })}" style="color:var(--accent-danger)">
                 <i class="bi bi-trash"></i> Delete
               </button>
             </td>
@@ -147,7 +148,8 @@ const WAFPage = {
                   ${f.recommendation ? `<small class="text-info d-block" style="font-size:10.5px; margin-top:2px;"><i class="bi bi-lightbulb me-1"></i>${LP.escHtml(f.recommendation)}</small>` : ''}
                 </div>
                 ${f.canAutoFix && f.fixAction ? `
-                  <button class="btn-lp btn-lp-primary btn-lp-sm" style="font-size:11px; padding:4px 10px; height:28px; white-space:nowrap;" onclick="LP.call('WAFPage.fixIssue', '${LP.encJsArg(f.fixAction)}')">
+                  <button class="btn-lp btn-lp-primary btn-lp-sm" style="font-size:11px; padding:4px 10px; height:28px; white-space:nowrap;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WAFPage.fixIssue', (LP.encJsArg(f.fixAction)))
+    })}">
                     <i class="bi bi-magic me-1"></i> Auto Fix
                   </button>
                 ` : ''}
@@ -383,7 +385,8 @@ const WAFPage = {
       const detailDisplay = isOpen ? 'table-row' : 'none';
 
       return `
-        <tr class="threat-main-row" onclick="WAFPage.toggleThreatDetail('${t.id}')" style="cursor:pointer; transition: background .15s;">
+        <tr class="threat-main-row" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { WAFPage.toggleThreatDetail((t.id))
+    })}" style="cursor:pointer; transition: background .15s;">
           <td style="text-align:center; padding-left:12px; width:32px;">
             <i class="bi ${chevronClass}" id="threatChevron-${t.id}" style="font-size:12px;"></i>
           </td>
@@ -406,8 +409,10 @@ const WAFPage = {
           <td>
             <span class="lp-badge lp-badge-danger" style="font-size:10px;"><span class="lp-badge-dot"></span>${LP.escHtml(t.action || 'BLOCKED')}</span>
           </td>
-          <td style="text-align:right; white-space:nowrap;" onclick="event.stopPropagation()">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="WAFPage.quickBlockIp('${LP.escHtml(t.ip)}')" style="font-size:11px; padding:2px 8px;" title="Permanent IP Block">
+          <td style="text-align:right; white-space:nowrap;" data-lp-on-click="${LP.registerInlineHandler('click', function (event) { event.stopPropagation()
+    })}">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { WAFPage.quickBlockIp((LP.escHtml(t.ip)))
+    })}" style="font-size:11px; padding:2px 8px;" title="Permanent IP Block">
               <i class="bi bi-slash-circle me-1"></i> Block
             </button>
           </td>
@@ -440,7 +445,8 @@ const WAFPage = {
                 <div class="text-muted mb-1" style="font-size:10.5px; text-transform:uppercase; font-weight:600;"><i class="bi bi-shield-exclamation me-1 text-danger"></i> Block Reason</div>
                 <div class="text-danger" style="font-weight:600;">${LP.escHtml(t.reason || 'Automated Intrusion Block')}</div>
                 <div class="mt-2 d-flex gap-2">
-                  <button class="btn-lp btn-lp-sm btn-lp-ghost text-info" onclick="LP.copy('${LP.escHtml(t.ip)}', 'IP Copied to clipboard!')" style="font-size:11px; padding:3px 8px;">
+                  <button class="btn-lp btn-lp-sm btn-lp-ghost text-info" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.copy((LP.escHtml(t.ip)), 'IP Copied to clipboard!')
+    })}" style="font-size:11px; padding:3px 8px;">
                     <i class="bi bi-clipboard me-1"></i> Copy IP
                   </button>
                 </div>
@@ -464,13 +470,15 @@ const WAFPage = {
               Showing <strong>${start + 1}</strong> to <strong>${Math.min(end, this._filteredThreats.length)}</strong> of <strong>${this._filteredThreats.length}</strong> attacks
             </span>
             <div class="btn-group" style="gap:4px;">
-              <button class="btn-lp btn-lp-sm btn-lp-ghost" ${this._threatsPage === 1 ? 'disabled' : ''} onclick="WAFPage.changeThreatsPage(${this._threatsPage - 1})">
+              <button class="btn-lp btn-lp-sm btn-lp-ghost" ${this._threatsPage === 1 ? 'disabled' : ''} data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { WAFPage.changeThreatsPage((this._threatsPage - 1))
+    })}">
                 <i class="bi bi-chevron-left me-1"></i> Prev
               </button>
               <span class="btn-lp btn-lp-sm btn-lp-ghost" style="pointer-events:none; font-weight:600;">
                 Page ${this._threatsPage} / ${totalPages}
               </span>
-              <button class="btn-lp btn-lp-sm btn-lp-ghost" ${this._threatsPage === totalPages ? 'disabled' : ''} onclick="WAFPage.changeThreatsPage(${this._threatsPage + 1})">
+              <button class="btn-lp btn-lp-sm btn-lp-ghost" ${this._threatsPage === totalPages ? 'disabled' : ''} data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { WAFPage.changeThreatsPage((this._threatsPage + 1))
+    })}">
                 Next <i class="bi bi-chevron-right ms-1"></i>
               </button>
             </div>
@@ -580,7 +588,8 @@ const WAFPage = {
             <td><span class="lp-badge lp-badge-warning" style="font-size:10px;">${LP.escHtml(d.duration)}</span></td>
             <td style="font-size:11px; color:var(--text-muted);">${new Date(d.createdAt).toLocaleString()}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('WAFPage.deleteCrowdSecDecision', '${LP.encJsArg(d.ip)}')" title="Unban IP">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WAFPage.deleteCrowdSecDecision', (LP.encJsArg(d.ip)))
+    })}" title="Unban IP">
                 <i class="bi bi-trash"></i> Unban
               </button>
             </td>
@@ -690,7 +699,8 @@ const WAFPage = {
               <td><span class="lp-badge lp-badge-danger"><span class="lp-badge-dot"></span>AUTO-BANNED</span></td>
               <td style="font-size:11px; color:var(--text-muted);">${new Date(h.created_at).toLocaleString()}</td>
               <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="LP.call('WAFPage.deleteCrowdSecDecision', '${LP.encJsArg(h.ip)}')" title="Unban this IP">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-success" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WAFPage.deleteCrowdSecDecision', (LP.encJsArg(h.ip)))
+    })}" title="Unban this IP">
                 <i class="bi bi-unlock"></i> Unban
               </button>
             </td>

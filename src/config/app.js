@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { getStorageDir, resolveFromRoot } from './paths.js';
 
 // [CRIT-2 FIX] Fail fast in production if critical secrets are still defaults
 if (process.env.NODE_ENV === 'production') {
@@ -7,6 +8,10 @@ if (process.env.NODE_ENV === 'production') {
     'dev-secret-change-in-production',
     'jwt-secret-change-in-production',
     'refresh-secret-change-in-production',
+    // Placeholders shipped in .env.example (previously accepted silently by Docker)
+    'change_this_to_a_very_long_random_secret_string',
+    'change_this_jwt_secret_very_long_random_string',
+    'change_this_refresh_secret_very_long_random',
   ];
   for (const key of REQUIRED_SECRETS) {
     const val = process.env[key];
@@ -44,16 +49,16 @@ export default {
 
   upload: {
     maxSize: parseInt(process.env.UPLOAD_MAX_SIZE) || 104857600,
-    path: process.env.UPLOAD_PATH || './storage/uploads',
+    path: process.env.UPLOAD_PATH ? resolveFromRoot(process.env.UPLOAD_PATH) : `${getStorageDir()}/uploads`,
   },
 
   backup: {
-    path: process.env.BACKUP_PATH || './storage/backups',
+    path: process.env.BACKUP_PATH ? resolveFromRoot(process.env.BACKUP_PATH) : `${getStorageDir()}/backups`,
   },
 
   logs: {
     level: process.env.LOG_LEVEL || 'info',
-    path: process.env.LOG_PATH || './storage/logs',
+    path: process.env.LOG_PATH ? resolveFromRoot(process.env.LOG_PATH) : `${getStorageDir()}/logs`,
   },
 
   rateLimit: {

@@ -42,6 +42,19 @@ class AutoHealController {
     }
   }
 
+  /**
+   * Installed systemd services, so the admin can opt in per service instead
+   * of monitoring a fixed hardcoded list.
+   */
+  async getAvailableServices(req, res) {
+    try {
+      const services = await autohealService.listAvailableServices();
+      return successResponse(res, { services });
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
   // ── Universal Diagnostics ──
 
   async diagnoseAll(req, res) {

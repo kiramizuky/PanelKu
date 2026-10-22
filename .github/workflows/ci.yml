@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   NODE_OPTIONS: '--experimental-vm-modules'
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
         # (e.g. '../../middleware/auth.js' instead of '../../src/middleware/auth.js'),
         # which would silently prevent the plugin from loading at runtime.
 
-  # ── Stage 2: Unit Tests (Jest) — [8.3] testing matrix Node 20 & 24 LTS ──
+  # ── Stage 2: Unit Tests (Jest) — Node 20, 22 (primary) & 24 LTS ──
   test:
     name: 🧪 Tests (Jest) Node ${{ matrix.node }}
     runs-on: ubuntu-latest
@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['20', '24']
+        node: ['20', '22', '24']
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -99,6 +99,83 @@ jobs:
           path: coverage/
           retention-days: 14
           if-no-files-found: ignore
+
+  # ── Stage 2b: Boot Smoke Test ──────────────────────────────────
+  # Starts the real server with a clean database and requires /api/health to
+  # answer 200 within 90 seconds. This catches bootstrap/import regressions
+  # that unit tests do not execute.
+  smoke-boot:
+    name: 🚀 Boot Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [test]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create isolated storage
+        run: mkdir -p storage/smoke/logs storage/smoke/uploads storage/smoke/backups storage/smoke/temp
+
+      - name: Boot panel and verify /api/health
+        env:
+          NODE_ENV: production
+          PORT: '34567'
+          PANELKU_STORAGE: ${{ github.workspace }}/storage/smoke
+          PANELKU_DB_PATH: ${{ github.workspace }}/storage/smoke/panelku.db
+          JWT_SECRET: ci-smoke-jwt-secret-not-for-production
+          JWT_REFRESH_SECRET: ci-smoke-refresh-secret-not-for-production
+          APP_SECRET: ci-smoke-app-secret-not-for-production
+          ADMIN_PASSWORD: CiSmokeAdmin!2026
+        run: |
+          set -euo pipefail
+          node src/server.js > /tmp/panelku-smoke.log 2>&1 &
+          PANEL_PID=$!
+          trap 'kill "$PANEL_PID" 2>/dev/null || true' EXIT
+
+          healthy=0
+          for i in $(seq 1 45); do
+            if curl -fsS "http://127.0.0.1:34567/api/health" -o /tmp/panelku-health.json; then
+              healthy=1
+              break
+            fi
+            if ! kill -0 "$PANEL_PID" 2>/dev/null; then
+              echo "::error::Panel process exited during boot"
+              cat /tmp/panelku-smoke.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+          if [ "$healthy" != "1" ]; then
+            echo "::error::Panel did not become healthy within 90 seconds"
+            cat /tmp/panelku-smoke.log
+            exit 1
+          fi
+
+          cat /tmp/panelku-health.json
+          node -e "
+            const fs = require('fs');
+            const health = JSON.parse(fs.readFileSync('/tmp/panelku-health.json', 'utf8'));
+            if (health.success !== true || health.status !== 'ok') {
+              console.error('Unexpected health payload:', health);
+              process.exit(1);
+            }
+            if (!health.redis || typeof health.redis.available !== 'boolean') {
+              console.error('Health payload is missing redis status:', health);
+              process.exit(1);
+            }
+            console.log('Boot smoke test passed');
+          "
 
   # ── Stage 3: Window Assignment Check ───────────────────────────
   # Scans all JS files to ensure every `const ModuleName = ...` has a
@@ -187,7 +264,7 @@ jobs:
     name: 🐳 Docker Build Check
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [lint, window-check]
+    needs: [lint, window-check, audit]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

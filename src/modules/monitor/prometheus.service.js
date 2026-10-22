@@ -7,11 +7,40 @@ import dockerService from '../docker/docker.service.js';
 import queueManager from '../../core/queue/QueueManager.js';
 import httpMetrics from '../../middleware/metrics.middleware.js';
 
+const DEFAULT_CACHE_MS = 10_000;
+let _cacheText = null;
+let _cacheAt = 0;
+
+function cacheTtlMs() {
+  if (process.env.NODE_ENV === 'test') return 0;
+  const raw = Number.parseInt(process.env.PROMETHEUS_CACHE_MS ?? '', 10);
+  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_CACHE_MS;
+}
+
 class PrometheusService {
   /**
-   * Render Prometheus text-based OpenMetrics format
+   * Render Prometheus text-based OpenMetrics format.
+   * Scrapes within PROMETHEUS_CACHE_MS share one snapshot so a busy /metrics
+   * scraper cannot repeatedly hit SQLite, Docker and the queue backend.
    */
-  async getMetrics() {
+  async getMetrics(force = false) {
+    const ttl = cacheTtlMs();
+    if (!force && ttl > 0 && _cacheText && Date.now() - _cacheAt < ttl) {
+      return _cacheText;
+    }
+
+    const text = await this._collect();
+    _cacheText = text;
+    _cacheAt = Date.now();
+    return text;
+  }
+
+  clearCache() {
+    _cacheText = null;
+    _cacheAt = 0;
+  }
+
+  async _collect() {
     const lines = [];
 
     // ── System Host Metrics ──

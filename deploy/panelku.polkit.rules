@@ -1,0 +1,18 @@
+// Panelku polkit rule (optional, safer than broad sudo for systemctl).
+//
+// Install:
+//   install -m 0644 deploy/panelku.polkit.rules /etc/polkit-1/rules.d/49-panelku.rules
+//   systemctl restart polkit
+//
+// This only allows the panel to start/stop/restart its own unit and tailscaled.
+// Package management still needs sudoers or a separate helper.
+
+polkit.addRule(function(action, subject) {
+    if (action.id !== "org.freedesktop.systemd1.manage-units") return;
+    if (subject.user !== "panelku") return;
+
+    var unit = action.lookup("unit");
+    if (unit === "panelku.service" || unit === "tailscaled.service") {
+        return polkit.Result.YES;
+    }
+});

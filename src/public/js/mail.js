@@ -119,11 +119,13 @@ const MAIL = (() => {
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
             <div style="font-size:11px;color:var(--text-muted);">${c.desc}</div>
             <div style="display:flex;gap:4px;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm" title="${toggleTitle} ${c.name}" onclick="MAIL.controlService('${c.id}', '${toggleAction}')">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" title="${toggleTitle} ${c.name}" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { MAIL.controlService((c.id), (toggleAction))
+    })}">
                 <i class="bi ${toggleIcon}"></i>
               </button>
               ${c.active ? `
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" title="Stop ${c.name}" onclick="MAIL.controlService('${c.id}', 'stop')">
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" title="Stop ${c.name}" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { MAIL.controlService((c.id), 'stop')
+    })}">
                   <i class="bi bi-stop-fill"></i>
                 </button>
               ` : ''}
@@ -186,10 +188,12 @@ const MAIL = (() => {
             <td><strong><i class="bi bi-globe me-2 text-primary"></i>${LP.escHtml(d)}</strong></td>
             <td><span class="badge bg-success" style="font-size:11px;">Configured</span></td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm me-1" title="View DNS Records" onclick="LP.call('MAIL.selectDomainForDns', '${LP.encJsArg(d)}')">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm me-1" title="View DNS Records" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('MAIL.selectDomainForDns', (LP.encJsArg(d)))
+    })}">
                 <i class="bi bi-shield-check"></i> DNS
               </button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" title="Remove Domain" onclick="LP.call('MAIL.removeDomain', '${LP.encJsArg(d)}')">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" title="Remove Domain" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('MAIL.removeDomain', (LP.encJsArg(d)))
+    })}">
                 <i class="bi bi-trash"></i>
               </button>
             </td>
@@ -218,10 +222,12 @@ const MAIL = (() => {
             <td><strong><i class="bi bi-envelope-at me-2 text-info"></i>${LP.escHtml(a.email)}</strong></td>
             <td style="font-size:12px;color:var(--text-muted);font-family:monospace;">${LP.escHtml(a.mailbox)}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm me-1" title="Change Password" onclick="LP.call('MAIL.showChangePasswordModal', '${LP.encJsArg(a.email)}')">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm me-1" title="Change Password" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('MAIL.showChangePasswordModal', (LP.encJsArg(a.email)))
+    })}">
                 <i class="bi bi-key"></i>
               </button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" title="Delete Account" onclick="LP.call('MAIL.deleteAccount', '${LP.encJsArg(a.email)}')">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" title="Delete Account" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('MAIL.deleteAccount', (LP.encJsArg(a.email)))
+    })}">
                 <i class="bi bi-trash"></i>
               </button>
             </td>
@@ -262,7 +268,8 @@ const MAIL = (() => {
             <td>
               <div style="display:flex;align-items:center;gap:6px;">
                 <code>${LP.escHtml(r.host)}</code>
-                <button class="btn-lp btn-lp-ghost btn-lp-sm" style="padding:2px 6px;font-size:10px;" title="Copy Host" onclick="LP.copy('${LP.escHtml(r.host)}', 'Host copied!')">
+                <button class="btn-lp btn-lp-ghost btn-lp-sm" style="padding:2px 6px;font-size:10px;" title="Copy Host" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.copy((LP.escHtml(r.host)), 'Host copied!')
+    })}">
                   <i class="bi bi-clipboard"></i>
                 </button>
               </div>
@@ -273,7 +280,8 @@ const MAIL = (() => {
               <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${LP.escHtml(r.note || '')}</div>
             </td>
             <td style="text-align:right;white-space:nowrap;">
-              <button class="btn-lp btn-lp-primary btn-lp-sm" title="Copy Target Value" onclick="LP.copy('${LP.escHtml(r.value)}', 'Value copied to clipboard!')">
+              <button class="btn-lp btn-lp-primary btn-lp-sm" title="Copy Target Value" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.copy((LP.escHtml(r.value)), 'Value copied to clipboard!')
+    })}">
                 <i class="bi bi-clipboard me-1"></i> Copy
               </button>
             </td>
@@ -423,10 +431,12 @@ const MAIL = (() => {
                   <td><span class="text-muted">${formatBytes(item.size)}</span></td>
                   <td style="font-size:11px;color:var(--text-muted);">${LP.escHtml(item.date || '-')}</td>
                   <td style="text-align:right;">
-                    <button class="btn-lp btn-lp-ghost btn-lp-sm me-1" title="Retry Delivery (Requeue)" onclick="LP.call('MAIL.requeue', '${LP.encJsArg(item.id)}')">
+                    <button class="btn-lp btn-lp-ghost btn-lp-sm me-1" title="Retry Delivery (Requeue)" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('MAIL.requeue', (LP.encJsArg(item.id)))
+    })}">
                       <i class="bi bi-arrow-repeat text-info"></i>
                     </button>
-                    <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" title="Delete message" onclick="LP.call('MAIL.deleteFromQueue', '${LP.encJsArg(item.id)}')">
+                    <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" title="Delete message" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('MAIL.deleteFromQueue', (LP.encJsArg(item.id)))
+    })}">
                       <i class="bi bi-trash"></i>
                     </button>
                   </td>
@@ -461,7 +471,8 @@ const MAIL = (() => {
               <label class="lp-label" style="font-size:12px;margin-bottom:6px;">Required Score Threshold (1.0 — 20.0)</label>
               <div style="display:flex;gap:8px;">
                 <input type="number" id="spamScoreInput" class="lp-input" value="${c.requiredScore || 5}" min="1" max="20" step="0.5" style="width:120px;">
-                <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="MAIL.updateSpamScore()"><i class="bi bi-check-lg"></i> Save Score</button>
+                <button class="btn-lp btn-lp-primary btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { MAIL.updateSpamScore()
+    })}"><i class="bi bi-check-lg"></i> Save Score</button>
               </div>
               <small style="color:var(--text-muted);font-size:11px;display:block;margin-top:4px;">Messages with score higher than this value are tagged as SPAM. Lower is stricter (default 5.0).</small>
             </div>

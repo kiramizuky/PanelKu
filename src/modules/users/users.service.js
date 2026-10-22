@@ -9,6 +9,7 @@ import bcrypt from 'bcryptjs';
 import { getDb } from '../../core/db/sqlite.js';
 import sessionRepository from '../../repositories/session.repository.js';
 import logger from '../../config/logger.js';
+import cache from '../../helpers/cache.js';
 
 class UsersService {
   /**
@@ -225,6 +226,12 @@ class UsersService {
       await sessionRepository.deactivateAll(id);
     } catch (e) {
       logger.error('Failed to deactivate sessions after password change: ' + e.message);
+    }
+    // Drop the cached user object so mustChangePassword=false takes effect immediately
+    try {
+      await cache.del(`user:${id}`);
+    } catch (e) {
+      logger.warn('Failed to invalidate user cache after password change: ' + e.message);
     }
   }
 

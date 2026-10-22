@@ -168,15 +168,22 @@ const FMPage = (() => {
       html += `
         <div class="fm-header-row" style="display:flex; align-items:center; gap:12px; padding:6px 12px; border-bottom:1px solid var(--glass-border); font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">
           <div style="width:18px; display:flex; align-items:center; justify-content:center;">
-            <input type="checkbox" id="selectAllCheckbox" onclick="FMPage.toggleSelectAll(this)" style="width:14px; height:14px; cursor:pointer;">
+            <input type="checkbox" id="selectAllCheckbox" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { FMPage.toggleSelectAll(this)
+    })}" style="width:14px; height:14px; cursor:pointer;">
           </div>
           <div style="width:18px;"></div>
-          <div class="fm-sort-th" onclick="FMPage.sortBy('name')" style="flex:1; min-width:140px; cursor:pointer; user-select:none; display:flex; align-items:center;">Name ${getSortIcon('name')}</div>
-          <div class="fm-sort-th fm-header-modified" onclick="FMPage.sortBy('modified')" style="width:130px; cursor:pointer; user-select:none; display:flex; align-items:center;">Modified ${getSortIcon('modified')}</div>
-          <div class="fm-sort-th fm-header-created" onclick="FMPage.sortBy('created')" style="width:130px; cursor:pointer; user-select:none; display:flex; align-items:center;">Created ${getSortIcon('created')}</div>
-          <div class="fm-sort-th fm-header-size" onclick="FMPage.sortBy('size')" style="width:90px; text-align:right; cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:flex-end;">Size ${getSortIcon('size')}</div>
-          <div class="fm-sort-th fm-header-permissions" onclick="FMPage.sortBy('permissions')" style="width:75px; cursor:pointer; user-select:none; display:flex; align-items:center;">Perms ${getSortIcon('permissions')}</div>
-          <div class="fm-sort-th fm-header-owner" onclick="FMPage.sortBy('owner')" style="width:100px; cursor:pointer; user-select:none; display:flex; align-items:center;">Owner ${getSortIcon('owner')}</div>
+          <div class="fm-sort-th" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { FMPage.sortBy('name')
+    })}" style="flex:1; min-width:140px; cursor:pointer; user-select:none; display:flex; align-items:center;">Name ${getSortIcon('name')}</div>
+          <div class="fm-sort-th fm-header-modified" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { FMPage.sortBy('modified')
+    })}" style="width:130px; cursor:pointer; user-select:none; display:flex; align-items:center;">Modified ${getSortIcon('modified')}</div>
+          <div class="fm-sort-th fm-header-created" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { FMPage.sortBy('created')
+    })}" style="width:130px; cursor:pointer; user-select:none; display:flex; align-items:center;">Created ${getSortIcon('created')}</div>
+          <div class="fm-sort-th fm-header-size" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { FMPage.sortBy('size')
+    })}" style="width:90px; text-align:right; cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:flex-end;">Size ${getSortIcon('size')}</div>
+          <div class="fm-sort-th fm-header-permissions" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { FMPage.sortBy('permissions')
+    })}" style="width:75px; cursor:pointer; user-select:none; display:flex; align-items:center;">Perms ${getSortIcon('permissions')}</div>
+          <div class="fm-sort-th fm-header-owner" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { FMPage.sortBy('owner')
+    })}" style="width:100px; cursor:pointer; user-select:none; display:flex; align-items:center;">Owner ${getSortIcon('owner')}</div>
         </div>
       `;
     }
@@ -193,12 +200,17 @@ const FMPage = (() => {
         data-created="${item.created || ''}"
         data-permissions="${item.permissions || '-'}"
         data-owner="${item.owner || '-'}"
-        onclick="FMPage.selectItem(this, event)"
-        ondblclick="FMPage.openItem(this)"
-        oncontextmenu="FMPage.showContextMenu(event, this)"
+        data-lp-on-click="${LP.registerInlineHandler('click', function (event) { FMPage.selectItem(this, event)
+    })}"
+        data-lp-on-dblclick="${LP.registerInlineHandler('dblclick', function (_event) { FMPage.openItem(this)
+    })}"
+        data-lp-on-contextmenu="${LP.registerInlineHandler('contextmenu', function (event) { FMPage.showContextMenu(event, this)
+    })}"
         title="${escHtml(tooltip)}">
-        <div class="fm-checkbox-wrapper" onclick="event.stopPropagation()">
-          <input type="checkbox" class="fm-checkbox" data-path="${escHtml(item.path)}" onchange="FMPage.updateBulkBar()" style="margin:0;">
+        <div class="fm-checkbox-wrapper" data-lp-on-click="${LP.registerInlineHandler('click', function (event) { event.stopPropagation()
+    })}">
+          <input type="checkbox" class="fm-checkbox" data-path="${escHtml(item.path)}" data-lp-on-change="${LP.registerInlineHandler('change', function (_event) { FMPage.updateBulkBar()
+    })}" style="margin:0;">
         </div>
         <div class="fm-item-icon">${getIcon(item)}</div>
         <div class="fm-item-name" title="${escHtml(item.name)}">${escHtml(item.name)}</div>
@@ -227,12 +239,16 @@ const FMPage = (() => {
     if (!container) return;
     
     if (path === '/') {
-      container.innerHTML = `<span style="cursor:pointer; color:var(--accent-primary);" onclick="LP.call('FMPage.navigate', '/')">/</span>`;
+      container.innerHTML = `<span style="cursor:pointer; color:var(--accent-primary);" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('FMPage.navigate', '/')
+    })}">/</span>`;
       return;
     }
 
     const parts = path.split('/').filter(Boolean);
-    let html = `<span style="cursor:pointer; transition:color 0.2s;" onmouseover="this.style.color='var(--accent-primary)'" onmouseout="this.style.color=''" onclick="LP.call('FMPage.navigate', '/')">/</span>`;
+    let html = `<span style="cursor:pointer; transition:color 0.2s;" data-lp-on-mouseover="${LP.registerInlineHandler('mouseover', function (_event) { this.style.color='var(--accent-primary)'
+    })}" data-lp-on-mouseout="${LP.registerInlineHandler('mouseout', function (_event) { this.style.color=''
+    })}" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('FMPage.navigate', '/')
+    })}">/</span>`;
     let accum = '';
     
     parts.forEach((p, idx) => {
@@ -241,7 +257,10 @@ const FMPage = (() => {
       if (isLast) {
         html += `<span class="mx-1">/</span><span style="color:var(--text-primary); font-weight:600;">${escHtml(p)}</span>`;
       } else {
-        html += `<span class="mx-1">/</span><span style="cursor:pointer; transition:color 0.2s;" onmouseover="this.style.color='var(--accent-primary)'" onmouseout="this.style.color=''" onclick="LP.call('FMPage.navigate', '${LP.encJsArg(accum)}')">${escHtml(p)}</span>`;
+        html += `<span class="mx-1">/</span><span style="cursor:pointer; transition:color 0.2s;" data-lp-on-mouseover="${LP.registerInlineHandler('mouseover', function (_event) { this.style.color='var(--accent-primary)'
+    })}" data-lp-on-mouseout="${LP.registerInlineHandler('mouseout', function (_event) { this.style.color=''
+    })}" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('FMPage.navigate', (LP.encJsArg(accum)))
+    })}">${escHtml(p)}</span>`;
       }
     });
 
@@ -623,10 +642,12 @@ const FMPage = (() => {
     if (!container) return;
     container.innerHTML = _openTabs.map(t => `
       <div class="fm-split-tab${t.path === _activeTab ? ' active' : ''}"
-           onclick="LP.call('FM.switchTab', '${LP.encJsArg(t.path)}')">
+           data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('FM.switchTab', (LP.encJsArg(t.path)))
+    })}">
         <i class="${getTabIcon(t.path)}" style="font-size:11px;"></i>
         ${escHtml(t.name)}
-        <span class="fm-split-tab-close" onclick="event.stopPropagation(); LP.call('FM.closeTab', '${LP.encJsArg(t.path)}')">
+        <span class="fm-split-tab-close" data-lp-on-click="${LP.registerInlineHandler('click', function (event) { event.stopPropagation(); LP.call('FM.closeTab', (LP.encJsArg(t.path)))
+    })}">
           <i class="bi bi-x"></i>
         </span>
       </div>
@@ -812,7 +833,8 @@ const FMPage = (() => {
 
       if (type === 'image') {
         container.innerHTML = `<div class="fm-zoom-wrapper fm-zoom-mode-fit" id="fmZoomWrapper">
-          <img src="${url}" alt="${escHtml(path)}" onerror="this.closest('.fm-preview-content').innerHTML='<div class=\"fm-preview-error\"><i class=\"bi bi-exclamation-triangle-fill\"></i>Failed to load image: ${escHtml(path)}</div>'">
+          <img src="${url}" alt="${escHtml(path)}" data-lp-on-error="${LP.registerInlineHandler('error', function (_event) { this.closest('.fm-preview-content').innerHTML=`<div class=&quot;fm-preview-error&quot;><i class=&quot;bi bi-exclamation-triangle-fill&quot;></i>Failed to load image: ${escHtml(path)}</div>`
+    })}">
         </div>`;
         // Set up zoom controls when image loads
         const img = container.querySelector('img');
@@ -923,7 +945,8 @@ const FMPage = (() => {
         </div>
         <div class="fm-tree-children" data-parent="${escHtml(item.path)}"></div>`;
       } else {
-        return `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file" draggable="true" ondragstart="FM.onTreeDragStart(event)">
+        return `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file" draggable="true" data-lp-on-dragstart="${LP.registerInlineHandler('dragstart', function (event) { FMPage.onTreeDragStart(event)
+    })}">
           <span class="fm-tree-toggle" style="visibility:hidden;">▶</span>
           <span class="fm-tree-icon">${icon}</span>
           <span class="fm-tree-name">${escHtml(item.name)}</span>
@@ -985,14 +1008,16 @@ const FMPage = (() => {
         const activeClass = isActive ? 'fm-tree-active' : '';
 
         if (item.type === 'dir') {
-          html += `<div class="fm-tree-item fm-tree-dir ${activeClass}" data-path="${escHtml(item.path)}" data-type="dir" draggable="true" ondragstart="FM.onTreeDragStart(event)">
+          html += `<div class="fm-tree-item fm-tree-dir ${activeClass}" data-path="${escHtml(item.path)}" data-type="dir" draggable="true" data-lp-on-dragstart="${LP.registerInlineHandler('dragstart', function (event) { FMPage.onTreeDragStart(event)
+    })}">
             <span class="fm-tree-toggle">▶</span>
             <span class="fm-tree-icon">📁</span>
             <span class="fm-tree-name">${escHtml(item.name)}</span>
           </div>
           <div class="fm-tree-children" data-parent="${escHtml(item.path)}"></div>`;
         } else {
-          html += `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file" draggable="true" ondragstart="FM.onTreeDragStart(event)">
+          html += `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file" draggable="true" data-lp-on-dragstart="${LP.registerInlineHandler('dragstart', function (event) { FMPage.onTreeDragStart(event)
+    })}">
             <span class="fm-tree-toggle" style="visibility:hidden;">▶</span>
             <span class="fm-tree-icon">${icon}</span>
             <span class="fm-tree-name">${escHtml(item.name)}</span>
@@ -2145,7 +2170,8 @@ const FMPage = (() => {
           <span class="text-white text-truncate" style="font-size: 12.5px; font-weight: 500;">${escHtml(f.name)}</span>
           <span style="font-size: 10px; color: var(--text-muted);">${LP.formatBytes(f.size)}</span>
         </div>
-        <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('FMPage.removeSelectedUpload', '${LP.encJsArg(index)}')" style="width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center; border-radius: 6px; color:#ef4444;" title="Remove">
+        <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('FMPage.removeSelectedUpload', (LP.encJsArg(index)))
+    })}" style="width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center; border-radius: 6px; color:#ef4444;" title="Remove">
           <i class="bi bi-trash"></i>
         </button>
       </div>

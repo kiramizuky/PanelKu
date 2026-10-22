@@ -7,6 +7,7 @@ import Website from '../../models/Website.js';
 import cache from '../../helpers/cache.js';
 import eventBus, { EVENTS } from '../../core/events/EventBus.js';
 import queueManager from '../../core/queue/QueueManager.js';
+import { getAppRoot } from '../../config/paths.js';
 
 const execAsync = util.promisify(exec);
 const execFileAsync = util.promisify(execFile);
@@ -19,7 +20,7 @@ function secureToken(bytes = 24) {
 }
 
 export const ACME_CHALLENGE_DIR = process.platform === 'win32'
-  ? path.join(process.cwd(), 'data', 'acme-challenge')
+  ? path.join(getAppRoot(), 'data', 'acme-challenge')
   : '/var/www/acme-challenge';
 
 // Vhost templates
@@ -850,7 +851,7 @@ class WebsiteService {
       try {
         await fs.access(logFile);
       } catch {
-        const localLogFile = path.join(process.cwd(), 'data', 'nginx-logs', `${safeDomain}.${logType}.log`);
+        const localLogFile = path.join(getAppRoot(), 'data', 'nginx-logs', `${safeDomain}.${logType}.log`);
         try {
           await fs.access(localLogFile);
           logFile = localLogFile;
@@ -911,7 +912,7 @@ class WebsiteService {
       try {
         await fs.access(logFile);
       } catch {
-        const localLogFile = path.join(process.cwd(), 'data', 'nginx-logs', `${safeDomain}.${logType}.log`);
+        const localLogFile = path.join(getAppRoot(), 'data', 'nginx-logs', `${safeDomain}.${logType}.log`);
         try {
           await fs.access(localLogFile);
           logFile = localLogFile;

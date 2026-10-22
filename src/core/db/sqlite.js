@@ -8,25 +8,17 @@
  */
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'fs';
-import { resolve, dirname } from 'path';
+import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../../config/logger.js';
+import { getDbPath } from '../../config/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// [TEST FIX] Compute DB_PATH lazily inside getDb() so tests can change CWD before first call.
-// ESM hoists all imports to the top of the module, so process.chdir() in test setup
-// happens AFTER this module is evaluated. Making DB_PATH lazy ensures the correct
-// working directory is used even when tests call chdir() before their first getDb() call.
-function getDbPath() {
-  // Allow override via env var for testing
-  if (process.env.PANELKU_DB_PATH) {
-    return resolve(process.env.PANELKU_DB_PATH);
-  }
-  return resolve(process.cwd(), 'storage', 'panelku.db');
-}
-
+// DB path is still resolved lazily so tests can chdir() before the first getDb()
+// call. Resolution itself lives in src/config/paths.js (no more process.cwd()
+// dependency in production and DB_PATH is honoured).
 let _db = null;
 let _storageEnsured = false;
 
@@ -34,7 +26,7 @@ function ensureStorageDir() {
   if (_storageEnsured) return;
   _storageEnsured = true;
   try {
-    mkdirSync(resolve(process.cwd(), 'storage'), { recursive: true });
+    mkdirSync(dirname(getDbPath()), { recursive: true });
   } catch {}
 }
 
@@ -182,6 +174,7 @@ function initSchema(db) {
       discord     TEXT NOT NULL DEFAULT '{"enabled":false,"webhookUrl":""}',
       slack       TEXT NOT NULL DEFAULT '{"enabled":false,"webhookUrl":""}',
       webhook     TEXT NOT NULL DEFAULT '{"enabled":false,"url":""}',
+      whatsapp    TEXT NOT NULL DEFAULT '{"enabled":false,"phoneNumber":""}',
       thresholds  TEXT NOT NULL DEFAULT '{"cpuPercent":90,"ramPercent":90,"diskPercent":90}',
       created_at  TEXT NOT NULL,
       updated_at  TEXT NOT NULL

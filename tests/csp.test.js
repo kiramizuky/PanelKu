@@ -76,11 +76,13 @@ function assertCspStructure(csp) {
   // 'unsafe-inline' must NOT be in script-src (nonce-based protection against XSS)
   expect(csp['script-src'].some(v => v === "'unsafe-inline'")).toBe(false);
 
-  // style-src, script-src-attr and style-src-attr NEED 'unsafe-inline' because
-  // runtime UI widgets (xterm.js, CodeMirror) inject dynamic <style> tags, and nonces
-  // don't work for HTML attribute event handlers or style="..." attributes
+  // style-src and style-src-attr NEED 'unsafe-inline' because runtime UI widgets
+  // (xterm.js, CodeMirror) inject dynamic <style> tags and many templates use
+  // style="..." attributes. script-src-attr is locked to 'none': static handlers
+  // are rewritten to data-lp-handler + a nonced listener script, and dynamic
+  // templates use LP.registerInlineHandler().
   expect(csp['style-src']).toContain("'unsafe-inline'");
-  expect(csp['script-src-attr']).toContain("'unsafe-inline'");
+  expect(csp['script-src-attr']).toEqual(["'none'"]);
   expect(csp['style-src-attr']).toContain("'unsafe-inline'");
 
   // Nonce-based protection for <script> tags (XSS defense)
@@ -403,6 +405,11 @@ describe('CSP Header — Authenticated Pages', () => {
     const csp = parseCsp(res.headers['content-security-policy']);
 
     assertCspStructure(csp);
+
+    // The post-render transformer must have removed all static inline handlers.
+    // (Dynamic handlers use data-lp-on-* + LP.registerInlineHandler instead.)
+    expect(res.text).not.toMatch(/\son[a-z]+\s*=\s*["']/i);
+    expect(res.text).toMatch(/data-lp-handler="s\d+"/);
   });
 
   // ── Nonce uniqueness test ──
@@ -601,13 +608,11 @@ describe('CSP Runtime Compatibility — Library & Pattern Scan', () => {
         console.warn(`[WARN] ${shortPath} has potentially dangerous self-closing inline script tags`);
       }
 
-      // Also check for event handler attributes that need script-src-attr 'unsafe-inline'
-      // These are expected and documented
+      // Also check for event handler attributes. These are migrated post-render
+      // to data-lp-handler + a nonced listener script (see cspHandlers.js).
       const eventHandlers = content.match(/\bon\w+\s*=\s*["']/gi);
       if (eventHandlers && eventHandlers.length > 50) {
-        // Large number of inline event handlers — verify script-src-attr is set
-        // This is verified in Suite 1/3 via assertCspStructure
-        console.log(`[DOC] ${shortPath} has ${eventHandlers.length} event handler attributes (covered by script-src-attr 'unsafe-inline')`);
+        console.log(`[DOC] ${shortPath} has ${eventHandlers.length} static event handler attributes (migrated by cspHandlers.js)`);
       }
     }
   });

@@ -36,10 +36,12 @@ const POWER = (() => {
             <select id="governorSelect" class="lp-input" style="width:auto;font-size:12px;margin:0;">
               ${(info.availableGovernors || []).map(g => `<option value="${g}" ${g === info.currentGovernor ? 'selected' : ''}>${g}</option>`).join('')}
             </select>
-            <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="POWER.setGovernor()">Apply</button>
+            <button class="btn-lp btn-lp-primary btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { POWER.setGovernor()
+    })}">Apply</button>
             <label class="lp-label" style="margin:0 0 0 15px;">Set Freq (MHz):</label>
             <input type="number" id="freqInput" class="lp-input" style="width:100px;font-size:12px;margin:0;" placeholder="e.g. 2400">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="POWER.setFrequency()">Set</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { POWER.setFrequency()
+    })}">Set</button>
           </div>
           <details style="margin-top:15px;">
             <summary style="font-size:11px;color:var(--text-muted);cursor:pointer;">Per-Core Details (${info.cpus?.length || 0} cores)</summary>
@@ -102,7 +104,8 @@ const POWER = (() => {
         el.innerHTML = `
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             ${(profiles || []).map(p => `
-              <button class="btn-lp ${p === current ? 'btn-lp-primary' : 'btn-lp-ghost'}" onclick="POWER.setProfile('${p}')" style="text-transform:capitalize;">
+              <button class="btn-lp ${p === current ? 'btn-lp-primary' : 'btn-lp-ghost'}" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { POWER.setProfile((p))
+    })}" style="text-transform:capitalize;">
                 <i class="bi ${p === 'performance' ? 'bi-lightning-charge' : p === 'power-saver' ? 'bi-battery' : 'bi-sliders'} me-1"></i>
                 ${p.replace('-', ' ')}
               </button>

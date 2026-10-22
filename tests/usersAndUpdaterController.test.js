@@ -27,6 +27,8 @@ const mockUpdaterService = {
   getChangelog: jest.fn(),
   getDiffPreview: jest.fn(),
   performUpdate: jest.fn(),
+  startUpdateJob: jest.fn(),
+  getUpdateStatus: jest.fn(),
   performRollback: jest.fn(),
   restartPanel: jest.fn(),
   runHealthCheck: jest.fn(),
@@ -406,23 +408,46 @@ describe('UpdaterController', () => {
     expect(res.statusCode).toBe(500);
   });
 
-  test('performUpdate triggers update process', async () => {
-    mockUpdaterService.performUpdate.mockResolvedValue({ success: true });
+  test('performUpdate starts a background job', async () => {
+    mockUpdaterService.startUpdateJob.mockResolvedValue({ jobId: 'upd_1', status: 'running' });
     const req = { body: { method: 'git', branch: 'main' } };
     const res = createMockRes();
 
     await updaterController.performUpdate(req, res);
-    expect(res.statusCode).toBe(200);
-    expect(res.body.message).toBe('Update completed successfully');
+    expect(res.statusCode).toBe(202);
+    expect(res.body.message).toBe('Update started');
+    expect(res.body.data.jobId).toBe('upd_1');
+  });
+
+  test('performUpdate rejects concurrent updates with 409', async () => {
+    const err = new Error('An update is already in progress');
+    err.code = 'UPDATE_IN_PROGRESS';
+    err.statusCode = 409;
+    mockUpdaterService.startUpdateJob.mockRejectedValue(err);
+    const req = { body: {} };
+    const res = createMockRes();
+
+    await updaterController.performUpdate(req, res);
+    expect(res.statusCode).toBe(409);
   });
 
   test('performUpdate handles error', async () => {
-    mockUpdaterService.performUpdate.mockRejectedValue(new Error('Update failed'));
+    mockUpdaterService.startUpdateJob.mockRejectedValue(new Error('Update failed'));
     const req = { body: {} };
     const res = createMockRes();
 
     await updaterController.performUpdate(req, res);
     expect(res.statusCode).toBe(500);
+  });
+
+  test('getUpdateStatus returns current job state', async () => {
+    mockUpdaterService.getUpdateStatus.mockResolvedValue({ status: 'success' });
+    const req = {};
+    const res = createMockRes();
+
+    await updaterController.getUpdateStatus(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.status).toBe('success');
   });
 
   test('dryRunUpdate triggers dry run', async () => {

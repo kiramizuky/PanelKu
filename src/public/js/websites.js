@@ -19,7 +19,8 @@ const WebsitesPage = (() => {
       if (isInstalled === false) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;">
           <h4 style="margin-bottom:15px;">Nginx is not installed</h4>
-          <button class="btn-lp btn-lp-primary" onclick="WebsitesPage.installPackage('nginx')"><i class="bi bi-download"></i> Install Nginx</button>
+          <button class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { WebsitesPage.installPackage('nginx')
+    })}"><i class="bi bi-download"></i> Install Nginx</button>
         </td></tr>`;
         return;
       }
@@ -56,19 +57,24 @@ const WebsitesPage = (() => {
             </td>
             <td style="font-size:13px;">${sslBadge}</td>
             <td style="text-align:right;white-space:nowrap;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm ${w.status === 'active' ? 'text-warning' : 'text-success'}" onclick="LP.call('WebsitesPage.toggleStatusRow', '${LP.encJsArg(w._id)}', '${w.status === 'active' ? 'inactive' : 'active'}')" title="${w.status === 'active' ? 'Stop / Disable Website' : 'Start / Enable Website'}">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm ${w.status === 'active' ? 'text-warning' : 'text-success'}" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WebsitesPage.toggleStatusRow', (LP.encJsArg(w._id)), (w.status === 'active' ? 'inactive' : 'active'))
+    })}" title="${w.status === 'active' ? 'Stop / Disable Website' : 'Start / Enable Website'}">
                 <i class="bi ${w.status === 'active' ? 'bi-pause-circle' : 'bi-play-circle'}"></i>
               </button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('WebsitesPage.openFolder', '${LP.encJsArg(w.rootDirectory || '')}')" title="File Manager">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WebsitesPage.openFolder', (LP.encJsArg(w.rootDirectory || '')))
+    })}" title="File Manager">
                 <i class="bi bi-folder"></i>
               </button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-secondary" onclick="LP.call('WebsitesPage.openWebsiteLogs', '${LP.encJsArg(w._id)}')" title="View Logs">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-secondary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WebsitesPage.openWebsiteLogs', (LP.encJsArg(w._id)))
+    })}" title="View Logs">
                 <i class="bi bi-journal-text"></i>
               </button>
-              <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LP.call('WebsitesPage.openEditDrawer', '${LP.encJsArg(w._id)}')" title="Edit Website">
+              <button class="btn-lp btn-lp-primary btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WebsitesPage.openEditDrawer', (LP.encJsArg(w._id)))
+    })}" title="Edit Website">
                 <i class="bi bi-pencil-square me-1"></i> Edit
               </button>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('WebsitesPage.deleteWebsiteRow', '${LP.encJsArg(w._id)}', '${LP.encJsArg(w.domain)}')" title="Delete Website">
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WebsitesPage.deleteWebsiteRow', (LP.encJsArg(w._id)), (LP.encJsArg(w.domain)))
+    })}" title="Delete Website">
                 <i class="bi bi-trash"></i>
               </button>
             </td>

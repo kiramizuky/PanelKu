@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import Website from '../../models/Website.js';
 import websiteService, { ACME_CHALLENGE_DIR } from '../websites/websites.service.js';
+import { getAppRoot } from '../../config/paths.js';
 
 const execFileAsync = util.promisify(execFile);
 
@@ -15,7 +16,7 @@ function getCleanEnv() {
 }
 
 const SSL_BASE_DIR = process.platform === 'win32'
-  ? path.join(process.cwd(), 'data', 'ssl')
+  ? path.join(getAppRoot(), 'data', 'ssl')
   : '/etc/nginx/ssl';
 
 /**

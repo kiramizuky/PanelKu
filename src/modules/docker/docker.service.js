@@ -144,8 +144,37 @@ export function generateComposeYaml({ services = [] }) {
 
 class DockerService {
   constructor() {
+    this.docker = new Docker(this._dockerOptions());
+  }
+
+  /**
+   * Resolve Docker connection settings.
+   *
+   * DOCKER_HOST takes precedence (used by docker-compose with the socket
+   * proxy). Without it, keep the historical local socket behaviour.
+   */
+  _dockerOptions() {
+    const dockerHost = (process.env.DOCKER_HOST || '').trim();
+    if (dockerHost) {
+      if (dockerHost.startsWith('unix://')) {
+        return { socketPath: dockerHost.slice('unix://'.length) || '/var/run/docker.sock' };
+      }
+      if (dockerHost.startsWith('npipe://')) {
+        return { socketPath: dockerHost.slice('npipe://'.length) };
+      }
+      if (dockerHost.startsWith('tcp://') || dockerHost.startsWith('http://') || dockerHost.startsWith('https://')) {
+        const url = new URL(dockerHost);
+        return {
+          protocol: url.protocol === 'https:' ? 'https' : 'http',
+          host: url.hostname,
+          port: Number(url.port) || (url.protocol === 'https:' ? 2376 : 2375),
+        };
+      }
+      logger.warn(`DockerService: unsupported DOCKER_HOST "${dockerHost}", falling back to local socket`);
+    }
+
     const isWindows = process.platform === 'win32';
-    this.docker = new Docker(isWindows ? { socketPath: '//./pipe/docker_engine' } : { socketPath: '/var/run/docker.sock' });
+    return { socketPath: isWindows ? '//./pipe/docker_engine' : '/var/run/docker.sock' };
   }
 
   async getInfo() {

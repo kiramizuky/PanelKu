@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] — 2026-10-22
+
+### Added
+- **Operations CLI** (`bin/panelku.js`): `status`, `doctor`, `check-update`, `rollback`, and `reset-password`. The installer links it to `/usr/local/bin/panelku`; rollback requires an explicit `--yes`.
+- **Immutable asset caching**: content-hash query strings (`?v=<sha256-12>`) with `Cache-Control: public, max-age=31536000, immutable` for hashed JS/CSS/fonts, while HTML and un-versioned URLs stay revalidatable.
+- **Docker socket proxy**: `docker-compose.yml` now runs `tecnativa/docker-socket-proxy` and the app connects through `DOCKER_HOST` instead of mounting the raw daemon socket.
+- **Opt-in systemd hardening**: `deploy/systemd/panelku.service`, `deploy/panelku.sudoers`, and `deploy/panelku.polkit.rules`, plus `PANELKU_HARDENED=1` / `PANELKU_NNP=1` / `PANELKU_USER=<name>` installer support (the matched group and sudoers scope follow the chosen user).
+- **Safe git-based installer**: `/opt/panelku` is always a real git clone/update (the updater requires git); an existing non-git directory is never deleted automatically because it may hold the SQLite database, certificates and uploads.
+- **Monitoring fallback contract**: the monitor page prefers `/monitor` Socket.IO frames, uses `/monitor/current` only as a fallback, and pauses when the tab is hidden.
+- **Metrics cache**: `/metrics` snapshots are shared for `PROMETHEUS_CACHE_MS` (default 10s) and each DB/Docker/queue section is isolated.
+- **Analytics downsampling in SQLite**: `MonitorHistory.aggregate()` filters and buckets in SQL, returning at most 500 chart points.
+
+### Security
+- **CSP**: `script-src-attr 'none'`. Static inline handlers are rewritten post-render to `data-lp-handler` plus one nonced script; runtime templates use `LP.registerInlineHandler()` and `data-lp-on-*` delegation.
+- **Timeouts**: every `systeminformation` call in monitoring/analytics is bounded by `SI_TIMEOUT_MS` (default 3000ms) to prevent stuck probes.
+- **Dependencies**: `multer` 2.x, `compression`, and `@whiskeysockets/baileys` pinned to `7.0.0-rc13`.
+
+### Changed
+- Redis reconnect, retention, AutoHeal opt-in, and updater-supervisor work from 3.6.x remain enabled.
+- Node 22 is used by the Docker image and CI, while `package.json` still accepts Node >=20.
+
 ## [3.6.0] — 2026-09-22
 
 ### Added

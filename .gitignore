@@ -10,12 +10,23 @@ storage/panel-backups/*
 storage/databases/*
 storage/snapshots/*
 storage/whatsapp-sessions/*
+storage/websites/*
+storage/update-backup/*
+storage/data/*
 storage/*.json
 !storage/panel.json.example
 !storage/uploads/.gitkeep
 !storage/backups/.gitkeep
 !storage/logs/.gitkeep
 !storage/temp/.gitkeep
+
+# Local runtime data / process files
+data/
+run/
+*.pid
+.DS_Store
+Thumbs.db
+*.log
 
 # Databases & SQLite
 *.sqlite
@@ -33,3 +44,4 @@ index.html
 install.sh
 tmp-*
 *.tmp
+plugins/_test_*

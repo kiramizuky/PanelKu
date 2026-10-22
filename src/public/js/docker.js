@@ -24,7 +24,8 @@ const DockerPage = (() => {
     if (isInstalled === false) {
       tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;">
         <h4 style="margin-bottom:15px;">Docker is not installed</h4>
-        <button class="btn-lp btn-lp-primary" onclick="DockerPage.installPackage('docker')"><i class="bi bi-download"></i> Install Docker</button>
+        <button class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.installPackage('docker')
+    })}"><i class="bi bi-download"></i> Install Docker</button>
       </td></tr>`;
       return;
     }
@@ -55,14 +56,20 @@ const DockerPage = (() => {
           <td style="font-size:12px;color:var(--text-muted)">${new Date(c.created * 1000).toLocaleString()}</td>
           <td style="text-align:right">
             ${isRunning 
-              ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger me-1" onclick="DockerPage.action('stop', '${LP.escHtml(containerId)}')" title="Stop"><i class="bi bi-stop-fill"></i> Stop</button>
-                 <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning me-1" onclick="DockerPage.action('restart', '${LP.escHtml(containerId)}')" title="Restart"><i class="bi bi-arrow-clockwise"></i> Restart</button>`
-              : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success me-1" onclick="DockerPage.action('start', '${LP.escHtml(containerId)}')" title="Start"><i class="bi bi-play-fill"></i> Start</button>`
-            }
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DockerPage.showResourceModal('${LP.escHtml(containerId)}', '${LP.escHtml(containerName)}')" title="Resource Limits &amp; Stats"><i class="bi bi-sliders"></i> Resources</button>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info me-1" onclick="DockerPage.viewLogs('${LP.escHtml(containerId)}', '${LP.escHtml(containerName)}')" title="Logs"><i class="bi bi-justify-left"></i> Logs</button>
-            ${isRunning ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-light me-1" onclick="DockerPage.viewConsole('${LP.escHtml(containerId)}', '${LP.escHtml(containerName)}')" title="Terminal Console"><i class="bi bi-terminal"></i> Console</button>` : ''}
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.action('delete', '${LP.escHtml(containerId)}')" title="Delete"><i class="bi bi-trash"></i> Delete</button>
+              ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.action('stop', (LP.escHtml(containerId)))
+    })}" title="Stop"><i class="bi bi-stop-fill"></i> Stop</button>
+                 <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.action('restart', (LP.escHtml(containerId)))
+    })}" title="Restart"><i class="bi bi-arrow-clockwise"></i> Restart</button>`
+              : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.action('start', (LP.escHtml(containerId)))
+    })}" title="Start"><i class="bi bi-play-fill"></i> Start</button>`}
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.showResourceModal((LP.escHtml(containerId)), (LP.escHtml(containerName)))
+    })}" title="Resource Limits &amp; Stats"><i class="bi bi-sliders"></i> Resources</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.viewLogs((LP.escHtml(containerId)), (LP.escHtml(containerName)))
+    })}" title="Logs"><i class="bi bi-justify-left"></i> Logs</button>
+            ${isRunning ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-light me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.viewConsole((LP.escHtml(containerId)), (LP.escHtml(containerName)))
+    })}" title="Terminal Console"><i class="bi bi-terminal"></i> Console</button>` : ''}
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.action('delete', (LP.escHtml(containerId)))
+    })}" title="Delete"><i class="bi bi-trash"></i> Delete</button>
           </td>
         </tr>
       `;
@@ -74,7 +81,8 @@ const DockerPage = (() => {
     if (isInstalled === false) {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:40px;">
         <h4 style="margin-bottom:15px;">Docker is not installed</h4>
-        <button class="btn-lp btn-lp-primary" onclick="DockerPage.installPackage('docker')"><i class="bi bi-download"></i> Install Docker</button>
+        <button class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.installPackage('docker')
+    })}"><i class="bi bi-download"></i> Install Docker</button>
       </td></tr>`;
       return;
     }
@@ -109,7 +117,8 @@ const DockerPage = (() => {
           <td style="font-size:12px">${LP.formatBytes(img.size)}</td>
           <td style="font-size:12px;color:var(--text-muted)">${new Date(img.created * 1000).toLocaleString()}</td>
           <td style="text-align:right">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.deleteImage('${LP.escHtml(imgId)}', ${hasRunningContainers})" title="Delete"><i class="bi bi-trash"></i> Delete</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.deleteImage((LP.escHtml(imgId)), (hasRunningContainers))
+    })}" title="Delete"><i class="bi bi-trash"></i> Delete</button>
           </td>
         </tr>
       `;
@@ -186,7 +195,8 @@ const DockerPage = (() => {
     row.innerHTML = `
       <input type="number" class="lp-input" placeholder="Host Port (e.g. 8080)" data-type="host">
       <input type="number" class="lp-input" placeholder="Container Port (e.g. 80)" data-type="container">
-      <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="this.parentElement.remove()">X</button>
+      <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { this.parentElement.remove()
+    })}">X</button>
     `;
     container.appendChild(row);
   }
@@ -199,7 +209,8 @@ const DockerPage = (() => {
     row.innerHTML = `
       <input type="text" class="lp-input" placeholder="Host Path (e.g. /opt/data)" data-type="host-path">
       <input type="text" class="lp-input" placeholder="Container Path (e.g. /app/data)" data-type="container-path">
-      <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="this.parentElement.remove()">X</button>
+      <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { this.parentElement.remove()
+    })}">X</button>
     `;
     container.appendChild(row);
   }
@@ -212,7 +223,8 @@ const DockerPage = (() => {
     row.innerHTML = `
       <input type="text" class="lp-input" placeholder="Variable Name (e.g. NODE_ENV)" data-type="env-key">
       <input type="text" class="lp-input" placeholder="Value" data-type="env-value">
-      <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="this.parentElement.remove()">X</button>
+      <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { this.parentElement.remove()
+    })}">X</button>
     `;
     container.appendChild(row);
   }
@@ -304,7 +316,8 @@ const DockerPage = (() => {
             <div style="font-size:10px; color:var(--text-muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${LP.escHtml(img.description || 'No description')}</div>
             <div style="font-size:10px; color:var(--accent-info)">★ ${LP.escHtml(img.star_count)} stars | Official: ${img.is_official ? 'Yes' : 'No'}</div>
           </div>
-          <button class="btn-lp btn-lp-primary btn-lp-sm" style="padding: 2px 8px;" onclick="LP.call('DockerPage.selectOnlineImage', '${LP.encJsArg(img.name)}')">Select</button>
+          <button class="btn-lp btn-lp-primary btn-lp-sm" style="padding: 2px 8px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DockerPage.selectOnlineImage', (LP.encJsArg(img.name)))
+    })}">Select</button>
         </div>
       `).join('');
     } else {
@@ -600,8 +613,10 @@ services:
               Compose Studio allows you to visually build, run, and map domains to multi-container applications.
             </p>
             <div class="d-flex justify-content-center gap-2">
-              <button class="btn-lp btn-lp-primary" onclick="DockerPage.openNewStudio()"><i class="bi bi-plus-lg me-1"></i> Create First Stack</button>
-              <button class="btn-lp btn-lp-ghost" onclick="DockerPage.newStudioFromTemplate('wordpress')"><i class="bi bi-box-seam me-1"></i> Load Template</button>
+              <button class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.openNewStudio()
+    })}"><i class="bi bi-plus-lg me-1"></i> Create First Stack</button>
+              <button class="btn-lp btn-lp-ghost" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.newStudioFromTemplate('wordpress')
+    })}"><i class="bi bi-box-seam me-1"></i> Load Template</button>
             </div>
           </div>
         </div>`;
@@ -619,7 +634,8 @@ services:
         s.exposedPorts.map(ep => `
           <div class="d-flex align-items-center gap-2 p-1 px-2 rounded" style="background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); font-size:11px;">
             <span class="font-mono" style="color:var(--accent-info); font-weight:600;"><i class="bi bi-hdd-network me-1"></i>${ep.hostPort} &rarr; ${ep.containerPort}</span>
-            <button class="btn-lp btn-lp-primary btn-lp-sm" style="padding: 1px 6px; font-size:10px; height:20px; line-height:1;" onclick="LP.call('DockerPage.openAutoProxyModal', '${LP.encJsArg(s.name)}', '${LP.encJsArg(ep.service)}', ${ep.hostPort})" title="Map to Domain with SSL">
+            <button class="btn-lp btn-lp-primary btn-lp-sm" style="padding: 1px 6px; font-size:10px; height:20px; line-height:1;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DockerPage.openAutoProxyModal', (LP.encJsArg(s.name)), (LP.encJsArg(ep.service)), (ep.hostPort))
+    })}" title="Map to Domain with SSL">
               <i class="bi bi-shield-lock me-1"></i>HTTPS Proxy
             </button>
           </div>
@@ -661,15 +677,20 @@ services:
             <div class="d-flex justify-content-between align-items-center pt-3 mt-2 flex-wrap gap-2" style="border-top:1px solid rgba(255,255,255,0.06);">
               <div class="d-flex gap-1">
                 ${isRunning
-                  ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DockerPage.stopStack', '${LP.encJsArg(s.name)}')"><i class="bi bi-stop-fill me-1"></i>Stop</button>
-                     <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="LP.call('DockerPage.restartStack', '${LP.encJsArg(s.name)}')"><i class="bi bi-arrow-clockwise me-1"></i>Restart</button>`
-                  : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="LP.call('DockerPage.startStack', '${LP.encJsArg(s.name)}')"><i class="bi bi-play-fill me-1"></i>Start</button>`
-                }
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('DockerPage.openStackLogs', '${LP.encJsArg(s.name)}')"><i class="bi bi-terminal me-1"></i>Logs</button>
+                  ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DockerPage.stopStack', (LP.encJsArg(s.name)))
+    })}"><i class="bi bi-stop-fill me-1"></i>Stop</button>
+                     <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DockerPage.restartStack', (LP.encJsArg(s.name)))
+    })}"><i class="bi bi-arrow-clockwise me-1"></i>Restart</button>`
+                  : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DockerPage.startStack', (LP.encJsArg(s.name)))
+    })}"><i class="bi bi-play-fill me-1"></i>Start</button>`}
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DockerPage.openStackLogs', (LP.encJsArg(s.name)))
+    })}"><i class="bi bi-terminal me-1"></i>Logs</button>
               </div>
               <div class="d-flex gap-1">
-                <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="LP.call('DockerPage.openEditStudio', '${LP.encJsArg(s.name)}')"><i class="bi bi-pencil-square me-1"></i>Edit Studio</button>
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DockerPage.deleteStack', '${LP.encJsArg(s.name)}')"><i class="bi bi-trash"></i></button>
+                <button class="btn-lp btn-lp-primary btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DockerPage.openEditStudio', (LP.encJsArg(s.name)))
+    })}"><i class="bi bi-pencil-square me-1"></i>Edit Studio</button>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DockerPage.deleteStack', (LP.encJsArg(s.name)))
+    })}"><i class="bi bi-trash"></i></button>
               </div>
             </div>
           </div>
@@ -854,7 +875,8 @@ services:
             <span style="width:24px; height:24px; border-radius:6px; background:rgba(99,102,241,0.2); color:var(--accent-primary); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">${sIdx + 1}</span>
             <strong class="font-mono text-white" style="font-size:13px;">Service: ${LP.escHtml(svc.name || 'unnamed')}</strong>
           </div>
-          ${composeStudioServices.length > 1 ? `<button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DockerPage.removeVisualService(${sIdx})" title="Remove Service"><i class="bi bi-trash"></i></button>` : ''}
+          ${composeStudioServices.length > 1 ? `<button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.removeVisualService((sIdx))
+    })}" title="Remove Service"><i class="bi bi-trash"></i></button>` : ''}
         </div>
 
         <div class="row g-2 mb-3">
@@ -881,7 +903,8 @@ services:
         <div class="mb-3 p-2 rounded" style="background:rgba(0,0,0,0.2);">
           <div class="d-flex justify-content-between align-items-center mb-1">
             <label class="lp-label mb-0" style="font-size:10px; font-weight:700;"><i class="bi bi-hdd-network me-1 text-primary"></i>Port Bindings (Host : Container)</label>
-            <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0" style="font-size:10px;" onclick="DockerPage.addVisualPort(${sIdx})">+ Add Port</button>
+            <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0" style="font-size:10px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.addVisualPort((sIdx))
+    })}">+ Add Port</button>
           </div>
           <div class="svc-ports-container">
             ${(svc.ports || []).map((p, pIdx) => `
@@ -889,7 +912,8 @@ services:
                 <input type="number" class="lp-input font-mono port-host" style="height:28px; font-size:11px;" placeholder="Host Port (e.g. 8080)" value="${LP.escHtml(String(p.host || ''))}">
                 <span>:</span>
                 <input type="number" class="lp-input font-mono port-container" style="height:28px; font-size:11px;" placeholder="Container Port (e.g. 80)" value="${LP.escHtml(String(p.container || ''))}">
-                <button type="button" class="btn-lp btn-lp-ghost text-danger py-0 px-2" style="height:28px;" onclick="DockerPage.removeVisualPort(${sIdx}, ${pIdx})">&times;</button>
+                <button type="button" class="btn-lp btn-lp-ghost text-danger py-0 px-2" style="height:28px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.removeVisualPort((sIdx), (pIdx))
+    })}">&times;</button>
               </div>
             `).join('')}
           </div>
@@ -899,7 +923,8 @@ services:
         <div class="mb-3 p-2 rounded" style="background:rgba(0,0,0,0.2);">
           <div class="d-flex justify-content-between align-items-center mb-1">
             <label class="lp-label mb-0" style="font-size:10px; font-weight:700;"><i class="bi bi-key me-1 text-warning"></i>Environment Variables (KEY = VALUE)</label>
-            <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0" style="font-size:10px;" onclick="DockerPage.addVisualEnv(${sIdx})">+ Add Variable</button>
+            <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0" style="font-size:10px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.addVisualEnv((sIdx))
+    })}">+ Add Variable</button>
           </div>
           <div class="svc-envs-container">
             ${(svc.environment || []).map((e, eIdx) => `
@@ -907,7 +932,8 @@ services:
                 <input type="text" class="lp-input font-mono env-key" style="height:28px; font-size:11px;" placeholder="KEY (e.g. NODE_ENV)" value="${LP.escHtml(e.key || '')}">
                 <span>=</span>
                 <input type="text" class="lp-input font-mono env-value" style="height:28px; font-size:11px;" placeholder="VALUE (e.g. production)" value="${LP.escHtml(e.value || '')}">
-                <button type="button" class="btn-lp btn-lp-ghost text-danger py-0 px-2" style="height:28px;" onclick="DockerPage.removeVisualEnv(${sIdx}, ${eIdx})">&times;</button>
+                <button type="button" class="btn-lp btn-lp-ghost text-danger py-0 px-2" style="height:28px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.removeVisualEnv((sIdx), (eIdx))
+    })}">&times;</button>
               </div>
             `).join('')}
           </div>
@@ -917,7 +943,8 @@ services:
         <div class="p-2 rounded" style="background:rgba(0,0,0,0.2);">
           <div class="d-flex justify-content-between align-items-center mb-1">
             <label class="lp-label mb-0" style="font-size:10px; font-weight:700;"><i class="bi bi-folder2-open me-1 text-success"></i>Volume Mounts (Host Path : Container Path)</label>
-            <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0" style="font-size:10px;" onclick="DockerPage.addVisualVolume(${sIdx})">+ Add Volume</button>
+            <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0" style="font-size:10px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.addVisualVolume((sIdx))
+    })}">+ Add Volume</button>
           </div>
           <div class="svc-vols-container">
             ${(svc.volumes || []).map((v, vIdx) => `
@@ -925,7 +952,8 @@ services:
                 <input type="text" class="lp-input font-mono vol-host" style="height:28px; font-size:11px;" placeholder="./data or /var/storage" value="${LP.escHtml(v.host || '')}">
                 <span>:</span>
                 <input type="text" class="lp-input font-mono vol-container" style="height:28px; font-size:11px;" placeholder="/app/data or /var/lib/mysql" value="${LP.escHtml(v.container || '')}">
-                <button type="button" class="btn-lp btn-lp-ghost text-danger py-0 px-2" style="height:28px;" onclick="DockerPage.removeVisualVolume(${sIdx}, ${vIdx})">&times;</button>
+                <button type="button" class="btn-lp btn-lp-ghost text-danger py-0 px-2" style="height:28px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.removeVisualVolume((sIdx), (vIdx))
+    })}">&times;</button>
               </div>
             `).join('')}
           </div>
@@ -1380,7 +1408,8 @@ services:
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.06); padding-top:10px;">
             <small class="text-muted font-mono" style="font-size:10.5px;">Port: ${app.defaultPort || 'Custom'}</small>
-            <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="DockerPage.showAppInstallModal('${app.id}')" style="font-size:11.5px; padding:4px 12px;">
+            <button class="btn-lp btn-lp-primary btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DockerPage.showAppInstallModal((app.id))
+    })}" style="font-size:11.5px; padding:4px 12px;">
               <i class="bi bi-download me-1"></i> Install
             </button>
           </div>

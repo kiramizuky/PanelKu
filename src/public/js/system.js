@@ -96,17 +96,21 @@ const SystemPage = {
           </span>
         </td>
         <td style="text-align:right; white-space:nowrap;">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.showServiceLog', '${LP.encJsArg(svc)}')" style="color:var(--text-muted)" title="View Logs">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('SystemPage.showServiceLog', (LP.encJsArg(svc)))
+    })}" style="color:var(--text-muted)" title="View Logs">
             <i class="bi bi-card-text"></i> Logs
           </button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('restart')}')" style="color:var(--accent-info)">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('SystemPage.manageService', (LP.encJsArg(svc)), (LP.encJsArg('restart')))
+    })}" style="color:var(--accent-info)">
             <i class="bi bi-arrow-repeat"></i> Restart
           </button>
           ${this._allServices[svc] ? `
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('stop')}')" style="color:var(--accent-danger)">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('SystemPage.manageService', (LP.encJsArg(svc)), (LP.encJsArg('stop')))
+    })}" style="color:var(--accent-danger)">
             <i class="bi bi-stop-circle"></i> Stop
           </button>` : `
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SystemPage.manageService', '${LP.encJsArg(svc)}', '${LP.encJsArg('start')}')" style="color:var(--accent-success)">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('SystemPage.manageService', (LP.encJsArg(svc)), (LP.encJsArg('start')))
+    })}" style="color:var(--accent-success)">
             <i class="bi bi-play-circle"></i> Start
           </button>`}
         </td>
@@ -236,7 +240,8 @@ const SystemPage = {
             <td style="font-family:monospace; color:var(--accent-info); font-size:11px;">${LP.escHtml(k.type)}</td>
             <td style="word-break:break-all; font-size:11px; padding-right:10px;" title="${LP.escHtml(k.key.substring(0,30))}...">${LP.escHtml(k.comment)}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger p-0" onclick="LP.call('SystemPage.deleteSshKey', '${LP.encJsArg(k.id)}')" title="Delete Key"><i class="bi bi-trash"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger p-0" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('SystemPage.deleteSshKey', (LP.encJsArg(k.id)))
+    })}" title="Delete Key"><i class="bi bi-trash"></i></button>
             </td>
           </tr>
         `).join('');

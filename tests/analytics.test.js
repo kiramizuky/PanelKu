@@ -38,6 +38,27 @@ describe('Analytics Service', () => {
     expect(typeof res.count).toBe('number');
   });
 
+  test('MonitorHistory.aggregate returns bounded SQL-downsampled series', async () => {
+    const now = Date.now();
+    for (let i = 0; i < 10; i++) {
+      await MonitorHistory.create({
+        timestamp: new Date(now - (9 - i) * 60 * 1000),
+        metrics: { cpu: 10 + i, ramUsed: 100, ramTotal: 200, ramPercent: 50, diskPercent: 20 },
+      });
+    }
+
+    const result = await MonitorHistory.aggregate({
+      since: new Date(now - 10 * 60 * 1000),
+      maxPoints: 5,
+    });
+
+    expect(result.count).toBeGreaterThanOrEqual(10);
+    expect(result.bucketSeconds).toBeGreaterThanOrEqual(120);
+    expect(result.series.length).toBeLessThanOrEqual(5);
+    expect(result.series.length).toBeGreaterThan(0);
+    expect(result.series[0].loadAvg).toHaveLength(3);
+  });
+
   test('getRealtimeMetrics returns snapshot of system resources', async () => {
     const res = await analyticsService.getRealtimeMetrics();
     expect(res).toBeDefined();

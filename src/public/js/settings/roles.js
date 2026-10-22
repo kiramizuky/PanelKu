@@ -77,10 +77,12 @@ const RolesPage = (() => {
       }
 
       tbody.innerHTML = roles.map(r => {
-        const editBtn = `<button class="btn-lp btn-lp-ghost text-primary" onclick="LP.call('RolesPage.editRole', '${LP.encJsArg(r._id)}')" title="Edit"><i class="bi bi-pencil"></i></button>`;
+        const editBtn = `<button class="btn-lp btn-lp-ghost text-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('RolesPage.editRole', (LP.encJsArg(r._id)))
+    })}" title="Edit"><i class="bi bi-pencil"></i></button>`;
         const delBtn = r.isSystem 
           ? `<button class="btn-lp btn-lp-ghost text-muted" disabled title="System Role"><i class="bi bi-trash"></i></button>`
-          : `<button class="btn-lp btn-lp-ghost text-danger" onclick="LP.call('RolesPage.deleteRole', '${LP.encJsArg(r._id)}')" title="Delete"><i class="bi bi-trash"></i></button>`;
+          : `<button class="btn-lp btn-lp-ghost text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('RolesPage.deleteRole', (LP.encJsArg(r._id)))
+    })}" title="Delete"><i class="bi bi-trash"></i></button>`;
 
         return `
           <tr>

@@ -61,7 +61,8 @@ const DB = (() => {
         details.push(`
           <div class="d-flex justify-content-between align-items-center py-1">
             <span><i class="bi bi-box-seam text-primary me-1"></i> <strong>Docker:</strong> ${LP.escHtml(c.name)} (<span class="font-mono text-info">${LP.escHtml(c.image)}</span>) — Port: <code class="text-warning">${c.suggestedPort}</code></span>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info py-0 px-2" onclick="DB.quickConnectDocker('${c.type}', '${c.suggestedHost}', ${c.suggestedPort})"><i class="bi bi-plug me-1"></i> Hubungkan</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info py-0 px-2" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.quickConnectDocker((c.type), (c.suggestedHost), (c.suggestedPort))
+    })}"><i class="bi bi-plug me-1"></i> Hubungkan</button>
           </div>
         `);
       });
@@ -74,7 +75,8 @@ const DB = (() => {
         details.push(`
           <div class="d-flex justify-content-between align-items-center py-1">
             <span><i class="bi bi-hdd-network text-warning me-1"></i> <strong>${LP.escHtml(p.name)}:</strong> ${LP.escHtml(p.type.toUpperCase())} di <code class="font-mono">${LP.escHtml(p.detectedPaths[0])}</code> ${p.version ? `(${LP.escHtml(p.version)})` : ''}</span>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning py-0 px-2" onclick="LP.call('DB.quickConnectPanel', '${p.type}', '${LP.encJsArg(p.socket || '')}')"><i class="bi bi-link-45deg me-1"></i> Gunakan Config</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning py-0 px-2" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DB.quickConnectPanel', (p.type), (LP.encJsArg(p.socket || '')))
+    })}"><i class="bi bi-link-45deg me-1"></i> Gunakan Config</button>
           </div>
         `);
       });
@@ -89,7 +91,8 @@ const DB = (() => {
       badges.push(`<span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1"><i class="bi bi-check-circle me-1"></i> Host PostgreSQL</span>`);
     }
 
-    badges.push(`<button class="btn btn-sm btn-link text-decoration-none py-0 px-1 text-muted" onclick="DB.toggleEnvDetails()" style="font-size:11px;"><i class="bi bi-chevron-down"></i> Detail</button>`);
+    badges.push(`<button class="btn btn-sm btn-link text-decoration-none py-0 px-1 text-muted" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.toggleEnvDetails()
+    })}" style="font-size:11px;"><i class="bi bi-chevron-down"></i> Detail</button>`);
     badgesEl.innerHTML = badges.join(' ');
 
     if (details.length > 0 && detailsEl) {
@@ -146,13 +149,15 @@ const DB = (() => {
         tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:30px;">
           <h5 style="margin-bottom:8px;color:#60a5fa;"><i class="bi bi-hdd-network me-2"></i>${type.toUpperCase()} Terdeteksi via ${hasDocker ? 'Docker Container' : (hasPanel ? 'Modul Panel Lain' : 'Service Port')}</h5>
           <p style="color:var(--text-muted);font-size:12px;margin-bottom:15px;">Instance database aktif terdeteksi. Silakan atur kredensial koneksi untuk melihat dan mengelola database.</p>
-          <button class="btn-lp btn-lp-primary btn-lp-sm" onclick="DB.showCredentialsModal()"><i class="bi bi-gear-fill me-1"></i> Atur Kredensial ${type.toUpperCase()}</button>
+          <button class="btn-lp btn-lp-primary btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.showCredentialsModal()
+    })}"><i class="bi bi-gear-fill me-1"></i> Atur Kredensial ${type.toUpperCase()}</button>
         </td></tr>`;
         return;
       }
       tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:40px;">
         <h4 style="margin-bottom:15px;">${type.charAt(0).toUpperCase() + type.slice(1)} is not installed</h4>
-        <button class="btn-lp btn-lp-primary" onclick="DB.installPackage('${type}')"><i class="bi bi-download"></i> Install ${type.charAt(0).toUpperCase() + type.slice(1)}</button>
+        <button class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.installPackage((type))
+    })}"><i class="bi bi-download"></i> Install ${type.charAt(0).toUpperCase() + type.slice(1)}</button>
       </td></tr>`;
       return;
     }
@@ -161,10 +166,14 @@ const DB = (() => {
         <td class="font-mono"><strong>${LP.escHtml(db)}</strong></td>
         <td style="text-align:center;"><span style="font-size:11px;color:var(--text-muted);">—</span></td>
         <td style="text-align:right">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" onclick="DB.openExplorer('${LP.escHtml(type)}', '${LP.escHtml(db)}')" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info me-1" onclick="DB.backupDatabase('${LP.escHtml(type)}', '${LP.escHtml(db)}', this)" title="Backup Database (Download & Simpan)"><i class="bi bi-cloud-arrow-down"></i> Backup</button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning me-1" onclick="DB.showRestoreModal('${LP.escHtml(type)}', '${LP.escHtml(db)}')" title="Restore Database (Menimpa Seluruh Data)"><i class="bi bi-cloud-arrow-up"></i> Restore</button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="DB.deleteDb('${LP.escHtml(type)}', '${LP.escHtml(db)}')" title="Delete Database"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.openExplorer((LP.escHtml(type)), (LP.escHtml(db)))
+    })}" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.backupDatabase((LP.escHtml(type)), (LP.escHtml(db)), this)
+    })}" title="Backup Database (Download & Simpan)"><i class="bi bi-cloud-arrow-down"></i> Backup</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.showRestoreModal((LP.escHtml(type)), (LP.escHtml(db)))
+    })}" title="Restore Database (Menimpa Seluruh Data)"><i class="bi bi-cloud-arrow-up"></i> Restore</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.deleteDb((LP.escHtml(type)), (LP.escHtml(db)))
+    })}" title="Delete Database"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No ' + type + ' databases found', 2);
@@ -391,7 +400,8 @@ const DB = (() => {
           listEl.innerHTML = '<p class="text-muted" style="font-size:12px;">No tables found</p>';
         } else {
           listEl.innerHTML = res.data.tables.map(tbl => `
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-start w-100" style="padding:5px 8px;font-size:12px;${activeTable === tbl ? 'background:rgba(99,102,241,0.15);color:var(--accent-primary);' : ''}" onclick="DB.selectTable('${LP.escHtml(tbl)}')">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-start w-100" style="padding:5px 8px;font-size:12px;${activeTable === tbl ? 'background:rgba(99,102,241,0.15);color:var(--accent-primary);' : ''}" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.selectTable((LP.escHtml(tbl)))
+    })}">
               <i class="bi bi-table text-info me-1"></i> ${LP.escHtml(tbl)}
             </button>
           `).join('');
@@ -458,9 +468,11 @@ const DB = (() => {
         const totalPages = Math.ceil(total / parseInt(limit)) || 1;
         const pagEl = document.getElementById('browsePagination');
         pagEl.innerHTML = `
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DB.goToPage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''} style="font-size:11px;padding:2px 8px;"><i class="bi bi-chevron-left"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.goToPage((currentPage - 1))
+    })}" ${currentPage <= 1 ? 'disabled' : ''} style="font-size:11px;padding:2px 8px;"><i class="bi bi-chevron-left"></i></button>
           <span style="font-size:11px;color:var(--text-muted);padding:0 8px;display:flex;align-items:center;">${currentPage} / ${totalPages}</span>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="DB.goToPage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''} style="font-size:11px;padding:2px 8px;"><i class="bi bi-chevron-right"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.goToPage((currentPage + 1))
+    })}" ${currentPage >= totalPages ? 'disabled' : ''} style="font-size:11px;padding:2px 8px;"><i class="bi bi-chevron-right"></i></button>
         `;
 
         renderTableData(rows);
@@ -514,8 +526,9 @@ const DB = (() => {
             <i class="bi ${badgeIcon} me-1"></i>${badgeText}
           </span>
           <code class="text-secondary text-truncate" style="max-width:150px;font-size:11px;" title="${LP.escHtml(rawJsonStr)}">${LP.escHtml(compact)}</code>
-          <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0 px-1 text-info border-0" 
-            onclick="event.stopPropagation(); DB.openJsonModal('${encCol}', '${encData}')" 
+          <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm py-0 px-1 text-info border-0"
+            data-lp-on-click="${LP.registerInlineHandler('click', function (event) { event.stopPropagation(); DB.openJsonModal((encCol), (encData))
+            })}"
             title="Lihat Detail JSON / Object" style="font-size:11px;height:20px;line-height:1;">
             <i class="bi bi-arrows-fullscreen"></i>
           </button>
@@ -683,7 +696,8 @@ const DB = (() => {
       const res = await LP.get('/database/query-history');
       if (res?.success && res.data.history?.length > 0) {
         document.getElementById('historyList').innerHTML = res.data.history.slice(0, 50).map(h => `
-          <div class="lp-glass-card" style="padding:10px;margin-bottom:5px;font-size:12px;cursor:pointer;" onclick="document.getElementById('queryInput').value='${LP.escHtml(h.query).replace(/'/g, "\\'")}';DB.switchExplorerTab('query')">
+          <div class="lp-glass-card" style="padding:10px;margin-bottom:5px;font-size:12px;cursor:pointer;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { document.getElementById('queryInput').value=(LP.escHtml(h.query).replace(/'/g, "\\'"));DB.switchExplorerTab('query')
+    })}">
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
               <span class="text-info" style="font-size:10px;text-transform:uppercase;">${LP.escHtml(h.type)} / ${LP.escHtml(h.database)}</span>
               <span style="color:var(--text-muted);font-size:10px;">${new Date(h.timestamp).toLocaleString()}</span>
@@ -770,7 +784,7 @@ const DB = (() => {
 
     if (!Array.isArray(rows) || rows.length === 0) {
       head.innerHTML = '<tr><th>No Data</th></tr>';
-      body.innerHTML = '<tr><td class="text-muted">Table is empty. <button class="btn-lp btn-lp-primary btn-lp-sm ms-2" onclick="DB.showInsertRowModal()"><i class="bi bi-plus"></i> Add First Row</button></td></tr>';
+      body.innerHTML = '<tr><td class="text-muted">Table is empty. <button class="btn-lp btn-lp-primary btn-lp-sm ms-2" data-lp-on-click="' + LP.registerInlineHandler('click', function () { DB.showInsertRowModal(); }) + '"><i class="bi bi-plus"></i> Add First Row</button></td></tr>';
       return;
     }
 
@@ -780,7 +794,8 @@ const DB = (() => {
     head.innerHTML = `
       <tr>
         <th style="width:40px;text-align:center;">#</th>
-        ${currentColumns.map(c => `<th class="sortable${currentSort.column === c ? ' ' + currentSort.dir.toLowerCase() : ''}" onclick="LP.call('DB.sortColumn', '${LP.encJsArg(c)}')">${LP.escHtml(c)}</th>`).join('')}
+        ${currentColumns.map(c => `<th class="sortable${currentSort.column === c ? ' ' + currentSort.dir.toLowerCase() : ''}" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DB.sortColumn', (LP.encJsArg(c)))
+    })}">${LP.escHtml(c)}</th>`).join('')}
         <th style="width:70px;text-align:center;">Actions</th>
       </tr>
     `;
@@ -791,12 +806,14 @@ const DB = (() => {
         <tr>
           <td style="text-align:center;color:var(--text-muted);font-size:11px;">${(currentPage - 1) * parseInt(document.getElementById('browseLimit')?.value || 50) + idx + 1}</td>
           ${currentColumns.map(col => `
-            <td ondblclick="DB.makeCellEditable(this, '${LP.escHtml(col)}', '${LP.escHtml(pkCol)}', '${LP.escHtml(String(pkVal))}')" title="Double click to edit" style="cursor:pointer;">
+            <td data-lp-on-dblclick="${LP.registerInlineHandler('dblclick', function (_event) { DB.makeCellEditable(this, (LP.escHtml(col)), (LP.escHtml(pkCol)), (LP.escHtml(String(pkVal))))
+    })}" title="Double click to edit" style="cursor:pointer;">
               ${formatCellValue(row[col], col)}
             </td>
           `).join('')}
           <td style="text-align:center;">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" style="padding:2px 6px;" onclick="DB.deleteRow('${LP.escHtml(pkCol)}', '${LP.escHtml(String(pkVal))}')" title="Delete Row">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" style="padding:2px 6px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.deleteRow((LP.escHtml(pkCol)), (LP.escHtml(String(pkVal))))
+    })}" title="Delete Row">
               <i class="bi bi-trash"></i>
             </button>
           </td>
@@ -914,7 +931,8 @@ const DB = (() => {
               <h5 class="modal-title font-mono" style="font-size:14px;"><i class="bi bi-plus-circle text-primary me-2"></i>Insert Row into <code>${LP.escHtml(activeTable)}</code></h5>
               <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="insertRowForm" onsubmit="DB.submitInsertRow(event)">
+            <form id="insertRowForm" data-lp-on-submit="${LP.registerInlineHandler('submit', function (event) { DB.submitInsertRow(event)
+    })}">
               <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
                 ${fieldsHtml}
               </div>

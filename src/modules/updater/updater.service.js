@@ -11,24 +11,33 @@
  *   - Backup sebelum update: tar.gz dari seluruh direktori panel (excl node_modules, storage)
  */
 
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import util from 'util';
 import path from 'path';
 import fs from 'fs/promises';
+import { existsSync } from 'fs';
 import logger from '../../config/logger.js';
+import { getAppRoot, getStorageDir } from '../../config/paths.js';
 
 const execAsync = util.promisify(exec);
 
-// ── Paths ──────────────────────────────────────────────────────────
-const PANEL_DIR       = process.cwd();
-const STORAGE_DIR     = path.join(PANEL_DIR, 'storage');
+// ── Paths (resolved from the module location, NOT process.cwd) ─────
+const PANEL_DIR       = getAppRoot();
+const STORAGE_DIR     = getStorageDir();
 const HISTORY_FILE    = path.join(STORAGE_DIR, 'update_history.json');
+const STATE_FILE      = path.join(STORAGE_DIR, 'update_state.json');
 const PANEL_CONFIG    = path.join(STORAGE_DIR, 'panel.json');
 const SYSTEM_CONFIG   = path.join(STORAGE_DIR, 'system.json');
 const BACKUP_DIR      = path.join(STORAGE_DIR, 'panel-backups');
+const QUARANTINE_DIR  = path.join(STORAGE_DIR, 'update-backup');
+const SUPERVISOR_SCRIPT = path.join(PANEL_DIR, 'scripts', 'panel-update.sh');
+const SUPERVISOR_STALE_MS = 30 * 60 * 1000;
 
 class UpdaterService {
   constructor() {
+    this._running = false;      // guards performUpdate (single update at a time)
+    this._activeJob = null;     // { id, status, startedAt, log, ... }
+    this._lastJob = null;
     this._initStorage();
   }
 
@@ -36,6 +45,7 @@ class UpdaterService {
   async _initStorage() {
     try {
       await fs.mkdir(BACKUP_DIR, { recursive: true });
+      await fs.mkdir(QUARANTINE_DIR, { recursive: true });
       await fs.mkdir(STORAGE_DIR, { recursive: true });
     } catch { /* ignore */ }
   }
@@ -52,6 +62,420 @@ class UpdaterService {
 
   async _writeJSON(filePath, data) {
     await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+  }
+
+  // ── Job status / persisted update state ──────────────────────────
+  async _writeState(state) {
+    try {
+      await this._writeJSON(STATE_FILE, {
+        ...state,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      logger.warn(`Updater: could not persist update state: ${err.message}`);
+    }
+  }
+
+  async _readState() {
+    return this._readJSON(STATE_FILE, null);
+  }
+
+  _stateIsStale(state) {
+    const stamp = Date.parse(state?.updatedAt || state?.startedAt || '');
+    return !Number.isFinite(stamp) || Date.now() - stamp > SUPERVISOR_STALE_MS;
+  }
+
+  isUpdateRunning() {
+    return this._running;
+  }
+
+  /**
+   * Start an update in the background and return immediately.
+   *
+   * On Linux the real work is handed to a detached supervisor
+   * (`scripts/panel-update.sh`) so it survives the panel restart, polls
+   * /api/health and can roll back when the new commit does not boot within
+   * 120 seconds. On Windows/tests we keep using the in-process job.
+   */
+  async startUpdateJob(options = {}) {
+    if (this._running || this._activeJob) {
+      const err = new Error('An update is already in progress');
+      err.code = 'UPDATE_IN_PROGRESS';
+      err.statusCode = 409;
+      throw err;
+    }
+
+    const job = {
+      id: `upd_${Date.now().toString(36)}`,
+      status: 'running',
+      phase: 'starting',
+      startedAt: new Date().toISOString(),
+      log: 'Update started. This can take several minutes (git + npm + native build)...',
+      supervised: false,
+    };
+
+    this._running = true;
+    this._activeJob = job;
+    this._lastJob = job;
+
+    if (this._supervisorEnabled()) {
+      job.supervised = true;
+      await this._writeState(job);
+      try {
+        await this._spawnSupervisor(job, options);
+        void this._monitorSupervisor(job);
+        return { jobId: job.id, status: job.status, startedAt: job.startedAt, supervised: true };
+      } catch (err) {
+        logger.warn(`Updater: supervisor could not start (${err.message}); falling back to in-process update`);
+        job.supervised = false;
+        job.phase = 'updating';
+        job.log = `${job.log}\n⚠️ Supervisor unavailable: ${err.message}\nContinuing in-process.`;
+      }
+    }
+
+    await this._writeState(job);
+    this._runJobInProcess(job, options);
+    return { jobId: job.id, status: job.status, startedAt: job.startedAt };
+  }
+
+  _supervisorEnabled() {
+    if (process.env.PANELKU_UPDATE_SUPERVISOR === 'false') return false;
+    if (process.platform === 'win32' || process.env.NODE_ENV === 'test') return false;
+    // Containers cannot restart themselves with systemctl/pm2; let the
+    // orchestrator do it and use the in-process fallback.
+    if (existsSync('/.dockerenv')) return false;
+    return existsSync(SUPERVISOR_SCRIPT);
+  }
+
+  async _spawnSupervisor(job, options = {}) {
+    const info = await this.getVersionInfo();
+    const branch = this._validateGitRef(options.branch || info.branch || 'master');
+    const channel = this._validateChannel(options.channel || info.channel || 'stable');
+    const previousCommit = info.commit || '';
+    const healthTimeout = Math.min(
+      Math.max(parseInt(process.env.PANELKU_UPDATE_HEALTH_TIMEOUT) || 120000, 30000),
+      600000
+    );
+
+    const args = [
+      '--job-id', job.id,
+      '--branch', branch,
+      '--channel', channel,
+      '--previous-commit', previousCommit,
+      '--panel-dir', PANEL_DIR,
+      '--storage-dir', STORAGE_DIR,
+      '--state-file', STATE_FILE,
+      '--service', process.env.PANELKU_SERVICE || 'panelku',
+      '--port', String(parseInt(process.env.PORT) || 23456),
+      '--health-timeout', String(healthTimeout),
+    ];
+
+    const env = {
+      ...process.env,
+      PANELKU_HOME: PANEL_DIR,
+      PANELKU_STORAGE: STORAGE_DIR,
+      PANELKU_NODE_BIN: process.execPath || 'node',
+    };
+
+    // systemd kills the whole service cgroup on restart. Run the supervisor in
+    // its own transient unit so it survives `systemctl restart panelku`.
+    const systemdRun = (await this._runCommand('which systemd-run 2>/dev/null').catch(() => '')).trim();
+    if (systemdRun && !systemdRun.includes('[ERROR]')) {
+      const unit = `panelku-update-${job.id}`.replace(/[^a-zA-Z0-9_.-]/g, '-');
+      const child = spawn(systemdRun, [
+        '--unit', unit,
+        '--collect',
+        '--quiet',
+        '--property=Type=oneshot',
+        `--property=WorkingDirectory=${PANEL_DIR}`,
+        // systemd-run does not inherit the caller's environment.
+        `--setenv=PANELKU_HOME=${PANEL_DIR}`,
+        `--setenv=PANELKU_STORAGE=${STORAGE_DIR}`,
+        `--setenv=PANELKU_NODE_BIN=${process.execPath || 'node'}`,
+        `--setenv=NODE_ENV=${process.env.NODE_ENV || 'production'}`,
+        'bash', SUPERVISOR_SCRIPT, ...args,
+      ], {
+        cwd: PANEL_DIR,
+        env,
+        detached: true,
+        stdio: 'ignore',
+      });
+      child.unref();
+      logger.info(`Updater: detached supervisor started in systemd unit ${unit}`);
+      return;
+    }
+
+    const child = spawn('bash', [SUPERVISOR_SCRIPT, ...args], {
+      cwd: PANEL_DIR,
+      env,
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+    logger.info('Updater: detached supervisor started (no systemd-run available)');
+  }
+
+  /**
+   * Mirror the supervisor's persisted state into the in-memory job so
+   * /api/updater/status stays useful while the panel is still up.
+   */
+  async _monitorSupervisor(job) {
+    const deadline = Date.now() + 45 * 60 * 1000;
+    try {
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const state = await this._readState();
+        if (!state || state.id !== job.id) continue;
+
+        Object.assign(job, state);
+        if (['success', 'failed', 'rolled_back', 'interrupted'].includes(state.status)) {
+          this._running = false;
+          this._activeJob = null;
+          return;
+        }
+      }
+      logger.warn('Updater: supervisor status did not reach a terminal state within 45 minutes');
+    } catch (err) {
+      logger.warn(`Updater: supervisor monitor stopped: ${err.message}`);
+    }
+  }
+
+  _runJobInProcess(job, options) {
+    // Fire-and-forget: errors are captured into the job state.
+    void (async () => {
+      try {
+        const result = await this.performUpdate({ ...options, _internal: true });
+        Object.assign(job, {
+          status: result.success ? 'success' : 'failed',
+          phase: result.success ? 'done' : 'failed',
+          finishedAt: new Date().toISOString(),
+          log: result.log || job.log,
+          result,
+        });
+      } catch (err) {
+        Object.assign(job, {
+          status: 'failed',
+          phase: 'failed',
+          finishedAt: new Date().toISOString(),
+          error: err.message,
+          log: `${job.log || ''}\n❌ ${err.message}`.trim(),
+        });
+      } finally {
+        this._running = false;
+        this._activeJob = null;
+        await this._writeState({
+          ...job,
+          restartPending: job.status === 'success',
+          expectedCommit: job.result?.commit || null,
+          previousCommit: job.result?.previousCommit || null,
+        });
+      }
+    })();
+  }
+
+  async getUpdateStatus() {
+    const persisted = await this._readState();
+
+    if (this._activeJob?.supervised) {
+      if (persisted && persisted.id === this._activeJob.id) {
+        return { ...this._activeJob, ...persisted };
+      }
+      return this._activeJob;
+    }
+
+    if (this._activeJob) return this._activeJob;
+    if (this._lastJob) return this._lastJob;
+    return persisted || { status: 'idle' };
+  }
+
+  /**
+   * Called on startup: if the previous run ended with a successful update and a
+   * pending restart, confirm that the new commit is actually running.
+   */
+  async markBootVerified() {
+    try {
+      const state = await this._readState();
+      if (!state) return;
+
+      // The process died mid-update (crash, OOM, manual restart). There is no
+      // worker anymore; mark it so the UI does not poll a "running" job forever.
+      if (state.status === 'running') {
+        // A detached supervisor is still doing the work. Only declare it
+        // interrupted when the state file has not been touched for 30 minutes.
+        if (state.supervised && !this._stateIsStale(state)) {
+          await this._writeState({ ...state, bootSeenAt: new Date().toISOString() });
+          return;
+        }
+        await this._writeState({
+          ...state,
+          status: 'interrupted',
+          phase: 'interrupted',
+          finishedAt: new Date().toISOString(),
+          restartPending: false,
+          error: 'Panel restarted while the update job was running',
+        });
+        return;
+      }
+
+      // Supervisor restarted the panel and is polling /api/health. Let it
+      // decide success/rollback; bootstrap only records that the new process
+      // came up.
+      if (state.status === 'restarting' && state.supervised) {
+        await this._writeState({
+          ...state,
+          phase: 'health-check',
+          bootSeenAt: new Date().toISOString(),
+        });
+        return;
+      }
+
+      if (state.status !== 'success' || !state.restartPending) return;
+
+      const current = (await this._runCommand('git rev-parse HEAD 2>/dev/null')).trim();
+      if (state.expectedCommit && current && !current.startsWith(state.expectedCommit)) {
+        logger.warn(`Updater: boot commit mismatch (expected ${state.expectedCommit.slice(0, 8)}, got ${current.slice(0, 8)})`);
+        await this._writeState({ ...state, restartPending: false, bootMismatch: true, bootCheckedAt: new Date().toISOString() });
+        return;
+      }
+
+      await this._writeState({
+        ...state,
+        restartPending: false,
+        bootVerifiedAt: new Date().toISOString(),
+        runningCommit: current || null,
+      });
+      logger.info('Updater: post-restart boot verification succeeded');
+    } catch (err) {
+      logger.warn(`Updater: boot verification skipped: ${err.message}`);
+    }
+  }
+
+  // ── Git safety helpers ───────────────────────────────────────────
+  _pullFailed(output = '') {
+    const s = String(output).toLowerCase();
+    return (
+      output.includes('[ERROR]') ||
+      s.includes('error:') ||
+      s.includes('fatal:') ||
+      s.includes('aborting') ||
+      s.includes('would be overwritten') ||
+      s.includes('untracked working tree') ||
+      s.includes('divergent branches') ||
+      s.includes('not possible to fast-forward')
+    );
+  }
+
+  /**
+   * Parse the file list from git messages such as:
+   *   error: The following untracked working tree files would be overwritten by merge:
+   *       plugins/foo/index.js
+   */
+  _extractUntrackedConflicts(output = '') {
+    const files = [];
+    const lines = String(output).split(/\r?\n/);
+    let collecting = false;
+
+    for (const line of lines) {
+      if (/would be (overwritten|removed) by (merge|checkout)/i.test(line)) {
+        collecting = true;
+        continue;
+      }
+      if (!collecting) continue;
+
+      if (!line.trim()) {
+        if (files.length) break;
+        continue;
+      }
+      if (/^\s+/.test(line)) {
+        files.push(line.trim());
+      } else if (files.length) {
+        break;
+      }
+    }
+
+    return [...new Set(files)];
+  }
+
+  /** Move untracked files that block a merge into storage/update-backup/<timestamp>/. */
+  async _quarantineFiles(files, timestamp) {
+    if (!files.length) return [];
+
+    const destRoot = path.join(QUARANTINE_DIR, String(timestamp).replace(/[:.]/g, '-'));
+    const moved = [];
+
+    for (const rel of files) {
+      const normalized = path.normalize(rel).replace(/^[/\\]+/, '');
+      const src = path.resolve(PANEL_DIR, normalized);
+      if (!src.startsWith(PANEL_DIR + path.sep)) continue; // path traversal guard
+
+      try {
+        const dest = path.join(destRoot, normalized);
+        await fs.mkdir(path.dirname(dest), { recursive: true });
+        await fs.rename(src, dest);
+        moved.push(normalized);
+      } catch (err) {
+        logger.warn(`Updater: could not quarantine ${normalized}: ${err.message}`);
+      }
+    }
+
+    if (moved.length) {
+      await fs.writeFile(
+        path.join(destRoot, 'MANIFEST.txt'),
+        `Quarantined before update at ${timestamp}\n\n${moved.join('\n')}\n`,
+        'utf8'
+      );
+    }
+
+    return moved;
+  }
+
+  /** Keep local commits + uncommitted changes recoverable before a hard reset. */
+  async _createRecoveryBundle(timestamp) {
+    const safeTs = String(timestamp).replace(/[:.]/g, '-');
+    const file = path.join(BACKUP_DIR, `pre-update-${safeTs}.bundle`);
+    try {
+      await this._runChecked(`git bundle create "${file}" --all`, { cwd: PANEL_DIR });
+      return file;
+    } catch (err) {
+      logger.warn(`Updater: recovery bundle skipped: ${err.message}`);
+      return null;
+    }
+  }
+
+  async _saveWorkingTreePatch(timestamp) {
+    const dir = path.join(QUARANTINE_DIR, String(timestamp).replace(/[:.]/g, '-'));
+    const file = path.join(dir, 'working-tree.patch');
+    try {
+      await fs.mkdir(dir, { recursive: true });
+      await this._runCommand(`git diff --binary > "${file}"`, { cwd: PANEL_DIR });
+      return file;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Verify the new build before declaring success. Catches broken imports,
+   * missing dependencies and native addon ABI mismatches — not just syntax.
+   */
+  async _verifyBoot(log = []) {
+    const node = process.execPath || 'node';
+
+    await this._runChecked(`"${node}" --check src/app.js`, { cwd: PANEL_DIR, timeout: 30000 });
+
+    // Importing the whole app module graph catches missing modules/files.
+    await this._runChecked(
+      `"${node}" --input-type=module -e "await import('./src/app.js');"`,
+      { cwd: PANEL_DIR, timeout: 120000 }
+    );
+
+    const native = await this._checkNativeModules();
+    if (!native.sqliteOk) {
+      throw new Error(`better-sqlite3 failed to load after update: ${native.sqliteError || 'unknown error'}`);
+    }
+    if (!native.ptyOk) {
+      log.push(`   ⚠️ node-pty unavailable (Web Terminal disabled): ${native.ptyError || 'unknown error'}`);
+    }
   }
 
   async _runCommand(cmd, options = {}) {
@@ -74,15 +498,37 @@ class UpdaterService {
           return this._mockCommand(cmd);
         }
       }
-      const { stdout, stderr } = await execAsync(cmd, { timeout: 120000, ...options });
+      const { stdout, stderr } = await execAsync(cmd, { cwd: PANEL_DIR, timeout: 120000, maxBuffer: 10 * 1024 * 1024, ...options });
       return stdout || stderr || '';
     } catch (error) {
       if (process.platform === 'win32' || process.env.NODE_ENV === 'test') {
         const mocked = this._mockCommand(cmd);
         if (mocked) return mocked;
       }
-      const output = (error.stdout || error.stderr || error.message || '').trim();
+      const output = [error.stdout, error.stderr, error.message]
+        .filter(Boolean)
+        .join('\n')
+        .trim();
       return `[ERROR] ${output || error.message}`;
+    }
+  }
+
+  /**
+   * Like _runCommand, but THROWS on failure.
+   *
+   * Critical update steps (git/npm/rebuild) must never be reported as success
+   * when the underlying command failed.
+   */
+  async _runChecked(cmd, options = {}) {
+    try {
+      const { stdout, stderr } = await execAsync(cmd, { cwd: PANEL_DIR, timeout: 300000, maxBuffer: 10 * 1024 * 1024, ...options });
+      return (stdout || stderr || '').toString();
+    } catch (error) {
+      const output = [error.stdout, error.stderr, error.message]
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+      throw new Error(output || error.message || `Command failed: ${cmd}`);
     }
   }
 
@@ -328,15 +774,32 @@ class UpdaterService {
     let behindCount = 0;
     let changelogSummary = '';
     let diffStats = { files: 0, insertions: 0, deletions: 0 };
+    let checkFailed = false;
+    let checkError = null;
 
     try {
       const safeBranch = this._validateGitRef(info.branch);
 
-      // Ensure safe directory is configured
+      // Ensure safe directory is configured (scoped to the panel dir only)
       await this._runCommand(`git config --global --add safe.directory "${PANEL_DIR}"`).catch(() => {});
 
-      // Fetch remote
-      await this._runCommand('git fetch origin').catch(() => {});
+      // Fetch remote — a failure here MUST be surfaced, not reported as "up to date"
+      const fetchOut = await this._runCommand('git fetch origin 2>&1');
+      if (this._pullFailed(fetchOut)) {
+        checkFailed = true;
+        checkError = `git fetch failed: ${fetchOut.replace('[ERROR]', '').trim()}`;
+        logger.warn(`Update check: ${checkError}`);
+        return {
+          ...info,
+          latest,
+          hasUpdate: false,
+          behindCount: 0,
+          changelogSummary,
+          diffStats,
+          checkFailed,
+          checkError,
+        };
+      }
 
       // Count commits behind using cross-platform git rev-list
       let behindOut = await this._runCommand(
@@ -347,7 +810,13 @@ class UpdaterService {
         behindOut = await this._runCommand(
           `git log HEAD..origin/${safeBranch} --oneline`
         );
-        behindCount = behindOut.includes('[ERROR]') ? 0 : behindOut.trim().split('\n').filter(Boolean).length;
+        if (behindOut.includes('[ERROR]')) {
+          checkFailed = true;
+          checkError = `Cannot compare with origin/${safeBranch}: ${behindOut.replace('[ERROR]', '').trim()}`;
+          behindCount = 0;
+        } else {
+          behindCount = behindOut.trim().split('\n').filter(Boolean).length;
+        }
       } else {
         behindCount = parseInt(behindOut.trim()) || 0;
       }
@@ -392,6 +861,8 @@ class UpdaterService {
         }
       }
     } catch (err) {
+      checkFailed = true;
+      checkError = err.message;
       logger.warn(`Update check failed: ${err.message}`);
     }
 
@@ -402,6 +873,8 @@ class UpdaterService {
       behindCount,
       changelogSummary,
       diffStats,
+      checkFailed,
+      checkError,
     };
   }
 
@@ -448,7 +921,12 @@ class UpdaterService {
       ];
 
       const cmd = `tar -czf "${backupFile}" ${excludePatterns.join(' ')} .`;
-      const output = await this._runCommand(cmd, { cwd: PANEL_DIR, timeout: 300000 });
+      const output = await this._runChecked(cmd, { cwd: PANEL_DIR, timeout: 300000 });
+
+      const size = await this._getFileSize(backupFile);
+      if (!size) {
+        throw new Error('backup archive is empty or missing');
+      }
 
       // Save backup record
       const history = await this.getUpdateHistory();
@@ -457,7 +935,7 @@ class UpdaterService {
         id: backupName,
         name: backupName,
         file: backupFile,
-        size: await this._getFileSize(backupFile),
+        size,
         createdAt: new Date().toISOString(),
         type: 'pre-update',
       });
@@ -494,14 +972,28 @@ class UpdaterService {
     const channel = options.channel || 'stable';
     const skipBackup = options.skipBackup || false;
     const dryRun = options.dryRun || false;
+    const internal = options._internal === true;
+    const deferRestart = options._deferRestart === true;
 
     this._validateGitRef(branch);
     this._validateChannel(channel);
+
+    // Single-flight guard: two concurrent updates corrupt node_modules and .git.
+    if (!dryRun) {
+      if (this._running && !internal) {
+        const err = new Error('An update is already in progress');
+        err.code = 'UPDATE_IN_PROGRESS';
+        err.statusCode = 409;
+        throw err;
+      }
+      if (!internal) this._running = true;
+    }
 
     const log = [];
     const timestamp = new Date().toISOString();
     let success = false;
     let backupInfo = null;
+    let newCommit = '';
 
     // Record current state for rollback
     const info = await this.getVersionInfo();
@@ -509,15 +1001,12 @@ class UpdaterService {
     const previousVersion = info.current;
 
     try {
-      // 1. Create backup (unless skipped)
+      // 1. Create backup (unless skipped). A failed backup aborts the update:
+      //    without a recovery point, a destructive git reset is not safe.
       if (!skipBackup && !dryRun) {
         log.push('📦 Creating pre-update backup...');
-        try {
-          backupInfo = await this.createPreUpdateBackup();
-          log.push(`   ✅ Backup created: ${backupInfo.name} (${this._formatSize(backupInfo.size)})`);
-        } catch (err) {
-          log.push(`   ⚠️ Backup failed but continuing: ${err.message}`);
-        }
+        backupInfo = await this.createPreUpdateBackup();
+        log.push(`   ✅ Backup created: ${backupInfo.name} (${this._formatSize(backupInfo.size)})`);
       }
 
       if (dryRun) {
@@ -527,10 +1016,22 @@ class UpdaterService {
 
       // 2. Apply update based on method
       if (method === 'git') {
-        // Mark directory safe for current user/root
-        log.push('🔧 Configuring git safe directory...');
+        // Scoped safe.directory only — never "*" (that disables git's ownership check globally)
+        log.push('🔧 Verifying git repository...');
+        const insideTree = await this._runCommand('git rev-parse --is-inside-work-tree 2>&1');
+        if (insideTree.trim() !== 'true') {
+          throw new Error(
+            `Not a git repository: ${PANEL_DIR}. ` +
+            'This installation cannot self-update. Reinstall with scripts/install.sh (git clone).'
+          );
+        }
         await this._runCommand(`git config --global --add safe.directory "${PANEL_DIR}" 2>&1`).catch(() => {});
-        await this._runCommand('git config --global --add safe.directory "*" 2>&1').catch(() => {});
+
+        // Recovery point: keep local commits and uncommitted changes recoverable
+        const bundle = await this._createRecoveryBundle(timestamp);
+        if (bundle) log.push(`   ✅ Recovery bundle: ${path.basename(bundle)}`);
+        const patch = await this._saveWorkingTreePatch(timestamp);
+        if (patch) log.push('   ✅ Working tree patch saved');
 
         // Backup runtime configs in storage to prevent untracked / overwrite merge conflicts
         const panelJsonPath = path.join(STORAGE_DIR, 'panel.json');
@@ -544,11 +1045,8 @@ class UpdaterService {
         await this._runCommand('git merge --abort 2>&1').catch(() => {});
         await this._runCommand('git rebase --abort 2>&1').catch(() => {});
 
-        // Ignore local changes to tracked runtime config files if present in git index
-        await this._runCommand('git update-index --skip-worktree storage/panel.json 2>&1').catch(() => {});
-        await this._runCommand('git update-index --assume-unchanged storage/panel.json 2>&1').catch(() => {});
-
-        // Discard any accidental local modifications to tracked source files (e.g. package-lock.json modified by npm)
+        // Discard accidental local modifications to tracked source files.
+        // They are already preserved in the patch/bundle created above.
         log.push('🧹 Preparing clean working directory for git pull...');
         await this._runCommand('git checkout HEAD -- . 2>&1').catch(() => {});
 
@@ -556,31 +1054,35 @@ class UpdaterService {
         log.push(`⬇️ Pulling from origin/${branch}...`);
         let pullOut = await this._runCommand(`git pull --no-edit origin ${branch} 2>&1`);
 
-        // If git pull failed or encountered merge/overwrite/untracked conflicts, fallback to robust git fetch + reset --hard
-        if (
-          pullOut.includes('[ERROR]') ||
-          pullOut.toLowerCase().includes('error:') ||
-          pullOut.toLowerCase().includes('fatal:') ||
-          pullOut.includes('Aborting') ||
-          pullOut.includes('would be overwritten by merge') ||
-          pullOut.includes('untracked working tree') ||
-          pullOut.includes('divergent branches')
-        ) {
-          log.push(`   ${pullOut.trim().split('\n').join('\n   ')}`);
-          log.push('   ⚠️ Standard git pull encountered an issue. Falling back to robust git fetch and reset...');
-          const fetchOut = await this._runCommand(`git fetch origin ${branch} 2>&1`);
-          if (fetchOut.includes('[ERROR]') || fetchOut.toLowerCase().includes('fatal:')) {
-            throw new Error(`Git update failed during fetch: ${fetchOut.replace('[ERROR]', '').trim()}`);
+        // Untracked files blocking the merge are quarantined, then pull is retried once.
+        if (this._pullFailed(pullOut)) {
+          const conflicts = this._extractUntrackedConflicts(pullOut);
+          if (conflicts.length) {
+            log.push(`   📦 Moving ${conflicts.length} untracked conflicting file(s) aside...`);
+            const moved = await this._quarantineFiles(conflicts, timestamp);
+            log.push(`   ✅ Moved ${moved.length} file(s) to storage/update-backup/`);
+            pullOut = await this._runCommand(`git pull --no-edit origin ${branch} 2>&1`);
           }
-          // Ensure branch is checked out or set to origin/branch
-          await this._runCommand(`git checkout -B ${branch} origin/${branch} 2>&1`).catch(() => {});
-          const resetOut = await this._runCommand(`git reset --hard origin/${branch} 2>&1`);
-          if (resetOut.includes('[ERROR]') || resetOut.toLowerCase().includes('fatal:')) {
-            throw new Error(`Git update failed during reset: ${resetOut.replace('[ERROR]', '').trim()}`);
-          }
-          pullOut = resetOut;
         }
-        log.push(`   ${pullOut.trim().split('\n').join('\n   ')}`);
+
+        // Last resort: fetch + hard reset (bundle/patch already created)
+        if (this._pullFailed(pullOut)) {
+          log.push(`   ${String(pullOut).trim().split('\n').join('\n   ')}`);
+          log.push('   ⚠️ Standard git pull failed. Falling back to fetch + reset --hard...');
+          // A conflicted merge leaves the index unresolved. Clear MERGE_HEAD
+          // before switching branches, otherwise `checkout -B` itself fails.
+          await this._runCommand('git merge --abort 2>&1').catch(() => {});
+          await this._runCommand('git rebase --abort 2>&1').catch(() => {});
+          await this._runChecked('git reset --hard HEAD 2>&1');
+          const fetchOut = await this._runChecked(`git fetch origin ${branch} 2>&1`);
+          const conflicts = this._extractUntrackedConflicts(fetchOut);
+          if (conflicts.length) {
+            await this._quarantineFiles(conflicts, timestamp);
+          }
+          await this._runChecked(`git checkout -B ${branch} origin/${branch} 2>&1`);
+          pullOut = await this._runChecked(`git reset --hard origin/${branch} 2>&1`);
+        }
+        log.push(`   ${String(pullOut).trim().split('\n').join('\n   ')}`);
 
         // Restore runtime configs
         if (savedPanelConfig) {
@@ -589,67 +1091,39 @@ class UpdaterService {
         if (savedSystemConfig) {
           try { await fs.writeFile(systemJsonPath, savedSystemConfig, 'utf8'); } catch {}
         }
+      }
 
-        // Re-apply skip-worktree to avoid git dirty index
-        await this._runCommand('git update-index --skip-worktree storage/panel.json 2>&1').catch(() => {});
-        await this._runCommand('git update-index --assume-unchanged storage/panel.json 2>&1').catch(() => {});
-
-        // Install dependencies
+      // 3. Install dependencies. npm ci is reproducible and MUST fail loudly.
+      if (method === 'git' || method === 'npm') {
         log.push('📦 Installing npm dependencies...');
-        const npmOut = await this._runCommand('npm install --omit=dev 2>&1');
-        log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
+        const hasLock = await fs.access(path.join(PANEL_DIR, 'package-lock.json'))
+          .then(() => true)
+          .catch(() => false);
+        const installCmd = hasLock ? 'npm ci --omit=dev' : 'npm install --omit=dev';
 
-        // Ensure package-lock.json doesn't remain dirty after npm install
-        await this._runCommand('git checkout HEAD -- package-lock.json 2>&1').catch(() => {});
-
-        log.push('🔨 Rebuilding native dependencies (better-sqlite3, node-pty)...');
-        await this.rebuildNativeModules(log);
-      } else if (method === 'npm') {
-        log.push('📦 Running npm install only...');
-        const npmOut = await this._runCommand('npm install --omit=dev 2>&1');
-        log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
-        log.push('🔨 Rebuilding native dependencies (better-sqlite3, node-pty)...');
-        await this.rebuildNativeModules(log);
-      }
-
-      // 3. Syntax check (health check before restart)
-      log.push('🔍 Running syntax check...');
-      let syntaxOK = false;
-      try {
-        if (process.platform !== 'win32') {
-          await execAsync('node --check src/app.js', { timeout: 15000 });
+        try {
+          const npmOut = await this._runChecked(installCmd, { timeout: 900000 });
+          const tail = npmOut.trim().split('\n').slice(-5).join('\n   ');
+          if (tail) log.push(`   ${tail}`);
+        } catch (err) {
+          throw new Error(`Dependency installation failed (${installCmd}): ${err.message}`);
         }
-        syntaxOK = true;
-        log.push('   ✅ Syntax check passed');
-      } catch (err) {
-        log.push(`   ❌ Syntax check failed: ${err.message}`);
+
+        log.push('🔨 Rebuilding native dependencies (better-sqlite3, node-pty)...');
+        const native = await this.rebuildNativeModules(log);
+        if (!native.sqliteOk) {
+          throw new Error(`better-sqlite3 unusable after update: ${native.sqliteError || 'unknown error'}`);
+        }
+        if (!native.ptyOk) {
+          log.push('   ⚠️ node-pty unavailable — Web Terminal will not work until it is rebuilt');
+        }
       }
 
-      // 4. If syntax check failed, trigger auto-rollback
-      if (!syntaxOK && previousCommit) {
-        log.push('\n⚠️ AUTO-ROLLBACK triggered!');
-        const rollbackResult = await this.performRollback({ commit: previousCommit });
-        log.push(rollbackResult.log);
-        success = false;
-
-        // Save failed update to history
-        await this._saveUpdateHistory({
-          type: 'update',
-          status: 'failed_rolled_back',
-          fromVersion: previousVersion,
-          toVersion: null,
-          previousCommit,
-          newCommit: '',
-          method,
-          branch,
-          channel,
-          backup: backupInfo?.name || null,
-          log: log.join('\n'),
-          timestamp,
-        });
-
-        return { success: false, log: log.join('\n'), rollback: true };
-      }
+      // 4. Verify the new build can actually boot (imports + native modules),
+      //    not merely parse: `node --check` cannot detect missing files/deps.
+      log.push('🔍 Verifying new build...');
+      await this._verifyBoot(log);
+      log.push('   ✅ Boot verification passed');
 
       // 5. Save last updated timestamp
       const panelCfg = await this._readJSON(PANEL_CONFIG, {});
@@ -660,7 +1134,6 @@ class UpdaterService {
       success = true;
 
       // Get new commit
-      let newCommit = '';
       try {
         const commitOut = await this._runCommand('git rev-parse HEAD 2>/dev/null');
         newCommit = commitOut.trim();
@@ -683,8 +1156,12 @@ class UpdaterService {
       });
 
       log.push('\n✅ Update completed successfully!');
-      log.push('⏳ Panel will restart in 5 seconds...');
-      setTimeout(() => { this.restartPanel().catch(() => {}); }, 5000);
+      if (deferRestart) {
+        log.push('⏳ Update supervisor will restart the panel and verify /api/health.');
+      } else {
+        log.push('⏳ Panel will restart in 5 seconds...');
+        setTimeout(() => { this.restartPanel().catch(() => {}); }, 5000);
+      }
     } catch (err) {
       log.push(`\n❌ Update failed: ${err.message}`);
 
@@ -692,7 +1169,7 @@ class UpdaterService {
       if (previousCommit) {
         log.push('\n⚠️ Attempting auto-rollback...');
         try {
-          const rollbackResult = await this.performRollback({ commit: previousCommit });
+          const rollbackResult = await this.performRollback({ commit: previousCommit, _deferRestart: deferRestart });
           log.push(rollbackResult.log);
         } catch (rbErr) {
           log.push(`❌ Rollback failed: ${rbErr.message}`);
@@ -715,17 +1192,20 @@ class UpdaterService {
       });
     }
 
-    return { success, log: log.join('\n'), backupInfo };
+    if (!internal && !dryRun) this._running = false;
+    return { success, log: log.join('\n'), backupInfo, commit: newCommit, previousCommit };
   }
 
   // ── Rollback ─────────────────────────────────────────────────────
   async performRollback(options = {}) {
     const commit = options.commit;
     const restoreBackup = options.restoreBackup || null; // backup id from listBackups
+    const deferRestart = options._deferRestart === true;
     const timestamp = new Date().toISOString();
     const log = [];
 
     let targetCommit = commit;
+    let verified = false;
 
     try {
       if (restoreBackup) {
@@ -741,7 +1221,7 @@ class UpdaterService {
         }
 
         // Extract backup
-        const extractOut = await this._runCommand(
+        const extractOut = await this._runChecked(
           `tar -xzf "${backupFile}"`,
           { cwd: PANEL_DIR, timeout: 300000 }
         );
@@ -757,36 +1237,41 @@ class UpdaterService {
         // Git reset to specific commit
         const validatedCommit = this._validateCommitHash(commit);
         log.push(`🔙 Rolling back to commit ${validatedCommit.substring(0, 8)}...`);
-        const resetOut = await this._runCommand(`git reset --hard ${validatedCommit} 2>&1`);
+        const resetOut = await this._runChecked(`git reset --hard ${validatedCommit} 2>&1`);
         log.push(`   ${resetOut.trim()}`);
         targetCommit = validatedCommit;
       }
 
       // Reinstall dependencies after rollback
       log.push('📦 Re-installing npm dependencies...');
-      const npmOut = await this._runCommand('npm install --omit=dev 2>&1');
-      log.push(`   ${npmOut.trim().split('\n').slice(0, 3).join('\n   ')}`);
-      log.push('🔨 Rebuilding native dependencies after rollback (better-sqlite3, node-pty)...');
-      await this.rebuildNativeModules(log);
+      const hasLock = await fs.access(path.join(PANEL_DIR, 'package-lock.json'))
+        .then(() => true)
+        .catch(() => false);
+      const installCmd = hasLock ? 'npm ci --omit=dev' : 'npm install --omit=dev';
+      const npmOut = await this._runChecked(installCmd, { timeout: 900000 });
+      log.push(`   ${npmOut.trim().split('\n').slice(-5).join('\n   ')}`);
 
-      // Syntax check
-      log.push('🔍 Running syntax check after rollback...');
-      let syntaxOK = false;
+      log.push('🔨 Rebuilding native dependencies after rollback (better-sqlite3, node-pty)...');
+      const native = await this.rebuildNativeModules(log);
+      if (!native.sqliteOk) {
+        throw new Error(`better-sqlite3 unusable after rollback: ${native.sqliteError || 'unknown error'}`);
+      }
+
+      // Boot verification
+      log.push('🔍 Verifying rollback build...');
       try {
-        if (process.platform !== 'win32') {
-          await execAsync('node --check src/app.js', { timeout: 15000 });
-        }
-        syntaxOK = true;
-        log.push('   ✅ Syntax check passed');
+        await this._verifyBoot(log);
+        verified = true;
+        log.push('   ✅ Boot verification passed');
       } catch (err) {
-        log.push(`   ⚠️ Syntax check failed after rollback: ${err.message}`);
+        log.push(`   ⚠️ Boot verification failed after rollback: ${err.message}`);
       }
 
       // Save rollback to history
       const info = await this.getVersionInfo();
       await this._saveUpdateHistory({
         type: 'rollback',
-        status: syntaxOK ? 'success' : 'failed',
+        status: verified ? 'success' : 'failed',
         fromVersion: '',
         toVersion: info.current,
         previousCommit: '',
@@ -799,12 +1284,16 @@ class UpdaterService {
         timestamp,
       });
 
-      log.push(syntaxOK
+      log.push(verified
         ? '\n✅ Rollback completed successfully!'
-        : '\n⚠️ Rollback completed but syntax check failed — panel may not start correctly.'
+        : '\n⚠️ Rollback completed but boot verification failed — panel may not start correctly.'
       );
-      log.push('⏳ Panel will restart in 5 seconds...');
-      setTimeout(() => { this.restartPanel().catch(() => {}); }, 5000);
+      if (deferRestart) {
+        log.push('⏳ Update supervisor will restart the panel and verify /api/health.');
+      } else {
+        log.push('⏳ Panel will restart in 5 seconds...');
+        setTimeout(() => { this.restartPanel().catch(() => {}); }, 5000);
+      }
     } catch (err) {
       log.push(`\n❌ Rollback failed: ${err.message}`);
       await this._saveUpdateHistory({
@@ -824,7 +1313,7 @@ class UpdaterService {
       return { success: false, log: log.join('\n') };
     }
 
-    return { success: true, log: log.join('\n'), commit: targetCommit };
+    return { success: verified, log: log.join('\n'), commit: targetCommit };
   }
 
   // ── Restart Panel ────────────────────────────────────────────────
@@ -856,9 +1345,10 @@ class UpdaterService {
             throw new Error(pm2Out);
           }
         } catch {
-          logger.warn('Updater: PM2 restart failed, falling back to process.exit(0)');
+          logger.warn('Updater: PM2 restart failed, falling back to process.exit(1)');
           if (process.env.NODE_ENV === 'production' || process.env.pm_id !== undefined) {
-            process.exit(0);
+            // Exit non-zero so supervisors with Restart=on-failure (systemd) restart us.
+            process.exit(1);
           }
         }
       }
@@ -1011,8 +1501,8 @@ class UpdaterService {
     const history = await this.getUpdateHistory();
     history.updates = history.updates || [];
     history.updates.unshift(entry);
-    // Keep max 100 entries
-    history.updates = history.updates.slice(0, 100);
+    // Keep max 50 entries (Sprint 1 retention policy)
+    history.updates = history.updates.slice(0, 50);
     await this._writeJSON(HISTORY_FILE, history);
   }
 

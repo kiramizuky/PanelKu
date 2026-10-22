@@ -1,0 +1,27 @@
+# Normalize line endings: the repository is stored with LF everywhere.
+# This prevents "modified" noise on Windows (core.autocrlf) and broken shell
+# scripts on Linux after a checkout/update.
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.js   text eol=lf
+*.cjs  text eol=lf
+*.mjs  text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.md   text eol=lf
+
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.eot  binary

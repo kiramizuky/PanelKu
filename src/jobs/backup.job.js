@@ -3,8 +3,9 @@ import logger from '../config/logger.js';
 import { getDb } from '../core/db/sqlite.js';
 import fs from 'fs/promises';
 import path from 'path';
+import { getStorageDir } from '../config/paths.js';
 
-const BACKUP_DIR = path.resolve(process.cwd(), 'storage', 'backups');
+const BACKUP_DIR = path.join(getStorageDir(), 'backups');
 
 export const startBackupJob = () => {
   // Register recurring job: every 24 hours (86,400,000 ms)

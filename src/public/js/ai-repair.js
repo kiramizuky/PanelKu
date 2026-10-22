@@ -169,8 +169,7 @@ const AIRepairPage = {
                   ${i.name || i.type}${i.value ? ` (${i.value}%)` : ''}
                 </span>
               </div>
-            `).join('')
-          }
+            `).join('')}
         </div>
         ${(data.recommendations || []).length > 0 ? `
           <div class="col-12">
@@ -183,7 +182,8 @@ const AIRepairPage = {
           </div>
         ` : ''}
         <div class="col-12">
-          <button class="btn-lp btn-lp-ghost btn-sm" onclick="LP.call('AIRepairPage.runDiagnostic')">
+          <button class="btn-lp btn-lp-ghost btn-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('AIRepairPage.runDiagnostic')
+    })}">
             <i class="bi bi-arrow-clockwise me-1"></i> Refresh Diagnostic
           </button>
         </div>
@@ -262,7 +262,8 @@ const AIRepairPage = {
           if (d.aiAnalysis) html += `<div style="padding:10px;background:rgba(99,102,241,0.08);border-radius:8px;font-size:12px;">${this._formatAIResponse(d.aiAnalysis)}</div>`;
           html += `<div style="margin-top:10px;font-size:12px;">${d.message || ''}</div>`;
           if (d.autoFixable) {
-            html += `<button class="btn-lp btn-lp-primary btn-sm mt-2" onclick="LP.call('AIRepairPage.runFix', '${LP.encJsArg(d.fixId)}')"><i class="bi bi-wrench me-1"></i> Apply Fix</button>`;
+            html += `<button class="btn-lp btn-lp-primary btn-sm mt-2" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('AIRepairPage.runFix', (LP.encJsArg(d.fixId)))
+    })}"><i class="bi bi-wrench me-1"></i> Apply Fix</button>`;
           }
         } else {
           html = `<div style="color:var(--text-muted);">${d.message || 'No matching fix found'}</div>`;
@@ -295,7 +296,8 @@ const AIRepairPage = {
             <span class="lp-badge lp-badge-${sevColors[p.severity] || 'secondary'}" style="font-size:8px;text-transform:uppercase;">${p.severity}</span>
           </div>
           <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">${p.description}</div>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('AIRepairPage.runFix', '${LP.encJsArg(p.id)}')" style="font-size:11px;">
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('AIRepairPage.runFix', (LP.encJsArg(p.id)))
+    })}" style="font-size:11px;">
             <i class="bi bi-wrench me-1"></i> Apply Fix Now
           </button>
         </div>

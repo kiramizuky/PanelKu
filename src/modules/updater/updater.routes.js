@@ -15,6 +15,7 @@ router.get('/diff', rbac(RESOURCES.SYSTEM, ACTIONS.READ), updaterController.getD
 
 // ── Update Actions ──
 router.post('/update', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), updaterController.performUpdate.bind(updaterController));
+router.get('/status', rbac(RESOURCES.SYSTEM, ACTIONS.READ), updaterController.getUpdateStatus.bind(updaterController));
 router.post('/dry-run', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), updaterController.dryRunUpdate.bind(updaterController));
 
 // ── Rollback ──

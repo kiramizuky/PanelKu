@@ -7,6 +7,7 @@ import path from 'path';
 import logger from '../../config/logger.js';
 import { normalizeDisks } from '../../helpers/system.js';
 import cache from '../../helpers/cache.js';
+import { siCall } from '../../helpers/withTimeout.js';
 
 const _remember = (key, ttl, fn) => {
   if (process.env.NODE_ENV === 'test') return fn();
@@ -44,35 +45,13 @@ class AnalyticsService {
    * Uses monitor_history SQLite table.
    */
   async getMetricsHistory(hours = 24) {
-    const since = new Date(Date.now() - hours * 3600 * 1000);
-    const all = await MonitorHistory.find({ since });
+    const safeHours = Math.max(1, Math.min(24 * 30, Number(hours) || 24));
+    const since = new Date(Date.now() - safeHours * 3600 * 1000);
 
-    const filtered = all.filter(h => new Date(h.timestamp) >= since);
-
-    // Downsample: determine interval
-    const count = filtered.length;
-    let step = 1;
-    if (count > 500) step = Math.ceil(count / 500);
-
-    const sampled = filtered.filter((_, i) => i % step === 0);
-
-    const series = sampled.map(h => {
-      const m = h.metrics || {};
-      return {
-        t: new Date(h.timestamp).getTime(),
-        cpu: m.cpu ?? 0,
-        ramUsed: m.ramUsed ?? 0,
-        ramTotal: m.ramTotal ?? 0,
-        ramPercent: m.ramPercent ?? (m.ramTotal ? Math.round((m.ramUsed / m.ramTotal) * 100) : 0),
-        diskUsed: m.diskUsed ?? 0,
-        diskTotal: m.diskTotal ?? 0,
-        diskPercent: m.diskPercent ?? 0,
-        networkRx: m.networkRx ?? 0,
-        networkTx: m.networkTx ?? 0,
-        diskRead: m.diskRead ?? 0,
-        diskWrite: m.diskWrite ?? 0,
-        loadAvg: m.loadAvg ?? [0, 0, 0],
-      };
+    // SQL-side filtering + time-bucket downsampling. Only <=500 points reach Node.
+    const { series, count, bucketSeconds } = await MonitorHistory.aggregate({
+      since,
+      maxPoints: 500,
     });
 
     // Compute stats
@@ -101,7 +80,7 @@ class AnalyticsService {
       },
     };
 
-    return { series, stats, count: filtered.length, hours };
+    return { series, stats, count, hours: safeHours, bucketSeconds };
   }
 
   /**
@@ -110,12 +89,12 @@ class AnalyticsService {
   async getRealtimeMetrics() {
     // NOTE: si.currentLoad() was previously called twice (duplicate). Removed the redundant 6th call.
     const [cpu, mem, disk, net, temp, diskIO] = await Promise.allSettled([
-      si.currentLoad(),
-      si.mem(),
-      si.fsSize(),
-      si.networkStats(),
-      si.cpuTemperature(),
-      si.disksIO(),
+      siCall(() => si.currentLoad(), 'si.currentLoad'),
+      siCall(() => si.mem(), 'si.mem'),
+      siCall(() => si.fsSize(), 'si.fsSize'),
+      siCall(() => si.networkStats(), 'si.networkStats'),
+      siCall(() => si.cpuTemperature(), 'si.cpuTemperature'),
+      siCall(() => si.disksIO(), 'si.disksIO'),
     ]);
 
     const cpuData = cpu.value || {};
@@ -373,7 +352,7 @@ class AnalyticsService {
 
   async getTopProcesses(sortBy = 'cpu', limit = 20) {
     try {
-      const data = await si.processes();
+      const data = await siCall(() => si.processes(), 'si.processes');
       const list = (data.list || []).map(p => ({
         pid: p.pid,
         name: p.name,
@@ -403,9 +382,9 @@ class AnalyticsService {
 
   async getNetworkAnalytics() {
     const [ifaces, stats, connections] = await Promise.allSettled([
-      si.networkInterfaces(),
-      si.networkStats(),
-      si.networkConnections(),
+      siCall(() => si.networkInterfaces(), 'si.networkInterfaces'),
+      siCall(() => si.networkStats(), 'si.networkStats'),
+      siCall(() => si.networkConnections(), 'si.networkConnections'),
     ]);
 
     const interfaces = (ifaces.value || []).filter(i => !i.virtual);

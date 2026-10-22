@@ -6,6 +6,14 @@
 
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
+// Keep notification/database state isolated from other Jest workers. Several
+// suites share storage/panelku.db and truncate notifications in beforeEach;
+// running in parallel made this suite intermittently see another worker's DELETE.
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+const TEST_DB_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'panelku-autoheal-test-'));
+process.env.PANELKU_DB_PATH = path.join(TEST_DB_DIR, 'panelku.db');
 
 import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 
@@ -80,6 +88,8 @@ beforeEach(() => {
   }
   autohealService._incidentCounts = {};
   autohealService._initialized = false;
+  autohealService._unitCache = { at: 0, units: null };
+  autohealService._notificationCooldowns = {};
 
   mockExecCmdHandler.mockImplementation(async (bin, args) => {
     const cmd = [bin, ...(args || [])].join(' ');
@@ -212,6 +222,75 @@ describe('AutoHealService — Health Checks & Auto-Recovery', () => {
     expect(results.some(r => r.name === 'CPU')).toBe(true);
     expect(results.some(r => r.name === 'RAM')).toBe(true);
     expect(results.some(r => r.name === 'Disk')).toBe(true);
+  });
+});
+
+describe('AutoHealService — Opt-in Services & Cooldowns', () => {
+  test('does not monitor or restart a service that is not installed', async () => {
+    const activeCalls = [];
+    mockExecCmdHandler.mockImplementation(async (bin, args) => {
+      const cmd = [bin, ...(args || [])].join(' ');
+      if (cmd.includes('list-unit-files')) return 'nginx.service enabled\nssh.service enabled';
+      if (cmd.includes('systemctl is-active')) {
+        activeCalls.push(cmd);
+        return 'inactive';
+      }
+      return 'ok';
+    });
+    autohealService._unitCache = { at: 0, units: null };
+
+    const config = await autohealService.getConfig();
+    const result = await autohealService._checkService({ name: 'mysql', displayName: 'MySQL' }, config);
+
+    expect(result.status).toBe('not_installed');
+    expect(activeCalls).toHaveLength(0);
+  });
+
+  test('does not start a service that is installed but disabled', async () => {
+    mockExecCmdHandler.mockImplementation(async (bin, args) => {
+      const cmd = [bin, ...(args || [])].join(' ');
+      if (cmd.includes('list-unit-files')) return 'redis-server.service disabled';
+      if (cmd.includes('systemctl is-active')) return 'inactive';
+      return 'ok';
+    });
+    autohealService._unitCache = { at: 0, units: null };
+
+    const config = await autohealService.getConfig();
+    const result = await autohealService._checkService({ name: 'redis-server', displayName: 'Redis' }, config);
+    expect(result.status).toBe('disabled');
+  });
+
+  test('lists detected units for the opt-in service picker', async () => {
+    mockExecCmdHandler.mockImplementation(async (bin, args) => {
+      const cmd = [bin, ...(args || [])].join(' ');
+      if (cmd.includes('list-unit-files')) {
+        return 'nginx.service enabled\nmysql.service disabled\nredis-server.service enabled';
+      }
+      return 'ok';
+    });
+    autohealService._unitCache = { at: 0, units: null };
+
+    const services = await autohealService.listAvailableServices();
+    expect(services.find((s) => s.name === 'nginx')?.eligible).toBe(true);
+    expect(services.find((s) => s.name === 'mysql')?.eligible).toBe(false);
+    expect(services.find((s) => s.name === 'redis-server')).toBeTruthy();
+  });
+
+  test('manual heal rejects a unit that is not installed', async () => {
+    mockExecCmdHandler.mockImplementation(async (bin, args) => {
+      const cmd = [bin, ...(args || [])].join(' ');
+      if (cmd.includes('list-unit-files')) return 'nginx.service enabled';
+      return 'active';
+    });
+    autohealService._unitCache = { at: 0, units: null };
+
+    await expect(autohealService.healService('mysql')).rejects.toThrow('not installed');
+  });
+
+  test('notification cooldown suppresses repeated incidents', () => {
+    expect(autohealService._shouldNotify('svc:nginx:critical', 15)).toBe(true);
+    expect(autohealService._shouldNotify('svc:nginx:critical', 15)).toBe(false);
+    expect(autohealService._shouldNotify('svc:nginx:recovered', 15)).toBe(true);
   });
 });
 

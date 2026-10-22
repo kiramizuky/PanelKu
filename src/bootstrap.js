@@ -13,12 +13,20 @@ import { startBackupJob } from './jobs/backup.job.js';
 import pluginLoader from './core/plugin-loader/PluginLoader.js';
 import auditRepository from './repositories/audit.repository.js';
 import { startPasswordExpiryReminder } from './jobs/password-expiry-reminder.job.js';
+import { startRetentionJob } from './jobs/retention.job.js';
 import { mkdirSync } from 'fs';
 import cache from './helpers/cache.js';
 import queueManager from './core/queue/QueueManager.js';
+import updaterService from './modules/updater/updater.service.js';
+import { getStorageDir } from './config/paths.js';
 
-// Ensure storage directories exist
-['./storage/logs', './storage/uploads', './storage/backups', './storage/temp'].forEach((dir) => {
+// Ensure storage directories exist (absolute, independent of process.cwd())
+[
+  `${getStorageDir()}/logs`,
+  `${getStorageDir()}/uploads`,
+  `${getStorageDir()}/backups`,
+  `${getStorageDir()}/temp`,
+].forEach((dir) => {
   mkdirSync(dir, { recursive: true });
 });
 
@@ -48,22 +56,25 @@ export const bootstrap = async (app, httpServer) => {
   }
   logger.info('SQLite database ready');
 
-  // 2. Connect Redis
+  // 2. Connect Redis (optional — retries forever in the background)
   logger.info('Connecting to Redis...');
   redis = new Redis(redisConfig);
-  redis.on('error', (err) => logger.warn('Redis error: ' + err.message));
-  redis.on('ready', () => logger.info('Redis connected'));
-  cache.setClient(redis);
+  cache.trackRedisEvents(redis);
   cache.initEventBusInvalidation();
+  cache.startHealthMonitor();
   queueManager.init(redis);
   try {
     await redis.connect();
   } catch (err) {
-    logger.warn(`Failed to connect to Redis: ${err.message}. Panel will run with in-memory cache.`);
+    const reason = err?.code || err?.name || err?.message || 'unknown';
+    logger.warn(`Failed to connect to Redis [${reason}]. Panel will run with in-memory cache and keep retrying.`);
   }
 
   // 3. Seed initial data (roles, super admin)
   await seedInitialData();
+
+  // 3.5 Confirm a pending update actually booted (writes verification marker)
+  await updaterService.markBootVerified();
 
   // 4. Initialize Socket.IO
   const io = new SocketIO(httpServer, socketConfig);
@@ -87,6 +98,7 @@ export const bootstrap = async (app, httpServer) => {
   startHealthJob();
   startBackupJob();
   startPasswordExpiryReminder();
+  startRetentionJob();
 
   // 5.5 Load WAF cache
   const { refreshWafCache } = await import('./middleware/waf.middleware.js');
@@ -117,6 +129,7 @@ export const gracefulShutdown = async () => {
   }
 
   // Now safe to close Queues, DB and Redis
+  cache.stopHealthMonitor();
   try { await queueManager.closeAll(); } catch (e) { logger.warn('Queue close error: ' + e.message); }
   try { getDb().close(); } catch (e) { logger.warn('DB close error: ' + e.message); }
   if (redis) {
@@ -191,10 +204,13 @@ async function seedInitialData() {
   const userCount = await User.countDocuments();
   if (userCount === 0) {
     const superAdminRole = await Role.findOne({ slug: ROLES.SUPER_ADMIN });
+    // Installer generates a random password and passes it via ADMIN_PASSWORD,
+    // so a fresh install never exposes the well-known default to the internet.
+    const initialPassword = process.env.ADMIN_PASSWORD || 'Admin@123456';
     await User.create({
       username: 'admin',
       email: 'admin@panelku.local',
-      password: 'Admin@123456',
+      password: initialPassword,
       role: superAdminRole._id,
       firstName: 'Super',
       lastName: 'Admin',
@@ -203,7 +219,11 @@ async function seedInitialData() {
       // [LOW-2 FIX] Force password change on first login — even admin must set a strong password
       mustChangePassword: true,
     });
-    logger.warn('⚠️  Default admin created: username=admin password=Admin@123456 — CHANGE THIS IMMEDIATELY!');
+    if (process.env.ADMIN_PASSWORD) {
+      logger.warn('Default admin created with ADMIN_PASSWORD from environment — change it after first login.');
+    } else {
+      logger.warn('⚠️  Default admin created: username=admin password=Admin@123456 — CHANGE THIS IMMEDIATELY!');
+    }
 
     // [AUDIT] Log the creation of default admin account for security tracking
     auditRepository.log({

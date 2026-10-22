@@ -5,6 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { execFile } from 'child_process';
 import util from 'util';
+import { getPluginsDir } from '../../config/paths.js';
 
 const execFileAsync = util.promisify(execFile);
 
@@ -90,7 +91,7 @@ async function checkAndInstallSystemDependencies(pluginPath) {
 class PluginsController {
   async getPlugins(req, res) {
     try {
-      const pluginsDir = path.resolve('./plugins');
+      const pluginsDir = getPluginsDir();
       let dirs = [];
       try {
         dirs = await fs.readdir(pluginsDir, { withFileTypes: true });
@@ -163,7 +164,7 @@ class PluginsController {
       const safeId = validatePluginId(id);
 
       // Verify directory exists
-      const pluginPath = path.resolve('./plugins', safeId);
+      const pluginPath = path.join(getPluginsDir(), safeId);
       try {
         await fs.access(pluginPath);
       } catch {
@@ -485,7 +486,7 @@ class PluginsController {
       const targetVersion = serverVersions[safeId];
       if (!targetVersion) return errorResponse(res, 'No updates found for this plugin on the server', 404);
 
-      const pluginPath = path.resolve('./plugins', safeId);
+      const pluginPath = path.join(getPluginsDir(), safeId);
       const manifestPath = path.join(pluginPath, 'plugin.json');
       
       let manifest;

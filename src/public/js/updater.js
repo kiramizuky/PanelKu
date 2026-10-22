@@ -24,6 +24,7 @@ const UpdaterPage = (() => {
     await Promise.all([
       loadVersionInfo(),
       loadUpdateStatus(),
+      loadLastJobState(),
       loadChangelog(),
       loadHealth(),
       loadHistory(),
@@ -63,7 +64,12 @@ const UpdaterPage = (() => {
         const statusEl = document.getElementById('ovUpdateStatus');
         const badgeEl = document.getElementById('updaterHealthBadge');
 
-        if (d.hasUpdate) {
+        if (d.checkFailed) {
+          statusEl.innerHTML = '<span class="lp-badge lp-badge-warning"><span class="lp-badge-dot"></span>Check Failed</span>';
+          badgeEl.innerHTML = '<span class="lp-badge lp-badge-warning"><i class="bi bi-exclamation-triangle me-1"></i>Check Failed</span>';
+          statusEl.title = d.checkError || 'Could not reach the git remote';
+          badgeEl.title = d.checkError || 'Could not reach the git remote';
+        } else if (d.hasUpdate) {
           statusEl.innerHTML = '<span class="lp-badge lp-badge-danger"><span class="lp-badge-dot"></span>Update Available!</span>';
           badgeEl.innerHTML = '<span class="lp-badge lp-badge-danger"><i class="bi bi-arrow-up-circle me-1"></i>Update: ' + d.latest + '</span>';
         } else {
@@ -91,9 +97,30 @@ const UpdaterPage = (() => {
     }
   }
 
-  // ── Changelog ──────────────────────────────────────────────────
-  async function loadChangelog() {
+  // ── Last Update Job State (persisted by the supervisor) ─────────
+  async function loadLastJobState() {
     try {
+      const res = await LP.get('/updater/status');
+      const job = res?.data;
+      if (!job || !job.finishedAt) return;
+
+      const age = Date.now() - new Date(job.finishedAt).getTime();
+      if (!Number.isFinite(age) || age > 6 * 60 * 60 * 1000) return;
+
+      if (job.status === 'rolled_back') {
+        LP.toast(job.error || 'Update failed — previous version was restored', 'warning');
+      } else if (job.status === 'failed') {
+        LP.toast(job.error || 'Last update failed. Check the update history.', 'error');
+      } else if (job.status === 'interrupted') {
+        LP.toast(job.error || 'Last update was interrupted', 'warning');
+      }
+    } catch {
+      /* not critical */
+    }
+  }
+
+  // ── Changelog ──────────────────────────────────────────────────
+  async function loadChangelog() {    try {
       const res = await LP.get('/updater/changelog?limit=30');
       if (res?.success && res.data?.entries) {
         state.changelog = res.data.entries;
@@ -287,7 +314,8 @@ const UpdaterPage = (() => {
           ${entry.channel ? `<span class="lp-badge lp-badge-ghost" style="font-size:9px;">${entry.channel}</span>` : ''}
         </div>
         ${entry.log ? `<div style="margin-top:4px;">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" style="font-size:10px;padding:2px 6px;" onclick="UpdaterPage.toggleHistoryLog(this)">Show Log</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" style="font-size:10px;padding:2px 6px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { UpdaterPage.toggleHistoryLog(this)
+    })}">Show Log</button>
           <pre style="display:none;margin-top:6px;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;font-family:monospace;font-size:11px;color:var(--text-secondary);max-height:150px;overflow-y:auto;white-space:pre-wrap;">${LP.escHtml(entry.log)}</pre>
         </div>` : ''}
       </div>`;
@@ -481,6 +509,20 @@ const UpdaterPage = (() => {
 
     try {
       const res = await LP.post('/updater/update', { method, branch, channel });
+
+      // The server runs real updates as a background job and returns 202 + jobId.
+      // Poll the job instead of relying on one long-lived HTTP request.
+      if (res?.data?.jobId) {
+        const restarted = await pollUpdateJob(res.data.jobId, logEl);
+        if (restarted) {
+          startReconnectPolling(logEl);
+        } else {
+          btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i> Update Panel';
+          btn.disabled = false;
+        }
+        return;
+      }
+
       if (res?.success && res.data?.success) {
         logEl.textContent += res.data?.log || 'Update completed.\n';
         logEl.textContent += '\n✅ Update completed! Waiting for panel to restart...';
@@ -645,6 +687,64 @@ const UpdaterPage = (() => {
   }
 
   // ── Reconnect Polling ───────────────────────────────────────────
+  async function pollUpdateJob(jobId, logEl) {
+    const maxWait = 15 * 60 * 1000; // 15 minutes (npm ci + native rebuild)
+    const start = Date.now();
+    let lastStatus = 'running';
+
+    if (logEl) logEl.textContent += '\n⏳ Update job started. Polling progress...';
+
+    while (Date.now() - start < maxWait) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      try {
+        const res = await LP.get('/updater/status');
+        const job = res?.data || {};
+        if (job.id && job.id !== jobId) continue;
+
+        lastStatus = job.status || 'running';
+        if (job.log && logEl) {
+          logEl.textContent = job.log;
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        if (lastStatus === 'success') {
+          LP.toast('Update completed! Panel restarting...', 'success');
+          return true;
+        }
+
+        // The detached supervisor owns restart + health polling. The panel is
+        // about to go away; hand over to the reconnect poller and let the
+        // persisted state explain the final result after reload.
+        if (['restarting', 'verifying', 'rolling_back'].includes(lastStatus)) {
+          if (logEl) logEl.textContent += `\n⏳ Supervisor: ${job.phase || lastStatus}...`;
+          return true;
+        }
+
+        if (lastStatus === 'rolled_back') {
+          LP.toast('Update failed — previous version was restored', 'warning');
+          return true;
+        }
+
+        if (lastStatus === 'failed' || lastStatus === 'interrupted') {
+          const msg = job.error || (lastStatus === 'interrupted'
+            ? 'Update was interrupted by a panel restart'
+            : 'Update failed');
+          if (logEl) logEl.textContent += `\n❌ ${msg}`;
+          LP.toast(msg, 'error');
+          return false;
+        }
+      } catch {
+        // Panel is probably restarting. The reconnect poller takes over.
+        if (lastStatus === 'success') return true;
+        return true;
+      }
+    }
+
+    if (logEl) logEl.textContent += '\n❌ Timed out waiting for update job status. Check server logs.';
+    return false;
+  }
+
   function startReconnectPolling(logEl) {
     const maxWait = 180000; // 3 minutes timeout for compilation and restart
     const interval = 2500;

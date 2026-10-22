@@ -62,8 +62,10 @@ const UsersPage = (() => {
           const roleColor = u.role?.color || 'var(--accent-primary)';
 
           const toggleBtn = isActive
-            ? `<button class="btn-lp btn-lp-ghost text-warning me-1" onclick="LP.call('UsersPage.toggleStatus', '${LP.encJsArg(userId)}', 'inactive')" title="Deactivate"><i class="bi bi-pause-circle"></i></button>`
-            : `<button class="btn-lp btn-lp-ghost text-success me-1" onclick="LP.call('UsersPage.toggleStatus', '${LP.encJsArg(userId)}', 'active')" title="Activate"><i class="bi bi-play-circle"></i></button>`;
+            ? `<button class="btn-lp btn-lp-ghost text-warning me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('UsersPage.toggleStatus', (LP.encJsArg(userId)), 'inactive')
+    })}" title="Deactivate"><i class="bi bi-pause-circle"></i></button>`
+            : `<button class="btn-lp btn-lp-ghost text-success me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('UsersPage.toggleStatus', (LP.encJsArg(userId)), 'active')
+    })}" title="Activate"><i class="bi bi-play-circle"></i></button>`;
 
           return `
             <tr>
@@ -76,9 +78,12 @@ const UsersPage = (() => {
               <td>${statusBadge}</td>
               <td class="text-end" style="white-space:nowrap">
                 ${toggleBtn}
-                <button class="btn-lp btn-lp-ghost text-info me-1" onclick="UsersPage.showSessionsModal('${LP.escHtml(userId)}', '${LP.escHtml(u.username)}')" title="Active Sessions"><i class="bi bi-shield-check"></i></button>
-                <button class="btn-lp btn-lp-ghost text-primary me-1" onclick="UsersPage.editUser('${LP.escHtml(userId)}')" title="Edit"><i class="bi bi-pencil"></i> Edit</button>
-                ${u.isSuperAdmin ? '' : `<button class="btn-lp btn-lp-ghost text-danger" onclick="UsersPage.deleteUser('${LP.escHtml(userId)}')" title="Delete"><i class="bi bi-trash"></i> Delete</button>`}
+                <button class="btn-lp btn-lp-ghost text-info me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { UsersPage.showSessionsModal((LP.escHtml(userId)), (LP.escHtml(u.username)))
+    })}" title="Active Sessions"><i class="bi bi-shield-check"></i></button>
+                <button class="btn-lp btn-lp-ghost text-primary me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { UsersPage.editUser((LP.escHtml(userId)))
+    })}" title="Edit"><i class="bi bi-pencil"></i> Edit</button>
+                ${u.isSuperAdmin ? '' : `<button class="btn-lp btn-lp-ghost text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { UsersPage.deleteUser((LP.escHtml(userId)))
+    })}" title="Delete"><i class="bi bi-trash"></i> Delete</button>`}
               </td>
             </tr>
           `;
@@ -322,7 +327,8 @@ const UsersPage = (() => {
             <td style="font-size:12px;color:var(--text-muted);">${LP.escHtml(createdDate)}</td>
             <td style="font-size:12px;color:var(--text-secondary);">${LP.escHtml(lastActiveDate)}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-danger btn-lp-sm" onclick="UsersPage.revokeSession('${LP.escHtml(s.id)}')">
+              <button class="btn-lp btn-lp-danger btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { UsersPage.revokeSession((LP.escHtml(s.id)))
+    })}">
                 <i class="bi bi-x-circle me-1"></i> Revoke
               </button>
             </td>

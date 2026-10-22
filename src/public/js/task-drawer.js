@@ -261,7 +261,8 @@ const TaskDrawer = {
 
           ${isRunning ? `
             <div style="display:flex; justify-content:flex-end; margin-top: 6px;">
-              <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 10px;" onclick="LP.TaskDrawer.cancelTask('${task.queueName}', '${task.id}')">Cancel</button>
+              <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 10px;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.TaskDrawer.cancelTask((task.queueName), (task.id))
+    })}">Cancel</button>
             </div>
           ` : ''}
         </div>

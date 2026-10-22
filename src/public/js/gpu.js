@@ -109,7 +109,8 @@ const GPU = (() => {
             <td>${p.usedMemory} MB</td>
             <td>${p.busId}</td>
             <td>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('GPU.killProcess', ${p.pid}, '${LP.encJsArg(p.name)}')"><i class="bi bi-x-circle"></i> Kill</button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('GPU.killProcess', (p.pid), (LP.encJsArg(p.name)))
+    })}"><i class="bi bi-x-circle"></i> Kill</button>
             </td>
           </tr>
         `).join('');

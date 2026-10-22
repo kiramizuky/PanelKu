@@ -4,6 +4,7 @@ import path from 'path';
 import logger from '../../config/logger.js';
 import packageManager from './package-manager.js';
 import { getDb } from '../../core/db/sqlite.js';
+import { getAppRoot, getStorageDir } from '../../config/paths.js';
 
 const execAsync = util.promisify(exec);
 const execFileAsync = util.promisify(execFile);
@@ -681,7 +682,7 @@ class SystemService {
     const currentCommit = this._validateCommitHash(rawCommit);
 
     if (method === 'git') {
-      const PANEL_DIR = process.env.PANEL_DIR || process.cwd();
+      const PANEL_DIR = process.env.PANEL_DIR || getAppRoot();
       
       const rawLocalBranch = (await this._execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: PANEL_DIR }).catch(async () => {
         return await this._execFile('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
@@ -702,7 +703,7 @@ class SystemService {
       log += await this._execFile('npm', ['install', '--omit=dev'], { cwd: PANEL_DIR }).catch(e => `[npm install error] ${e.message}`) + '\n';
       await this._execFile('git', ['checkout', 'HEAD', '--', 'package-lock.json'], { cwd: PANEL_DIR }).catch(() => {});
     } else if (method === 'npm') {
-      const PANEL_DIR = process.env.PANEL_DIR || process.cwd();
+      const PANEL_DIR = process.env.PANEL_DIR || getAppRoot();
       log += await this._execFile('npm', ['install', '--omit=dev'], { cwd: PANEL_DIR }).catch(e => `[npm install error] ${e.message}`) + '\n';
     }
 
@@ -804,7 +805,7 @@ class SystemService {
 
     const cmdCountByDate = {};
     const cmdFreq = {};
-    const logPath = path.resolve(process.cwd(), 'storage', 'logs', 'terminal_audit.log');
+    const logPath = path.join(getStorageDir(), 'logs', 'terminal_audit.log');
     
     try {
       const fs = await import('fs/promises');
@@ -861,7 +862,7 @@ class SystemService {
     }));
 
     const termLogs = [];
-    const logPath = path.resolve(process.cwd(), 'storage', 'logs', 'terminal_audit.log');
+    const logPath = path.join(getStorageDir(), 'logs', 'terminal_audit.log');
     try {
       const fs = await import('fs/promises');
       const content = await fs.readFile(logPath, 'utf8').catch(() => '');

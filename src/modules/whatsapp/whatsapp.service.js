@@ -11,12 +11,13 @@ import pino from 'pino';
 import axios from 'axios';
 import WhatsappSession from '../../models/WhatsappSession.js';
 import logger from '../../config/logger.js';
+import { getStorageDir } from '../../config/paths.js';
 
 class WhatsappService {
   constructor() {
     this.sessions = new Map(); // runtime instance baileys
     this.qrs = new Map(); // runtime qr codes
-    this.sessionsDir = path.resolve(process.cwd(), 'storage', 'whatsapp-sessions');
+    this.sessionsDir = path.join(getStorageDir(), 'whatsapp-sessions');
     mkdirSync(this.sessionsDir, { recursive: true });
 
     // Auto-restore sessions after boot

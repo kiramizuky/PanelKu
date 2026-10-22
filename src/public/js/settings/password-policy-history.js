@@ -58,7 +58,8 @@ const PolicyHistoryPage = {
         <div class="text-center py-5" style="color:var(--text-muted);">
           <i class="bi bi-exclamation-triangle" style="font-size:32px; display:block; margin-bottom:10px; color:#ef4444;"></i>
           <p style="font-size:13px;">Failed to load history: ${LP.escHtml(err.message || err)}</p>
-          <button class="btn-lp btn-lp-ghost mt-2" onclick="PolicyHistoryPage.load()" style="font-size:12px; padding:6px 12px;">
+          <button class="btn-lp btn-lp-ghost mt-2" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { PolicyHistoryPage.load()
+    })}" style="font-size:12px; padding:6px 12px;">
             <i class="bi bi-arrow-clockwise me-1"></i> Retry
           </button>
         </div>

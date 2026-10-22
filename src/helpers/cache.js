@@ -56,6 +56,19 @@ export class CacheService {
     this._memory = new InMemoryCache();
     this._prefix = 'panelku:cache:';
     this._isEventBusListening = false;
+    this._health = {
+      status: 'not_configured',
+      available: false,
+      reconnectAttempts: 0,
+      errors: 0,
+      lastError: null,
+      lastErrorAt: null,
+      connectedAt: null,
+      lastPingAt: null,
+      latencyMs: null,
+    };
+    this._pingTimer = null;
+    this._redisListenersAttached = false;
   }
 
   /**
@@ -63,6 +76,137 @@ export class CacheService {
    */
   setClient(redisClient) {
     this._redis = redisClient;
+    this._health.available = this.isRedisAvailable();
+  }
+
+  /**
+   * Human-readable error description. Some ioredis errors have an empty
+   * `message`, so include code/name to keep logs diagnosable.
+   */
+  static describeRedisError(err) {
+    if (!err) return 'unknown';
+    return err.code || err.name || err.message || String(err) || 'unknown';
+  }
+
+  /**
+   * Attach Redis lifecycle listeners and keep a health snapshot.
+   * Safe to call more than once.
+   */
+  trackRedisEvents(redisClient = this._redis) {
+    if (!redisClient) return;
+    this.setClient(redisClient);
+    if (this._redisListenersAttached) return;
+    this._redisListenersAttached = true;
+
+    redisClient.on('ready', () => {
+      this._health = {
+        ...this._health,
+        status: 'ready',
+        available: true,
+        connectedAt: new Date().toISOString(),
+        lastError: null,
+      };
+      logger.info('Redis connected — cache and queues use Redis');
+    });
+
+    redisClient.on('connecting', () => {
+      this._health.status = 'connecting';
+      this._health.available = false;
+    });
+
+    redisClient.on('reconnecting', (delay) => {
+      this._health.status = 'reconnecting';
+      this._health.available = false;
+      this._health.reconnectAttempts += 1;
+      logger.warn(
+        `Redis reconnecting (attempt ${this._health.reconnectAttempts})` +
+        `${delay ? ` in ${delay}ms` : ''} — using in-memory cache meanwhile`
+      );
+    });
+
+    redisClient.on('close', () => {
+      this._health.status = 'closed';
+      this._health.available = false;
+    });
+
+    redisClient.on('end', () => {
+      this._health.status = 'end';
+      this._health.available = false;
+    });
+
+    redisClient.on('error', (err) => {
+      const reason = CacheService.describeRedisError(err);
+      this._health.errors += 1;
+      this._health.lastError = reason;
+      this._health.lastErrorAt = new Date().toISOString();
+      this._health.available = false;
+      logger.warn(`Redis error [${reason}] — panel continues with in-memory cache`);
+    });
+  }
+
+  /**
+   * Periodically PING Redis so a half-open connection is detected, and so the
+   * health indicator reflects the real connection state.
+   */
+  startHealthMonitor(intervalMs = 30000) {
+    if (this._pingTimer) clearInterval(this._pingTimer);
+    this._pingTimer = setInterval(async () => {
+      if (!this.isRedisAvailable()) return;
+      const started = Date.now();
+      try {
+        await this._redis.ping();
+        this._health.latencyMs = Date.now() - started;
+        this._health.lastPingAt = new Date().toISOString();
+        this._health.status = 'ready';
+        this._health.available = true;
+      } catch (err) {
+        const reason = CacheService.describeRedisError(err);
+        this._health.errors += 1;
+        this._health.lastError = reason;
+        this._health.lastErrorAt = new Date().toISOString();
+        this._health.available = false;
+        logger.warn(`Redis ping failed [${reason}]`);
+      }
+    }, intervalMs);
+    // Do not keep Jest / short-lived scripts alive.
+    if (typeof this._pingTimer.unref === 'function') this._pingTimer.unref();
+    return this._pingTimer;
+  }
+
+  stopHealthMonitor() {
+    if (this._pingTimer) {
+      clearInterval(this._pingTimer);
+      this._pingTimer = null;
+    }
+  }
+
+  /**
+   * Snapshot for /api/health and monitoring tools.
+   */
+  getRedisHealth() {
+    if (!this._redis) {
+      return {
+        configured: false,
+        available: false,
+        status: 'not_configured',
+        lastError: null,
+      };
+    }
+
+    const clientStatus = this._redis.status || this._health.status || 'unknown';
+    const available = this.isRedisAvailable();
+    return {
+      configured: true,
+      available,
+      status: available ? 'ready' : clientStatus,
+      reconnectAttempts: this._health.reconnectAttempts,
+      errors: this._health.errors,
+      lastError: this._health.lastError,
+      lastErrorAt: this._health.lastErrorAt,
+      connectedAt: this._health.connectedAt,
+      lastPingAt: this._health.lastPingAt,
+      latencyMs: this._health.latencyMs,
+    };
   }
 
   /**

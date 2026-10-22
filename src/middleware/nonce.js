@@ -15,11 +15,14 @@
  * drastically reducing XSS surface area while keeping
  * UI libraries working.
  *
- * Inline event handlers (onclick, onchange, etc.) still require
- * 'unsafe-inline' in scriptSrcAttr — those cannot use nonces.
+ * Static inline event handlers (onclick, onchange, etc.) are migrated to
+ * `data-lp-handler` + a per-request nonced script by cspHandlers.js. Dynamic
+ * client-side markup uses LP.registerInlineHandler() instead.
  */
 
 import crypto from 'crypto';
+import { migrateInlineHandlers } from './cspHandlers.js';
+import { versionAssetUrls } from './assets.js';
 
 /**
  * Generates a CSP nonce and stores it on res.locals.
@@ -59,7 +62,12 @@ export const nonceInjector = (req, res, next) => {
     if (!wrappedCallback) {
       return originalRender(view, options, (err, html) => {
         if (err) return res.send(err);
-        res.send(injectNoncesIntoHtml(html, res.locals.nonce));
+        // 1) Turn static on* attributes into nonced listeners.
+        // 2) Add content hashes to local asset URLs for immutable caching.
+        // 3) Add the CSP nonce to remaining inline scripts.
+        const migrated = migrateInlineHandlers(html, res.locals.nonce);
+        const versioned = versionAssetUrls(migrated);
+        res.send(injectNoncesIntoHtml(versioned, res.locals.nonce));
       });
     }
 

@@ -107,7 +107,8 @@ const AutoHealPage = {
 
               <div class="pt-3 mt-2 border-top" style="border-color:var(--glass-border) !important;display:flex;justify-content:space-between;align-items:center;">
                 <span style="font-size:11px;color:var(--text-muted);">${items.length} items verified</span>
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('AutoHealPage.healModule', '${LP.encJsArg(key)}')">
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('AutoHealPage.healModule', (LP.encJsArg(key)))
+    })}">
                   <i class="bi bi-arrow-repeat me-1"></i> Heal Module
                 </button>
               </div>
@@ -169,7 +170,8 @@ const AutoHealPage = {
                 <div style="font-size:12px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${LP.escHtml(s.name)}</div>
                 <div style="font-size:10px;color:var(--text-muted);">${LP.escHtml(s.message || s.status)}</div>
               </div>
-              ${isCritical ? `<button class="btn-lp btn-lp-ghost btn-lp-sm p-0 ms-auto" style="font-size:10px;color:#ef4444;flex-shrink:0;" onclick="LP.call('AutoHealPage.healService', '${LP.encJsArg(s.serviceName || s.name)}')" title="Restart Service"><i class="bi bi-arrow-clockwise"></i></button>` : ''}
+              ${isCritical ? `<button class="btn-lp btn-lp-ghost btn-lp-sm p-0 ms-auto" style="font-size:10px;color:#ef4444;flex-shrink:0;" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('AutoHealPage.healService', (LP.encJsArg(s.serviceName || s.name)))
+    })}" title="Restart Service"><i class="bi bi-arrow-clockwise"></i></button>` : ''}
             </div>
           </div>
         `;
@@ -254,10 +256,14 @@ const AutoHealPage = {
 
   async loadServiceManager() {
     try {
-      const res = await LP.get('/autoheal/config');
+      const [res, availRes] = await Promise.all([
+        LP.get('/autoheal/config'),
+        LP.get('/autoheal/services').catch(() => null),
+      ]);
       if (!res?.success) throw new Error(res?.message);
 
       const services = res.data?.config?.services || [];
+      const available = availRes?.data?.services || [];
       const container = document.getElementById('ahServiceManagerList');
 
       if (services.length === 0) {
@@ -265,11 +271,32 @@ const AutoHealPage = {
         return;
       }
 
+      const configured = new Set(services.map((s) => s.name));
+      const detected = available.filter((s) => s.eligible && !configured.has(s.name));
+
+      const detectedHtml = detected.length ? `
+        <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--glass-border);">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px;">
+            Detected services (opt-in)
+          </div>
+          ${detected.map((svc) => `
+            <div class="d-flex justify-content-between align-items-center py-1">
+              <code style="font-size:12px;color:var(--text-secondary);">${LP.escHtml(svc.unit)}</code>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm" style="font-size:11px;"
+                data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('AutoHealPage.addService', (LP.encJsArg(svc.name)))
+    })}">
+                <i class="bi bi-plus-circle me-1"></i> Monitor
+              </button>
+            </div>
+          `).join('')}
+        </div>` : '';
+
       container.innerHTML = services.map((svc, idx) => `
         <div class="d-flex justify-content-between align-items-center py-2 px-3 rounded mb-1" style="background:rgba(0,0,0,0.08);border:1px solid var(--glass-border);">
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="form-check" style="margin:0;">
-              <input class="form-check-input" type="checkbox" ${svc.enabled ? 'checked' : ''} id="svc_${idx}" onchange="AutoHealPage.toggleService(${idx}, this.checked)" style="cursor:pointer;">
+              <input class="form-check-input" type="checkbox" ${svc.enabled ? 'checked' : ''} id="svc_${idx}" data-lp-on-change="${LP.registerInlineHandler('change', function (_event) { AutoHealPage.toggleService((idx), this.checked)
+    })}" style="cursor:pointer;">
             </div>
             <div>
               <strong style="font-size:14px;color:var(--text-primary);">${LP.escHtml(svc.displayName || svc.name)}</strong>
@@ -280,18 +307,35 @@ const AutoHealPage = {
             </div>
           </div>
           <div style="display:flex;gap:5px;">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('AutoHealPage.healService', '${LP.encJsArg(svc.name)}')" title="Restart ${LP.escHtml(svc.name)}" style="font-size:11px;">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('AutoHealPage.healService', (LP.encJsArg(svc.name)))
+    })}" title="Restart ${LP.escHtml(svc.name)}" style="font-size:11px;">
               <i class="bi bi-arrow-clockwise"></i> Restart
             </button>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('AutoHealPage.checkService', '${LP.encJsArg(svc.name)}')" title="Check ${LP.escHtml(svc.name)} status" style="font-size:11px;">
+            <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('AutoHealPage.checkService', (LP.encJsArg(svc.name)))
+    })}" title="Check ${LP.escHtml(svc.name)} status" style="font-size:11px;">
               <i class="bi bi-search"></i>
             </button>
           </div>
         </div>
-      `).join('');
+      `).join('') + detectedHtml;
     } catch (err) {
       document.getElementById('ahServiceManagerList').innerHTML =
         `<div style="padding:20px;text-align:center;color:var(--accent-danger);font-size:13px;">Error: ${LP.escHtml(err.message)}</div>`;
+    }
+  },
+
+  async addService(name) {
+    try {
+      const res = await LP.get('/autoheal/config');
+      const config = res.data?.config || {};
+      const services = config.services || [];
+      if (services.some((s) => s.name === name)) return;
+      services.push({ name, displayName: name, type: 'systemd', enabled: true, critical: false });
+      await LP.post('/autoheal/config', { ...config, services });
+      LP.toast(`${name} added to AutoHeal monitoring`, 'success');
+      await this.loadServiceManager();
+    } catch (err) {
+      LP.toast('Error adding service: ' + err.message, 'error');
     }
   },
 

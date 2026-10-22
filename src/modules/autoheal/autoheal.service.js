@@ -19,6 +19,8 @@ class AutoHealService {
   constructor() {
     this._incidentCounts = {};
     this._initialized = false;
+    this._unitCache = { at: 0, units: null };
+    this._notificationCooldowns = {};
     this.providers = {
       web: webProvider,
       database: databaseProvider,
@@ -121,6 +123,95 @@ class AutoHealService {
     ];
   }
 
+  /**
+   * Installed systemd units, cached briefly.
+   *
+   * Returns null when systemd is unavailable or the output cannot be parsed.
+   * Callers treat null as "unknown" and keep the old behaviour (check the
+   * service) instead of disabling AutoHeal on non-systemd hosts.
+   */
+  async _getManagedUnits(maxAgeMs = 60000) {
+    if (this._unitCache.units && Date.now() - this._unitCache.at < maxAgeMs) {
+      return this._unitCache.units;
+    }
+
+    let output = '';
+    try {
+      output = await execCmd(
+        'systemctl',
+        ['list-unit-files', '--type=service', '--no-legend', '--no-pager'],
+        { timeout: 10000 }
+      );
+    } catch {
+      output = '';
+    }
+
+    const units = new Map();
+    for (const line of String(output).split(/\r?\n/)) {
+      const match = line.trim().match(/^(\S+\.service)\s+(\S+)/);
+      if (!match) continue;
+      units.set(match[1], match[2]);
+      units.set(match[1].replace(/\.service$/, ''), match[2]);
+    }
+
+    this._unitCache = { at: Date.now(), units: units.size ? units : null };
+    return this._unitCache.units;
+  }
+
+  /**
+   * 'available' | 'disabled' | 'not_installed' | 'unknown'
+   *
+   * Sprint 1: never restart a service that is not installed or deliberately
+   * disabled — that only produced noisy "critical" notifications on
+   * homeservers that intentionally do not run MySQL/PostgreSQL/Apache.
+   */
+  async _getServiceAvailability(svc) {
+    const units = await this._getManagedUnits();
+    if (!units) return 'unknown';
+
+    const state = units.get(`${svc.name}.service`) || units.get(svc.name);
+    if (!state) return 'not_installed';
+    if (state === 'disabled' || state === 'masked' || state === 'masked-runtime') {
+      return 'disabled';
+    }
+    return 'available';
+  }
+
+  /**
+   * Notification cooldown: at most one notification per incident key per
+   * `cooldownMinutes`. Prevents a down service from spamming every 3 minutes.
+   */
+  _shouldNotify(key, cooldownMinutes) {
+    const now = Date.now();
+    const windowMs = Math.max(1, Number(cooldownMinutes) || 15) * 60000;
+    const last = this._notificationCooldowns[key] || 0;
+    if (now - last < windowMs) return false;
+    this._notificationCooldowns[key] = now;
+    return true;
+  }
+
+  /**
+   * Services detected on this host, for the per-user service list in the UI.
+   */
+  async listAvailableServices() {
+    const units = await this._getManagedUnits(0);
+    if (!units) return [];
+
+    const seen = new Set();
+    const result = [];
+    for (const [unit, state] of units.entries()) {
+      if (!unit.endsWith('.service') || seen.has(unit)) continue;
+      seen.add(unit);
+      result.push({
+        name: unit.replace(/\.service$/, ''),
+        unit,
+        state,
+        eligible: !['disabled', 'masked', 'masked-runtime'].includes(state),
+      });
+    }
+    return result.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  HEALTH CHECK ENGINE (Multi-Module)
   // ═══════════════════════════════════════════════════════════════
@@ -215,6 +306,26 @@ class AutoHealService {
   async _checkService(svc, config) {
     const key = `svc:${svc.name}`;
     try {
+      const availability = await this._getServiceAvailability(svc);
+      if (availability === 'not_installed') {
+        return {
+          type: 'service',
+          name: svc.displayName || svc.name,
+          serviceName: svc.name,
+          status: 'not_installed',
+          message: `${svc.displayName || svc.name} is not installed on this server`,
+        };
+      }
+      if (availability === 'disabled') {
+        return {
+          type: 'service',
+          name: svc.displayName || svc.name,
+          serviceName: svc.name,
+          status: 'disabled',
+          message: `${svc.displayName || svc.name} is installed but disabled — AutoHeal will not start it`,
+        };
+      }
+
       const stdout = await execCmd('systemctl', ['is-active', svc.name], { timeout: 10000 }).catch(() => 'inactive');
       const isActive = stdout.trim() === 'active';
 
@@ -265,25 +376,34 @@ class AutoHealService {
             this._incidentCounts[key] = 0;
             const msg = `${svc.displayName || svc.name} was down. Auto-Healer restarted it successfully.`;
             logger.info(`AutoHeal: ${msg}`);
-            await this._createNotification('service_recovered', `✅ ${svc.displayName || svc.name} Recovered`, msg);
-            if (config.notifyOnRecovery) {
-              alertsService.triggerAlert('Service Auto-Recovery', msg);
+            if (this._shouldNotify(`svc:${svc.name}:recovered`, config.cooldownMinutes)) {
+              await this._createNotification('service_recovered', `✅ ${svc.displayName || svc.name} Recovered`, msg);
+              if (config.notifyOnRecovery) {
+                alertsService.triggerAlert('Service Auto-Recovery', msg);
+              }
             }
             return { type: 'service', name: svc.displayName || svc.name, status: 'recovered', message: msg };
           }
         } catch { /* restart attempt failed */ }
 
         const failMsg = `${svc.displayName || svc.name} is inactive. Auto-Healer restart attempt #${attemptCount} failed.`;
-        await this._createNotification('service_critical', `⚠️ ${svc.displayName || svc.name} Down`, failMsg);
-        alertsService.triggerAlert(`Service Down: ${svc.displayName || svc.name}`, failMsg);
+        if (this._shouldNotify(`svc:${svc.name}:critical`, config.cooldownMinutes)) {
+          await this._createNotification('service_critical', `⚠️ ${svc.displayName || svc.name} Down`, failMsg);
+          alertsService.triggerAlert(`Service Down: ${svc.displayName || svc.name}`, failMsg);
+        }
         return { type: 'service', name: svc.displayName || svc.name, status: 'critical', message: failMsg };
       }
 
+      const cooldownMsg = `${svc.displayName || svc.name} remains down after ${config.maxRetries} restart attempts. Entering cooldown (${config.cooldownMinutes} min).`;
+      if (this._shouldNotify(`svc:${svc.name}:critical`, config.cooldownMinutes)) {
+        await this._createNotification('service_critical', `⚠️ ${svc.displayName || svc.name} Down`, cooldownMsg);
+        alertsService.triggerAlert(`Service Down: ${svc.displayName || svc.name}`, cooldownMsg);
+      }
       return {
         type: 'service',
         name: svc.displayName || svc.name,
         status: 'critical',
-        message: `${svc.displayName || svc.name} remains down after ${config.maxRetries} restart attempts. Entering cooldown (${config.cooldownMinutes} min).`,
+        message: cooldownMsg,
       };
     } catch (err) {
       return {
@@ -302,6 +422,22 @@ class AutoHealService {
       this._incidentCounts[key] = 0;
       return { type: 'docker', name: 'Docker Daemon', status: 'healthy', message: 'Docker is running' };
     } catch {
+      // Daemon is down (or the binary is missing). Only try to start it when
+      // systemd actually knows a Docker unit and that unit is not disabled.
+      const units = await this._getManagedUnits();
+      if (units) {
+        const dockerUnit = [...units.keys()].find(
+          (unit) => unit === 'docker.service' || unit.endsWith('.docker.service') || unit.endsWith('.dockerd.service')
+        );
+        if (!dockerUnit) {
+          return { type: 'docker', name: 'Docker Daemon', status: 'not_installed', message: 'Docker is not installed on this server' };
+        }
+        const state = units.get(dockerUnit);
+        if (state === 'disabled' || state === 'masked' || state === 'masked-runtime') {
+          return { type: 'docker', name: 'Docker Daemon', status: 'disabled', message: 'Docker is installed but disabled — AutoHeal will not start it' };
+        }
+      }
+
       this._incidentCounts[key] = (this._incidentCounts[key] || 0) + 1;
       const attempt = this._incidentCounts[key];
 
@@ -313,12 +449,17 @@ class AutoHealService {
           try { await execCmd('docker', ['info'], { timeout: 5000 }); } catch {}
 
           const msg = 'Docker daemon was down. Auto-Healer restarted it.';
-          await this._createNotification('docker_recovered', '✅ Docker Recovered', msg);
-          if (config.notifyOnRecovery) alertsService.triggerAlert('Docker Auto-Recovery', msg);
+          if (this._shouldNotify('docker:daemon:recovered', config.cooldownMinutes)) {
+            await this._createNotification('docker_recovered', '✅ Docker Recovered', msg);
+            if (config.notifyOnRecovery) alertsService.triggerAlert('Docker Auto-Recovery', msg);
+          }
           return { type: 'docker', name: 'Docker Daemon', status: 'recovered', message: msg };
         } catch {
           const msg = `Docker daemon restart attempt #${attempt} failed.`;
-          alertsService.triggerAlert('Docker Critical', msg);
+          if (this._shouldNotify('docker:daemon:critical', config.cooldownMinutes)) {
+            await this._createNotification('docker_critical', '⚠️ Docker Down', msg);
+            alertsService.triggerAlert('Docker Critical', msg);
+          }
           return { type: 'docker', name: 'Docker Daemon', status: 'critical', message: msg };
         }
       }
@@ -563,6 +704,30 @@ class AutoHealService {
           continue;
         }
         try {
+          const availability = await this._getServiceAvailability(svc);
+          if (availability === 'not_installed') {
+            results.push({
+              type: 'service',
+              name: svc.displayName || svc.name,
+              serviceName: svc.name,
+              status: 'not_installed',
+              message: 'Not installed',
+              critical: false,
+            });
+            continue;
+          }
+          if (availability === 'disabled') {
+            results.push({
+              type: 'service',
+              name: svc.displayName || svc.name,
+              serviceName: svc.name,
+              status: 'disabled',
+              message: 'Disabled in systemd',
+              critical: false,
+            });
+            continue;
+          }
+
           const stdout = await execCmd('systemctl', ['is-active', svc.name], { timeout: 8000 }).catch(() => 'inactive');
           const isActive = stdout.trim() === 'active';
           results.push({
@@ -599,6 +764,15 @@ class AutoHealService {
     // Check if it's a provider module key
     if (this.providers[serviceName]) {
       return this.healModule(serviceName, 'all');
+    }
+
+    const units = await this._getManagedUnits();
+    if (units) {
+      const state = units.get(`${serviceName}.service`) || units.get(serviceName);
+      if (!state) throw new Error(`${serviceName} is not installed on this server`);
+      if (state === 'disabled' || state === 'masked' || state === 'masked-runtime') {
+        throw new Error(`${serviceName} is disabled — enable it explicitly before restarting`);
+      }
     }
 
     try {

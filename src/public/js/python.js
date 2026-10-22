@@ -103,8 +103,10 @@ const PythonPage = {
               </div>
             </div>
             <div class="d-flex gap-2">
-              ${!isCurrent && ver !== 'system' ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('PythonPage.setGlobal', '${LP.encJsArg(ver)}')" title="Set global"><i class="bi bi-globe"></i> Global</button>` : ''}
-              ${ver !== 'system' ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('PythonPage.confirmUninstall', '${LP.encJsArg(ver)}')" title="Uninstall"><i class="bi bi-trash"></i></button>` : ''}
+              ${!isCurrent && ver !== 'system' ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('PythonPage.setGlobal', (LP.encJsArg(ver)))
+    })}" title="Set global"><i class="bi bi-globe"></i> Global</button>` : ''}
+              ${ver !== 'system' ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('PythonPage.confirmUninstall', (LP.encJsArg(ver)))
+    })}" title="Uninstall"><i class="bi bi-trash"></i></button>` : ''}
             </div>
           </div>
         `;
@@ -132,7 +134,8 @@ const PythonPage = {
       container.innerHTML = show.map(v =>
         `<div class="p-2 px-3 rounded d-flex justify-content-between align-items-center" style="background:rgba(0,0,0,0.08);border:1px solid var(--glass-border);">
           <span style="font-family:monospace;font-size:14px;color:var(--text-primary);">${LP.escHtml(v)}</span>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" onclick="LP.call('PythonPage.installSpecific', '${LP.encJsArg(v)}')"><i class="bi bi-download"></i> Install</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('PythonPage.installSpecific', (LP.encJsArg(v)))
+    })}"><i class="bi bi-download"></i> Install</button>
         </div>`
       ).join('');
 
@@ -211,7 +214,8 @@ const PythonPage = {
             <td style="font-family:monospace;font-size:12px;color:var(--text-muted);">${LP.escHtml(v.path)}</td>
             <td>${LP.escHtml(v.pythonVersion)}</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('PythonPage.deleteVenv', '${LP.encJsArg(v.name)}')" title="Delete"><i class="bi bi-trash3"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('PythonPage.deleteVenv', (LP.encJsArg(v.name)))
+    })}" title="Delete"><i class="bi bi-trash3"></i></button>
             </td>
           </tr>
         `, 'No virtual environments.', 4);
@@ -271,7 +275,8 @@ const PythonPage = {
           <tr><td style="font-family:monospace;">${LP.escHtml(p.name)}</td>
           <td style="font-family:monospace;color:var(--text-muted);">${LP.escHtml(p.version)}</td>
           <td style="text-align:right;">
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('PythonPage.uninstallPip', '${LP.encJsArg(p.name)}')" title="Uninstall"><i class="bi bi-trash3"></i></button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('PythonPage.uninstallPip', (LP.encJsArg(p.name)))
+    })}" title="Uninstall"><i class="bi bi-trash3"></i></button>
           </td></tr>
         `).join('');
       }
@@ -327,7 +332,8 @@ const PythonPage = {
             <td>${s.cpu}%</td>
             <td>${s.mem}%</td>
             <td style="text-align:right;">
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="PythonPage.stopWsgi('${s.pid}')" title="Stop"><i class="bi bi-stop-fill"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { PythonPage.stopWsgi((s.pid))
+    })}" title="Stop"><i class="bi bi-stop-fill"></i></button>
             </td>
           </tr>
         `).join('');
@@ -404,9 +410,12 @@ const PythonPage = {
             <td>${LP.escHtml(p.uptime)}</td>
             <td style="text-align:right;">
               <div class="d-flex gap-1 justify-content-end">
-                ${!statusOk ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="LP.call('PythonPage.supervisorAction', '${LP.encJsArg(p.name)}', 'start')" title="Start"><i class="bi bi-play-fill"></i></button>` : ''}
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="LP.call('PythonPage.supervisorAction', '${LP.encJsArg(p.name)}', 'restart')" title="Restart"><i class="bi bi-arrow-clockwise"></i></button>
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('PythonPage.supervisorAction', '${LP.encJsArg(p.name)}', 'stop')" title="Stop"><i class="bi bi-stop-fill"></i></button>
+                ${!statusOk ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('PythonPage.supervisorAction', (LP.encJsArg(p.name)), 'start')
+    })}" title="Start"><i class="bi bi-play-fill"></i></button>` : ''}
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('PythonPage.supervisorAction', (LP.encJsArg(p.name)), 'restart')
+    })}" title="Restart"><i class="bi bi-arrow-clockwise"></i></button>
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('PythonPage.supervisorAction', (LP.encJsArg(p.name)), 'stop')
+    })}" title="Stop"><i class="bi bi-stop-fill"></i></button>
               </div>
             </td>
           </tr>`;

@@ -35,10 +35,12 @@ const SSLPage = {
                 </span>
               </td>
               <td style="text-align:right">
-                <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('SSLPage.renewCertificate', '${LP.encJsArg(websiteId)}')" style="color:var(--accent-info)" title="Renew Certificate">
+                <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('SSLPage.renewCertificate', (LP.encJsArg(websiteId)))
+    })}" style="color:var(--accent-info)" title="Renew Certificate">
                   <i class="bi bi-arrow-repeat"></i>
                 </button>
-                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('SSLPage.disableCertificate', '${LP.encJsArg(websiteId)}')" title="Disable SSL">
+                <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('SSLPage.disableCertificate', (LP.encJsArg(websiteId)))
+    })}" title="Disable SSL">
                   <i class="bi bi-shield-x"></i>
                 </button>
               </td>

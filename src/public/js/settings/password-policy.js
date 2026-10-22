@@ -192,7 +192,8 @@ const PasswordPolicyPage = {
             <code style="background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:4px;">${complexity}</code>
             <code style="background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:4px;">${d.expiryEnabled ? `Expiry ${d.expiryDays}d` : 'No expiry'}</code>
           </div>
-          <button class="btn-lp btn-lp-primary w-100 mt-2" onclick="PasswordPolicyPage.importFromUrl()" id="btnImportUrl" style="padding:8px; font-weight:600; font-size:12px;">
+          <button class="btn-lp btn-lp-primary w-100 mt-2" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { PasswordPolicyPage.importFromUrl()
+    })}" id="btnImportUrl" style="padding:8px; font-weight:600; font-size:12px;">
             <i class="bi bi-download me-1"></i> Import This Policy
           </button>
         </div>

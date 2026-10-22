@@ -1,10 +1,12 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { timingSafeEqual } from 'crypto';
 import appConfig from './config/app.js';
 import logger from './config/logger.js';
 import apiRoutes from './routes/index.js';
@@ -14,6 +16,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { wafMiddleware } from './middleware/waf.middleware.js';
 import { nonceMiddleware, nonceInjector } from './middleware/nonce.js';
 import { metricsMiddleware } from './middleware/metrics.middleware.js';
+import { staticCacheMiddleware } from './middleware/assets.js';
 
 import expressEjsLayouts from 'express-ejs-layouts';
 import pluginLoader from './core/plugin-loader/PluginLoader.js';
@@ -55,11 +58,10 @@ const createApp = () => {
           "'self'",
           (req, res) => `'nonce-${res.locals.nonce}'`,
         ],
-        // script-src-attr must remain 'unsafe-inline' because:
-        // 1) LP.call() pattern renders inline onclick handlers via innerHTML
-        // 2) 126+ inline event handlers across views (onclick, onchange, etc.)
-        // 3) CSP nonces do NOT work for HTML attribute event handlers
-        scriptSrcAttr: ["'unsafe-inline'"],
+        // script-src-attr is now locked down. Static handlers are rewritten to
+        // data-lp-handler + a nonced listener script (middleware/cspHandlers.js);
+        // client-side templates use LP.registerInlineHandler().
+        scriptSrcAttr: ["'none'"],
         // style-src uses 'unsafe-inline' instead of nonce because:
         // 1) CSP spec: if nonce is present, 'unsafe-inline' is IGNORED
         // 2) xterm.js, CodeMirror, and other client libs dynamically inject
@@ -114,6 +116,10 @@ const createApp = () => {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(cookieParser());
 
+  // [PERF] Compress HTML/JS/CSS/JSON responses (gzip/deflate) when the client
+  // supports it and the payload is large enough to benefit.
+  app.use(compression({ threshold: 1024 }));
+
   // HTTP request logging (Morgan)
   if (appConfig.isDev) {
     app.use(morgan('dev'));
@@ -129,17 +135,17 @@ const createApp = () => {
   // Prometheus HTTP telemetry
   app.use(metricsMiddleware);
 
-  // Static assets — enable conditional caching (ETag / 304 Not Modified)
+  // Static assets — hash-versioned URLs get a one-year immutable cache; HTML
+  // and unversioned URLs keep revalidating so a deployment is picked up at once.
   const publicDir = join(__dirname, 'public');
+  app.use(staticCacheMiddleware);
   app.use(express.static(publicDir, {
-    setHeaders(res, filePath) {
-      if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
-        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-      }
-    }
+    etag: true,
+    lastModified: true,
+    maxAge: 0,
   }));
-  app.use('/public', express.static(publicDir));
-  app.use(['/img', '/public/img'], express.static(join(publicDir, 'images')));
+  app.use('/public', express.static(publicDir, { etag: true, lastModified: true, maxAge: 0 }));
+  app.use(['/img', '/public/img'], express.static(join(publicDir, 'images'), { etag: true, lastModified: true, maxAge: 0 }));
 
   // API rate limiting
   app.use('/api', apiLimiter);
@@ -148,7 +154,40 @@ const createApp = () => {
   app.use(wafMiddleware);
 
   // ── Prometheus / OpenMetrics Metrics Exporter (Fase 5) ──
-  app.get(['/metrics', '/api/metrics'], async (req, res) => {
+  // [SEC] Metrics expose host/service topology. Require METRICS_TOKEN when set,
+  // otherwise only allow loopback scrapers (nginx/systemd) in production.
+  const metricsAuth = (req, res, next) => {
+    const expected = process.env.METRICS_TOKEN;
+    const provided = (req.headers.authorization || '').replace(/^Bearer\s+/i, '') || req.query.token;
+
+    if (expected) {
+      const a = Buffer.from(String(provided || ''));
+      const b = Buffer.from(expected);
+      if (a.length === b.length && timingSafeEqual(a, b)) return next();
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    if (appConfig.env !== 'production') return next();
+
+    // req.ip respects `trust proxy 1`, so a request proxied by nginx carries the
+    // real client IP. Require the actual TCP peer to be loopback as well, so a
+    // direct external request cannot spoof X-Forwarded-For: 127.0.0.1 and reach
+    // /metrics without a token. A local reverse proxy forwarding an external
+    // client still fails the forwarded-IP check below and must send the token.
+    const normalizeIp = (value) => String(value || '').replace(/^::ffff:/, '');
+    const isLoopback = (value) => value === '127.0.0.1' || value === '::1';
+    const socketRemote = normalizeIp(req.socket?.remoteAddress);
+    const forwardedIp = normalizeIp(req.ip);
+    const hasForwardedFor = Boolean(req.headers['x-forwarded-for']);
+
+    if (isLoopback(socketRemote) && (!hasForwardedFor || isLoopback(forwardedIp))) {
+      return next();
+    }
+
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  };
+
+  app.get(['/metrics', '/api/metrics'], metricsAuth, async (req, res) => {
     try {
       const metrics = await prometheusService.getMetrics();
       res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');

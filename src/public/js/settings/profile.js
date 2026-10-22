@@ -44,7 +44,8 @@ const ProfilePage = (() => {
                 <small class="text-muted" style="font-size:10px;">Added: ${new Date(k.createdAt).toLocaleDateString()}</small>
               </div>
             </div>
-            <button class="btn-lp btn-lp-ghost text-danger btn-lp-sm" onclick="ProfilePage.deletePasskey('${k.id}')" title="Delete Passkey" style="padding:2px 6px;">
+            <button class="btn-lp btn-lp-ghost text-danger btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { ProfilePage.deletePasskey((k.id))
+    })}" title="Delete Passkey" style="padding:2px 6px;">
               <i class="bi bi-trash"></i>
             </button>
           </div>

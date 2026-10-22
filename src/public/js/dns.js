@@ -48,7 +48,8 @@ const DNSPage = {
       this.providers.map(p => `
         <div class="col-6 col-md-3 col-lg">
           <div class="lp-glass-card provider-card p-3 text-center ${this.activeProvider === p.id ? 'active' : ''}"
-               onclick="DNSPage.selectProvider('${p.id}')">
+               data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DNSPage.selectProvider((p.id))
+    })}">
             <i class="bi ${providerIcons[p.id] || 'bi-globe2'}" style="font-size:24px;color:${providerColors[p.id] || 'var(--text-muted)'};display:block;margin-bottom:6px;"></i>
             <div style="font-weight:600;font-size:13px;">${p.name}</div>
             <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">
@@ -104,7 +105,10 @@ const DNSPage = {
     }
     container.innerHTML = this.zones.map(z =>
       `<div class="lp-glass-card" style="padding:10px 14px;cursor:pointer;border:1px solid ${this.activeZoneId === z.id ? 'var(--accent-primary)' : 'transparent'};"
-            onclick="DNSPage.selectZone('${z.id}','${LP.escHtml(z.name)}')" onmouseover="this.style.borderColor='var(--accent-primary)'" onmouseout="this.style.borderColor='${this.activeZoneId === z.id ? 'var(--accent-primary)' : 'transparent'}'">
+            data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DNSPage.selectZone((z.id),(LP.escHtml(z.name)))
+    })}" data-lp-on-mouseover="${LP.registerInlineHandler('mouseover', function (_event) { this.style.borderColor='var(--accent-primary)'
+    })}" data-lp-on-mouseout="${LP.registerInlineHandler('mouseout', function (_event) { this.style.borderColor=(this.activeZoneId === z.id ? 'var(--accent-primary)' : 'transparent')
+    })}">
         <div style="font-weight:600;font-size:13px;color:var(--text-primary);">${LP.escHtml(z.name)}</div>
         <div style="font-size:11px;color:var(--text-muted);">
           ${LP.escHtml(z.status || 'active')} ${z.plan ? '· ' + LP.escHtml(z.plan) : ''}
@@ -151,8 +155,10 @@ const DNSPage = {
         <td style="font-family:monospace;font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${LP.escHtml(r.content)}">${LP.escHtml(r.content)}</td>
         <td style="font-size:12px;color:var(--text-muted);font-family:monospace;">${r.ttl === 1 ? 'Auto' : r.ttl + 's'}</td>
         <td style="text-align:right;white-space:nowrap;">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('DNSPage.editRecord', '${LP.encJsArg(r.id)}')" title="Edit"><i class="bi bi-pencil"></i></button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DNSPage.deleteRecord', '${LP.encJsArg(r.id)}')" title="Delete"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DNSPage.editRecord', (LP.encJsArg(r.id)))
+    })}" title="Edit"><i class="bi bi-pencil"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DNSPage.deleteRecord', (LP.encJsArg(r.id)))
+    })}" title="Delete"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No records found', 10);
@@ -171,8 +177,10 @@ const DNSPage = {
         <td style="font-family:monospace;font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;">${LP.escHtml(r.content)}</td>
         <td style="font-size:12px;color:var(--text-muted);font-family:monospace;">${r.ttl === 1 ? 'Auto' : r.ttl + 's'}</td>
         <td style="text-align:right;white-space:nowrap;">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('DNSPage.editRecord', '${LP.encJsArg(r.id)}')"><i class="bi bi-pencil"></i></button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('DNSPage.deleteRecord', '${LP.encJsArg(r.id)}')"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-info" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DNSPage.editRecord', (LP.encJsArg(r.id)))
+    })}"><i class="bi bi-pencil"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('DNSPage.deleteRecord', (LP.encJsArg(r.id)))
+    })}"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No matching records', 10);
@@ -372,7 +380,8 @@ const DNSPage = {
             <h5 style="font-size:15px;font-weight:600;margin:0;">
               <i class="bi bi-shield-check text-success me-1"></i> DNSSEC Status
             </h5>
-            <button class="btn-lp ${isEnabled ? 'btn-lp-warning' : 'btn-lp-primary'} btn-sm" onclick="DNSPage.toggleDNSSEC()">
+            <button class="btn-lp ${isEnabled ? 'btn-lp-warning' : 'btn-lp-primary'} btn-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DNSPage.toggleDNSSEC()
+    })}">
               <i class="bi ${isEnabled ? 'bi-shield-x' : 'bi-shield-check'} me-1"></i> ${isEnabled ? 'Disable' : 'Enable'} DNSSEC
             </button>
           </div>

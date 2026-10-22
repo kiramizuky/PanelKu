@@ -33,11 +33,14 @@ const WhatsappPage = (() => {
           <td class="font-mono" style="font-size:12px">${acc.webhookUrl ? LP.escHtml(acc.webhookUrl) : '<span class="text-muted">Not configured</span>'}</td>
           <td style="text-align:right">
             ${acc.status !== 'connected' 
-              ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="LP.call('WhatsappPage.startQrScan', '${LP.encJsArg(acc.sessionName)}')" title="Scan QR"><i class="bi bi-qr-code"></i> Scan</button>`
-              : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" onclick="LP.call('WhatsappPage.showTestModal', '${LP.encJsArg(acc.sessionName)}')" title="Test Send"><i class="bi bi-send-fill"></i> Test</button>`
-            }
-            <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('WhatsappPage.showWebhookModal', '${LP.encJsArg(acc.sessionName)}', '${LP.encJsArg(acc.webhookUrl || '')}')" title="Webhook"><i class="bi bi-link"></i> Webhook</button>
-            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('WhatsappPage.deleteSession', '${LP.encJsArg(acc.sessionName)}')" title="Delete"><i class="bi bi-trash"></i></button>
+              ? `<button class="btn-lp btn-lp-ghost btn-lp-sm text-info" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WhatsappPage.startQrScan', (LP.encJsArg(acc.sessionName)))
+    })}" title="Scan QR"><i class="bi bi-qr-code"></i> Scan</button>`
+              : `<button class="btn-lp btn-lp-ghost btn-lp-sm text-success" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WhatsappPage.showTestModal', (LP.encJsArg(acc.sessionName)))
+    })}" title="Test Send"><i class="bi bi-send-fill"></i> Test</button>`}
+            <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WhatsappPage.showWebhookModal', (LP.encJsArg(acc.sessionName)), (LP.encJsArg(acc.webhookUrl || '')))
+    })}" title="Webhook"><i class="bi bi-link"></i> Webhook</button>
+            <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('WhatsappPage.deleteSession', (LP.encJsArg(acc.sessionName)))
+    })}" title="Delete"><i class="bi bi-trash"></i></button>
           </td>
         </tr>
       `;

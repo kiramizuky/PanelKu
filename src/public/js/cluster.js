@@ -140,7 +140,8 @@ const ClusterPage = (() => {
 
           <!-- Header: name + status badge -->
           <div class="d-flex justify-content-between align-items-start mb-3">
-            <div onclick="LP.call('ClusterPage.showDetails', '${LP.encJsArg(node.id)}')" style="cursor:pointer;" title="Klik untuk melihat detail info node">
+            <div data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ClusterPage.showDetails', (LP.encJsArg(node.id)))
+    })}" style="cursor:pointer;" title="Klik untuk melihat detail info node">
               <h5 class="text-white text-hover-underline" style="font-weight:700; margin:0 0 3px 0; font-size:15px; text-decoration: underline dotted rgba(255,255,255,0.4);">${LP.escHtml(node.name)}</h5>
               <span style="font-size:10px; color:var(--text-muted);">Agent Node <i class="bi bi-info-circle ms-1"></i></span>
             </div>
@@ -157,7 +158,8 @@ const ClusterPage = (() => {
               <span>${LP.escHtml(hostLabel)}</span>
             </div>
             <div class="d-flex gap-1">
-              <button class="btn-lp btn-lp-ghost" onclick="LP.call('ClusterPage.copyHost', '${LP.encJsArg(hostLabel)}')" title="Copy host" style="width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:12px;">
+              <button class="btn-lp btn-lp-ghost" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ClusterPage.copyHost', (LP.encJsArg(hostLabel)))
+    })}" title="Copy host" style="width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:12px;">
                 <i class="bi bi-clipboard"></i>
               </button>
               <a href="${nodeUrl}" target="_blank" class="btn-lp btn-lp-ghost" title="Buka di tab baru" style="width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:12px; text-decoration:none;">
@@ -176,7 +178,8 @@ const ClusterPage = (() => {
 
           <!-- Actions -->
           <div class="d-flex gap-2 pt-2" style="border-top:1px solid var(--glass-border);">
-            <button class="btn-lp btn-lp-ghost" onclick="LP.call('ClusterPage.pingNode', '${LP.encJsArg(node.id)}', this)"
+            <button class="btn-lp btn-lp-ghost" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ClusterPage.pingNode', (LP.encJsArg(node.id)), this)
+    })}"
               style="flex:1; font-size:12px; height:34px; padding:0 10px; display:flex; align-items:center; justify-content:center; gap:5px; border-radius:8px;"
               title="Ping node">
               <i class="bi bi-arrow-repeat"></i><span>Ping</span>
@@ -186,14 +189,18 @@ const ClusterPage = (() => {
               title="Open Remote Terminal">
               <i class="bi bi-terminal"></i><span>Terminal</span>
             </a>
-            <button class="btn-lp btn-lp-ghost" onclick="LP.call('ClusterPage.refreshMetrics', '${LP.encJsArg(node.id)}')"
+            <button class="btn-lp btn-lp-ghost" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ClusterPage.refreshMetrics', (LP.encJsArg(node.id)))
+    })}"
               style="flex:1; font-size:12px; height:34px; padding:0 10px; display:flex; align-items:center; justify-content:center; gap:5px; border-radius:8px;"
               title="Refresh metrics" ${!isOnline ? 'disabled' : ''}>
               <i class="bi bi-activity"></i><span>Metrics</span>
             </button>
-            <button class="btn-lp" onclick="LP.call('ClusterPage.deleteNode', '${LP.encJsArg(node.id)}')"
+            <button class="btn-lp" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ClusterPage.deleteNode', (LP.encJsArg(node.id)))
+    })}"
               style="width:34px; height:34px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid rgba(239,68,68,0.3); background:rgba(239,68,68,0.08); color:#ef4444; font-size:13px; transition:all .2s;"
-              onmouseover="this.style.background='rgba(239,68,68,0.2)'" onmouseout="this.style.background='rgba(239,68,68,0.08)'"
+              data-lp-on-mouseover="${LP.registerInlineHandler('mouseover', function (_event) { this.style.background='rgba(239,68,68,0.2)'
+    })}" data-lp-on-mouseout="${LP.registerInlineHandler('mouseout', function (_event) { this.style.background='rgba(239,68,68,0.08)'
+    })}"
               title="Hapus node">
               <i class="bi bi-trash3"></i>
             </button>
@@ -227,7 +234,8 @@ const ClusterPage = (() => {
             <i class="bi bi-diagram-3" style="font-size:52px; display:block; margin-bottom:16px; color:rgba(255,255,255,0.08);"></i>
             <h5 class="text-white" style="font-weight:600; margin-bottom:6px;">Belum Ada Agent Node</h5>
             <p style="font-size:13px; max-width:400px; margin:0 auto 20px;">Tambahkan server sekunder sebagai Agent Node untuk memantau resource-nya dari dashboard ini.</p>
-            <button class="btn-lp btn-lp-primary" onclick="LP.call('ClusterPage.showAddModal')"><i class="bi bi-plus-lg me-1"></i>Tambah Node Pertama</button>
+            <button class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ClusterPage.showAddModal')
+    })}"><i class="bi bi-plus-lg me-1"></i>Tambah Node Pertama</button>
           </div>`;
         return;
       }
@@ -550,7 +558,8 @@ const ClusterPage = (() => {
           const items = [
             `
             <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#fff; cursor:pointer;">
-              <input type="checkbox" value="all" id="execCheckAll" onchange="ClusterPage.toggleExecCheckAll(this)">
+              <input type="checkbox" value="all" id="execCheckAll" data-lp-on-change="${LP.registerInlineHandler('change', function (_event) { ClusterPage.toggleExecCheckAll(this)
+    })}">
               <strong>Select All Fleet Nodes (${s.totalNodes})</strong>
             </label>
             `,

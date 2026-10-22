@@ -63,8 +63,10 @@ const CronPage = (() => {
           </span>
         </td>
         <td style="text-align:right">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LP.call('CronPage.toggleTask', '${LP.encJsArg(t.id)}')"><i class="bi ${t.status === 'active' ? 'bi-pause-fill text-warning' : 'bi-play-fill text-success'}"></i></button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('CronPage.deleteTask', '${LP.encJsArg(t.id)}')"><i class="bi bi-trash"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('CronPage.toggleTask', (LP.encJsArg(t.id)))
+    })}"><i class="bi ${t.status === 'active' ? 'bi-pause-fill text-warning' : 'bi-play-fill text-success'}"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('CronPage.deleteTask', (LP.encJsArg(t.id)))
+    })}"><i class="bi bi-trash"></i></button>
         </td>
       </tr>
     `, 'No scheduled tasks found', 6);

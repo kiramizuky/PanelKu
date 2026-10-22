@@ -4,8 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import WebSocket from 'ws';
 import { getDb } from '../core/db/sqlite.js';
+import { getStorageDir } from '../config/paths.js';
 
-const AUDIT_LOG_PATH = path.resolve(process.cwd(), 'storage', 'logs', 'terminal_audit.log');
+const AUDIT_LOG_PATH = path.join(getStorageDir(), 'logs', 'terminal_audit.log');
 
 function logTerminalCommand(username, command) {
   const cleanCommand = command.trim();

@@ -107,6 +107,11 @@ describe('MonitorService — Metrics and System Health', () => {
     ]);
     mockSi.networkStats.mockResolvedValue([
       { iface: 'eth0', rx_sec: 1200, tx_sec: 800 },
+      { iface: 'lo', rx_sec: 50, tx_sec: 50 },
+    ]);
+    mockSi.networkInterfaces.mockResolvedValue([
+      { iface: 'eth0', ip4: '10.0.0.12', ip6: 'fe80::1', mac: 'aa:bb:cc:dd:ee:ff', operstate: 'up' },
+      { iface: 'lo', ip4: '127.0.0.1', operstate: 'unknown' },
     ]);
     mockSi.cpuTemperature.mockResolvedValue({ main: 55.4 });
     mockSi.disksIO.mockResolvedValue({ rIO_sec: 15, wIO_sec: 25 });
@@ -124,6 +129,15 @@ describe('MonitorService — Metrics and System Health', () => {
     expect(metrics.diskRead).toBe(15);
     expect(metrics.diskWrite).toBe(25);
     expect(metrics.loadAvg).toEqual([1.5, 1.2, 0.9]);
+    expect(metrics.networks).toHaveLength(1);
+    expect(metrics.networks[0]).toMatchObject({
+      iface: 'eth0',
+      ip4: '10.0.0.12',
+      ip6: 'fe80::1',
+      mac: 'aa:bb:cc:dd:ee:ff',
+      operstate: 'up',
+      rxSec: 1200,
+    });
     expect(metrics.timestamp).toBeGreaterThan(0);
   });
 
@@ -266,6 +280,27 @@ describe('PrometheusService — OpenMetrics Exporter', () => {
     const output = await prometheusService.getMetrics();
     expect(output).toContain('panelku_waf_rules_total 0');
     expect(output).toContain('panelku_users_total 1');
+  });
+
+  test('getMetrics reuses the cached snapshot outside tests', async () => {
+    const previousEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = 'production';
+      process.env.PROMETHEUS_CACHE_MS = '10000';
+      prometheusService.clearCache();
+      mockDb.prepare.mockImplementation(() => ({ get: () => ({ c: 1 }) }));
+
+      const first = await prometheusService.getMetrics();
+      const second = await prometheusService.getMetrics();
+      expect(second).toBe(first);
+
+      const forced = await prometheusService.getMetrics(true);
+      expect(forced).not.toBe(first);
+    } finally {
+      process.env.NODE_ENV = previousEnv;
+      delete process.env.PROMETHEUS_CACHE_MS;
+      prometheusService.clearCache();
+    }
   });
 });
 

@@ -41,11 +41,15 @@ const IOT = (() => {
         const ctrlEl = document.getElementById('mqttControls');
         if (s.installed) {
           ctrlEl.innerHTML = `
-            <button class="btn-lp btn-lp-success btn-lp-sm" onclick="IOT.mqttAction('start')"><i class="bi bi-play"></i> Start</button>
-            <button class="btn-lp btn-lp-danger btn-lp-sm" onclick="IOT.mqttAction('stop')"><i class="bi bi-stop"></i> Stop</button>
-            <button class="btn-lp btn-lp-warning btn-lp-sm" onclick="IOT.mqttAction('restart')"><i class="bi bi-arrow-clockwise"></i> Restart</button>`;
+            <button class="btn-lp btn-lp-success btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { IOT.mqttAction('start')
+    })}"><i class="bi bi-play"></i> Start</button>
+            <button class="btn-lp btn-lp-danger btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { IOT.mqttAction('stop')
+    })}"><i class="bi bi-stop"></i> Stop</button>
+            <button class="btn-lp btn-lp-warning btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { IOT.mqttAction('restart')
+    })}"><i class="bi bi-arrow-clockwise"></i> Restart</button>`;
         } else {
-          ctrlEl.innerHTML = `<button class="btn-lp btn-lp-primary" onclick="IOT.installMosquitto()"><i class="bi bi-download"></i> Install Mosquitto</button>`;
+          ctrlEl.innerHTML = `<button class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { IOT.installMosquitto()
+    })}"><i class="bi bi-download"></i> Install Mosquitto</button>`;
         }
 
         // Load config
@@ -59,7 +63,8 @@ const IOT = (() => {
           usrList.innerHTML = usr.data.users.map(u => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid rgba(255,255,255,0.05);">
               <span>${LP.escHtml(u.username)}</span>
-              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" onclick="LP.call('IOT.deleteMqttUser', '${LP.encJsArg(u.username)}')"><i class="bi bi-trash"></i></button>
+              <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('IOT.deleteMqttUser', (LP.encJsArg(u.username)))
+    })}"><i class="bi bi-trash"></i></button>
             </div>
           `).join('');
         } else usrList.innerHTML = '<p class="text-muted">No MQTT users configured.</p>';
@@ -150,7 +155,8 @@ const IOT = (() => {
             </div>
           </div>
           ${s.active ? `<a href="http://${location.hostname}:${s.port || 8123}" target="_blank" class="btn-lp btn-lp-primary"><i class="bi bi-box-arrow-up-right"></i> Open Home Assistant</a>` : ''}
-          ${!s.installed ? `<button class="btn-lp btn-lp-primary" onclick="IOT.installHa()"><i class="bi bi-download"></i> Install Docker</button>` : ''}
+          ${!s.installed ? `<button class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { IOT.installHa()
+    })}"><i class="bi bi-download"></i> Install Docker</button>` : ''}
         `;
       } else el.innerHTML = '<p class="text-muted">Home Assistant not detected.</p>';
     } catch { el.innerHTML = '<p class="text-danger">Failed</p>'; }
@@ -186,7 +192,8 @@ const IOT = (() => {
             </div>
           </div>
           ${s.active ? `<a href="http://${location.hostname}:${s.port || 1880}" target="_blank" class="btn-lp btn-lp-primary"><i class="bi bi-box-arrow-up-right"></i> Open Node-RED</a>` : ''}
-          ${!s.installed ? `<button class="btn-lp btn-lp-primary" onclick="IOT.installNodeRed()"><i class="bi bi-download"></i> Install Node-RED</button>` : ''}
+          ${!s.installed ? `<button class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { IOT.installNodeRed()
+    })}"><i class="bi bi-download"></i> Install Node-RED</button>` : ''}
         `;
       } else el.innerHTML = '<p class="text-muted">Node-RED not detected.</p>';
     } catch { el.innerHTML = '<p class="text-danger">Failed</p>'; }
