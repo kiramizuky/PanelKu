@@ -53,6 +53,7 @@ export const RESOURCES = {
   MONGODB: 'mongodb',
   GPU: 'gpu',
   POWER: 'power',
+  VULNERABILITIES: 'vulnerabilities',
 };
 
 // Token types

@@ -168,22 +168,30 @@ class PasswordPolicyService {
       throw Object.assign(new Error('Invalid URL format'), { statusCode: 400 });
     }
 
-    // SSRF protection — block requests to private/reserved IP ranges
-    const hostname = parsedUrl.hostname.toLowerCase();
-    if (
+    // SSRF protection — block requests to private/reserved IP ranges and cloud metadata
+    const hostname = parsedUrl.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    const isPrivateOrLoopback =
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
       hostname === '0.0.0.0' ||
-      hostname === '[::1]' ||
       hostname === '::1' ||
+      hostname === '::' ||
       hostname.endsWith('.local') ||
-      hostname.endsWith('.localhost')
-    ) {
-      throw Object.assign(new Error('Requests to local/private addresses are not allowed'), { statusCode: 400 });
-    }
-    // Check for common private IP patterns (with \d suffix to avoid matching domain names)
-    if (/^(?:10\.|172\.(?:1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.)\d/.test(hostname)) {
-      throw Object.assign(new Error('Requests to private network addresses are not allowed'), { statusCode: 400 });
+      hostname.endsWith('.localhost') ||
+      hostname.endsWith('.internal') ||
+      hostname === 'metadata.google.internal' ||
+      hostname === 'instance-data' ||
+      /^127\./.test(hostname) ||
+      /^10\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^172\.(?:1[6-9]|2\d|3[01])\./.test(hostname) ||
+      /^169\.254\./.test(hostname) ||
+      /^fc00:|^fe80:|^::ffff:(?:127|10|192\.168|172\.(?:1[6-9]|2\d|3[01])|169\.254)\./i.test(hostname) ||
+      /^0x[0-9a-f]+$/i.test(hostname) ||
+      /^\d+$/.test(hostname);
+
+    if (isPrivateOrLoopback) {
+      throw Object.assign(new Error('Requests to local, private, or metadata network addresses are not allowed'), { statusCode: 400 });
     }
 
     let response;
@@ -191,6 +199,7 @@ class PasswordPolicyService {
       response = await fetch(url, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
+        redirect: 'error',
         signal: AbortSignal.timeout(10000), // 10 second timeout
       });
     } catch (e) {

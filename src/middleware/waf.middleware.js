@@ -24,6 +24,9 @@ const XSS_PATTERNS = [
 // Path Traversal pattern
 const DIR_TRAVERSAL = /(\.\.\/)|(\.\.\\)/;
 
+// Prototype Pollution pattern
+const PROTO_POLLUTION_PATTERN = /(__proto__|constructor\s*\.\s*prototype|prototype\s*\[)/i;
+
 // RCE & Shellshock patterns
 const RCE_PATTERNS = [
   /;\s*(cat|ls|id|whoami|curl|wget|bash|sh|nc|ncat|netcat|python|perl|ruby|php|uname|rm|chmod|chown)\b/i,
@@ -147,7 +150,7 @@ export const wafMiddleware = async (req, res, next) => {
   }
 
   // 5. GeoIP Country Blocking
-  const isLocalIp = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === 'localhost' || clientIp.startsWith('192.168.') || clientIp.startsWith('10.') || clientIp.startsWith('172.16.') || clientIp.startsWith('172.17.') || clientIp.startsWith('172.18.') || clientIp.startsWith('172.19.') || clientIp.startsWith('172.2') || clientIp.startsWith('172.3');
+  const isLocalIp = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === 'localhost' || clientIp.startsWith('192.168.') || clientIp.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(clientIp) || clientIp.startsWith('fc00:') || clientIp.startsWith('fe80:');
   if (globalRulesCache.blockedCountries.length > 0 && !isLocalIp) {
     try {
       const geo = await geoipService.resolveIp(clientIp);
@@ -167,6 +170,7 @@ export const wafMiddleware = async (req, res, next) => {
     if (SQLI_PATTERN.test(str)) return 'SQL Injection';
     if (XSS_PATTERNS.some(p => p.test(str))) return 'XSS';
     if (DIR_TRAVERSAL.test(str)) return 'Directory Traversal';
+    if (PROTO_POLLUTION_PATTERN.test(str)) return 'Prototype Pollution';
     if (RCE_PATTERNS.some(p => p.test(str))) return 'Remote Code Execution (RCE)';
     return false;
   };

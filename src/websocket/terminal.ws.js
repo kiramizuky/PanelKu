@@ -1,4 +1,6 @@
 import terminalService from '../modules/terminal/terminal.service.js';
+import PermissionManager from '../core/permissions/PermissionManager.js';
+import { RESOURCES, ACTIONS } from '../config/constants.js';
 import logger from '../config/logger.js';
 import fs from 'fs';
 import path from 'path';
@@ -25,6 +27,14 @@ function logTerminalCommand(username, command) {
 export const registerTerminalSocket = (namespace) => {
   namespace.on('connection', (socket) => {
     logger.debug(`Terminal WS: client connected ${socket.id} user=${socket.user?.username}`);
+
+    // Check RBAC permission for terminal execution
+    const hasPerm = PermissionManager.userCan(socket.user, RESOURCES.TERMINAL, ACTIONS.EXECUTE);
+    if (!hasPerm || socket.user?.mustChangePassword) {
+      logger.warn(`Terminal WS: unauthorized access attempt by ${socket.user?.username || 'unknown'}`);
+      socket.emit('terminal:error', { message: 'Unauthorized: Terminal execution permission required' });
+      return socket.disconnect(true);
+    }
 
     let activeSessions = new Set();
     let sessionBuffers = new Map();

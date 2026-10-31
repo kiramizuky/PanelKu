@@ -918,7 +918,7 @@ const FMPage = (() => {
 
     // Parent directory entry (..)
     if (basePath !== '/') {
-      html += `<div class="fm-tree-item fm-tree-dir" data-path="${escHtml(basePath)}" data-type="parent">
+      html += `<div class="fm-tree-item fm-tree-dir" data-path="${escHtml(basePath)}" data-type="parent" data-level="0">
         <span class="fm-tree-toggle"><i class="bi bi-arrow-up-short" style="font-size:12px;"></i></span>
         <span class="fm-tree-icon">📂</span>
         <span class="fm-tree-name" style="color:var(--text-muted);font-style:italic;">..</span>
@@ -938,14 +938,14 @@ const FMPage = (() => {
       const activeClass = isActive ? 'fm-tree-active' : '';
 
       if (item.type === 'dir') {
-        return `<div class="fm-tree-item ${typeClass} ${activeClass}" data-path="${escHtml(item.path)}" data-type="dir">
+        return `<div class="fm-tree-item ${typeClass} ${activeClass}" data-path="${escHtml(item.path)}" data-type="dir" data-level="0">
           <span class="fm-tree-toggle">▶</span>
           <span class="fm-tree-icon">📁</span>
           <span class="fm-tree-name">${escHtml(item.name)}</span>
         </div>
         <div class="fm-tree-children" data-parent="${escHtml(item.path)}"></div>`;
       } else {
-        return `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file" draggable="true" data-lp-on-dragstart="${LP.registerInlineHandler('dragstart', function (event) { FMPage.onTreeDragStart(event)
+        return `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file" data-level="0" draggable="true" data-lp-on-dragstart="${LP.registerInlineHandler('dragstart', function (event) { FMPage.onTreeDragStart(event)
     })}">
           <span class="fm-tree-toggle" style="visibility:hidden;">▶</span>
           <span class="fm-tree-icon">${icon}</span>
@@ -980,8 +980,10 @@ const FMPage = (() => {
 
     if (childrenContainer.classList.contains('open')) {
       childrenContainer.classList.remove('open');
-      if (toggle) toggle.classList.remove('expanded');
-      if (toggle) toggle.textContent = '▶';
+      if (toggle) {
+        toggle.classList.remove('expanded');
+        toggle.textContent = '▶';
+      }
       return;
     }
 
@@ -991,7 +993,10 @@ const FMPage = (() => {
     try {
       const res = await LP.get(`/filemanager/list?path=${encodeURIComponent(path)}`);
       if (!res?.success) {
-        if (toggle) toggle.textContent = '▶';
+        if (toggle) {
+          toggle.textContent = '▶';
+          toggle.classList.remove('expanded');
+        }
         return;
       }
 
@@ -1001,38 +1006,48 @@ const FMPage = (() => {
         return a.name.localeCompare(b.name);
       });
 
-      let html = '';
-      sorted.forEach(item => {
-        const icon = item.type === 'dir' ? '📁' : getIcon(item);
-        const isActive = item.path === _activeTab;
-        const activeClass = isActive ? 'fm-tree-active' : '';
+      const parentLevel = parseInt(el.dataset.level || '0', 10);
+      const childLevel = parentLevel + 1;
 
-        if (item.type === 'dir') {
-          html += `<div class="fm-tree-item fm-tree-dir ${activeClass}" data-path="${escHtml(item.path)}" data-type="dir" draggable="true" data-lp-on-dragstart="${LP.registerInlineHandler('dragstart', function (event) { FMPage.onTreeDragStart(event)
-    })}">
-            <span class="fm-tree-toggle">▶</span>
-            <span class="fm-tree-icon">📁</span>
-            <span class="fm-tree-name">${escHtml(item.name)}</span>
-          </div>
-          <div class="fm-tree-children" data-parent="${escHtml(item.path)}"></div>`;
-        } else {
-          html += `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file" draggable="true" data-lp-on-dragstart="${LP.registerInlineHandler('dragstart', function (event) { FMPage.onTreeDragStart(event)
-    })}">
-            <span class="fm-tree-toggle" style="visibility:hidden;">▶</span>
-            <span class="fm-tree-icon">${icon}</span>
-            <span class="fm-tree-name">${escHtml(item.name)}</span>
-          </div>`;
-        }
-      });
+      let html = '';
+      if (sorted.length === 0) {
+        html = `<div class="fm-tree-empty-folder">(folder kosong)</div>`;
+      } else {
+        sorted.forEach(item => {
+          const icon = item.type === 'dir' ? '📁' : getIcon(item);
+          const isActive = item.path === _activeTab;
+          const activeClass = isActive ? 'fm-tree-active' : '';
+
+          if (item.type === 'dir') {
+            html += `<div class="fm-tree-item fm-tree-dir ${activeClass}" data-path="${escHtml(item.path)}" data-type="dir" data-level="${childLevel}" draggable="true" data-lp-on-dragstart="${LP.registerInlineHandler('dragstart', function (event) { FMPage.onTreeDragStart(event)
+      })}">
+              <span class="fm-tree-toggle">▶</span>
+              <span class="fm-tree-icon">📁</span>
+              <span class="fm-tree-name">${escHtml(item.name)}</span>
+            </div>
+            <div class="fm-tree-children" data-parent="${escHtml(item.path)}"></div>`;
+          } else {
+            html += `<div class="fm-tree-item ${activeClass}" data-path="${escHtml(item.path)}" data-type="file" data-level="${childLevel}" draggable="true" data-lp-on-dragstart="${LP.registerInlineHandler('dragstart', function (event) { FMPage.onTreeDragStart(event)
+      })}">
+              <span class="fm-tree-toggle" style="visibility:hidden;">▶</span>
+              <span class="fm-tree-icon">${icon}</span>
+              <span class="fm-tree-name">${escHtml(item.name)}</span>
+            </div>`;
+          }
+        });
+      }
 
       childrenContainer.innerHTML = html;
       childrenContainer.classList.add('open');
       if (toggle) {
+        toggle.textContent = '▶';
         toggle.classList.add('expanded');
-        toggle.textContent = '▼';
       }
     } catch (err) {
-      if (toggle) toggle.textContent = '▶';
+      if (toggle) {
+        toggle.textContent = '▶';
+        toggle.classList.remove('expanded');
+      }
     }
   }
 

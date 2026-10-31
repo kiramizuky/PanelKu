@@ -318,6 +318,48 @@ function initSchema(db) {
       created_at    TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_snapshots_created ON backup_snapshots(created_at);
+
+    -- Vulnerability Scans & Remediation (v3.8.0)
+    CREATE TABLE IF NOT EXISTS vulnerability_scans (
+      id              TEXT PRIMARY KEY,
+      scan_type       TEXT NOT NULL DEFAULT 'full',
+      status          TEXT NOT NULL DEFAULT 'completed',
+      total_findings  INTEGER NOT NULL DEFAULT 0,
+      critical_count  INTEGER NOT NULL DEFAULT 0,
+      high_count      INTEGER NOT NULL DEFAULT 0,
+      medium_count    INTEGER NOT NULL DEFAULT 0,
+      low_count       INTEGER NOT NULL DEFAULT 0,
+      fixed_count     INTEGER NOT NULL DEFAULT 0,
+      security_score  INTEGER NOT NULL DEFAULT 100,
+      scan_metadata   TEXT NOT NULL DEFAULT '{}',
+      started_at      TEXT NOT NULL,
+      completed_at    TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_vuln_scans_started ON vulnerability_scans(started_at);
+
+    CREATE TABLE IF NOT EXISTS vulnerability_findings (
+      id                TEXT PRIMARY KEY,
+      scan_id           TEXT NOT NULL,
+      category          TEXT NOT NULL,
+      title             TEXT NOT NULL,
+      cve_id            TEXT,
+      severity          TEXT NOT NULL,
+      cvss_score        REAL NOT NULL DEFAULT 0.0,
+      component         TEXT NOT NULL,
+      installed_version TEXT,
+      fixed_version     TEXT,
+      description       TEXT NOT NULL,
+      impact            TEXT NOT NULL,
+      manual_steps      TEXT NOT NULL,
+      auto_fix_command  TEXT,
+      auto_fix_safe     INTEGER NOT NULL DEFAULT 1,
+      status            TEXT NOT NULL DEFAULT 'open',
+      remediation_notes TEXT,
+      created_at        TEXT NOT NULL,
+      updated_at        TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_vuln_findings_scan ON vulnerability_findings(scan_id);
+    CREATE INDEX IF NOT EXISTS idx_vuln_findings_status ON vulnerability_findings(status);
   `);
   
 

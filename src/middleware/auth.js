@@ -34,7 +34,7 @@ export const authenticate = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, appConfig.jwt.secret);
+      decoded = jwt.verify(token, appConfig.jwt.secret, { algorithms: ['HS256'] });
     } catch (err) {
       if (err.name === 'TokenExpiredError') {
         return unauthorized(res, 'Token expired');

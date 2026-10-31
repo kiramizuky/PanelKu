@@ -19,7 +19,7 @@ export const initWebSocket = (io) => {
 
       if (!token) return next(new Error('No token'));
 
-      const decoded = jwt.verify(token, appConfig.jwt.secret);
+      const decoded = jwt.verify(token, appConfig.jwt.secret, { algorithms: ['HS256'] });
       const user = await userRepository.findById(decoded.sub, { populate: 'role' });
 
       if (!user || !user.isActive) return next(new Error('Unauthorized'));

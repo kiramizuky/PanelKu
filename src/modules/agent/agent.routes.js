@@ -69,7 +69,7 @@ router.get('/info', async (req, res) => {
  * POST /api/agent/exec
  * Execute remote maintenance command from Master Panel
  */
-router.post('/exec', async (req, res) => {
+router.post('/exec', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), async (req, res) => {
   const { command, timeout = 30000 } = req.body;
   if (!command || typeof command !== 'string') {
     return error(res, 'Command is required', 400);

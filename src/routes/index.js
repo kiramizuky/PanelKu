@@ -40,6 +40,7 @@ import cdnRoutes from '../modules/cdn/cdn.routes.js';
 import iotRoutes from '../modules/iot/iot.routes.js';
 import lvmManagerRoutes from '../modules/lvm-manager/lvm-manager.routes.js';
 import tasksRoutes from '../modules/tasks/tasks.routes.js';
+import vulnerabilitiesRoutes from '../modules/vulnerabilities/vulnerabilities.routes.js';
 import cache from '../helpers/cache.js';
 
 const router = Router();
@@ -102,6 +103,7 @@ router.use('/cdn', cdnRoutes);
 router.use('/iot', iotRoutes);
 router.use('/lvm-manager', lvmManagerRoutes);
 router.use('/tasks', tasksRoutes);
+router.use('/vulnerabilities', vulnerabilitiesRoutes);
 
 // API Documentation (mounted under /api prefix)
 router.use('/api-docs', apiDocsRoutes);

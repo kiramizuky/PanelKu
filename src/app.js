@@ -252,6 +252,7 @@ const createApp = () => {
   app.get('/analytics', (req, res) => res.render('analytics/index', { title: 'Analytics Dashboard' }));
   app.get('/autoheal', (req, res) => res.render('autoheal/index', { title: 'Auto-Healing' }));
   app.get('/ai-repair', (req, res) => res.render('ai-repair/index', { title: 'AI Auto-Repair' }));
+  app.get('/vulnerabilities', (req, res) => res.render('vulnerabilities/index', { title: 'AI Vulnerability Scanner & Remediation' }));
   app.get('/updater', (req, res) => res.render('updater/index', { title: 'Panel Updater' }));
   app.get('/caddy', (req, res) => res.render('caddy/index', { title: 'Caddy Server' }));
   app.get('/gpu', (req, res) => res.render('gpu/index', { title: 'GPU Manager' }));

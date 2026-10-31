@@ -620,22 +620,25 @@
   .fm-tree-container {
     flex: 1;
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
     padding: 6px 0;
   }
   
   .fm-tree-item {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 14px;
+    gap: 5px;
+    padding: 4px 8px 4px 6px;
     font-size: 12.5px;
     cursor: pointer;
     color: var(--text-secondary);
-    transition: all 0.12s;
+    transition: background 0.12s, color 0.12s;
     white-space: nowrap;
     user-select: none;
     border-left: 3px solid transparent;
+    border-radius: 4px;
+    margin: 1px 6px 1px 4px;
+    min-width: max-content;
   }
   .fm-tree-item:hover {
     background: rgba(255,255,255,0.07);
@@ -645,6 +648,7 @@
     background: rgba(59,130,246,0.22);
     color: #93c5fd;
     border-left-color: var(--accent-primary);
+    font-weight: 500;
   }
   .fm-tree-item.fm-tree-active:hover {
     background: rgba(59,130,246,0.30);
@@ -662,7 +666,7 @@
     font-size: 8px;
     color: var(--text-muted);
     flex-shrink: 0;
-    transition: transform 0.15s;
+    transition: transform 0.18s ease;
   }
   .fm-tree-toggle.expanded {
     transform: rotate(90deg);
@@ -679,15 +683,30 @@
     text-overflow: ellipsis;
   }
   
+  /* Tree Children Indentation & Visual Guide Lines */
   .fm-tree-children {
     display: none;
+    margin-left: 14px;
+    padding-left: 4px;
+    border-left: 1px dashed rgba(255, 255, 255, 0.14);
+    position: relative;
   }
   .fm-tree-children.open {
     display: block;
   }
+  .fm-tree-children:hover {
+    border-left-color: rgba(99, 102, 241, 0.45);
+  }
+  
+  .fm-tree-empty-folder {
+    padding: 3px 8px 3px 22px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
   
   .fm-tree-loading {
-    padding: 8px 14px;
+    padding: 6px 14px 6px 24px;
     font-size: 11px;
     color: var(--text-muted);
   }
@@ -715,6 +734,23 @@
   }
   .fm-editor-panel.fm-drag-over .CodeMirror {
     opacity: 0.85;
+  }
+  .fm-editor-light .fm-tree-children {
+    border-left-color: rgba(0, 0, 0, 0.12);
+  }
+  .fm-editor-light .fm-tree-children:hover {
+    border-left-color: rgba(99, 102, 241, 0.5);
+  }
+  .fm-editor-light .fm-tree-empty-folder {
+    color: #94a3b8;
+  }
+  .fm-editor-light .fm-tree-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #0f172a;
+  }
+  .fm-editor-light .fm-tree-item.fm-tree-active {
+    background: rgba(59, 130, 246, 0.15);
+    color: #1d4ed8;
   }
   .fm-editor-light .fm-editor-panel.fm-drag-over {
     outline-color: rgba(99,102,241,0.6);

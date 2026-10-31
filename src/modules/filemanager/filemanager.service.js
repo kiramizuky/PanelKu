@@ -193,7 +193,7 @@ class FileManagerService {
         lowerPath.endsWith('.tar.xz') || lowerPath.endsWith('.txz') ||
         lowerPath.endsWith('.tar')) {
       return new Promise((resolvePromise, rejectPromise) => {
-        execFile('tar', ['-xf', src, '-C', dest], (err, _stdout, stderr) => {
+        execFile('tar', ['--no-same-owner', '-xf', src, '-C', dest, '--'], (err, _stdout, stderr) => {
           if (err) {
             return rejectPromise(new Error(`Failed to extract tar archive: ${stderr || err.message}`));
           }
@@ -204,7 +204,7 @@ class FileManagerService {
 
     if (lowerPath.endsWith('.rar')) {
       return new Promise((resolvePromise, rejectPromise) => {
-        execFile('unrar', ['x', '-o+', '-y', src, dest + '/'], (err, _stdout, stderr) => {
+        execFile('unrar', ['x', '-o+', '-y', '--', src, dest + '/'], (err, _stdout, stderr) => {
           if (err) {
             return rejectPromise(new Error(`Failed to extract RAR: ${stderr || err.message}. Make sure 'unrar' is installed.`));
           }
@@ -215,7 +215,7 @@ class FileManagerService {
 
     if (lowerPath.endsWith('.7z')) {
       return new Promise((resolvePromise, rejectPromise) => {
-        execFile('7z', ['x', '-y', `-o${dest}`, src], (err, _stdout, stderr) => {
+        execFile('7z', ['x', '-y', `-o${dest}`, '--', src], (err, _stdout, stderr) => {
           if (err) {
             return rejectPromise(new Error(`Failed to extract 7z: ${stderr || err.message}. Make sure 'p7zip' or '7z' is installed.`));
           }
@@ -236,10 +236,16 @@ class FileManagerService {
         entry.autodrain(); // Skip malformed entries
         continue;
       }
-      // [CRIT-2 FIX] Core check: resolved path must start with destDir
+      // [CRIT-2 FIX & HARDEN] Core check: resolved path must start with destDir
       if (!entryFull.startsWith(dest + sep) && entryFull !== dest) {
         logger.warn(`[Zip Slip Blocked] Entry '${entryPath}' resolved outside dest: ${entryFull}`);
         entry.autodrain(); // Discard this malicious entry
+        continue;
+      }
+      // Block symbolic links from archives to prevent Zip Slip via symlink traversal
+      if (entry.type === 'SymbolicLink' || entry.type === 'Link') {
+        logger.warn(`[Symlink Blocked] Archive link entry '${entryPath}' blocked for security`);
+        entry.autodrain();
         continue;
       }
       if (entry.type === 'Directory') {

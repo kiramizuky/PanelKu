@@ -176,7 +176,7 @@ class AuthService {
 
     let payload;
     try {
-      payload = jwt.verify(tempToken, appConfig.appSecret);
+      payload = jwt.verify(tempToken, appConfig.appSecret, { algorithms: ['HS256'] });
     } catch {
       // Don't audit log for invalid temp tokens — they are untrusted
       throw Object.assign(new Error('Invalid or expired temp token'), { statusCode: 401 });
@@ -247,7 +247,7 @@ class AuthService {
 
     let payload;
     try {
-      payload = jwt.verify(token, appConfig.jwt.refreshSecret);
+      payload = jwt.verify(token, appConfig.jwt.refreshSecret, { algorithms: ['HS256'] });
     } catch {
       await sessionRepository.deactivate(session._id);
       throw Object.assign(new Error('Refresh token expired'), { statusCode: 401 });

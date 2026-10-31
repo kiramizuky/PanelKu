@@ -6,7 +6,7 @@ export const registerDockerSocket = (namespace) => {
   namespace.on('connection', async (socket) => {
     logger.debug(`Docker WS connected: ${socket.id}`);
     
-    // Check permission
+    // Check base read permission for Docker WebSocket namespace
     const hasPerm = PermissionManager.userCan(socket.user, 'docker_manage', 'read');
     if (!hasPerm) {
       return socket.disconnect(true);
@@ -35,9 +35,14 @@ export const registerDockerSocket = (namespace) => {
       return shell || 'sh';
     };
 
-    // Exec terminal session inside a container
+    // Exec terminal session inside a container - requires EXECUTE permission
     socket.on('exec:create', async ({ containerId, shell = 'sh' }) => {
       try {
+        const canExec = PermissionManager.userCan(socket.user, 'docker_manage', 'execute');
+        if (!canExec || socket.user?.mustChangePassword) {
+          return socket.emit('exec:error', 'Unauthorized: Execute permission on Docker containers required');
+        }
+
         if (execStream) {
           execStream.destroy();
         }
@@ -153,4 +158,4 @@ export const registerDockerSocket = (namespace) => {
       if (execStream) execStream.destroy();
     });
   });
-}
+};
