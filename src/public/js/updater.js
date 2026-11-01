@@ -46,6 +46,14 @@ const UpdaterPage = (() => {
         document.getElementById('ovLastUpdated').textContent = 'Last update: ' + (d.lastUpdated ? new Date(d.lastUpdated).toLocaleString() : '—');
         document.getElementById('ovChannel').textContent = d.channel || 'stable';
         document.getElementById('ovNodeVersion').textContent = 'Node: ' + (d.nodeVersion || '—');
+        const branchInput = document.getElementById('upBranch');
+        if (branchInput && d.branch) {
+          branchInput.value = d.branch;
+        }
+        const channelSelect = document.getElementById('upChannel');
+        if (channelSelect && d.channel) {
+          channelSelect.value = d.channel;
+        }
       }
     } catch (err) {
       console.error('Failed to load version info', err);

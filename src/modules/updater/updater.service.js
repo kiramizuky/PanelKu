@@ -943,7 +943,7 @@ class UpdaterService {
       history.backups = history.backups.slice(0, 10);
       await this._writeJSON(HISTORY_FILE, history);
 
-      return { name: backupName, file: backupFile, output };
+      return { name: backupName, file: backupFile, size, output };
     } catch (err) {
       logger.error(`Updater: Pre-update backup failed: ${err.message}`);
       throw new Error(`Pre-update backup failed: ${err.message}`);
@@ -1099,14 +1099,26 @@ class UpdaterService {
         const hasLock = await fs.access(path.join(PANEL_DIR, 'package-lock.json'))
           .then(() => true)
           .catch(() => false);
-        const installCmd = hasLock ? 'npm ci --omit=dev' : 'npm install --omit=dev';
+        const installCmd = hasLock ? 'npm ci --omit=dev --ignore-scripts' : 'npm install --omit=dev --ignore-scripts';
 
         try {
           const npmOut = await this._runChecked(installCmd, { timeout: 900000 });
           const tail = npmOut.trim().split('\n').slice(-5).join('\n   ');
           if (tail) log.push(`   ${tail}`);
         } catch (err) {
-          throw new Error(`Dependency installation failed (${installCmd}): ${err.message}`);
+          if (hasLock) {
+            log.push(`   ⚠️ ${installCmd} failed, falling back to npm install --omit=dev --ignore-scripts...`);
+            try {
+              const fallbackCmd = 'npm install --omit=dev --ignore-scripts';
+              const npmOut = await this._runChecked(fallbackCmd, { timeout: 900000 });
+              const tail = npmOut.trim().split('\n').slice(-5).join('\n   ');
+              if (tail) log.push(`   ${tail}`);
+            } catch (fallbackErr) {
+              throw new Error(`Dependency installation failed: ${fallbackErr.message}`);
+            }
+          } else {
+            throw new Error(`Dependency installation failed (${installCmd}): ${err.message}`);
+          }
         }
 
         log.push('🔨 Rebuilding native dependencies (better-sqlite3, node-pty)...');
@@ -1247,9 +1259,20 @@ class UpdaterService {
       const hasLock = await fs.access(path.join(PANEL_DIR, 'package-lock.json'))
         .then(() => true)
         .catch(() => false);
-      const installCmd = hasLock ? 'npm ci --omit=dev' : 'npm install --omit=dev';
-      const npmOut = await this._runChecked(installCmd, { timeout: 900000 });
-      log.push(`   ${npmOut.trim().split('\n').slice(-5).join('\n   ')}`);
+      const installCmd = hasLock ? 'npm ci --omit=dev --ignore-scripts' : 'npm install --omit=dev --ignore-scripts';
+      try {
+        const npmOut = await this._runChecked(installCmd, { timeout: 900000 });
+        log.push(`   ${npmOut.trim().split('\n').slice(-5).join('\n   ')}`);
+      } catch (err) {
+        if (hasLock) {
+          log.push(`   ⚠️ ${installCmd} failed, falling back to npm install --omit=dev --ignore-scripts...`);
+          const fallbackCmd = 'npm install --omit=dev --ignore-scripts';
+          const npmOut = await this._runChecked(fallbackCmd, { timeout: 900000 });
+          log.push(`   ${npmOut.trim().split('\n').slice(-5).join('\n   ')}`);
+        } else {
+          throw err;
+        }
+      }
 
       log.push('🔨 Rebuilding native dependencies after rollback (better-sqlite3, node-pty)...');
       const native = await this.rebuildNativeModules(log);

@@ -17,8 +17,8 @@
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
-import { getDb, generateId, now, toJson, fromJson } from '../../core/db/sqlite.js';
-import { execCmd, execShell, isBinaryInstalled } from '../../helpers/exec.js';
+import { getDb, generateId, now, toJson } from '../../core/db/sqlite.js';
+import { execShell, isBinaryInstalled } from '../../helpers/exec.js';
 import aiService from '../ai/ai.service.js';
 import Setting from '../../models/Setting.js';
 import auditRepository from '../../repositories/audit.repository.js';
@@ -423,7 +423,7 @@ class VulnerabilitiesService {
             severity: 'critical',
             cvss_score: 9.3,
             component: `Website DocRoot: ${docRoot}`,
-            installed_version: `Permission: ${modeOctal}`,
+            installed_version: `Permission: ${modeOctal} (world-readable: ${isWorldReadable})`,
             fixed_version: 'Permission 600 / Web Block Rule',
             description: `Berkas rahasia .env terdeteksi di dalam root web (${envPath}). Berkas ini umumnya menyimpan DB_PASSWORD, JWT_SECRET, APP_KEY, dan kredensial API lainnya.`,
             impact: 'Pencurian seluruh kredensial database, API keys, dan token sistem oleh publik.',
@@ -551,7 +551,7 @@ class VulnerabilitiesService {
   /**
    * Run full multi-vector scan and store findings
    */
-  async startScan(scanType = 'full', options = {}) {
+  async startScan(scanType = 'full', _options = {}) {
     if (this._isScanning) {
       throw new Error('Proses pemindaian kerentanan sedang berjalan di background.');
     }
