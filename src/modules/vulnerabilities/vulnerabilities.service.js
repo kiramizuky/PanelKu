@@ -158,21 +158,34 @@ class VulnerabilitiesService {
         const numVer = parseFloat(verStr);
         // Vulnerable versions: 8.5p1 up to 9.7p1 (unauthenticated remote code execution as root)
         if (numVer >= 8.5 && numVer <= 9.7) {
-          findings.push({
-            category: 'os',
-            title: 'OpenSSH Remote Code Execution (regreSSHion)',
-            cve_id: 'CVE-2024-6387',
-            severity: 'critical',
-            cvss_score: 9.8,
-            component: 'OpenSSH Server',
-            installed_version: `OpenSSH ${verStr}`,
-            fixed_version: 'OpenSSH 9.8p1+ / Vendor Backport',
-            description: 'Ditemukan kerentanan signal handler race condition di OpenSSH Server (sshd). Penyerang jarak jauh tanpa autentikasi dapat mengeksekusi kode arbitrary dengan hak akses root.',
-            impact: 'Kompromi total server (Remote Root Privilege Escalation tanpa password).',
-            manual_steps: `# Opsi 1: Upgrade OpenSSH via Package Manager\nsudo apt-get update && sudo apt-get --only-upgrade install -y openssh-server\n\n# Opsi 2: Mitigasi Cepat (non-aktifkan LoginGraceTime)\nsudo sed -i 's/^#*LoginGraceTime.*/LoginGraceTime 0/' /etc/ssh/sshd_config\nsudo systemctl reload ssh || sudo systemctl reload sshd`,
-            auto_fix_command: "sed -i 's/^#*LoginGraceTime.*/LoginGraceTime 0/' /etc/ssh/sshd_config && (systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true)",
-            auto_fix_safe: 1,
-          });
+          // Check if mitigated by LoginGraceTime 0 or vendor backport patch
+          let isMitigated = false;
+          if (!isWin) {
+            try {
+              const sshdCheck = await execShell('sshd -T 2>/dev/null || cat /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null || true');
+              if (/(?:^|\n)\s*logingracetime\s+0\b/i.test(sshdCheck)) {
+                isMitigated = true;
+              }
+            } catch (_) {}
+          }
+
+          if (!isMitigated) {
+            findings.push({
+              category: 'os',
+              title: 'OpenSSH Remote Code Execution (regreSSHion)',
+              cve_id: 'CVE-2024-6387',
+              severity: 'critical',
+              cvss_score: 9.8,
+              component: 'OpenSSH Server',
+              installed_version: `OpenSSH ${verStr}`,
+              fixed_version: 'OpenSSH 9.8p1+ / LoginGraceTime 0',
+              description: 'Ditemukan kerentanan signal handler race condition di OpenSSH Server (sshd). Penyerang jarak jauh tanpa autentikasi dapat mengeksekusi kode arbitrary dengan hak akses root.',
+              impact: 'Kompromi total server (Remote Root Privilege Escalation tanpa password).',
+              manual_steps: `# Opsi 1: Upgrade OpenSSH via Package Manager\nsudo apt-get update && sudo apt-get --only-upgrade install -y openssh-server\n\n# Opsi 2: Mitigasi Cepat (non-aktifkan LoginGraceTime)\nsudo sed -i 's/^#*LoginGraceTime.*/LoginGraceTime 0/' /etc/ssh/sshd_config\nsudo systemctl reload ssh || sudo systemctl reload sshd`,
+              auto_fix_command: "sed -i 's/^#*LoginGraceTime.*/LoginGraceTime 0/' /etc/ssh/sshd_config && (systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true)",
+              auto_fix_safe: 1,
+            });
+          }
         }
       }
     } catch (e) {
@@ -215,21 +228,31 @@ class VulnerabilitiesService {
           const nrOut = await execShell('needrestart -v 2>&1 | head -n 1 || true').catch(() => '');
           const matchNr = nrOut.match(/needrestart v([0-9.]+)/i);
           if (matchNr && parseFloat(matchNr[1]) < 3.8) {
-            findings.push({
-              category: 'os',
-              title: 'Needrestart Local Privilege Escalation via Interpreter Scanning',
-              cve_id: 'CVE-2024-11003',
-              severity: 'high',
-              cvss_score: 7.8,
-              component: 'needrestart',
-              installed_version: `needrestart v${matchNr[1]}`,
-              fixed_version: 'needrestart 3.8+',
-              description: 'Needrestart versi sebelum 3.8 memicu eksekusi kode lokal dengan hak root saat memeriksa proses Python/Perl yang berjalan karena pemrosesan PYTHONPATH/PERL5LIB yang tidak aman.',
-              impact: 'Pengguna lokal non-root dapat mengelevasi hak akses ke root saat paket diupdate oleh sistem.',
-              manual_steps: `# Update paket needrestart ke versi terbaru\nsudo apt-get update && sudo apt-get --only-upgrade install -y needrestart\n\n# Atau nonaktifkan interpreter scanning di /etc/needrestart/needrestart.conf\nsudo sed -i "s/\\$nrconf{interpscan} = 1;/\$nrconf{interpscan} = 0;/" /etc/needrestart/needrestart.conf`,
-              auto_fix_command: 'apt-get update && apt-get --only-upgrade install -y needrestart',
-              auto_fix_safe: 1,
-            });
+            let isMitigated = false;
+            try {
+              const nrConf = await execShell('cat /etc/needrestart/needrestart.conf /etc/needrestart/conf.d/*.conf 2>/dev/null || true');
+              if (/\$nrconf\{interpscan\}\s*=\s*0\s*;/i.test(nrConf)) {
+                isMitigated = true;
+              }
+            } catch (_) {}
+
+            if (!isMitigated) {
+              findings.push({
+                category: 'os',
+                title: 'Needrestart Local Privilege Escalation via Interpreter Scanning',
+                cve_id: 'CVE-2024-11003',
+                severity: 'high',
+                cvss_score: 7.8,
+                component: 'needrestart',
+                installed_version: `needrestart v${matchNr[1]}`,
+                fixed_version: 'needrestart 3.8+',
+                description: 'Needrestart versi sebelum 3.8 memicu eksekusi kode lokal dengan hak root saat memeriksa proses Python/Perl yang berjalan karena pemrosesan PYTHONPATH/PERL5LIB yang tidak aman.',
+                impact: 'Pengguna lokal non-root dapat mengelevasi hak akses ke root saat paket diupdate oleh sistem.',
+                manual_steps: `# Update paket needrestart ke versi terbaru\nsudo apt-get update && sudo apt-get --only-upgrade install -y needrestart\n\n# Atau nonaktifkan interpreter scanning di /etc/needrestart/needrestart.conf\nsudo sed -i "s/\\$nrconf{interpscan} = 1;/\$nrconf{interpscan} = 0;/" /etc/needrestart/needrestart.conf`,
+                auto_fix_command: 'apt-get update && apt-get --only-upgrade install -y needrestart',
+                auto_fix_safe: 1,
+              });
+            }
           }
         }
       }
@@ -239,10 +262,38 @@ class VulnerabilitiesService {
 
     // 1.4 SSH Configuration Hardening (PermitRootLogin & PasswordAuth)
     try {
-      const sshdConfigPath = isWin ? null : '/etc/ssh/sshd_config';
-      if (sshdConfigPath && fs.existsSync(sshdConfigPath)) {
-        const config = fs.readFileSync(sshdConfigPath, 'utf8');
-        if (/^\s*PermitRootLogin\s+yes/m.test(config)) {
+      if (!isWin) {
+        let isRootLoginAllowed = false;
+        try {
+          const sshdConfigOut = await execShell('sshd -T 2>/dev/null || true');
+          if (sshdConfigOut) {
+            if (/^permitrootlogin\s+yes\b/mi.test(sshdConfigOut)) {
+              isRootLoginAllowed = true;
+            }
+          } else {
+            const files = ['/etc/ssh/sshd_config'];
+            try {
+              if (fs.existsSync('/etc/ssh/sshd_config.d')) {
+                const subFiles = fs.readdirSync('/etc/ssh/sshd_config.d');
+                for (const sf of subFiles) {
+                  if (sf.endsWith('.conf')) files.push(path.join('/etc/ssh/sshd_config.d', sf));
+                }
+              }
+            } catch (_) {}
+
+            for (const f of files) {
+              if (fs.existsSync(f)) {
+                const content = fs.readFileSync(f, 'utf8');
+                if (/(?:^|\n)\s*PermitRootLogin\s+yes\b/i.test(content)) {
+                  isRootLoginAllowed = true;
+                  break;
+                }
+              }
+            }
+          }
+        } catch (_) {}
+
+        if (isRootLoginAllowed) {
           findings.push({
             category: 'os',
             title: 'SSH Root Login Terbuka (PermitRootLogin Yes)',
@@ -294,6 +345,103 @@ class VulnerabilitiesService {
   }
 
   /**
+   * Helper: Check if Nginx server_tokens is turned off
+   */
+  async isNginxServerTokensOff() {
+    // 1. Check live HTTP response from local Nginx (fastest and most accurate)
+    try {
+      const curlOut = await execShell('curl -sI -m 2 http://127.0.0.1:80 2>/dev/null || curl -sI -m 2 http://localhost:80 2>/dev/null || true');
+      const serverMatch = curlOut.match(/^[Ss]erver:\s*(.+)$/m);
+      if (serverMatch) {
+        const serverVal = serverMatch[1].trim();
+        // "Server: nginx" without version number means server_tokens is OFF
+        if (/^nginx$/i.test(serverVal)) {
+          return true;
+        }
+        // "Server: nginx/1.24.0" (contains slash and version digits) means it is ON
+        if (/^nginx\/[0-9]/i.test(serverVal)) {
+          return false;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Check compiled configuration via `nginx -T`
+    try {
+      const nginxT = await execShell('nginx -T 2>/dev/null || sudo -n nginx -T 2>/dev/null || true');
+      if (nginxT && nginxT.length > 50) {
+        if (/(?:^|\n)\s*server_tokens\s+off\b/i.test(nginxT)) {
+          return true;
+        }
+        if (/(?:^|\n)\s*server_tokens\s+on\b/i.test(nginxT)) {
+          return false;
+        }
+      }
+    } catch (_) {}
+
+    // 3. Scan candidate configuration files across standard and aaPanel paths
+    const candidateFiles = [
+      '/etc/nginx/nginx.conf',
+      '/www/server/nginx/conf/nginx.conf',
+      '/usr/local/nginx/conf/nginx.conf',
+    ];
+
+    const candidateDirs = [
+      '/etc/nginx/conf.d',
+      '/etc/nginx/sites-enabled',
+      '/etc/nginx/snippets',
+      '/www/server/nginx/conf/vhost',
+    ];
+
+    for (const dir of candidateDirs) {
+      try {
+        if (fs.existsSync(dir)) {
+          const files = fs.readdirSync(dir);
+          for (const f of files) {
+            if (f.endsWith('.conf') || !f.includes('.')) {
+              candidateFiles.push(path.join(dir, f));
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    let foundAnyConfig = false;
+    for (const confPath of candidateFiles) {
+      try {
+        if (fs.existsSync(confPath)) {
+          foundAnyConfig = true;
+          const content = fs.readFileSync(confPath, 'utf8');
+          // Match active server_tokens off (allow arbitrary spaces, tabs, optional semicolon)
+          if (/(?:^|\n)\s*server_tokens\s+off\b/i.test(content)) {
+            return true;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Fallback: check with grep in case of file permission restrictions
+    try {
+      const grepOut = await execShell('grep -ri "server_tokens" /etc/nginx/ /www/server/nginx/conf/ 2>/dev/null || sudo -n grep -ri "server_tokens" /etc/nginx/ 2>/dev/null || true');
+      if (grepOut) {
+        const lines = grepOut.split('\n');
+        for (const line of lines) {
+          const clean = line.replace(/^[^:]+:\s*/, '').trim();
+          if (/^server_tokens\s+off\b/i.test(clean)) {
+            return true;
+          }
+        }
+      }
+    } catch (_) {}
+
+    // If no config found at all, avoid false positive
+    if (!foundAnyConfig) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * 2. Vector: Scan Applications & Runtimes
    */
   async scanApps() {
@@ -331,10 +479,10 @@ class VulnerabilitiesService {
     // 2.2 Nginx Web Server Tokens Leakage
     try {
       if (!isWin) {
-        const nginxInstalled = await isBinaryInstalled('nginx');
+        const nginxInstalled = (await isBinaryInstalled('nginx')) || fs.existsSync('/usr/sbin/nginx') || fs.existsSync('/www/server/nginx/sbin/nginx');
         if (nginxInstalled) {
-          const nginxConf = await execShell('cat /etc/nginx/nginx.conf 2>/dev/null || true').catch(() => '');
-          if (nginxConf && !/server_tokens\s+off;/i.test(nginxConf)) {
+          const isTokensOff = await this.isNginxServerTokensOff();
+          if (!isTokensOff) {
             findings.push({
               category: 'apps',
               title: 'Nginx Server Header Information Disclosure',
@@ -346,8 +494,8 @@ class VulnerabilitiesService {
               fixed_version: 'server_tokens off;',
               description: 'Nginx mengekspos nomor versi persis di HTTP header respon (Server: nginx/x.x.x) dan halaman error bawaan, memudahkan penyerang memetakan celah spesifik versi tersebut.',
               impact: 'Information disclosure mengenai stack dan versi server web.',
-              manual_steps: `# Tambahkan "server_tokens off;" di block http {} pada /etc/nginx/nginx.conf\nsudo sed -i '/http {/a \\    server_tokens off;' /etc/nginx/nginx.conf\nsudo nginx -t && sudo systemctl reload nginx`,
-              auto_fix_command: "sed -i '/http {/a \\    server_tokens off;' /etc/nginx/nginx.conf && nginx -t && systemctl reload nginx",
+              manual_steps: `# Tambahkan "server_tokens off;" di block http {} pada konfigurasi Nginx\nif [ -f /etc/nginx/nginx.conf ]; then CONF="/etc/nginx/nginx.conf"; else CONF="/www/server/nginx/conf/nginx.conf"; fi\nsudo sed -i '/http {/a \\    server_tokens off;' "$CONF"\nsudo nginx -t && (sudo systemctl reload nginx || sudo nginx -s reload)`,
+              auto_fix_command: "if [ -f /etc/nginx/nginx.conf ]; then CONF='/etc/nginx/nginx.conf'; elif [ -f /www/server/nginx/conf/nginx.conf ]; then CONF='/www/server/nginx/conf/nginx.conf'; else CONF='/etc/nginx/nginx.conf'; fi; if grep -qi 'server_tokens' \"$CONF\"; then sed -i 's/server_tokens.*/server_tokens off;/' \"$CONF\"; else sed -i '/http {/a \\    server_tokens off;' \"$CONF\"; fi; (nginx -t && (systemctl reload nginx 2>/dev/null || nginx -s reload 2>/dev/null || true))",
               auto_fix_safe: 1,
             });
           }
@@ -361,7 +509,7 @@ class VulnerabilitiesService {
     try {
       if (!isWin) {
         const netstatOut = await execShell('ss -tulpn 2>/dev/null || netstat -tulpn 2>/dev/null || true').catch(() => '');
-        if (/0\.0\.0\.0:6379\b/i.test(netstatOut)) {
+        if (/(?:0\.0\.0\.0|\*|\[::\]):6379\b/i.test(netstatOut)) {
           findings.push({
             category: 'apps',
             title: 'Redis Server Terbuka ke Publik (0.0.0.0:6379)',
@@ -413,44 +561,53 @@ class VulnerabilitiesService {
         if (fs.existsSync(envPath)) {
           const stat = fs.statSync(envPath);
           const modeOctal = (stat.mode & 0o777).toString(8);
-          // If world readable (last digit has read bit >= 4)
+          // If world readable (others read bit is set) or group readable
           const isWorldReadable = (stat.mode & 0o004) !== 0;
+          const isPermissionSafe = (stat.mode & 0o077) === 0; // only owner has read/write (e.g. 600, 400)
 
-          findings.push({
-            category: 'websites',
-            title: `Exposed Environment Secrets (.env) di ${docRoot}`,
-            cve_id: 'CWE-200 / CWE-552',
-            severity: 'critical',
-            cvss_score: 9.3,
-            component: `Website DocRoot: ${docRoot}`,
-            installed_version: `Permission: ${modeOctal} (world-readable: ${isWorldReadable})`,
-            fixed_version: 'Permission 600 / Web Block Rule',
-            description: `Berkas rahasia .env terdeteksi di dalam root web (${envPath}). Berkas ini umumnya menyimpan DB_PASSWORD, JWT_SECRET, APP_KEY, dan kredensial API lainnya.`,
-            impact: 'Pencurian seluruh kredensial database, API keys, dan token sistem oleh publik.',
-            manual_steps: `# Kunci hak akses berkas menjadi 600\nsudo chmod 600 ${envPath}\n\n# Pastikan web server memblokir akses ke berkas hidden:\n# Pada Nginx tambahkan: location ~ /\\.(?!well-known) { deny all; return 404; }`,
-            auto_fix_command: `chmod 600 "${envPath}"`,
-            auto_fix_safe: 1,
-          });
+          if (!isPermissionSafe || isWorldReadable) {
+            findings.push({
+              category: 'websites',
+              title: `Exposed Environment Secrets (.env) di ${docRoot}`,
+              cve_id: 'CWE-200 / CWE-552',
+              severity: 'critical',
+              cvss_score: 9.3,
+              component: `Website DocRoot: ${docRoot}`,
+              installed_version: `Permission: ${modeOctal} (world-readable: ${isWorldReadable})`,
+              fixed_version: 'Permission 600 / Web Block Rule',
+              description: `Berkas rahasia .env terdeteksi di dalam root web (${envPath}) dengan izin berkas terbuka (${modeOctal}). Berkas ini umumnya menyimpan DB_PASSWORD, JWT_SECRET, APP_KEY, dan kredensial API lainnya.`,
+              impact: 'Pencurian seluruh kredensial database, API keys, dan token sistem oleh publik.',
+              manual_steps: `# Kunci hak akses berkas menjadi 600\nsudo chmod 600 ${envPath}\n\n# Pastikan web server memblokir akses ke berkas hidden:\n# Pada Nginx tambahkan: location ~ /\\.(?!well-known) { deny all; return 404; }`,
+              auto_fix_command: `chmod 600 "${envPath}"`,
+              auto_fix_safe: 1,
+            });
+          }
         }
 
         // 3.2 Check exposed .git repository in docroot
         const gitPath = path.join(docRoot, '.git');
         if (fs.existsSync(gitPath)) {
-          findings.push({
-            category: 'websites',
-            title: `Direktori .git Terbuka di Web Root (${docRoot})`,
-            cve_id: 'CWE-538 / Git Disclosure',
-            severity: 'high',
-            cvss_score: 8.2,
-            component: `Website DocRoot: ${docRoot}`,
-            installed_version: '.git Directory Present',
-            fixed_version: 'Restricted / Denied by Web Server',
-            description: `Folder repositori .git berada di direktori publik web (${gitPath}). Penyerang dapat mengunduh seluruh commit history dan merekonstruksi source code aplikasi secara utuh.`,
-            impact: 'Source code aplikasi bocor 100% beserta history commit dan kata sandi hardcoded.',
-            manual_steps: `# Batasi akses ke folder .git\nsudo chmod 700 ${gitPath}\n\n# Blokir akses via Nginx:\n# location ~ /\\.git { deny all; return 404; }`,
-            auto_fix_command: `chmod 700 "${gitPath}"`,
-            auto_fix_safe: 1,
-          });
+          const stat = fs.statSync(gitPath);
+          const isWorldAccessible = (stat.mode & 0o005) !== 0;
+          const isSafe = (stat.mode & 0o077) === 0; // chmod 700
+
+          if (!isSafe || isWorldAccessible) {
+            findings.push({
+              category: 'websites',
+              title: `Direktori .git Terbuka di Web Root (${docRoot})`,
+              cve_id: 'CWE-538 / Git Disclosure',
+              severity: 'high',
+              cvss_score: 8.2,
+              component: `Website DocRoot: ${docRoot}`,
+              installed_version: `.git Directory Present (mode: ${(stat.mode & 0o777).toString(8)})`,
+              fixed_version: 'Restricted / Denied by Web Server',
+              description: `Folder repositori .git berada di direktori publik web (${gitPath}). Penyerang dapat mengunduh seluruh commit history dan merekonstruksi source code aplikasi secara utuh.`,
+              impact: 'Source code aplikasi bocor 100% beserta history commit dan kata sandi hardcoded.',
+              manual_steps: `# Batasi akses ke folder .git\nsudo chmod 700 ${gitPath}\n\n# Blokir akses via Nginx:\n# location ~ /\\.git { deny all; return 404; }`,
+              auto_fix_command: `chmod 700 "${gitPath}"`,
+              auto_fix_safe: 1,
+            });
+          }
         }
 
         // 3.3 Check exposed SQL dumps in docroot
@@ -496,8 +653,9 @@ class VulnerabilitiesService {
       if (!isWin) {
         const ufwInstalled = await isBinaryInstalled('ufw');
         if (ufwInstalled) {
-          const ufwStatus = await execShell('ufw status 2>/dev/null || true').catch(() => '');
-          if (!/Status:\s*active/i.test(ufwStatus)) {
+          const ufwStatus = await execShell('sudo -n ufw status 2>/dev/null || ufw status 2>/dev/null || systemctl is-active ufw 2>/dev/null || true').catch(() => '');
+          const isUfwActive = /Status:\s*active/i.test(ufwStatus) || ufwStatus.trim() === 'active';
+          if (!isUfwActive) {
             findings.push({
               category: 'plugins',
               title: 'Firewall Sistem (UFW) Tidak Aktif',

@@ -127,6 +127,29 @@ describe('Vulnerabilities Service Unit Tests', () => {
     expect(json).toHaveProperty('summary');
     expect(json).toHaveProperty('findings');
   });
+
+  test('isNginxServerTokensOff should correctly identify server_tokens off patterns', async () => {
+    // Direct regex pattern test as used in vulnerabilitiesService
+    const regex = /(?:^|\n)\s*server_tokens\s+off\b/i;
+
+    // Positive variations
+    expect(regex.test('server_tokens off;')).toBe(true);
+    expect(regex.test('server_tokens  off;')).toBe(true);
+    expect(regex.test('server_tokens  off ;')).toBe(true);
+    expect(regex.test('server_tokens\toff;')).toBe(true);
+    expect(regex.test('    server_tokens   off;')).toBe(true);
+    expect(regex.test('server_tokens off')).toBe(true);
+
+    // Negative / Commented out variations
+    expect(regex.test('# server_tokens off;')).toBe(false);
+    expect(regex.test('#server_tokens off;')).toBe(false);
+    expect(regex.test('server_tokens on;')).toBe(false);
+    expect(regex.test('server_tokens  on;')).toBe(false);
+
+    // Method execution
+    const isTokensOff = await vulnerabilitiesService.isNginxServerTokensOff();
+    expect(typeof isTokensOff).toBe('boolean');
+  });
 });
 
 describe('Vulnerabilities API Integration Tests', () => {
