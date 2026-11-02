@@ -414,12 +414,12 @@ setup_panel() {
 
   info "Installing npm packages..."
   if [ -f package-lock.json ]; then
-    npm ci --omit=dev --ignore-scripts --no-audit --no-fund 2>&1 || {
+    npm ci --omit=dev --no-audit --no-fund 2>&1 || {
       warn "npm ci encountered an issue, falling back to npm install..."
-      npm install --omit=dev --ignore-scripts --no-audit --no-fund || error "npm install failed"
+      npm install --omit=dev --no-audit --no-fund || error "npm install failed"
     }
   else
-    npm install --omit=dev --ignore-scripts --no-audit --no-fund || error "npm install failed"
+    npm install --omit=dev --no-audit --no-fund || error "npm install failed"
   fi
 
   # [NATIVE ADDONS] Rebuild and verify native C++ addons (better-sqlite3 & node-pty).
@@ -430,7 +430,7 @@ setup_panel() {
 
   # 1. better-sqlite3 build & verify
   info "Compiling and verifying better-sqlite3..."
-  npm rebuild better-sqlite3 2>&1 || {
+  npm --prefix node_modules/better-sqlite3 run install 2>&1 || npm rebuild better-sqlite3 2>&1 || {
     warn "npm rebuild better-sqlite3 had warnings, attempting build-from-source..."
     npm_config_build_from_source=true npm rebuild better-sqlite3 2>&1 || warn "better-sqlite3 build-from-source failed"
   }

@@ -602,7 +602,7 @@ class UpdaterService {
     if (cmd.includes('git diff')) return '';
     if (cmd.includes('npm install')) return 'added 0 packages, removed 0 packages, changed 0 packages\n';
     if (cmd.includes('node --check')) return '';
-    if (cmd.includes('npm rebuild')) return 'rebuilt better-sqlite3 node-pty successfully\n';
+    if (cmd.includes('npm rebuild') || cmd.includes('better-sqlite3')) return 'rebuilt better-sqlite3 node-pty successfully\n';
     if (cmd.includes('--build-from-source') || cmd.includes('build_from_source')) return 'built from source successfully\n';
     if (cmd.includes('which make')) return '/usr/bin/make\n';
     if (cmd.includes('which apt-get')) return '/usr/bin/apt-get\n';
@@ -740,21 +740,31 @@ class UpdaterService {
 
     // 2. Rebuild better-sqlite3 if not working
     if (!check.sqliteOk) {
-      log.push('   ⚙️ Rebuilding better-sqlite3...');
-      const bsOut = await this._runCommand('npm rebuild better-sqlite3 2>&1');
-      if (bsOut && !bsOut.includes('[ERROR]')) {
-        const summary = bsOut.trim().split('\n').slice(-2).join('\n   ');
+      log.push('   ⚙️ Fetching prebuild binary for better-sqlite3...');
+      const bsPre = await this._runCommand('npm --prefix node_modules/better-sqlite3 run install 2>&1');
+      if (bsPre && !bsPre.includes('[ERROR]')) {
+        const summary = bsPre.trim().split('\n').slice(-2).join('\n   ');
         if (summary) log.push(`   ${summary}`);
       }
 
       check = await this._checkNativeModules();
       if (!check.sqliteOk) {
-        log.push('   ⚠️ better-sqlite3 rebuild failed, attempting compile with npm_config_build_from_source...');
-        await fs.rm(path.join(PANEL_DIR, 'node_modules', 'better-sqlite3', 'build'), { recursive: true, force: true }).catch(() => {});
-        const bsSourceOut = await this._runCommand('npm_config_build_from_source=true npm rebuild better-sqlite3 2>&1');
-        if (bsSourceOut) {
-          const lines = bsSourceOut.replace('[ERROR]', '').trim().split('\n').slice(-3).join('\n   ');
-          if (lines) log.push(`   ${lines}`);
+        log.push('   ⚙️ Rebuilding better-sqlite3 with npm rebuild...');
+        const bsOut = await this._runCommand('npm rebuild better-sqlite3 2>&1');
+        if (bsOut && !bsOut.includes('[ERROR]')) {
+          const summary = bsOut.trim().split('\n').slice(-2).join('\n   ');
+          if (summary) log.push(`   ${summary}`);
+        }
+
+        check = await this._checkNativeModules();
+        if (!check.sqliteOk) {
+          log.push('   ⚠️ better-sqlite3 rebuild failed, attempting compile with npm_config_build_from_source...');
+          await fs.rm(path.join(PANEL_DIR, 'node_modules', 'better-sqlite3', 'build'), { recursive: true, force: true }).catch(() => {});
+          const bsSourceOut = await this._runCommand('npm_config_build_from_source=true npm rebuild better-sqlite3 2>&1');
+          if (bsSourceOut) {
+            const lines = bsSourceOut.replace('[ERROR]', '').trim().split('\n').slice(-3).join('\n   ');
+            if (lines) log.push(`   ${lines}`);
+          }
         }
       }
     }
@@ -1204,7 +1214,7 @@ class UpdaterService {
         const hasLock = await fs.access(path.join(PANEL_DIR, 'package-lock.json'))
           .then(() => true)
           .catch(() => false);
-        const installCmd = hasLock ? 'npm ci --omit=dev --ignore-scripts' : 'npm install --omit=dev --ignore-scripts';
+        const installCmd = hasLock ? 'npm ci --omit=dev' : 'npm install --omit=dev';
 
         try {
           const npmOut = await this._runChecked(installCmd, { timeout: 900000 });
@@ -1212,9 +1222,9 @@ class UpdaterService {
           if (tail) log.push(`   ${tail}`);
         } catch (err) {
           if (hasLock) {
-            log.push(`   ⚠️ ${installCmd} failed, falling back to npm install --omit=dev --ignore-scripts...`);
+            log.push(`   ⚠️ ${installCmd} failed, falling back to npm install --omit=dev...`);
             try {
-              const fallbackCmd = 'npm install --omit=dev --ignore-scripts';
+              const fallbackCmd = 'npm install --omit=dev';
               const npmOut = await this._runChecked(fallbackCmd, { timeout: 900000 });
               const tail = npmOut.trim().split('\n').slice(-5).join('\n   ');
               if (tail) log.push(`   ${tail}`);
@@ -1399,14 +1409,14 @@ class UpdaterService {
       const hasLock = await fs.access(path.join(PANEL_DIR, 'package-lock.json'))
         .then(() => true)
         .catch(() => false);
-      const installCmd = hasLock ? 'npm ci --omit=dev --ignore-scripts' : 'npm install --omit=dev --ignore-scripts';
+      const installCmd = hasLock ? 'npm ci --omit=dev' : 'npm install --omit=dev';
       try {
         const npmOut = await this._runChecked(installCmd, { timeout: 900000 });
         log.push(`   ${npmOut.trim().split('\n').slice(-5).join('\n   ')}`);
       } catch (err) {
         if (hasLock) {
-          log.push(`   ⚠️ ${installCmd} failed, falling back to npm install --omit=dev --ignore-scripts...`);
-          const fallbackCmd = 'npm install --omit=dev --ignore-scripts';
+          log.push(`   ⚠️ ${installCmd} failed, falling back to npm install --omit=dev...`);
+          const fallbackCmd = 'npm install --omit=dev';
           const npmOut = await this._runChecked(fallbackCmd, { timeout: 900000 });
           log.push(`   ${npmOut.trim().split('\n').slice(-5).join('\n   ')}`);
         } else {
