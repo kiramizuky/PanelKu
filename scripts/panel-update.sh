@@ -21,6 +21,9 @@ if [ -z "$NODE_BIN" ] || [ ! -x "$NODE_BIN" ]; then
   exit 1
 fi
 
+NODE_DIR="$(dirname "$NODE_BIN")"
+export PATH="$NODE_DIR:$PATH"
+
 if [ ! -f "$SCRIPT_DIR/panel-update-worker.mjs" ]; then
   echo "[panel-update] worker script missing: $SCRIPT_DIR/panel-update-worker.mjs" >&2
   exit 1

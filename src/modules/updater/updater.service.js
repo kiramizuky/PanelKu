@@ -189,6 +189,7 @@ class UpdaterService {
         '--property=Type=oneshot',
         `--property=WorkingDirectory=${PANEL_DIR}`,
         // systemd-run does not inherit the caller's environment.
+        `--setenv=PATH=${path.dirname(process.execPath || '')}:${process.env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`,
         `--setenv=PANELKU_HOME=${PANEL_DIR}`,
         `--setenv=PANELKU_STORAGE=${STORAGE_DIR}`,
         `--setenv=PANELKU_NODE_BIN=${process.execPath || 'node'}`,
@@ -602,7 +603,7 @@ class UpdaterService {
     if (cmd.includes('npm install')) return 'added 0 packages, removed 0 packages, changed 0 packages\n';
     if (cmd.includes('node --check')) return '';
     if (cmd.includes('npm rebuild')) return 'rebuilt better-sqlite3 node-pty successfully\n';
-    if (cmd.includes('--build-from-source')) return 'built from source successfully\n';
+    if (cmd.includes('--build-from-source') || cmd.includes('build_from_source')) return 'built from source successfully\n';
     if (cmd.includes('which make')) return '/usr/bin/make\n';
     if (cmd.includes('which apt-get')) return '/usr/bin/apt-get\n';
     if (cmd.includes('systemctl restart panelku')) return '';
@@ -722,50 +723,64 @@ class UpdaterService {
   }
 
   /**
-   * Rebuild native dependencies (better-sqlite3 and node-pty) with fallback to --build-from-source.
+   * Rebuild native dependencies (better-sqlite3 and node-pty) with fallback to clean compilation.
    */
   async rebuildNativeModules(customLog = null) {
     const log = Array.isArray(customLog) ? customLog : [];
     log.push('🔨 [Native Modules] Verifying and rebuilding C++ addons...');
 
+    // 1. Check if native modules are already operational
+    let check = await this._checkNativeModules();
+    if (check.sqliteOk && check.ptyOk) {
+      log.push('   ✅ Native addons already verified and operational');
+      return { success: true, sqliteOk: true, ptyOk: true, log: log.join('\n') };
+    }
+
     await this._ensureBuildTools(log);
 
-    // 1. Run npm rebuild
-    log.push('   ⚙️ Executing npm rebuild better-sqlite3 node-pty...');
-    const rebuildOut = await this._runCommand('npm rebuild better-sqlite3 node-pty 2>&1');
-    if (rebuildOut && !rebuildOut.includes('[ERROR]')) {
-      const summary = rebuildOut.trim().split('\n').slice(0, 3).join('\n   ');
-      if (summary) log.push(`   ${summary}`);
-    } else if (rebuildOut.includes('[ERROR]')) {
-      log.push(`   ⚠️ npm rebuild warning: ${rebuildOut.replace('[ERROR]', '').trim().split('\n')[0]}`);
-    }
-
-    // 2. Check status
-    let check = await this._checkNativeModules();
-
-    // 3. Fallback for node-pty if not working
-    if (!check.ptyOk) {
-      log.push('   ⚠️ node-pty still unverified. Cleaning build artifacts & compiling from source...');
-      await fs.rm(path.join(PANEL_DIR, 'node_modules', 'node-pty', 'build'), { recursive: true, force: true }).catch(() => {});
-      const ptySourceOut = await this._runCommand('npm install node-pty --build-from-source --omit=dev --no-audit --no-fund 2>&1');
-      if (ptySourceOut && !ptySourceOut.includes('[ERROR]')) {
-        const ptySummary = ptySourceOut.trim().split('\n').slice(0, 2).join('\n   ');
-        if (ptySummary) log.push(`   ${ptySummary}`);
-      }
-    }
-
-    // 4. Fallback for better-sqlite3 if not working
+    // 2. Rebuild better-sqlite3 if not working
     if (!check.sqliteOk) {
-      log.push('   ⚠️ better-sqlite3 unverified. Cleaning build artifacts & compiling from source...');
-      await fs.rm(path.join(PANEL_DIR, 'node_modules', 'better-sqlite3', 'build'), { recursive: true, force: true }).catch(() => {});
-      const bsSourceOut = await this._runCommand('npm install better-sqlite3 --build-from-source --omit=dev --no-audit --no-fund 2>&1');
-      if (bsSourceOut && !bsSourceOut.includes('[ERROR]')) {
-        const bsSummary = bsSourceOut.trim().split('\n').slice(0, 2).join('\n   ');
-        if (bsSummary) log.push(`   ${bsSummary}`);
+      log.push('   ⚙️ Rebuilding better-sqlite3...');
+      const bsOut = await this._runCommand('npm rebuild better-sqlite3 2>&1');
+      if (bsOut && !bsOut.includes('[ERROR]')) {
+        const summary = bsOut.trim().split('\n').slice(-2).join('\n   ');
+        if (summary) log.push(`   ${summary}`);
+      }
+
+      check = await this._checkNativeModules();
+      if (!check.sqliteOk) {
+        log.push('   ⚠️ better-sqlite3 rebuild failed, attempting compile with npm_config_build_from_source...');
+        await fs.rm(path.join(PANEL_DIR, 'node_modules', 'better-sqlite3', 'build'), { recursive: true, force: true }).catch(() => {});
+        const bsSourceOut = await this._runCommand('npm_config_build_from_source=true npm rebuild better-sqlite3 2>&1');
+        if (bsSourceOut) {
+          const lines = bsSourceOut.replace('[ERROR]', '').trim().split('\n').slice(-3).join('\n   ');
+          if (lines) log.push(`   ${lines}`);
+        }
       }
     }
 
-    // 5. Final re-verification
+    // 3. Rebuild node-pty if not working
+    if (!check.ptyOk) {
+      log.push('   ⚙️ Rebuilding node-pty...');
+      const ptyOut = await this._runCommand('npm rebuild node-pty 2>&1');
+      if (ptyOut && !ptyOut.includes('[ERROR]')) {
+        const summary = ptyOut.trim().split('\n').slice(-2).join('\n   ');
+        if (summary) log.push(`   ${summary}`);
+      }
+
+      check = await this._checkNativeModules();
+      if (!check.ptyOk) {
+        log.push('   ⚠️ node-pty rebuild failed, attempting compile with npm_config_build_from_source...');
+        await fs.rm(path.join(PANEL_DIR, 'node_modules', 'node-pty', 'build'), { recursive: true, force: true }).catch(() => {});
+        const ptySourceOut = await this._runCommand('npm_config_build_from_source=true npm rebuild node-pty 2>&1');
+        if (ptySourceOut) {
+          const lines = ptySourceOut.replace('[ERROR]', '').trim().split('\n').slice(-3).join('\n   ');
+          if (lines) log.push(`   ${lines}`);
+        }
+      }
+    }
+
+    // 4. Final re-verification
     check = await this._checkNativeModules();
     if (check.ptyOk) {
       log.push('   ✅ node-pty loaded successfully (Web Terminal available)');

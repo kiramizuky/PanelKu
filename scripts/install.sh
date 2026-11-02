@@ -432,7 +432,7 @@ setup_panel() {
   info "Compiling and verifying better-sqlite3..."
   npm rebuild better-sqlite3 2>&1 || {
     warn "npm rebuild better-sqlite3 had warnings, attempting build-from-source..."
-    npm install better-sqlite3 --build-from-source --omit=dev --no-audit --no-fund 2>&1 || warn "better-sqlite3 build-from-source failed"
+    npm_config_build_from_source=true npm rebuild better-sqlite3 2>&1 || warn "better-sqlite3 build-from-source failed"
   }
 
   if "$ACTIVE_NODE" -e "import('better-sqlite3').then(m => { const db = new (m.default || m)(':memory:'); db.prepare('SELECT 1').get(); db.close(); })" 2>/dev/null; then
@@ -440,7 +440,7 @@ setup_panel() {
   else
     warn "better-sqlite3 initial build failed, compiling cleanly from source..."
     rm -rf node_modules/better-sqlite3/build 2>/dev/null || true
-    npm install better-sqlite3 --build-from-source --omit=dev --no-audit --no-fund 2>&1 || true
+    npm_config_build_from_source=true npm rebuild better-sqlite3 2>&1 || true
     if "$ACTIVE_NODE" -e "import('better-sqlite3').then(m => { const db = new (m.default || m)(':memory:'); db.prepare('SELECT 1').get(); db.close(); })" 2>/dev/null; then
       log "better-sqlite3 verified successfully (compiled from source)"
     else
@@ -452,13 +452,13 @@ setup_panel() {
   info "Compiling and verifying node-pty (Web Terminal engine)..."
   npm rebuild node-pty 2>&1 || {
     info "npm rebuild node-pty triggered fallback, compiling from source..."
-    npm install node-pty --build-from-source --omit=dev --no-audit --no-fund 2>&1 || warn "node-pty build-from-source failed"
+    npm_config_build_from_source=true npm rebuild node-pty 2>&1 || warn "node-pty build-from-source failed"
   }
 
   if ! "$ACTIVE_NODE" -e "import('node-pty').then(m => { const pty = m.default || m; if (typeof pty.spawn !== 'function') process.exit(1); })" 2>/dev/null; then
     info "node-pty not yet verified. Forcing clean source compilation..."
     rm -rf node_modules/node-pty/build 2>/dev/null || true
-    npm install node-pty --build-from-source --omit=dev --no-audit --no-fund 2>&1 || true
+    npm_config_build_from_source=true npm rebuild node-pty 2>&1 || true
   fi
 
   if "$ACTIVE_NODE" -e "import('node-pty').then(m => { const pty = m.default || m; if (typeof pty.spawn !== 'function') process.exit(1); })" 2>/dev/null; then
