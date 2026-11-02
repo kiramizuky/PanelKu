@@ -166,16 +166,28 @@ const VulnerabilitiesPage = {
           return;
         }
 
-        // Ignore button
+        // Ignore button with standard LP confirmation popup
         const ignBtn = e.target.closest('.btn-ignore-finding');
         if (ignBtn) {
           const findingId = ignBtn.getAttribute('data-id');
-          if (findingId && confirm('Apakah Anda yakin ingin mengabaikan kerentanan ini?')) {
-            this.ignoreFinding(findingId);
+          if (findingId) {
+            this.confirmAndIgnore(findingId);
           }
           return;
         }
       });
+    }
+  },
+
+  async confirmAndIgnore(findingId) {
+    const finding = this.findings.find(f => f.id === findingId);
+    const titleSnippet = finding ? ` "${this.escapeHtml(finding.title)}"` : '';
+    const confirmed = await LP.confirm(
+      `Apakah Anda yakin ingin mengabaikan kerentanan${titleSnippet}? Temuan ini tidak akan ditampilkan pada daftar aktif kecuali difilter.`,
+      'Konfirmasi Abaikan Kerentanan'
+    );
+    if (confirmed) {
+      await this.ignoreFinding(findingId);
     }
   },
 
@@ -257,10 +269,10 @@ const VulnerabilitiesPage = {
         this.findings = res.data || [];
         this.applyFilter();
       } else {
-        container.innerHTML = `<div class="lp-card p-4 text-center text-muted">Gagal memuat temuan kerentanan.</div>`;
+        container.innerHTML = `<div class="lp-glass-card p-4 text-center text-muted">Gagal memuat temuan kerentanan.</div>`;
       }
     } catch (err) {
-      container.innerHTML = `<div class="lp-card p-4 text-center text-muted">Error memuat data: ${err.message}</div>`;
+      container.innerHTML = `<div class="lp-glass-card p-4 text-center text-muted">Error memuat data: ${this.escapeHtml(err.message)}</div>`;
     }
   },
 
@@ -283,7 +295,7 @@ const VulnerabilitiesPage = {
 
     if (filtered.length === 0) {
       container.innerHTML = `
-        <div class="lp-card p-5 text-center" style="background: rgba(20, 25, 45, 0.4); border: 1px dashed var(--glass-border);">
+        <div class="lp-glass-card p-5 text-center" style="border: 1px dashed var(--glass-border);">
           <i class="bi bi-shield-check text-success" style="font-size: 48px; display: block; margin-bottom: 12px;"></i>
           <h5 style="color: #fff; font-weight: 700; margin-bottom: 6px;">Tidak Ditemukan Kerentanan</h5>
           <p style="color: var(--text-muted); font-size: 13px; max-width: 480px; margin: 0 auto;">
@@ -310,7 +322,7 @@ const VulnerabilitiesPage = {
     const isIgnored = f.status === 'ignored';
 
     return `
-      <div class="lp-card p-3 p-md-4" style="background: rgba(18, 23, 40, 0.7); border: 1px solid var(--glass-border); border-left: 4px solid ${isFixed ? '#10b981' : c.border}; position: relative;">
+      <div class="lp-glass-card p-3 p-md-4" style="border-left: 4px solid ${isFixed ? '#10b981' : c.border}; position: relative;">
         <!-- Top Row: Badges & Status -->
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
           <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -319,16 +331,16 @@ const VulnerabilitiesPage = {
             </span>
             ${f.cve_id ? `
               <span class="lp-badge lp-badge-ghost" style="font-family: monospace; font-size: 11px;">
-                <i class="bi bi-tag-fill me-1"></i>${f.cve_id}
+                <i class="bi bi-tag-fill me-1"></i>${this.escapeHtml(f.cve_id)}
               </span>
             ` : ''}
             ${f.cvss_score ? `
-              <span class="lp-badge" style="background: rgba(255,255,255,0.06); color: #cbd5e1; font-size: 11px;">
+              <span class="lp-badge lp-badge-ghost" style="font-size: 11px;">
                 CVSS ${f.cvss_score}
               </span>
             ` : ''}
             <span class="lp-badge lp-badge-ghost" style="font-size: 11px; text-transform: uppercase;">
-              <i class="bi bi-folder-fill me-1"></i>${f.category}
+              <i class="bi bi-folder-fill me-1"></i>${this.escapeHtml(f.category)}
             </span>
           </div>
 
@@ -344,20 +356,20 @@ const VulnerabilitiesPage = {
         </div>
 
         <!-- Title & Affected Component -->
-        <h5 style="color: #fff; font-weight: 700; margin: 4px 0 6px;">${f.title}</h5>
+        <h5 style="color: #fff; font-weight: 700; margin: 4px 0 6px;">${this.escapeHtml(f.title)}</h5>
         <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-          <i class="bi bi-hdd-network me-1"></i>Komponen Terpengaruh: <strong style="color: #e2e8f0;">${f.component}</strong>
-          ${f.installed_version ? ` &bull; Versi terdeteksi: <span style="font-family: monospace; color: #cbd5e1;">${f.installed_version}</span>` : ''}
-          ${f.fixed_version ? ` &bull; Versi aman: <span style="font-family: monospace; color: #10b981;">${f.fixed_version}</span>` : ''}
+          <i class="bi bi-hdd-network me-1"></i>Komponen Terpengaruh: <strong style="color: #e2e8f0;">${this.escapeHtml(f.component)}</strong>
+          ${f.installed_version ? ` &bull; Versi terdeteksi: <span style="font-family: monospace; color: #cbd5e1;">${this.escapeHtml(f.installed_version)}</span>` : ''}
+          ${f.fixed_version ? ` &bull; Versi aman: <span style="font-family: monospace; color: #10b981;">${this.escapeHtml(f.fixed_version)}</span>` : ''}
         </div>
 
         <!-- Description & Impact -->
         <div style="font-size: 13px; color: #cbd5e1; line-height: 1.5; margin-bottom: 8px;">
-          ${f.description}
+          ${this.escapeHtml(f.description)}
         </div>
         ${f.impact ? `
           <div style="font-size: 12px; color: #f87171; background: rgba(239, 68, 68, 0.06); padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; border: 1px solid rgba(239, 68, 68, 0.15);">
-            <strong><i class="bi bi-shield-x me-1"></i>Potensi Dampak:</strong> ${f.impact}
+            <strong><i class="bi bi-shield-x me-1"></i>Potensi Dampak:</strong> ${this.escapeHtml(f.impact)}
           </div>
         ` : ''}
 
@@ -367,18 +379,18 @@ const VulnerabilitiesPage = {
             <span style="font-size: 11px; text-transform: uppercase; font-weight: 600; color: var(--text-muted); letter-spacing: 0.5px;">
               <i class="bi bi-terminal me-1"></i>Langkah Perbaikan Manual (Terminal)
             </span>
-            <button class="lp-btn lp-btn-sm lp-btn-ghost btn-copy-command d-flex align-items-center gap-1" data-cmd="${this.escapeHtml(f.manual_steps)}" style="font-size: 11px; padding: 2px 8px;">
+            <button class="btn-lp btn-lp-sm btn-lp-ghost btn-copy-command d-flex align-items-center gap-1" data-cmd="${this.escapeHtml(f.manual_steps)}" style="font-size: 11px; padding: 2px 8px;">
               <i class="bi bi-clipboard"></i> Salin Perintah
             </button>
           </div>
-          <pre style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 12px; color: #34d399; font-family: 'Fira Code', monospace; font-size: 12px; overflow-x: auto; margin: 0; white-space: pre-wrap;">${this.escapeHtml(f.manual_steps)}</pre>
+          <pre class="code-pre-block">${this.escapeHtml(f.manual_steps)}</pre>
         </div>
 
         <!-- Action Bar -->
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 pt-2" style="border-top: 1px solid rgba(255, 255, 255, 0.06);">
           <div class="d-flex align-items-center gap-2">
             ${!isFixed && f.auto_fix_command ? `
-              <button class="lp-btn lp-btn-sm lp-btn-primary btn-auto-remediate d-flex align-items-center gap-1" data-id="${f.id}">
+              <button class="btn-lp btn-lp-sm btn-lp-primary btn-auto-remediate d-flex align-items-center gap-1" data-id="${f.id}">
                 <i class="bi bi-magic"></i> Perbaiki Otomatis
                 <span class="lp-badge" style="font-size: 9px; padding: 1px 5px; background: rgba(255,255,255,0.2);">
                   ${f.auto_fix_safe ? 'Safe' : 'Caution'}
@@ -386,14 +398,14 @@ const VulnerabilitiesPage = {
               </button>
             ` : ''}
 
-            <button class="lp-btn lp-btn-sm lp-btn-ghost btn-ask-finding-ai d-flex align-items-center gap-1" data-id="${f.id}">
+            <button class="btn-lp btn-lp-sm btn-lp-ghost btn-ask-finding-ai d-flex align-items-center gap-1" data-id="${f.id}">
               <i class="bi bi-robot text-primary"></i> Tanya AI
             </button>
           </div>
 
           <div>
             ${!isFixed && !isIgnored ? `
-              <button class="lp-btn lp-btn-sm lp-btn-ghost text-muted btn-ignore-finding" data-id="${f.id}" title="Abaikan temuan ini">
+              <button class="btn-lp btn-lp-sm btn-lp-ghost text-muted btn-ignore-finding" data-id="${f.id}" title="Abaikan temuan ini">
                 <i class="bi bi-eye-slash"></i> Abaikan
               </button>
             ` : ''}
@@ -562,7 +574,7 @@ const VulnerabilitiesPage = {
         if (respArea) respArea.innerHTML = '<div class="text-danger">Gagal menerima jawaban dari AI Copilot.</div>';
       }
     } catch (err) {
-      if (respArea) respArea.innerHTML = `<div class="text-danger">Error: ${err.message}</div>`;
+      if (respArea) respArea.innerHTML = `<div class="text-danger">Error: ${this.escapeHtml(err.message)}</div>`;
     } finally {
       if (btnSend) btnSend.disabled = false;
       if (qInput) qInput.value = '';
@@ -633,3 +645,10 @@ const VulnerabilitiesPage = {
 
 window.VulnerabilitiesPage = VulnerabilitiesPage;
 
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.VulnerabilitiesPage) {
+      window.VulnerabilitiesPage.init();
+    }
+  });
+}
