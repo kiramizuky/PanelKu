@@ -1,9 +1,8 @@
 #!/bin/bash
-# ============================================================
-# ============================================================
+# ==============================================================================
 # Panelku — One-Click Install Script
-# Supports: Debian, Ubuntu, Armbian, RHEL/CentOS, Arch, Alpine
-# ============================================================
+# Supports: Debian, Ubuntu, Armbian, RHEL/CentOS/Rocky/Alma, Arch Linux, Alpine, Gentoo
+# ==============================================================================
 
 set -e
 
@@ -14,26 +13,22 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# [HIGH-4 FIX] Use /opt/panelku to match all references in system.service.js
-# Previously was /opt/linux-panel which caused panel update commands to fail
 PANEL_DIR="${PANELKU_INSTALL_DIR:-/opt/panelku}"
 PANEL_PORT="${PANELKU_PORT:-23456}"
 NODE_VERSION="${NODE_VERSION:-22}"
 REPO_URL="${PANELKU_REPO_URL:-https://github.com/kiramizuky/PanelKu.git}"
 REPO_BRANCH="${PANELKU_BRANCH:-master}"
 NEW_ADMIN_PASSWORD=""
-# Optional hardening. Default remains root to keep every panel feature working.
-# PANELKU_HARDENED=1 creates a dedicated `panelku` user + ProtectSystem=strict
-# and installs the sudoers policy. Set PANELKU_NNP=1 to enable
-# NoNewPrivileges (disables sudo, so privileged panel features stop).
 PANEL_USER="${PANELKU_USER:-root}"
 HARDENING_BLOCK=""
+ACTIVE_NODE=""
 
 # Parse CLI options (supports both flags and environment variables)
 while [ $# -gt 0 ]; do
   case "$1" in
     --hardened|-h)
       export PANELKU_HARDENED=1
+      PANEL_USER="${PANELKU_USER:-panelku}"
       shift
       ;;
     --nnp)
@@ -60,8 +55,14 @@ while [ $# -gt 0 ]; do
       export PANELKU_INSTALL_DIR="$2"
       shift 2
       ;;
+    --node-version|-n)
+      NODE_VERSION="$2"
+      shift 2
+      ;;
     --help)
+      echo "Panelku Installer"
       echo "Usage: sudo bash install.sh [OPTIONS]"
+      echo "   or: curl -sSL https://dl.panelku.fun/install.sh | sudo bash -s -- [OPTIONS]"
       echo ""
       echo "Options:"
       echo "  --hardened, -h      Enable systemd hardening (dedicated user + ProtectSystem=strict)"
@@ -70,6 +71,7 @@ while [ $# -gt 0 ]; do
       echo "  --user, -u <user>   Hardened system user (default: panelku)"
       echo "  --branch, -b <br>   Git branch to install (default: master)"
       echo "  --dir, -d <path>    Install directory (default: /opt/panelku)"
+      echo "  --node-version, -n  Target Node.js version (default: 22)"
       echo "  --help              Show this help message"
       exit 0
       ;;
@@ -91,14 +93,14 @@ print_banner() {
   echo -e "${NC}"
 }
 
-log() { echo -e "${GREEN}[✓]${NC} $1"; }
-warn() { echo -e "${YELLOW}[!]${NC} $1"; }
+log()   { echo -e "${GREEN}[✓]${NC} $1"; }
+warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 error() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
-info() { echo -e "${BLUE}[→]${NC} $1"; }
+info()  { echo -e "${BLUE}[→]${NC} $1"; }
 
 check_root() {
   if [ "$EUID" -ne 0 ]; then
-    error "Run as root: sudo bash install.sh"
+    error "Please run this installer as root (e.g. 'curl -sSL https://dl.panelku.fun/install.sh | sudo bash' or 'sudo bash install.sh')."
   fi
 }
 
@@ -149,10 +151,10 @@ install_dependencies() {
   info "Installing dependencies..."
   case "$PM" in
     apt)
-      apt-get update -qq || true
-      apt-get install -y curl git openssl build-essential python3 make g++ redis-server nginx docker.io ufw || {
+      DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
+      DEBIAN_FRONTEND=noninteractive apt-get install -y curl git openssl build-essential python3 make g++ redis-server nginx docker.io ufw || {
         for pkg in curl git openssl build-essential python3 make g++ redis-server nginx docker.io ufw; do
-          apt-get install -y -qq "$pkg" || warn "Failed to install $pkg"
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$pkg" || warn "Failed to install $pkg"
         done
       }
       ;;
@@ -216,87 +218,119 @@ install_dependencies() {
 }
 
 install_nodejs() {
-  if command -v node &>/dev/null; then
-    local ver=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-    if [ "$ver" -ge "$NODE_VERSION" ]; then
-      log "Node.js $(node -v) already installed"
-      return
-    fi
+  info "Checking Node.js runtime environment..."
+  local check_node=""
+  check_node="$(command -v node 2>/dev/null || which node 2>/dev/null || true)"
+  local current_ver=0
+
+  if [ -n "$check_node" ] && [ -x "$check_node" ]; then
+    current_ver=$("$check_node" -v 2>/dev/null | tr -d 'v' | cut -d'.' -f1)
   fi
 
-  info "Installing Node.js $NODE_VERSION LTS..."
-  local success=false
-  # Try repository / NodeSource first if 64-bit and supported PM
-  if [ "$PM" = "apt" ] && [ "$IS_64BIT" = true ]; then
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && apt-get install -y nodejs && success=true || true
-  elif [ "$PM" = "dnf" ] && [ "$IS_64BIT" = true ]; then
-    curl -fsSL https://rpm.nodesource.com/setup_${NODE_VERSION}.x | bash - && dnf install -y nodejs && success=true || true
-  fi
-
-  if [ "$success" = false ]; then
-    case "$PM" in
-      apt) apt-get install -y nodejs npm && success=true || true ;;
-      pacman) pacman -S --noconfirm --needed nodejs npm && success=true || true ;;
-      dnf|yum) $PM install -y nodejs npm && success=true || true ;;
-      apk) apk add nodejs npm && success=true || true ;;
-      zypper) zypper install -y nodejs npm && success=true || true ;;
-      emerge) emerge -v net-libs/nodejs && success=true || true ;;
-    esac
-  fi
-
-  local check_ver=0
-  if command -v node &>/dev/null; then
-    check_ver=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-  fi
-
-  # Bulletproof fallback using official prebuilt binaries
-  if [ "$check_ver" -lt "$NODE_VERSION" ]; then
-    local node_arch=""
-    case "$ARCH" in
-      x86_64) node_arch="x64" ;;
-      aarch64|arm64) node_arch="arm64" ;;
-      armv7l) node_arch="armv7l" ;;
-    esac
-
-    if [ -n "$node_arch" ]; then
-      info "Package manager did not provide Node.js >= $NODE_VERSION. Installing official prebuilt binary..."
-      case "$PM" in
-        apt)     DEBIAN_FRONTEND=noninteractive apt-get install -y tar gzip xz-utils 2>/dev/null || true ;;
-        pacman)  pacman -S --noconfirm --needed tar gzip xz 2>/dev/null || true ;;
-        dnf|yum) $PM install -y tar gzip xz 2>/dev/null || true ;;
-        apk)     apk add tar gzip xz 2>/dev/null || true ;;
-        zypper)  zypper install -y tar gzip xz 2>/dev/null || true ;;
-      esac
-      local node_dist_url="https://nodejs.org/dist/latest-v${NODE_VERSION}.x/"
-      local node_filename=$(curl -fsSL "$node_dist_url" 2>/dev/null | grep -oE "node-v[0-9.]+-linux-${node_arch}\.tar\.gz" | head -1)
-      if [ -z "$node_filename" ]; then
-        node_filename=$(curl -fsSL "$node_dist_url" 2>/dev/null | grep -oE "node-v[0-9.]+-linux-${node_arch}\.tar\.xz" | head -1)
-      fi
-      if [ -n "$node_filename" ]; then
-        local temp_archive="/tmp/${node_filename}"
-        curl -fsSL "${node_dist_url}${node_filename}" -o "$temp_archive" || true
-        tar -xf "$temp_archive" -C /usr/local --strip-components=1 2>/dev/null || true
-        rm -f "$temp_archive" || true
-      else
-        local temp_tar="/tmp/node.tar.xz"
-        curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}.0.0/node-v${NODE_VERSION}.0.0-linux-${node_arch}.tar.xz" -o "$temp_tar" || true
-        tar -xf "$temp_tar" -C /usr/local --strip-components=1 2>/dev/null || true
-        rm -f "$temp_tar" || true
-      fi
+  # Modern minimum version is Node 20. Node 20, 22, 24+ are fully supported.
+  # Node <= 18 is EOL and contains unpatched security vulnerabilities.
+  if [ "$current_ver" -ge 20 ]; then
+    log "Node.js $("$check_node" -v) detected and compatible (>= v20): $check_node"
+  else
+    if [ "$current_ver" -gt 0 ]; then
+      warn "Node.js v$current_ver detected, which is end-of-life (< v20) and insecure."
+      info "Automatically upgrading to Node.js $NODE_VERSION LTS (recommended secure version)..."
     else
-      error "No prebuilt Node.js binary fallback available for architecture $ARCH. Installation failed."
+      info "Installing Node.js $NODE_VERSION LTS..."
+    fi
+
+    local success=false
+    # Try repository / NodeSource first if 64-bit and supported PM
+    if [ "$PM" = "apt" ] && [ "$IS_64BIT" = true ]; then
+      curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && apt-get install -y nodejs && success=true || true
+    elif [ "$PM" = "dnf" ] && [ "$IS_64BIT" = true ]; then
+      curl -fsSL https://rpm.nodesource.com/setup_${NODE_VERSION}.x | bash - && dnf install -y nodejs && success=true || true
+    fi
+
+    if [ "$success" = false ]; then
+      case "$PM" in
+        apt) apt-get install -y nodejs npm && success=true || true ;;
+        pacman) pacman -S --noconfirm --needed nodejs npm && success=true || true ;;
+        dnf|yum) $PM install -y nodejs npm && success=true || true ;;
+        apk) apk add nodejs npm && success=true || true ;;
+        zypper) zypper install -y nodejs npm && success=true || true ;;
+        emerge) emerge -v net-libs/nodejs && success=true || true ;;
+      esac
+    fi
+
+    check_node="$(command -v node 2>/dev/null || which node 2>/dev/null || true)"
+    if [ -n "$check_node" ] && [ -x "$check_node" ]; then
+      current_ver=$("$check_node" -v 2>/dev/null | tr -d 'v' | cut -d'.' -f1)
+    else
+      current_ver=0
+    fi
+
+    # Bulletproof fallback using official prebuilt binaries
+    if [ "$current_ver" -lt 20 ]; then
+      local node_arch=""
+      case "$ARCH" in
+        x86_64) node_arch="x64" ;;
+        aarch64|arm64) node_arch="arm64" ;;
+        armv7l) node_arch="armv7l" ;;
+      esac
+
+      if [ -n "$node_arch" ]; then
+        info "Installing official prebuilt Node.js $NODE_VERSION binary..."
+        case "$PM" in
+          apt)     DEBIAN_FRONTEND=noninteractive apt-get install -y tar gzip xz-utils 2>/dev/null || true ;;
+          pacman)  pacman -S --noconfirm --needed tar gzip xz 2>/dev/null || true ;;
+          dnf|yum) $PM install -y tar gzip xz 2>/dev/null || true ;;
+          apk)     apk add tar gzip xz 2>/dev/null || true ;;
+          zypper)  zypper install -y tar gzip xz 2>/dev/null || true ;;
+        esac
+        local node_dist_url="https://nodejs.org/dist/latest-v${NODE_VERSION}.x/"
+        local node_filename=$(curl -fsSL "$node_dist_url" 2>/dev/null | grep -oE "node-v[0-9.]+-linux-${node_arch}\.tar\.gz" | head -1)
+        if [ -z "$node_filename" ]; then
+          node_filename=$(curl -fsSL "$node_dist_url" 2>/dev/null | grep -oE "node-v[0-9.]+-linux-${node_arch}\.tar\.xz" | head -1)
+        fi
+        if [ -n "$node_filename" ]; then
+          local temp_archive="/tmp/${node_filename}"
+          curl -fsSL "${node_dist_url}${node_filename}" -o "$temp_archive" || true
+          tar -xf "$temp_archive" -C /usr/local --strip-components=1 2>/dev/null || true
+          rm -f "$temp_archive" || true
+        else
+          local temp_tar="/tmp/node.tar.xz"
+          curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}.0.0/node-v${NODE_VERSION}.0.0-linux-${node_arch}.tar.xz" -o "$temp_tar" || true
+          tar -xf "$temp_tar" -C /usr/local --strip-components=1 2>/dev/null || true
+          rm -f "$temp_tar" || true
+        fi
+      else
+        error "No prebuilt Node.js binary fallback available for architecture $ARCH. Installation failed."
+      fi
     fi
   fi
 
-  # Verify the result before continuing to npm install.
-  local final_ver=0
-  if command -v node &>/dev/null; then
-    final_ver=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+  # Resolve the final active Node binary
+  ACTIVE_NODE="$(command -v node 2>/dev/null || which node 2>/dev/null || true)"
+  if [ -z "$ACTIVE_NODE" ] || [ ! -x "$ACTIVE_NODE" ]; then
+    error "Node.js executable could not be found. Installation cannot continue."
   fi
-  if [ "${final_ver:-0}" -lt "$NODE_VERSION" ]; then
-    error "Node.js >= $NODE_VERSION is required, but v${final_ver:-none} is installed. Aborting."
+
+  local final_ver=$("$ACTIVE_NODE" -v 2>/dev/null | tr -d 'v' | cut -d'.' -f1)
+  if [ "${final_ver:-0}" -lt 20 ]; then
+    error "Node.js >= 20 is required for Panelku, but v${final_ver:-none} is installed. Aborting."
   fi
-  log "Node.js $(node -v) ready"
+
+  # Synchronize /usr/bin/node and /usr/bin/npm to ACTIVE_NODE so systemd and CLI always match
+  mkdir -p /usr/bin /usr/local/bin
+  if [ "$ACTIVE_NODE" != "/usr/bin/node" ]; then
+    ln -sf "$ACTIVE_NODE" /usr/bin/node
+    log "Linked /usr/bin/node -> $ACTIVE_NODE"
+  fi
+  local active_npm
+  active_npm="$(command -v npm 2>/dev/null || which npm 2>/dev/null || true)"
+  if [ -n "$active_npm" ] && [ "$active_npm" != "/usr/bin/npm" ]; then
+    ln -sf "$active_npm" /usr/bin/npm
+    log "Linked /usr/bin/npm -> $active_npm"
+  fi
+
+  export PATH="$(dirname "$ACTIVE_NODE"):$PATH"
+  log "Node.js $($ACTIVE_NODE -v) ready (Binary: $ACTIVE_NODE)"
 }
 
 install_pm2() {
@@ -317,8 +351,6 @@ install_pm2() {
 setup_panel() {
   info "Setting up Panelku in $PANEL_DIR..."
 
-  # [FIX] The updater requires a real git repository. Copying files with `cp -r`
-  # produced installations where `git pull` and `git reset` could never work.
   if [ -d "$PANEL_DIR/.git" ]; then
     info "Existing installation detected — updating source..."
     git -C "$PANEL_DIR" remote set-url origin "$REPO_URL" 2>/dev/null || true
@@ -326,8 +358,6 @@ setup_panel() {
     git -C "$PANEL_DIR" checkout -B "$REPO_BRANCH" "origin/$REPO_BRANCH" 2>/dev/null || true
     git -C "$PANEL_DIR" reset --hard "origin/$REPO_BRANCH" 2>/dev/null || true
   elif [ -d "$PANEL_DIR" ] && [ -n "$(ls -A "$PANEL_DIR" 2>/dev/null)" ]; then
-    # Never delete an existing non-git installation: it may contain the SQLite
-    # database, certificates and uploads. The updater requires git anyway.
     error "Existing non-git installation found at $PANEL_DIR. Move it aside or convert it to a git clone before reinstalling."
   elif [ -f "$PWD/package.json" ] && [ -d "$PWD/src" ] && [ -d "$PWD/.git" ]; then
     info "Installing from local git clone ($PWD)..."
@@ -335,9 +365,9 @@ setup_panel() {
     cp -a "$PWD/." "$PANEL_DIR/"
   else
     info "Cloning $REPO_URL ($REPO_BRANCH)..."
-    rm -rf "$PANEL_DIR"
+    rmdir "$PANEL_DIR" 2>/dev/null || true
     mkdir -p "$(dirname "$PANEL_DIR")"
-    git clone --depth 1 --branch "$REPO_BRANCH" "$REPO_URL" "$PANEL_DIR"
+    git clone --depth 1 --branch "$REPO_BRANCH" "$REPO_URL" "$PANEL_DIR" || error "Failed to clone repository from $REPO_URL. Check your network or GitHub access."
   fi
 
   cd "$PANEL_DIR"
@@ -351,8 +381,6 @@ setup_panel() {
 
   info "Setting up storage directories..."
   mkdir -p storage/logs storage/backups storage/websites storage/uploads storage/temp storage/snapshots
-  # [MED-7 FIX] Use 750 instead of 777 — storage contains SQLite DB and secrets.
-  # Only panel process (running as root or dedicated user) needs access.
   chmod -R 750 storage
 
   # Copy env
@@ -386,65 +414,54 @@ setup_panel() {
 
   info "Installing npm packages..."
   if [ -f package-lock.json ]; then
-    npm ci --omit=dev --no-audit --no-fund 2>&1 || {
+    npm ci --omit=dev --ignore-scripts --no-audit --no-fund 2>&1 || {
       warn "npm ci encountered an issue, falling back to npm install..."
-      npm install --omit=dev --no-audit --no-fund || error "npm install failed"
+      npm install --omit=dev --ignore-scripts --no-audit --no-fund || error "npm install failed"
     }
   else
-    npm install --omit=dev --no-audit --no-fund || error "npm install failed"
+    npm install --omit=dev --ignore-scripts --no-audit --no-fund || error "npm install failed"
   fi
 
   # [NATIVE ADDONS] Rebuild and verify native C++ addons (better-sqlite3 & node-pty).
-  # Native modules MUST be compiled to match the host Linux kernel and Node.js ABI,
-  # otherwise better-sqlite3 (database) and node-pty (Web Terminal) will fail to load.
   info "Building and verifying native addons (better-sqlite3, node-pty)..."
 
-  # Temporary swap check: low-spec VPS (<=2GB RAM without swap) can trigger OOM during g++ linking
-  local created_temp_swap=false
-  if [ -f /proc/meminfo ]; then
-    local mem_total_kb=$(grep -i MemTotal /proc/meminfo | awk '{print $2}')
-    local swap_total_kb=$(grep -i SwapTotal /proc/meminfo | awk '{print $2}')
-    local mem_total_mb=$((mem_total_kb / 1024))
-    if [ "$mem_total_mb" -gt 0 ] && [ "$mem_total_mb" -le 2048 ] && [ "$swap_total_kb" -le 262144 ]; then
-      info "Low memory detected (${mem_total_mb}MB RAM without swap). Creating temporary 1GB swap to prevent compiler OOM..."
-      if command -v fallocate &>/dev/null; then
-        fallocate -l 1G /swapfile_panelku_install 2>/dev/null || dd if=/dev/zero of=/swapfile_panelku_install bs=1M count=1024 2>/dev/null || true
-      else
-        dd if=/dev/zero of=/swapfile_panelku_install bs=1M count=1024 2>/dev/null || true
-      fi
-      if [ -f /swapfile_panelku_install ]; then
-        chmod 600 /swapfile_panelku_install
-        mkswap /swapfile_panelku_install 2>/dev/null && swapon /swapfile_panelku_install 2>/dev/null && created_temp_swap=true
-      fi
-    fi
-  fi
+  # Clean old build directories to guarantee no ABI mismatch
+  rm -rf node_modules/better-sqlite3/build node_modules/node-pty/build 2>/dev/null || true
 
   # 1. better-sqlite3 build & verify
-  info "Building better-sqlite3..."
+  info "Compiling and verifying better-sqlite3..."
   npm rebuild better-sqlite3 2>&1 || {
     warn "npm rebuild better-sqlite3 had warnings, attempting build-from-source..."
     npm install better-sqlite3 --build-from-source --omit=dev --no-audit --no-fund 2>&1 || warn "better-sqlite3 build-from-source failed"
   }
 
-  if node -e "import('better-sqlite3').then(m => { const db = new (m.default || m)(':memory:'); db.prepare('SELECT 1').get(); db.close(); })" 2>/dev/null; then
+  if "$ACTIVE_NODE" -e "import('better-sqlite3').then(m => { const db = new (m.default || m)(':memory:'); db.prepare('SELECT 1').get(); db.close(); })" 2>/dev/null; then
     log "better-sqlite3 verified successfully"
   else
-    warn "better-sqlite3 verification failed — SQLite operations may fail"
+    warn "better-sqlite3 initial build failed, compiling cleanly from source..."
+    rm -rf node_modules/better-sqlite3/build 2>/dev/null || true
+    npm install better-sqlite3 --build-from-source --omit=dev --no-audit --no-fund 2>&1 || true
+    if "$ACTIVE_NODE" -e "import('better-sqlite3').then(m => { const db = new (m.default || m)(':memory:'); db.prepare('SELECT 1').get(); db.close(); })" 2>/dev/null; then
+      log "better-sqlite3 verified successfully (compiled from source)"
+    else
+      error "better-sqlite3 could not be compiled. Please ensure build-essential python3 make g++ are installed."
+    fi
   fi
 
   # 2. node-pty build & verify
-  info "Building node-pty (Web Terminal engine)..."
+  info "Compiling and verifying node-pty (Web Terminal engine)..."
   npm rebuild node-pty 2>&1 || {
     info "npm rebuild node-pty triggered fallback, compiling from source..."
     npm install node-pty --build-from-source --omit=dev --no-audit --no-fund 2>&1 || warn "node-pty build-from-source failed"
   }
 
-  if ! node -e "import('node-pty').then(m => { const pty = m.default || m; if (typeof pty.spawn !== 'function') process.exit(1); })" 2>/dev/null; then
-    info "node-pty not yet verified. Forcing source compilation with node-gyp..."
+  if ! "$ACTIVE_NODE" -e "import('node-pty').then(m => { const pty = m.default || m; if (typeof pty.spawn !== 'function') process.exit(1); })" 2>/dev/null; then
+    info "node-pty not yet verified. Forcing clean source compilation..."
+    rm -rf node_modules/node-pty/build 2>/dev/null || true
     npm install node-pty --build-from-source --omit=dev --no-audit --no-fund 2>&1 || true
   fi
 
-  if node -e "import('node-pty').then(m => { const pty = m.default || m; if (typeof pty.spawn !== 'function') process.exit(1); })" 2>/dev/null; then
+  if "$ACTIVE_NODE" -e "import('node-pty').then(m => { const pty = m.default || m; if (typeof pty.spawn !== 'function') process.exit(1); })" 2>/dev/null; then
     log "node-pty verified successfully (Web Terminal ready)"
   else
     warn "node-pty could not be verified. Web Terminal may require 'npm rebuild node-pty' after installation."
@@ -460,9 +477,6 @@ setup_panel() {
   log "NPM packages and native addons ready"
 
   # Operational CLI (doctor/status/check-update/rollback/reset-password).
-  # Symlink instead of copying: the CLI resolves its repository root from its
-  # own real path, so a copy in /usr/local/bin would look for package.json and
-  # .env in /usr/local.
   if [ -f "$PANEL_DIR/bin/panelku.js" ]; then
     mkdir -p /usr/local/bin /usr/bin
     chmod 0755 "$PANEL_DIR/bin/panelku.js"
@@ -471,8 +485,7 @@ setup_panel() {
     log "CLI installed: panelku -> $PANEL_DIR/bin/panelku.js (/usr/bin & /usr/local/bin)"
   fi
 
-  # Opt-in systemd hardening. Keep the default root unit behaviour intact so
-  # existing installs do not lose package/service management.
+  # Opt-in systemd hardening.
   if [ "${PANELKU_HARDENED:-0}" = "1" ]; then
     info "Applying opt-in systemd hardening (PANELKU_HARDENED=1)..."
     PANEL_USER="${PANELKU_USER:-panelku}"
@@ -481,7 +494,6 @@ setup_panel() {
     fi
     if [ -f "$PANEL_DIR/deploy/panelku.sudoers" ] && command -v visudo >/dev/null 2>&1; then
       mkdir -p /etc/sudoers.d
-      # Keep the policy in sync with PANELKU_USER (it is scoped to one account).
       sed "s/panelku/${PANEL_USER}/g" "$PANEL_DIR/deploy/panelku.sudoers" > /etc/sudoers.d/panelku
       chmod 0440 /etc/sudoers.d/panelku
       if ! visudo -cf /etc/sudoers.d/panelku >/dev/null 2>&1; then
@@ -504,8 +516,6 @@ setup_panel() {
     if ! id -u "$PANEL_USER" >/dev/null 2>&1; then
       error "Cannot create user $PANEL_USER (required by systemd User=)"
     fi
-    # systemd uses Group=$PANEL_USER; make sure it exists even when useradd
-    # imported an existing account whose primary group has another name.
     if ! grep -q "^${PANEL_USER}:" /etc/group; then
       if command -v groupadd >/dev/null 2>&1; then
         groupadd --system "$PANEL_USER" || true
@@ -516,8 +526,6 @@ setup_panel() {
     if ! grep -q "^${PANEL_USER}:" /etc/group; then
       error "Cannot create group $PANEL_USER (required by systemd Group=)"
     fi
-    chown -R "$PANEL_USER:$PANEL_USER" "$PANEL_DIR" || true
-    chmod 750 "$PANEL_DIR/storage" || true
 
     HARDENING_BLOCK=$(cat <<EOF
 ProtectSystem=strict
@@ -539,13 +547,25 @@ $HARDENING_BLOCK"
     log "Hardening enabled for user ${PANEL_USER}"
   fi
 
-  # Create systemd service so 'systemctl restart panelku' works
-  # [HIGH-4 FIX] Service name 'panelku' matches system.service.js restartPanel()
+  # Ensure ownership and permissions
+  info "Configuring file ownership and permissions..."
+  if [ "${PANELKU_HARDENED:-0}" = "1" ]; then
+    PANEL_USER="${PANELKU_USER:-panelku}"
+    chown -R "$PANEL_USER:$PANEL_USER" "$PANEL_DIR" || true
+    chmod 600 "$PANEL_DIR/.env" || true
+    chown "$PANEL_USER:$PANEL_USER" "$PANEL_DIR/.env" || true
+    chmod -R 770 "$PANEL_DIR/storage" || true
+  else
+    PANEL_USER="root"
+    chown -R root:root "$PANEL_DIR" || true
+    chmod 600 "$PANEL_DIR/.env" || true
+    chmod -R 755 "$PANEL_DIR/storage" || true
+  fi
+
+  # Create systemd service
   if command -v systemctl &>/dev/null; then
     info "Creating systemd service: panelku..."
 
-    # [FIX] Previous limits (512M/256M heap) OOM-killed the panel on normal use.
-    # Scale limits to the actual VPS size instead of one fixed value.
     local mem_total_mb
     mem_total_mb=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 0)
     local heap_mb=512 memory_high=1024M memory_max=1536M
@@ -568,11 +588,12 @@ Type=simple
 User=$PANEL_USER
 Group=$PANEL_USER
 WorkingDirectory=$PANEL_DIR
-ExecStart=$(which node) --max-old-space-size=$heap_mb src/server.js
+ExecStart=$ACTIVE_NODE --max-old-space-size=$heap_mb src/server.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
 Environment=PANELKU_HOME=$PANEL_DIR
+Environment=PATH=$(dirname "$ACTIVE_NODE"):/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 $HARDENING_BLOCK
 MemoryHigh=$memory_high
 MemoryMax=$memory_max
@@ -587,6 +608,15 @@ EOF
     systemctl enable panelku 2>/dev/null || true
     systemctl restart panelku 2>/dev/null || systemctl start panelku
     log "Panelku service created and started (heap ${heap_mb}MB, MemoryMax ${memory_max})"
+
+    info "Verifying Panelku service boot status..."
+    sleep 3
+    if systemctl is-active --quiet panelku; then
+      log "Panelku service is active and running!"
+    else
+      warn "Panelku service is not active yet. Checking service logs..."
+      journalctl -u panelku.service -n 25 --no-pager || true
+    fi
   else
     info "Starting panel with PM2..."
     pm2 start ecosystem.config.cjs --env production

@@ -478,6 +478,53 @@ class UpdaterService {
     }
   }
 
+  /**
+   * Synchronize systemd service runtime (ExecStart binary & file permissions).
+   */
+  async _syncServiceRuntime(log = []) {
+    if (process.platform !== 'linux') return;
+    try {
+      const serviceFile = '/etc/systemd/system/panelku.service';
+      const serviceExists = await fs.access(serviceFile).then(() => true).catch(() => false);
+      if (serviceExists) {
+        const svcContent = await fs.readFile(serviceFile, 'utf8');
+
+        // 1. Maintain service user ownership and storage permissions
+        const userMatch = svcContent.match(/^User=(\S+)/m);
+        const serviceUser = userMatch ? userMatch[1] : '';
+        if (serviceUser && serviceUser !== 'root') {
+          await this._runCommand(`chown -R "${serviceUser}:${serviceUser}" "${PANEL_DIR}" 2>/dev/null || true`);
+          await this._runCommand(`chmod -R 770 "${STORAGE_DIR}" 2>/dev/null || true`);
+        }
+
+        // 2. Align ExecStart to process.execPath if divergent
+        const currentExec = process.execPath;
+        const execMatch = svcContent.match(/^ExecStart=([^\s]+)/m);
+        if (execMatch && currentExec && execMatch[1] !== currentExec) {
+          const currentExecExists = await fs.access(currentExec).then(() => true).catch(() => false);
+          if (currentExecExists) {
+            log.push(`   🔧 Syncing systemd ExecStart to active Node binary: ${currentExec}`);
+            const updatedSvc = svcContent.replace(/^ExecStart=[^\s]+/m, `ExecStart=${currentExec}`);
+            await fs.writeFile(serviceFile, updatedSvc, 'utf8');
+            await this._runCommand('systemctl daemon-reload 2>/dev/null || true');
+          }
+        }
+      }
+    } catch (err) {
+      log.push(`   ⚠️ Service runtime sync notice: ${err.message}`);
+    }
+  }
+
+  _getExecEnv(customEnv = {}) {
+    const nodeBinDir = path.dirname(process.execPath || '');
+    const currentPath = customEnv?.PATH || process.env.PATH || '';
+    return {
+      ...process.env,
+      ...(customEnv || {}),
+      ...(nodeBinDir ? { PATH: `${nodeBinDir}${path.delimiter}${currentPath}` } : {}),
+    };
+  }
+
   async _runCommand(cmd, options = {}) {
     try {
       if (process.platform === 'win32') {
@@ -498,7 +545,8 @@ class UpdaterService {
           return this._mockCommand(cmd);
         }
       }
-      const { stdout, stderr } = await execAsync(cmd, { cwd: PANEL_DIR, timeout: 120000, maxBuffer: 10 * 1024 * 1024, ...options });
+      const env = this._getExecEnv(options.env);
+      const { stdout, stderr } = await execAsync(cmd, { cwd: PANEL_DIR, timeout: 120000, maxBuffer: 10 * 1024 * 1024, ...options, env });
       return stdout || stderr || '';
     } catch (error) {
       if (process.platform === 'win32' || process.env.NODE_ENV === 'test') {
@@ -521,7 +569,8 @@ class UpdaterService {
    */
   async _runChecked(cmd, options = {}) {
     try {
-      const { stdout, stderr } = await execAsync(cmd, { cwd: PANEL_DIR, timeout: 300000, maxBuffer: 10 * 1024 * 1024, ...options });
+      const env = this._getExecEnv(options.env);
+      const { stdout, stderr } = await execAsync(cmd, { cwd: PANEL_DIR, timeout: 300000, maxBuffer: 10 * 1024 * 1024, ...options, env });
       return (stdout || stderr || '').toString();
     } catch (error) {
       const output = [error.stdout, error.stderr, error.message]
@@ -689,8 +738,9 @@ class UpdaterService {
 
     // 3. Fallback for node-pty if not working
     if (!check.ptyOk) {
-      log.push('   ⚠️ node-pty still unverified. Attempting fallback: npm install node-pty --build-from-source...');
-      const ptySourceOut = await this._runCommand('npm install node-pty --build-from-source 2>&1');
+      log.push('   ⚠️ node-pty still unverified. Cleaning build artifacts & compiling from source...');
+      await fs.rm(path.join(PANEL_DIR, 'node_modules', 'node-pty', 'build'), { recursive: true, force: true }).catch(() => {});
+      const ptySourceOut = await this._runCommand('npm install node-pty --build-from-source --omit=dev --no-audit --no-fund 2>&1');
       if (ptySourceOut && !ptySourceOut.includes('[ERROR]')) {
         const ptySummary = ptySourceOut.trim().split('\n').slice(0, 2).join('\n   ');
         if (ptySummary) log.push(`   ${ptySummary}`);
@@ -699,8 +749,9 @@ class UpdaterService {
 
     // 4. Fallback for better-sqlite3 if not working
     if (!check.sqliteOk) {
-      log.push('   ⚠️ better-sqlite3 unverified. Attempting fallback: npm install better-sqlite3 --build-from-source...');
-      const bsSourceOut = await this._runCommand('npm install better-sqlite3 --build-from-source 2>&1');
+      log.push('   ⚠️ better-sqlite3 unverified. Cleaning build artifacts & compiling from source...');
+      await fs.rm(path.join(PANEL_DIR, 'node_modules', 'better-sqlite3', 'build'), { recursive: true, force: true }).catch(() => {});
+      const bsSourceOut = await this._runCommand('npm install better-sqlite3 --build-from-source --omit=dev --no-audit --no-fund 2>&1');
       if (bsSourceOut && !bsSourceOut.includes('[ERROR]')) {
         const bsSummary = bsSourceOut.trim().split('\n').slice(0, 2).join('\n   ');
         if (bsSummary) log.push(`   ${bsSummary}`);
@@ -1137,6 +1188,11 @@ class UpdaterService {
       await this._verifyBoot(log);
       log.push('   ✅ Boot verification passed');
 
+      // 4.5 Ensure service runtime and permissions are synchronized
+      if (process.platform === 'linux') {
+        await this._syncServiceRuntime(log);
+      }
+
       // 5. Save last updated timestamp
       const panelCfg = await this._readJSON(PANEL_CONFIG, {});
       panelCfg.lastUpdated = new Date().toISOString();
@@ -1288,6 +1344,11 @@ class UpdaterService {
         log.push('   ✅ Boot verification passed');
       } catch (err) {
         log.push(`   ⚠️ Boot verification failed after rollback: ${err.message}`);
+      }
+
+      // Ensure service runtime and permissions are synchronized after rollback
+      if (process.platform === 'linux') {
+        await this._syncServiceRuntime(log);
       }
 
       // Save rollback to history
