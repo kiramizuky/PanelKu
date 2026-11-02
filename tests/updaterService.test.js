@@ -95,6 +95,19 @@ describe('UpdaterService — Version and Update Information', () => {
     expect(res.success).toBe(true);
     expect(res.dryRun).toBe(true);
   });
+
+  test('performUpdate streams progress via onProgress callback', async () => {
+    const progressEvents = [];
+    const res = await updaterService.performUpdate({
+      dryRun: true,
+      onProgress: (entry, fullLog) => {
+        progressEvents.push({ entry, fullLog });
+      },
+    });
+    expect(res.success).toBe(true);
+    expect(progressEvents.length).toBeGreaterThan(0);
+    expect(progressEvents[0].entry).toContain('DRY RUN');
+  });
 });
 
 describe('UpdaterController', () => {

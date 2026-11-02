@@ -157,6 +157,13 @@ async function main() {
       channel: config.channel,
       _internal: true,
       _deferRestart: true,
+      onProgress: async (_entry, fullLog) => {
+        await writeState({
+          status: 'running',
+          phase: 'updating',
+          log: fullLog,
+        });
+      },
     });
   } catch (err) {
     await finish({
@@ -235,6 +242,13 @@ async function main() {
     const rollback = await updaterService.performRollback({
       commit: previousCommit || undefined,
       _deferRestart: true,
+      onProgress: async (_entry, fullLog) => {
+        await writeState({
+          status: 'rolling_back',
+          phase: 'rolling-back',
+          log: `${result?.log || ''}\n\n⚠️ ${failureReason}. Rolling back...\n\n${fullLog}`.trim(),
+        });
+      },
     });
     rollbackLog = rollback.log || '';
   } catch (err) {

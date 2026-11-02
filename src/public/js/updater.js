@@ -14,9 +14,30 @@ const UpdaterPage = (() => {
     changelog: [],
   };
 
+  // ── Tab State Persistence ──────────────────────────────────────
+  function setupTabs() {
+    const tabsEl = document.getElementById('updaterTabs');
+    if (!tabsEl) return;
+    tabsEl.addEventListener('shown.bs.tab', (e) => {
+      try {
+        if (e.target?.id) sessionStorage.setItem('updater_active_tab', e.target.id);
+      } catch {}
+    });
+    try {
+      const savedTab = sessionStorage.getItem('updater_active_tab');
+      if (savedTab) {
+        const tabEl = document.getElementById(savedTab);
+        if (tabEl && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+          new bootstrap.Tab(tabEl).show();
+        }
+      }
+    } catch {}
+  }
+
   // ── Initialization ──────────────────────────────────────────────
   async function init() {
     await LP.init();
+    setupTabs();
     await loadAll();
   }
 
@@ -110,12 +131,54 @@ const UpdaterPage = (() => {
     try {
       const res = await LP.get('/updater/status');
       const job = res?.data;
-      if (!job || !job.finishedAt) return;
+      if (!job) return;
 
+      const logEl = document.getElementById('upLog');
+      const btn = document.getElementById('btnUpdate');
+
+      // 1. If an update or verification is active right now (e.g. user refreshed the page)
+      if (['running', 'restarting', 'verifying', 'rolling_back'].includes(job.status)) {
+        if (logEl && job.log) {
+          logEl.textContent = job.log;
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+        if (btn) {
+          btn.innerHTML = '<i class="bi bi-arrow-repeat spin me-1"></i> Updating...';
+          btn.disabled = true;
+        }
+        const tabBtn = document.getElementById('tab-update');
+        if (tabBtn && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+          new bootstrap.Tab(tabBtn).show();
+        }
+        // Launch polling in background so loadAll() is not blocked
+        void (async () => {
+          const restarted = await pollUpdateJob(job.id, logEl);
+          if (restarted) {
+            startReconnectPolling(logEl);
+          } else if (btn) {
+            btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i> Update Panel';
+            btn.disabled = false;
+          }
+        })();
+        return;
+      }
+
+      // 2. If finished recently
+      if (!job.finishedAt) return;
       const age = Date.now() - new Date(job.finishedAt).getTime();
-      if (!Number.isFinite(age) || age > 6 * 60 * 60 * 1000) return;
+      if (!Number.isFinite(age) || age > 24 * 60 * 60 * 1000) return;
 
-      if (job.status === 'rolled_back') {
+      // Populate upLog with the completed update log so user sees the step-by-step progress
+      if (logEl && job.log) {
+        logEl.textContent = job.log;
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      if (job.status === 'success') {
+        if (age < 5 * 60 * 1000) {
+          LP.toast('Update completed successfully! Panel is running latest version.', 'success');
+        }
+      } else if (job.status === 'rolled_back') {
         LP.toast(job.error || 'Update failed — previous version was restored', 'warning');
       } else if (job.status === 'failed') {
         LP.toast(job.error || 'Last update failed. Check the update history.', 'error');
@@ -787,6 +850,7 @@ const UpdaterPage = (() => {
             if (hasSeenOffline || elapsed >= 8) {
               clearInterval(poll);
               if (logEl) logEl.textContent += `\n✅ Panel is back online! Reloading...`;
+              try { sessionStorage.setItem('updater_active_tab', 'tab-update'); } catch {}
               setTimeout(() => window.location.reload(), 1000);
             }
           } else {

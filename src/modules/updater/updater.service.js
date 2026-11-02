@@ -244,7 +244,14 @@ class UpdaterService {
     // Fire-and-forget: errors are captured into the job state.
     void (async () => {
       try {
-        const result = await this.performUpdate({ ...options, _internal: true });
+        const result = await this.performUpdate({
+          ...options,
+          _internal: true,
+          onProgress: async (_entry, fullLog) => {
+            job.log = fullLog;
+            await this._writeState({ ...job, log: fullLog });
+          },
+        });
         Object.assign(job, {
           status: result.success ? 'success' : 'failed',
           phase: result.success ? 'done' : 'failed',
@@ -1041,6 +1048,38 @@ class UpdaterService {
     }
 
     const log = [];
+    const origPush = log.push.bind(log);
+    let syncPromise = Promise.resolve();
+
+    const notifyProgress = (entry) => {
+      const currentLog = log.join('\n');
+      if (this._activeJob) {
+        this._activeJob.log = currentLog;
+      }
+      syncPromise = syncPromise.then(async () => {
+        if (typeof options.onProgress === 'function') {
+          try {
+            await options.onProgress(entry, currentLog);
+          } catch {}
+        } else {
+          try {
+            const state = await this._readState();
+            if (state && (state.status === 'running' || state.phase === 'updating')) {
+              await this._writeState({ ...state, log: currentLog });
+            }
+          } catch {}
+        }
+      }).catch(() => {});
+    };
+
+    // Intercept push so that any helper (rebuildNativeModules, _verifyBoot, etc.)
+    // automatically streams live updates without signature changes.
+    log.push = (...items) => {
+      const res = origPush(...items);
+      notifyProgress(items.join('\n'));
+      return res;
+    };
+
     const timestamp = new Date().toISOString();
     let success = false;
     let backupInfo = null;
@@ -1260,6 +1299,7 @@ class UpdaterService {
       });
     }
 
+    await syncPromise;
     if (!internal && !dryRun) this._running = false;
     return { success, log: log.join('\n'), backupInfo, commit: newCommit, previousCommit };
   }
@@ -1271,6 +1311,35 @@ class UpdaterService {
     const deferRestart = options._deferRestart === true;
     const timestamp = new Date().toISOString();
     const log = [];
+    const origPush = log.push.bind(log);
+    let syncPromise = Promise.resolve();
+
+    const notifyProgress = (entry) => {
+      const currentLog = log.join('\n');
+      if (this._activeJob) {
+        this._activeJob.log = currentLog;
+      }
+      syncPromise = syncPromise.then(async () => {
+        if (typeof options.onProgress === 'function') {
+          try {
+            await options.onProgress(entry, currentLog);
+          } catch {}
+        } else {
+          try {
+            const state = await this._readState();
+            if (state && (state.status === 'rolling_back' || state.phase === 'rolling-back')) {
+              await this._writeState({ ...state, log: currentLog });
+            }
+          } catch {}
+        }
+      }).catch(() => {});
+    };
+
+    log.push = (...items) => {
+      const res = origPush(...items);
+      notifyProgress(items.join('\n'));
+      return res;
+    };
 
     let targetCommit = commit;
     let verified = false;
@@ -1394,9 +1463,11 @@ class UpdaterService {
         log: log.join('\n'),
         timestamp,
       });
+      await syncPromise;
       return { success: false, log: log.join('\n') };
     }
 
+    await syncPromise;
     return { success: verified, log: log.join('\n'), commit: targetCommit };
   }
 
