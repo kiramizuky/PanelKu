@@ -101,7 +101,9 @@ class VulnerabilitiesController {
       const report = await vulnerabilitiesService.exportReport(format);
 
       if (format === 'json') {
-        return success(res, report, 'Export successful');
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="panelku-vulnerability-report.json"');
+        return res.send(JSON.stringify(report, null, 2));
       }
 
       res.setHeader('Content-Type', 'text/markdown; charset=utf-8');

@@ -207,7 +207,7 @@ const MonitorPage = (() => {
   }
 
   async function killProcess(pid, signal = 'SIGTERM') {
-    if (!confirm(`Are you sure you want to send ${signal} to process ${pid}?`)) return;
+    if (!(await LP.confirm(`Are you sure you want to send ${signal} to process ${pid}?`, 'Terminate Process'))) return;
     
     try {
       const res = await LP.post(`/monitor/processes/${pid}/kill`, { signal });

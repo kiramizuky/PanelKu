@@ -271,7 +271,7 @@ const TaskDrawer = {
   },
 
   async cancelTask(queueName, jobId) {
-    if (!confirm('Cancel or remove this task?')) return;
+    if (!(await LP.confirm('Cancel or remove this task?', 'Confirm Task Removal'))) return;
     try {
       const res = await LP.post(`/tasks/${queueName}/${jobId}/cancel`);
       if (res?.success) {

@@ -27,6 +27,10 @@ export const authenticate = async (req, res, next) => {
     else if (req.headers['x-api-key']) {
       return authenticateApiKey(req, res, next);
     }
+    // Query param token fallback for authenticated downloads (e.g. GET /api/.../export?token=...)
+    else if (req.query && req.query.token && typeof req.query.token === 'string') {
+      token = req.query.token;
+    }
 
     if (!token) {
       return unauthorized(res, 'No authentication token provided');

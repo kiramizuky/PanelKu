@@ -82,9 +82,15 @@
         </ul>
       </div>
 
-      <button class="btn-lp btn-lp-secondary d-flex align-items-center gap-1" id="btnExportReport" title="Unduh Laporan Audit">
-        <i class="bi bi-download"></i> Ekspor Laporan
-      </button>
+      <div class="dropdown">
+        <button class="btn-lp btn-lp-secondary dropdown-toggle d-flex align-items-center gap-1" id="btnExportReport" data-bs-toggle="dropdown" aria-expanded="false" title="Unduh Laporan Audit">
+          <i class="bi bi-download"></i> Ekspor Laporan
+        </button>
+        <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end lp-dropdown" aria-labelledby="btnExportReport">
+          <li><a class="dropdown-item" href="#" id="actExportMarkdown"><i class="bi bi-filetype-md text-primary me-2"></i>Format Markdown (.md)</a></li>
+          <li><a class="dropdown-item" href="#" id="actExportJSON"><i class="bi bi-filetype-json text-warning me-2"></i>Format JSON (.json)</a></li>
+        </ul>
+      </div>
 
       <button class="btn-lp btn-lp-ghost d-flex align-items-center gap-1" id="btnAskGeneralAI" title="Konsultasi Security Copilot">
         <i class="bi bi-robot text-primary"></i> Tanya AI

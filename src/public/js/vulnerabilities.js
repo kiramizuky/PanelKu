@@ -53,11 +53,30 @@ const VulnerabilitiesPage = {
       }
     });
 
-    // Export button
+    // Export options
+    const actExpMd = document.getElementById('actExportMarkdown');
+    if (actExpMd) {
+      actExpMd.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.exportReport('markdown');
+      });
+    }
+
+    const actExpJson = document.getElementById('actExportJSON');
+    if (actExpJson) {
+      actExpJson.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.exportReport('json');
+      });
+    }
+
     const btnExp = document.getElementById('btnExportReport');
     if (btnExp) {
-      btnExp.addEventListener('click', () => {
-        window.open('/api/vulnerabilities/export?format=markdown', '_blank');
+      btnExp.addEventListener('click', (e) => {
+        if (!btnExp.classList.contains('dropdown-toggle')) {
+          e.preventDefault();
+          this.exportReport('markdown');
+        }
       });
     }
 
@@ -413,6 +432,40 @@ const VulnerabilitiesPage = {
         </div>
       </div>
     `;
+  },
+
+  async exportReport(format = 'markdown') {
+    try {
+      LP.loading(true);
+      const token = (typeof LP !== 'undefined' && LP.state?.accessToken) || (typeof localStorage !== 'undefined' ? (localStorage.getItem('lp_token') || localStorage.getItem('token')) : null);
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch(`/api/vulnerabilities/export?format=${format}`, {
+        headers
+      });
+
+      if (!res.ok) {
+        throw new Error(`Gagal mengekspor laporan (status ${res.status})`);
+      }
+
+      const ext = format === 'json' ? 'json' : 'md';
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `panelku-vulnerability-report-${Date.now()}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      LP.toast(`Laporan kerentanan berhasil diekspor (${format.toUpperCase()})`, 'success');
+    } catch (err) {
+      LP.toast('Gagal mengekspor laporan: ' + err.message, 'error');
+    } finally {
+      LP.loading(false);
+    }
   },
 
   async startScan(type = 'full') {

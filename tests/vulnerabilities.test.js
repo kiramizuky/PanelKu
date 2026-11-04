@@ -201,6 +201,31 @@ describe('Vulnerabilities API Integration Tests', () => {
     expect(res.body.data).toHaveProperty('answer');
   });
 
+  test('GET /api/vulnerabilities/export should export markdown report with Bearer token', async () => {
+    const res = await request(app)
+      .get('/api/vulnerabilities/export?format=markdown')
+      .set('Authorization', `Bearer ${authToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/markdown');
+    expect(res.headers['content-disposition']).toContain('attachment');
+    expect(res.headers['content-disposition']).toContain('panelku-vulnerability-report.md');
+    expect(res.text).toContain('Laporan Audit Keamanan');
+  });
+
+  test('GET /api/vulnerabilities/export should export JSON report with query token', async () => {
+    const res = await request(app)
+      .get(`/api/vulnerabilities/export?format=json&token=${authToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/json');
+    expect(res.headers['content-disposition']).toContain('attachment');
+    expect(res.headers['content-disposition']).toContain('panelku-vulnerability-report.json');
+    const parsed = JSON.parse(res.text);
+    expect(parsed).toHaveProperty('summary');
+    expect(parsed).toHaveProperty('findings');
+  });
+
   test('GET /vulnerabilities view page should return 200 and render HTML', async () => {
     const res = await request(app).get('/vulnerabilities');
     expect(res.status).toBe(200);
