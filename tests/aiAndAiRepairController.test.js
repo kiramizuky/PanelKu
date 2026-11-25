@@ -58,7 +58,7 @@ describe('AIController - chat', () => {
     await aiController.chat(req, res);
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.answer).toContain('Hasil Diagnosa Error Terminal');
+    expect(res.body.data.answer).toContain('Terminal Error Diagnosis');
     expect(res.body.data.diagnosis).toBeDefined();
   });
 

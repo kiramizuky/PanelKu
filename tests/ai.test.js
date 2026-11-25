@@ -124,8 +124,8 @@ describe('OpenClaw AI Copilot - Security Guard', () => {
   });
 
   test('executeCommand throws Forbidden error on dangerous command', async () => {
-    await expect(aiService.executeCommand('rm -rf /')).rejects.toThrow(/diblokir oleh Security Guard/i);
-    await expect(aiService.executeCommand('mkfs /dev/sda')).rejects.toThrow(/diblokir oleh Security Guard/i);
+    await expect(aiService.executeCommand('rm -rf /')).rejects.toThrow(/blocked by Security Guard/i);
+    await expect(aiService.executeCommand('mkfs /dev/sda')).rejects.toThrow(/blocked by Security Guard/i);
   });
 
   test('detects system-modifying commands correctly', () => {
@@ -159,7 +159,7 @@ describe('Terminal AI Diagnostics - Heuristic Fallback', () => {
     const diagnosis = aiService.diagnoseTerminalError(errorText);
 
     expect(diagnosis).not.toBeNull();
-    expect(diagnosis.issue).toContain('Hak akses');
+    expect(diagnosis.issue).toContain('Insufficient permissions');
     expect(diagnosis.fixCommand).toContain('sudo');
   });
 

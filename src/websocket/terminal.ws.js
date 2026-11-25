@@ -46,8 +46,8 @@ export const registerTerminalSocket = (namespace) => {
       // Avoid duplicate listeners if reattaching
       const existing = localUnsubscribers.get(sessionId);
       if (existing) {
-        existing.offData();
-        existing.offExit();
+        if (typeof existing.offData === 'function') existing.offData();
+        if (typeof existing.offExit === 'function') existing.offExit();
       }
 
       const offData = terminalService.onData(sessionId, (data, offset) => {
@@ -267,8 +267,8 @@ export const registerTerminalSocket = (namespace) => {
       } else {
         const unsub = localUnsubscribers.get(sessionId);
         if (unsub) {
-          unsub.offData();
-          unsub.offExit();
+          if (typeof unsub.offData === 'function') unsub.offData();
+          if (typeof unsub.offExit === 'function') unsub.offExit();
           localUnsubscribers.delete(sessionId);
         }
         terminalService.kill(sessionId);
@@ -289,8 +289,8 @@ export const registerTerminalSocket = (namespace) => {
         } else {
           const unsub = localUnsubscribers.get(sessionId);
           if (unsub) {
-            unsub.offData();
-            unsub.offExit();
+            if (typeof unsub.offData === 'function') unsub.offData();
+            if (typeof unsub.offExit === 'function') unsub.offExit();
             localUnsubscribers.delete(sessionId);
           }
           terminalService.detach(sessionId);

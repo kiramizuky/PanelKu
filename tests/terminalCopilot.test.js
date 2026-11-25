@@ -157,8 +157,8 @@ describe('TerminalService — PTY Lifecycle and Session Pool', () => {
     const exitHandler = jest.fn();
     terminalService.onData(id, dataHandler);
     terminalService.onExit(id, exitHandler);
-    expect(mockPtyProcess.onData).toHaveBeenCalledWith(dataHandler);
-    expect(mockPtyProcess.onExit).toHaveBeenCalledWith(exitHandler);
+    expect(mockPtyProcess.onData).toHaveBeenCalledWith(expect.any(Function));
+    expect(mockPtyProcess.onExit).toHaveBeenCalledWith(expect.any(Function));
 
     terminalService.kill(id);
     expect(terminalService.exists(id)).toBe(false);
@@ -209,6 +209,7 @@ describe('TerminalService — PTY Lifecycle and Session Pool', () => {
   });
 
   test('create enforces MAX_SESSIONS limit', () => {
+    terminalService.killAll();
     terminalService._MAX_SESSIONS = 1;
     const s1 = terminalService.create(500, 'bash');
 

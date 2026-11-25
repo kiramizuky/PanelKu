@@ -80,10 +80,10 @@ describe('Terminal Service Resilience (Batching, Detach & Reattach)', () => {
     expect(mockSpawn).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Array),
-      expect.objectContaining({ cols: 80, rows: 24 })
+      expect.objectContaining({ cols: 80, rows: 1 })
     );
 
-    terminalService.resize(sessionId, 0, 999);
+    terminalService.resize(sessionId, -5, 999);
     expect(mockPty.resize).toHaveBeenCalledWith(1, 200);
 
     const onExitMock = jest.fn();

@@ -91,7 +91,7 @@ describe('Vulnerabilities Service Unit Tests', () => {
     const findings = await vulnerabilitiesService.getFindings({ status: 'open' });
     if (findings.length > 0) {
       await expect(vulnerabilitiesService.remediate(findings[0].id, { confirmed: false }))
-        .rejects.toThrow('Persetujuan manual diperlukan');
+        .rejects.toThrow('Manual confirmation is required');
     }
   });
 
