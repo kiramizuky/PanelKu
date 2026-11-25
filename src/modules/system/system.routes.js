@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { validateSchema } from '../../middleware/validate.js';
 import systemController from './system.controller.js';
 import tunnelController from './tunnel.controller.js';
 import { authenticate } from '../../middleware/auth.js';
@@ -81,6 +82,15 @@ router.get('/password-policy/export', rbac(RESOURCES.SYSTEM, ACTIONS.READ), syst
 router.post('/password-policy/import', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.importPasswordPolicy.bind(systemController));
 router.get('/password-policy/preview-url', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.previewUrlPasswordPolicy.bind(systemController));
 router.get('/password-policy/history', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.getPasswordPolicyHistory.bind(systemController));
+
+// Locale / i18n endpoints
+router.get('/locale', systemController.getLocale.bind(systemController));
+router.put(
+  '/locale',
+  rbac(RESOURCES.SYSTEM, ACTIONS.READ),
+  validateSchema({ body: { locale: { type: 'string', required: true, enum: ['en', 'id'] } } }),
+  systemController.setLocale.bind(systemController)
+);
 
 export default router;
 

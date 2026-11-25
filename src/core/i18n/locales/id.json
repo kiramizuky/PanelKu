@@ -1,0 +1,36 @@
+{
+  "common": {
+    "save": "Simpan",
+    "cancel": "Batal",
+    "close": "Tutup",
+    "delete": "Hapus",
+    "confirm": "Konfirmasi",
+    "loading": "Memuat...",
+    "error": "Kesalahan",
+    "success": "Berhasil",
+    "copied": "Disalin ke clipboard!",
+    "search": "Cari..."
+  },
+  "terminal": {
+    "title": "Terminal Web",
+    "subtitle": "Akses shell langsung ke host",
+    "connected": "Terhubung",
+    "reconnecting": "Menghubungkan ulang...",
+    "disconnected": "Terputus",
+    "sessionResumed": "Koneksi pulih. Sesi dilanjutkan.",
+    "recordingSaved": "Rekaman sesi disimpan"
+  },
+  "vulnerabilities": {
+    "title": "Pusat Kerentanan & AI Remediasi",
+    "runScan": "Jalankan Scan",
+    "exportReport": "Ekspor Laporan",
+    "askAi": "Tanya AI",
+    "scanComplete": "Pemindaian kerentanan selesai.",
+    "noFindings": "Tidak Ditemukan Kerentanan"
+  },
+  "validation": {
+    "failed": "Validasi gagal",
+    "required": "{{field}} wajib diisi",
+    "invalidType": "{{field}} harus bertipe {{type}}"
+  }
+}

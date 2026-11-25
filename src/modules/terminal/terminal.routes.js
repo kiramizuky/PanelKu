@@ -16,5 +16,9 @@ router.get('/stats', terminalController.getStats.bind(terminalController));
 router.post('/copilot/generate', terminalController.generateCommand.bind(terminalController));
 router.post('/copilot/explain', terminalController.explainCommand.bind(terminalController));
 
+// ── Terminal Session Recordings (Asciinema v2 .cast) ──
+router.get('/recordings', rbac(RESOURCES.TERMINAL, ACTIONS.READ), terminalController.listRecordings.bind(terminalController));
+router.get('/recordings/:sessionId', rbac(RESOURCES.TERMINAL, ACTIONS.READ), terminalController.getRecording.bind(terminalController));
+
 export default router;
 

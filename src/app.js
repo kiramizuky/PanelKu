@@ -17,6 +17,7 @@ import { wafMiddleware } from './middleware/waf.middleware.js';
 import { nonceMiddleware, nonceInjector } from './middleware/nonce.js';
 import { metricsMiddleware } from './middleware/metrics.middleware.js';
 import { staticCacheMiddleware } from './middleware/assets.js';
+import { i18nMiddleware } from './core/i18n/index.js';
 
 import expressEjsLayouts from 'express-ejs-layouts';
 import pluginLoader from './core/plugin-loader/PluginLoader.js';
@@ -115,6 +116,7 @@ const createApp = () => {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(cookieParser());
+  app.use(i18nMiddleware);
 
   // [PERF] Compress HTML/JS/CSS/JSON responses (gzip/deflate) when the client
   // supports it and the payload is large enough to benefit.

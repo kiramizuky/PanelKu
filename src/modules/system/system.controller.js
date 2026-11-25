@@ -533,6 +533,30 @@ class SystemController {
       return errorResponse(res, error.message || 'Failed to get password policy history', 500);
     }
   }
+
+  async getLocale(req, res) {
+    try {
+      const { getDictionary, resolveRequestLocale } = await import('../../core/i18n/index.js');
+      const locale = req.query.lang || resolveRequestLocale(req);
+      return success(res, getDictionary(locale));
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to load locale dictionary', 500);
+    }
+  }
+
+  async setLocale(req, res) {
+    try {
+      const { getDictionary, SUPPORTED_LOCALES } = await import('../../core/i18n/index.js');
+      const { locale } = req.body;
+      if (!SUPPORTED_LOCALES.includes(locale)) {
+        return errorResponse(res, `Unsupported locale. Supported: ${SUPPORTED_LOCALES.join(', ')}`, 400);
+      }
+      res.cookie('lp_locale', locale, { maxAge: 365 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
+      return success(res, getDictionary(locale), 'Locale updated');
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to update locale', 500);
+    }
+  }
 }
 
 export default new SystemController();

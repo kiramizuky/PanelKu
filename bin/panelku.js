@@ -143,6 +143,19 @@ async function commandDoctor(args) {
     add('fail', 'SQLite reachable', err.message);
   }
 
+  // Native addon ABI compatibility check (better-sqlite3 & node-pty)
+  try {
+    const abi = process.versions.modules;
+    const { default: terminalService } = await import('../src/modules/terminal/terminal.service.js');
+    if (terminalService.isAvailable()) {
+      add('ok', `Native Addons (ABI v${abi})`, 'better-sqlite3 and node-pty loaded cleanly');
+    } else {
+      add('warn', `Native Addon node-pty (ABI v${abi})`, 'unavailable — run "npm rebuild node-pty" to enable Web Terminal');
+    }
+  } catch (err) {
+    add('warn', `Native Addons (ABI v${process.versions.modules})`, err.message);
+  }
+
   try {
     const { default: dockerService } = await import('../src/modules/docker/docker.service.js');
     const dockerInfo = await Promise.race([

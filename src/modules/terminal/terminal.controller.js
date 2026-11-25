@@ -53,6 +53,30 @@ class TerminalController {
       return error(res, err.message, 500);
     }
   }
+
+  async listRecordings(req, res) {
+    try {
+      const recordings = terminalService.listRecordings(req.user);
+      return success(res, recordings);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async getRecording(req, res) {
+    try {
+      const { sessionId } = req.params;
+      const content = terminalService.getRecording(sessionId, req.user);
+      if (!content) {
+        return error(res, 'Recording not found or access denied', 404);
+      }
+      res.setHeader('Content-Type', 'application/x-asciicast; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${sessionId}.cast"`);
+      return res.send(content);
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
 }
 
 const terminalController = new TerminalController();

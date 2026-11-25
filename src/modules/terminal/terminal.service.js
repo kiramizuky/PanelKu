@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
 import logger from '../../config/logger.js';
+import { getStorageDir } from '../../config/paths.js';
 
 let pty = null;
 let ptyLoadError = null;
@@ -102,6 +103,7 @@ class TerminalService {
       cols: safeCols,
       rows: safeRows,
       createdAt: new Date(),
+      startedAtMs: Date.now(),
       exited: false,
       exitCode: null,
       dataListeners: new Set(),
@@ -112,6 +114,7 @@ class TerminalService {
       pendingOutput: '',
       flushTimer: null,
       detachTimer: null,
+      castStream: this._initRecordingStream(sessionId, userId, shell, safeCols, safeRows),
     };
 
     // Single PTY data handler with 16ms batching + ring-buffer scrollback
@@ -145,6 +148,7 @@ class TerminalService {
       }
       session.dataListeners.clear();
       session.exitListeners.clear();
+      this._closeRecordingStream(session);
       this._sessions.delete(sessionId);
     });
 
@@ -183,6 +187,13 @@ class TerminalService {
     while (session.scrollbackBytes > MAX_SCROLLBACK_CHARS && session.scrollbackChunks.length > 1) {
       const removed = session.scrollbackChunks.shift();
       session.scrollbackBytes -= removed.length;
+    }
+
+    if (session.castStream) {
+      try {
+        const elapsed = Number(((Date.now() - session.startedAtMs) / 1000).toFixed(6));
+        session.castStream.write(`${JSON.stringify([elapsed, 'o', batch])}\n`);
+      } catch (_) {}
     }
 
     for (const listener of [...session.dataListeners]) {
@@ -320,6 +331,7 @@ class TerminalService {
     session.exited = true;
     session.dataListeners.clear();
     session.exitListeners.clear();
+    this._closeRecordingStream(session);
     try {
       session.pty.kill();
     } catch { /* ignore */ }
@@ -393,6 +405,102 @@ class TerminalService {
         detached: s.dataListeners.size === 0,
       })),
     };
+  }
+
+  _getRecordingsDir() {
+    return path.join(getStorageDir(), 'logs', 'recordings');
+  }
+
+  _initRecordingStream(sessionId, userId, shell, cols, rows) {
+    if (process.env.TERMINAL_RECORDING === 'false') return null;
+    try {
+      const dir = this._getRecordingsDir();
+      fs.mkdirSync(dir, { recursive: true, mode: 0o750 });
+      const filePath = path.join(dir, `${sessionId}.cast`);
+      const stream = fs.createWriteStream(filePath, { flags: 'a', mode: 0o600 });
+      const header = {
+        version: 2,
+        width: cols,
+        height: rows,
+        timestamp: Math.floor(Date.now() / 1000),
+        title: `panelku-user-${userId}`,
+        env: { TERM: 'xterm-256color', SHELL: shell },
+      };
+      stream.write(`${JSON.stringify(header)}\n`);
+      return stream;
+    } catch (err) {
+      logger.warn(`Terminal recording init failed (${sessionId}): ${err.message}`);
+      return null;
+    }
+  }
+
+  _closeRecordingStream(session) {
+    if (session?.castStream) {
+      try {
+        session.castStream.end();
+      } catch (_) {}
+      session.castStream = null;
+    }
+  }
+
+  /**
+   * List asciinema (.cast) recordings scoped to the requesting user
+   * (Super Admins and Admins can view all recordings).
+   */
+  listRecordings(user) {
+    const dir = this._getRecordingsDir();
+    if (!fs.existsSync(dir)) return [];
+
+    const isPrivileged = Boolean(user?.isSuperAdmin || user?.role?.slug === 'admin');
+    const uid = String(user?._id || user?.id || '');
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.cast'));
+    const recordings = [];
+
+    for (const file of files) {
+      const fullPath = path.join(dir, file);
+      try {
+        const stat = fs.statSync(fullPath);
+        const firstLine = fs.readFileSync(fullPath, 'utf8').split('\n')[0];
+        const header = JSON.parse(firstLine || '{}');
+        const ownerMatch = typeof header.title === 'string' && header.title.startsWith('panelku-user-')
+          ? header.title.slice('panelku-user-'.length)
+          : '';
+        if (!isPrivileged && ownerMatch !== uid) continue;
+
+        recordings.push({
+          sessionId: file.replace(/\.cast$/, ''),
+          userId: ownerMatch,
+          sizeBytes: stat.size,
+          createdAt: header.timestamp ? new Date(header.timestamp * 1000).toISOString() : stat.birthtime.toISOString(),
+          width: header.width || 80,
+          height: header.height || 24,
+        });
+      } catch (_) {}
+    }
+
+    return recordings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  /**
+   * Read an asciinema (.cast) recording if authorized.
+   */
+  getRecording(sessionId, user) {
+    if (!/^[a-zA-Z0-9_-]{8,64}$/.test(String(sessionId || ''))) return null;
+    const filePath = path.join(this._getRecordingsDir(), `${sessionId}.cast`);
+    if (!fs.existsSync(filePath)) return null;
+
+    const content = fs.readFileSync(filePath, 'utf8');
+    const isPrivileged = Boolean(user?.isSuperAdmin || user?.role?.slug === 'admin');
+    if (!isPrivileged) {
+      const uid = String(user?._id || user?.id || '');
+      try {
+        const header = JSON.parse(content.split('\n')[0] || '{}');
+        if (header.title !== `panelku-user-${uid}`) return null;
+      } catch {
+        return null;
+      }
+    }
+    return content;
   }
 }
 

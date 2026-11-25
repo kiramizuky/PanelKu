@@ -887,7 +887,7 @@ const LP = {
       copyBtn.addEventListener('click', () => {
         const ok = LP.copy(cmd, 'Command copied to clipboard!');
         if (ok) {
-          copyBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Tersalin!';
+          copyBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Copied!';
           setTimeout(() => {
             copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy Command';
           }, 3000);
@@ -1007,6 +1007,25 @@ const LP = {
         });
       });
     }
+  },
+
+  _i18n: { locale: 'en', messages: {} },
+
+  async loadLocale(lang) {
+    try {
+      const q = lang ? `?lang=${encodeURIComponent(lang)}` : '';
+      const res = await this.get(`/system/locale${q}`);
+      if (res?.success && res.data?.messages) {
+        this._i18n = { locale: res.data.locale || 'en', messages: res.data.messages };
+      }
+    } catch (_) {}
+    return this._i18n;
+  },
+
+  t(key, params = {}) {
+    let val = key.split('.').reduce((acc, part) => (acc && acc[part] !== undefined ? acc[part] : undefined), this._i18n.messages);
+    if (typeof val !== 'string') return key;
+    return val.replace(/\{\{(\w+)\}\}/g, (_, tok) => (params[tok] !== undefined ? String(params[tok]) : `{{${tok}}}`));
   },
 
   _pageChange(containerId, dir) {
