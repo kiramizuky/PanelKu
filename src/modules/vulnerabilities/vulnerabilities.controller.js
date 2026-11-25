@@ -49,7 +49,7 @@ class VulnerabilitiesController {
     try {
       const scanType = req.body.type || 'full';
       const result = await vulnerabilitiesService.startScan(scanType);
-      return success(res, result, 'Pemindaian kerentanan berhasil diselesaikan.');
+      return success(res, result, 'Vulnerability scan completed successfully.');
     } catch (err) {
       logger.error(`Scan execution failed: ${err.message}`);
       return error(res, err.message, 500);

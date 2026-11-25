@@ -141,7 +141,7 @@ const ClusterPage = (() => {
           <!-- Header: name + status badge -->
           <div class="d-flex justify-content-between align-items-start mb-3">
             <div data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ClusterPage.showDetails', (LP.encJsArg(node.id)))
-    })}" style="cursor:pointer;" title="Klik untuk melihat detail info node">
+    })}" style="cursor:pointer;" title="Click to view node details">
               <h5 class="text-white text-hover-underline" style="font-weight:700; margin:0 0 3px 0; font-size:15px; text-decoration: underline dotted rgba(255,255,255,0.4);">${LP.escHtml(node.name)}</h5>
               <span style="font-size:10px; color:var(--text-muted);">Agent Node <i class="bi bi-info-circle ms-1"></i></span>
             </div>
@@ -201,7 +201,7 @@ const ClusterPage = (() => {
               data-lp-on-mouseover="${LP.registerInlineHandler('mouseover', function (_event) { this.style.background='rgba(239,68,68,0.2)'
     })}" data-lp-on-mouseout="${LP.registerInlineHandler('mouseout', function (_event) { this.style.background='rgba(239,68,68,0.08)'
     })}"
-              title="Hapus node">
+              title="Remove node">
               <i class="bi bi-trash3"></i>
             </button>
           </div>
@@ -223,7 +223,7 @@ const ClusterPage = (() => {
     try {
       const res = await LP.get('/cluster/nodes');
       if (!res?.success) {
-        container.innerHTML = `<div class="col-12 text-center text-danger">Gagal memuat nodes: ${LP.escHtml(res?.message || '')}</div>`;
+        container.innerHTML = `<div class="col-12 text-center text-danger">Failed to load nodes: ${LP.escHtml(res?.message || '')}</div>`;
         return;
       }
 
@@ -232,10 +232,10 @@ const ClusterPage = (() => {
         container.innerHTML = `
           <div class="col-12 text-center" style="padding:70px 20px; color:var(--text-muted);">
             <i class="bi bi-diagram-3" style="font-size:52px; display:block; margin-bottom:16px; color:rgba(255,255,255,0.08);"></i>
-            <h5 class="text-white" style="font-weight:600; margin-bottom:6px;">Belum Ada Agent Node</h5>
-            <p style="font-size:13px; max-width:400px; margin:0 auto 20px;">Tambahkan server sekunder sebagai Agent Node untuk memantau resource-nya dari dashboard ini.</p>
+            <h5 class="text-white" style="font-weight:600; margin-bottom:6px;">No Agent Nodes Yet</h5>
+            <p style="font-size:13px; max-width:400px; margin:0 auto 20px;">Add a secondary server as an Agent Node to monitor its resources from this dashboard.</p>
             <button class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { LP.call('ClusterPage.showAddModal')
-    })}"><i class="bi bi-plus-lg me-1"></i>Tambah Node Pertama</button>
+    })}"><i class="bi bi-plus-lg me-1"></i>Add First Node</button>
           </div>`;
         return;
       }
@@ -249,7 +249,7 @@ const ClusterPage = (() => {
       });
 
     } catch (e) {
-      container.innerHTML = '<div class="col-12 text-center text-danger">Gagal terhubung ke panel API.</div>';
+      container.innerHTML = '<div class="col-12 text-center text-danger">Failed to connect to panel API.</div>';
     }
   }
 
@@ -318,7 +318,7 @@ const ClusterPage = (() => {
 
   async function refreshMetrics(id) {
     const el = document.getElementById(`metrics-${id}`);
-    if (el) el.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:12px;height:12px;border-width:2px;"></span> Memuat...';
+    if (el) el.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:12px;height:12px;border-width:2px;"></span> Loading...';
     try {
       const res = await LP.get(`/cluster/nodes/${id}/metrics`);
       if (res?.success) {
@@ -326,10 +326,10 @@ const ClusterPage = (() => {
         await fetchAndRenderMetrics({ id, status: 'online' });
         LP.toast('Metrics diperbarui', 'success');
       } else {
-        LP.toast('Gagal mengambil metrics', 'error');
+        LP.toast('Failed to fetch metrics', 'error');
       }
     } catch {
-      LP.toast('Gagal mengambil metrics', 'error');
+      LP.toast('Failed to fetch metrics', 'error');
     }
   }
 
@@ -362,11 +362,11 @@ const ClusterPage = (() => {
     try {
       const res = await LP.post('/cluster/nodes', { name, ipAddress, port: port || null, apiKey });
       if (res?.success) {
-        LP.toast('Agent Node berhasil ditambahkan!', 'success');
+        LP.toast('Agent Node added successfully!', 'success');
         bootstrap.Modal.getInstance(document.getElementById('addNodeModal')).hide();
         loadNodes();
       } else {
-        LP.toast(res?.message || 'Gagal menambahkan node', 'error');
+        LP.toast(res?.message || 'Failed to add node', 'error');
       }
     } catch {
       LP.toast('Error saat mengirim request', 'error');
@@ -398,7 +398,7 @@ const ClusterPage = (() => {
         document.getElementById('detailNodeName').textContent = nodeObj ? nodeObj.name : 'Unknown';
         document.getElementById('detailSystemInfo').innerHTML = `
           <div class="col-12 text-center text-danger py-4">
-            <i class="bi bi-exclamation-triangle me-2"></i> Node Offline atau metrics tidak dapat dijangkau.
+            <i class="bi bi-exclamation-triangle me-2"></i> Node is offline or metrics are unreachable.
           </div>`;
         return;
       }
@@ -484,14 +484,14 @@ const ClusterPage = (() => {
   }
 
   async function deleteNode(id) {
-    if (!(await LP.confirm('Hapus Agent Node ini? Semua data tracking akan hilang.', 'Hapus Node'))) return;
+    if (!(await LP.confirm('Remove this Agent Node? All tracking data will be lost.', 'Remove Node'))) return;
     try {
       const res = await LP.delete(`/cluster/nodes/${id}`);
       if (res?.success) {
-        LP.toast('Agent Node berhasil dihapus', 'success');
+        LP.toast('Agent Node removed successfully', 'success');
         refreshAll();
       } else {
-        LP.toast(res?.message || 'Gagal menghapus node', 'error');
+        LP.toast(res?.message || 'Failed to remove node', 'error');
       }
     } catch {
       LP.toast('Error saat menghapus node', 'error');
@@ -515,7 +515,7 @@ const ClusterPage = (() => {
         }
         if (isOnline) refreshAll();
       } else {
-        LP.toast(res?.message || 'Ping gagal', 'error');
+        LP.toast(res?.message || 'Ping failed', 'error');
       }
     } catch {
       LP.toast('Ping connection error', 'error');

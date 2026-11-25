@@ -78,7 +78,7 @@ class AIService {
     const cleanCmd = command.trim();
     if (this.isDangerousCommand(cleanCmd)) {
       logger.warn(`[AI-SecurityGuard] Blocked dangerous command: ${cleanCmd}`);
-      throw new Error('Perintah ini diblokir oleh Security Guard karena berisiko merusak sistem.');
+      throw new Error('This command was blocked by Security Guard to protect system integrity.');
     }
 
     const timeout = options.timeout || 30000;
@@ -223,7 +223,7 @@ class AIService {
     ) {
       return {
         intent: 'check_failed_services',
-        title: 'Pengecekan Service Gagal (Systemd)',
+        title: 'Failed Services Check (Systemd)',
         command: 'systemctl --failed',
         category: 'Services',
         actionAdvice: 'systemctl reset-failed',
@@ -238,7 +238,7 @@ class AIService {
     ) {
       return {
         intent: 'check_nginx',
-        title: 'Pengecekan Sintaks Konfigurasi Nginx',
+        title: 'Nginx Configuration Syntax Check',
         command: 'nginx -t 2>&1',
         category: 'Web Server',
         actionAdvice: 'systemctl reload nginx',
@@ -253,7 +253,7 @@ class AIService {
     ) {
       return {
         intent: 'check_ufw',
-        title: 'Pengecekan Status Firewall (UFW)',
+        title: 'Firewall Status Check (UFW)',
         command: 'ufw status verbose 2>/dev/null || echo "UFW firewall is inactive or not installed"',
         category: 'Security',
       };
@@ -266,7 +266,7 @@ class AIService {
     ) {
       return {
         intent: 'check_system_logs',
-        title: 'Pengecekan Log Error Sistem Terkini',
+        title: 'Recent System Error Logs',
         command: 'journalctl -p 3 -xb -n 15 --no-pager 2>/dev/null || tail -n 15 /var/log/syslog 2>/dev/null || true',
         category: 'Logs',
       };
@@ -282,8 +282,8 @@ class AIService {
     if (!logText || typeof logText !== 'string') {
       return {
         category: 'General Terminal',
-        issue: 'Tidak ada log error yang terdeteksi secara spesifik.',
-        explanation: 'Tidak ada log error yang terdeteksi secara spesifik.',
+        issue: 'No specific error log detected.',
+        explanation: 'No specific error log detected.',
         fixCommand: '',
         riskLevel: 'safe',
       };
@@ -297,8 +297,8 @@ class AIService {
       const port = portMatch ? portMatch[1] : '80';
       return {
         category: 'Port Conflict',
-        issue: `Port ${port} sedang digunakan oleh proses lain, sehingga layanan baru tidak dapat mengikat (bind) ke port tersebut.`,
-        explanation: `Port ${port} sedang digunakan oleh proses lain, sehingga layanan baru tidak dapat mengikat (bind) ke port tersebut.`,
+        issue: `Port ${port} is already in use by another process, preventing the new service from binding to it.`,
+        explanation: `Port ${port} is already in use by another process, preventing the new service from binding to it.`,
         fixCommand: `fuser -k ${port}/tcp`,
         actionAdvice: `fuser -k ${port}/tcp`,
         riskLevel: 'medium',
@@ -309,8 +309,8 @@ class AIService {
     if (t.includes('permission denied') || t.includes('eacces') || t.includes('operation not permitted')) {
       return {
         category: 'Permission Denied',
-        issue: 'Hak akses (permission) tidak mencukupi untuk membaca atau mengeksekusi file/direktori target.',
-        explanation: 'Proses atau pengguna saat ini tidak memiliki hak akses (permission) ke file atau direktori target.',
+        issue: 'Insufficient permissions to read or execute the target file or directory.',
+        explanation: 'The current process or user lacks permissions on the target file or directory.',
         fixCommand: 'sudo chmod 755 . && sudo chown -R $USER:$USER .',
         actionAdvice: 'chmod 755 . && chown -R $USER:$USER .',
         riskLevel: 'medium',
@@ -321,8 +321,8 @@ class AIService {
     if (t.includes('could not get lock') || t.includes('unable to lock directory') || t.includes('/var/lib/dpkg/lock')) {
       return {
         category: 'Package Manager Lock',
-        issue: 'APT/dpkg terkunci oleh proses package manager lain.',
-        explanation: 'APT/dpkg terkunci karena ada proses instalasi atau update lain yang sedang berjalan di background.',
+        issue: 'APT/dpkg is locked by another package manager process.',
+        explanation: 'APT/dpkg is locked because another install or update process is running in the background.',
         fixCommand: 'killall apt apt-get dpkg 2>/dev/null || rm -f /var/lib/apt/lists/lock /var/lib/dpkg/lock*',
         actionAdvice: 'killall apt apt-get dpkg 2>/dev/null || rm -f /var/lib/apt/lists/lock /var/lib/dpkg/lock*',
         riskLevel: 'medium',
@@ -332,11 +332,11 @@ class AIService {
     // 4. Command not found
     if (t.includes('command not found') || t.includes('not recognized as an internal or external command')) {
       const cmdMatch = logText.match(/([a-zA-Z0-9_-]+):\s*command not found/i) || logText.match(/'([^']+)'\s*is not recognized/i);
-      const cmd = cmdMatch ? cmdMatch[1] : 'perintah';
+      const cmd = cmdMatch ? cmdMatch[1] : 'command';
       return {
         category: 'Command Not Found',
-        issue: `Perintah \`${cmd}\` belum terinstal di sistem atau tidak berada dalam PATH lingkungan.`,
-        explanation: `Perintah \`${cmd}\` belum terinstal di sistem atau tidak berada dalam PATH lingkungan.`,
+        issue: `Command \`${cmd}\` is not installed on the system or not in the environment PATH.`,
+        explanation: `Command \`${cmd}\` is not installed on the system or not in the environment PATH.`,
         fixCommand: `apt update && apt install -y ${cmd}`,
         actionAdvice: `apt update && apt install -y ${cmd}`,
         riskLevel: 'medium',
@@ -347,7 +347,7 @@ class AIService {
     if (t.includes('no space left on device') || t.includes('enospc') || t.includes('disk full')) {
       return {
         category: 'Disk Full',
-        explanation: 'Partisi disk penyimpanan telah mencapai kapasitas maksimum 100%.',
+        explanation: 'The storage disk partition has reached 100% capacity.',
         fixCommand: 'df -h',
         actionAdvice: 'journalctl --vacuum-size=50M && apt clean',
         riskLevel: 'safe',
@@ -358,7 +358,7 @@ class AIService {
     if (t.includes('cannot find module') || t.includes('module_not_found')) {
       return {
         category: 'Node.js Missing Module',
-        explanation: 'Dependensi Node.js belum terpasang atau berkas `node_modules` hilang.',
+        explanation: 'Node.js dependencies are not installed or `node_modules` is missing.',
         fixCommand: 'npm install',
         riskLevel: 'safe',
       };
@@ -367,7 +367,7 @@ class AIService {
     // Default fallback
     return {
       category: 'Diagnostic',
-      explanation: 'Error terminal terdeteksi. Silakan periksa detail error di atas untuk menentukan langkah perbaikan.',
+      explanation: 'Terminal error detected. Review the error details above to determine the next fix.',
       fixCommand: 'dmesg -T | tail -n 10',
       riskLevel: 'safe',
     };

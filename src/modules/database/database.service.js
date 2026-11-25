@@ -1734,10 +1734,10 @@ class DatabaseService {
           legacyEol: ['5.5', '5.6', '5.7'],
           currentDetected: null,
           upgradeGuidance: [
-            '1. Amankan seluruh database dengan membuat full backup / dump terlebih dahulu.',
+            '1. Secure all databases by creating a full backup / dump first.',
             '2. Pastikan disk space tersisa minimal 2x lipat dari ukuran database terbesar.',
             '3. Upgrade MySQL / MariaDB pada OS Debian/Ubuntu disarankan menggunakan repository resmi.',
-            '4. Untuk Docker: cukup ganti image tag (misal mysql:8.0 -> mysql:8.4) dan jalankan mysql_upgrade bila diperlukan.'
+            '4. For Docker: simply update the image tag (e.g. mysql:8.0 -> mysql:8.4) and run mysql_upgrade if needed.'
           ],
           downgradeGuidance: [
             'PERINGATAN: Downgrade binary database in-place tidak didukung secara native oleh MySQL/MariaDB.',
@@ -1751,8 +1751,8 @@ class DatabaseService {
           upgradeGuidance: [
             '1. Lakukan backup seluruh database via pg_dumpall.',
             '2. Pada Linux, install versi baru secara berdampingan (misal postgresql-16 di samping postgresql-14).',
-            '3. Gunakan pg_upgradecluster untuk migrasi data cluster secara otomatis dan cepat.',
-            '4. Verifikasi koneksi dan data sebelum menghapus cluster versi lama.'
+            '3. Use pg_upgradecluster to migrate cluster data automatically and quickly.',
+            '4. Verify connections and data before removing the old cluster version.'
           ],
           downgradeGuidance: [
             'Downgrade PostgreSQL memerlukan dump SQL logika (pg_dumpall --clean) dan restore pada versi target.'

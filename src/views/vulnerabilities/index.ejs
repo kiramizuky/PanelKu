@@ -57,12 +57,12 @@
     <div>
       <div class="d-flex align-items-center gap-2 mb-1">
         <h1 class="lp-page-title" style="font-size: 22px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 10px;">
-          <i class="bi bi-shield-shaded text-danger"></i> Pusat Kerentanan &amp; AI Remediasi
+          <i class="bi bi-shield-shaded text-danger"></i> Vulnerability Center &amp; AI Remediation
         </h1>
         <span class="lp-badge lp-badge-danger" style="font-size: 11px;">v3.8.0</span>
       </div>
       <p class="lp-page-subtitle" style="margin: 0; font-size: 13px; color: var(--text-muted);">
-        Pemindaian otomatis multi-vektor (OS, runtime, website, plugins) dengan rekomendasi perbaikan manual &amp; otomatis berbasis AI.
+        Automated multi-vector scanning (OS, runtimes, websites, plugins) with AI-assisted manual &amp; automated remediation.
       </p>
     </div>
 
@@ -70,30 +70,30 @@
       <div class="dropdown">
         <button class="btn-lp btn-lp-primary dropdown-toggle d-flex align-items-center gap-2" id="btnScanMenu" data-bs-toggle="dropdown" aria-expanded="false">
           <i class="bi bi-radar"></i>
-          <span id="scanBtnText">Jalankan Scan</span>
+          <span id="scanBtnText">Run Scan</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end lp-dropdown" aria-labelledby="btnScanMenu">
-          <li><a class="dropdown-item" href="#" id="actScanFull"><i class="bi bi-cpu-fill text-primary me-2"></i>Full System Scan (Semua Vektor)</a></li>
+          <li><a class="dropdown-item" href="#" id="actScanFull"><i class="bi bi-cpu-fill text-primary me-2"></i>Full System Scan (All Vectors)</a></li>
           <li><hr class="dropdown-divider"></li>
           <li><a class="dropdown-item" href="#" id="actScanOS"><i class="bi bi-terminal-fill text-warning me-2"></i>Scan OS &amp; Kernel</a></li>
-          <li><a class="dropdown-item" href="#" id="actScanApps"><i class="bi bi-app-indicator text-info me-2"></i>Scan Aplikasi &amp; Runtime</a></li>
-          <li><a class="dropdown-item" href="#" id="actScanWebsites"><i class="bi bi-globe2 text-success me-2"></i>Scan Website &amp; Project</a></li>
+          <li><a class="dropdown-item" href="#" id="actScanApps"><i class="bi bi-app-indicator text-info me-2"></i>Scan Apps &amp; Runtimes</a></li>
+          <li><a class="dropdown-item" href="#" id="actScanWebsites"><i class="bi bi-globe2 text-success me-2"></i>Scan Websites &amp; Projects</a></li>
           <li><a class="dropdown-item" href="#" id="actScanPlugins"><i class="bi bi-puzzle-fill text-danger me-2"></i>Scan Plugins &amp; Security Tools</a></li>
         </ul>
       </div>
 
       <div class="dropdown">
-        <button class="btn-lp btn-lp-secondary dropdown-toggle d-flex align-items-center gap-1" id="btnExportReport" data-bs-toggle="dropdown" aria-expanded="false" title="Unduh Laporan Audit">
-          <i class="bi bi-download"></i> Ekspor Laporan
+        <button class="btn-lp btn-lp-secondary dropdown-toggle d-flex align-items-center gap-1" id="btnExportReport" data-bs-toggle="dropdown" aria-expanded="false" title="Download Audit Report">
+          <i class="bi bi-download"></i> Export Report
         </button>
         <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end lp-dropdown" aria-labelledby="btnExportReport">
-          <li><a class="dropdown-item" href="#" id="actExportMarkdown"><i class="bi bi-filetype-md text-primary me-2"></i>Format Markdown (.md)</a></li>
-          <li><a class="dropdown-item" href="#" id="actExportJSON"><i class="bi bi-filetype-json text-warning me-2"></i>Format JSON (.json)</a></li>
+          <li><a class="dropdown-item" href="#" id="actExportMarkdown"><i class="bi bi-filetype-md text-primary me-2"></i>Markdown Format (.md)</a></li>
+          <li><a class="dropdown-item" href="#" id="actExportJSON"><i class="bi bi-filetype-json text-warning me-2"></i>JSON Format (.json)</a></li>
         </ul>
       </div>
 
-      <button class="btn-lp btn-lp-ghost d-flex align-items-center gap-1" id="btnAskGeneralAI" title="Konsultasi Security Copilot">
-        <i class="bi bi-robot text-primary"></i> Tanya AI
+      <button class="btn-lp btn-lp-ghost d-flex align-items-center gap-1" id="btnAskGeneralAI" title="Consult Security Copilot">
+        <i class="bi bi-robot text-primary"></i> Ask AI
       </button>
     </div>
   </div>
@@ -106,7 +106,7 @@
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Security Health Score</span>
-            <h5 style="margin: 4px 0 0; color: #fff; font-weight: 700;">Status Keamanan Sistem</h5>
+            <h5 style="margin: 4px 0 0; color: #fff; font-weight: 700;">System Security Status</h5>
           </div>
           <span class="lp-badge" id="scoreRatingBadge" style="font-size: 12px; font-weight: 700; padding: 4px 10px;">--</span>
         </div>
@@ -116,13 +116,13 @@
             --
           </div>
           <div>
-            <div style="font-size: 13px; font-weight: 600; color: #fff;" id="scoreStatusDesc">Memuat penilaian...</div>
-            <div style="font-size: 11px; color: var(--text-muted);" id="lastScanTimeDesc">Belum ada pemindaian</div>
+            <div style="font-size: 13px; font-weight: 600; color: #fff;" id="scoreStatusDesc">Loading assessment...</div>
+            <div style="font-size: 11px; color: var(--text-muted);" id="lastScanTimeDesc">No scans run yet</div>
           </div>
         </div>
 
         <div style="font-size: 11px; color: var(--text-muted);">
-          Dihitung dari kombinasi bobot kerentanan Kritis, Tinggi, Sedang, dan Rendah.
+          Calculated from weighted Critical, High, Medium, and Low findings.
         </div>
       </div>
     </div>
@@ -134,11 +134,11 @@
         <div class="col-6 col-sm-3">
           <div class="lp-glass-card lp-glass-card-fill p-3 d-flex flex-column justify-content-between" style="border-left: 3px solid #ef4444; background: rgba(239, 68, 68, 0.05);">
             <div class="d-flex justify-content-between align-items-center">
-              <span style="font-size: 12px; font-weight: 600; color: #ef4444;">KRITIS</span>
+              <span style="font-size: 12px; font-weight: 600; color: #ef4444;">CRITICAL</span>
               <i class="bi bi-exclamation-octagon-fill text-danger"></i>
             </div>
             <div style="font-size: 30px; font-weight: 800; color: #ef4444; margin: 8px 0;" id="countCritical">0</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Memerlukan tindakan segera</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Requires immediate action</div>
           </div>
         </div>
 
@@ -146,11 +146,11 @@
         <div class="col-6 col-sm-3">
           <div class="lp-glass-card lp-glass-card-fill p-3 d-flex flex-column justify-content-between" style="border-left: 3px solid #f97316; background: rgba(249, 115, 22, 0.05);">
             <div class="d-flex justify-content-between align-items-center">
-              <span style="font-size: 12px; font-weight: 600; color: #f97316;">TINGGI</span>
+              <span style="font-size: 12px; font-weight: 600; color: #f97316;">HIGH</span>
               <i class="bi bi-exclamation-triangle-fill text-warning"></i>
             </div>
             <div style="font-size: 30px; font-weight: 800; color: #f97316; margin: 8px 0;" id="countHigh">0</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Prioritas perbaikan tinggi</div>
+            <div style="font-size: 11px; color: var(--text-muted);">High remediation priority</div>
           </div>
         </div>
 
@@ -158,11 +158,11 @@
         <div class="col-6 col-sm-3">
           <div class="lp-glass-card lp-glass-card-fill p-3 d-flex flex-column justify-content-between" style="border-left: 3px solid #eab308; background: rgba(234, 179, 8, 0.05);">
             <div class="d-flex justify-content-between align-items-center">
-              <span style="font-size: 12px; font-weight: 600; color: #eab308;">SEDANG</span>
+              <span style="font-size: 12px; font-weight: 600; color: #eab308;">MEDIUM</span>
               <i class="bi bi-shield-exclamation text-warning"></i>
             </div>
             <div style="font-size: 30px; font-weight: 800; color: #eab308; margin: 8px 0;" id="countMedium">0</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Hardening &amp; mitigasi</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Hardening &amp; mitigation</div>
           </div>
         </div>
 
@@ -170,11 +170,11 @@
         <div class="col-6 col-sm-3">
           <div class="lp-glass-card lp-glass-card-fill p-3 d-flex flex-column justify-content-between" style="border-left: 3px solid #10b981; background: rgba(16, 185, 129, 0.05);">
             <div class="d-flex justify-content-between align-items-center">
-              <span style="font-size: 12px; font-weight: 600; color: #10b981;">DIPERBAIKI</span>
+              <span style="font-size: 12px; font-weight: 600; color: #10b981;">FIXED</span>
               <i class="bi bi-check-circle-fill text-success"></i>
             </div>
             <div style="font-size: 30px; font-weight: 800; color: #10b981; margin: 8px 0;" id="countFixed">0</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Remediasi berhasil</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Successfully remediated</div>
           </div>
         </div>
       </div>
@@ -186,24 +186,24 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
       <!-- Category Tabs -->
       <div class="d-flex align-items-center gap-2 flex-wrap" id="vulnFilterTabs">
-        <button class="vuln-tab active" data-cat="all">Semua Vektor</button>
+        <button class="vuln-tab active" data-cat="all">All Vectors</button>
         <button class="vuln-tab" data-cat="os"><i class="bi bi-terminal me-1"></i>OS &amp; Kernel</button>
-        <button class="vuln-tab" data-cat="apps"><i class="bi bi-app-indicator me-1"></i>Aplikasi &amp; Server</button>
-        <button class="vuln-tab" data-cat="websites"><i class="bi bi-globe me-1"></i>Website &amp; Project</button>
+        <button class="vuln-tab" data-cat="apps"><i class="bi bi-app-indicator me-1"></i>Apps &amp; Services</button>
+        <button class="vuln-tab" data-cat="websites"><i class="bi bi-globe me-1"></i>Websites &amp; Projects</button>
         <button class="vuln-tab" data-cat="plugins"><i class="bi bi-puzzle me-1"></i>Plugins &amp; Tools</button>
       </div>
 
       <!-- Right controls: Status filter & Search -->
       <div class="d-flex align-items-center gap-2">
         <select class="lp-input" id="vulnStatusFilter" style="width: 150px; padding: 6px 12px; font-size: 13px;">
-          <option value="open" selected>Status: Terbuka</option>
-          <option value="fixed">Status: Diperbaiki</option>
-          <option value="ignored">Status: Diabaikan</option>
-          <option value="all">Semua Status</option>
+          <option value="open" selected>Status: Open</option>
+          <option value="fixed">Status: Fixed</option>
+          <option value="ignored">Status: Ignored</option>
+          <option value="all">All Statuses</option>
         </select>
 
         <div style="position: relative; width: 220px;">
-          <input type="text" id="vulnSearchInput" class="lp-input" placeholder="Cari CVE / nama..." style="padding-left: 32px; padding-top: 6px; padding-bottom: 6px; font-size: 13px;">
+          <input type="text" id="vulnSearchInput" class="lp-input" placeholder="Search CVE / name..." style="padding-left: 32px; padding-top: 6px; padding-bottom: 6px; font-size: 13px;">
           <i class="bi bi-search" style="position: absolute; left: 10px; top: 9px; font-size: 12px; color: var(--text-muted);"></i>
         </div>
       </div>
@@ -214,18 +214,18 @@
   <div id="findingsContainer" class="d-flex flex-column gap-3">
     <div style="text-align: center; padding: 50px; color: var(--text-muted);">
       <div class="spinner-border spinner-border-sm text-primary me-2"></div>
-      Memuat temuan kerentanan...
+      Loading vulnerability findings...
     </div>
   </div>
 </div>
 
-<!-- ================= MODAL: KONFIRMASI PERBAIKAN OTOMATIS ================= -->
+<!-- ================= MODAL: AUTOMATED REMEDIATION CONFIRMATION ================= -->
 <div class="modal fade" id="modalRemediateConfirm" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title d-flex align-items-center gap-2">
-          <i class="bi bi-tools text-warning"></i> Konfirmasi Perbaikan Otomatis
+          <i class="bi bi-tools text-warning"></i> Confirm Automated Remediation
         </h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -233,19 +233,19 @@
         <div class="d-flex align-items-start gap-3 p-3 rounded mb-3" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); color: #fbbf24; border-radius: 10px;">
           <i class="bi bi-exclamation-triangle-fill fs-5 mt-0"></i>
           <div style="font-size: 13px; line-height: 1.5;">
-            <strong>Persetujuan Manual Diperlukan:</strong> Sistem akan mengeksekusi perintah perbaikan otomatis pada server. Harap tinjau perintah di bawah sebelum menyetujui.
+            <strong>Manual Approval Required:</strong> The system will execute an automated fix command on the server. Please review the command below before proceeding.
           </div>
         </div>
 
         <div style="margin-bottom: 16px;">
-          <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Kerentanan Target</div>
+          <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Target Vulnerability</div>
           <div id="modalTargetTitle" style="font-size: 15px; font-weight: 700; color: #fff; margin-top: 2px;">--</div>
           <div id="modalTargetMeta" style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">--</div>
         </div>
 
         <div style="margin-bottom: 20px;">
           <div class="d-flex justify-content-between align-items-center mb-1">
-            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Perintah Shell yang Akan Dijalankan</span>
+            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Shell Command to Execute</span>
             <span class="lp-badge lp-badge-info" id="modalTargetSafety" style="font-size: 10px;">Safe Action</span>
           </div>
           <pre id="modalTargetCommand" class="code-pre-block"></pre>
@@ -254,21 +254,21 @@
         <div class="form-check" style="background: rgba(255, 255, 255, 0.03); padding: 12px 14px 12px 36px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);">
           <input class="form-check-input" type="checkbox" id="chkRemediateConsent">
           <label class="form-check-label" for="chkRemediateConsent" style="font-size: 13px; color: #cbd5e1; cursor: pointer;">
-            Saya telah membaca perintah di atas dan menyetujui eksekusi perbaikan otomatis secara sadar.
+            I have reviewed the command above and consent to executing the automated remediation.
           </label>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Batalkan</button>
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn-lp btn-lp-primary d-flex align-items-center gap-2" id="btnExecuteRemediation" disabled>
-          <i class="bi bi-play-circle-fill"></i> Eksekusi Perbaikan Sekarang
+          <i class="bi bi-play-circle-fill"></i> Execute Fix Now
         </button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ================= MODAL: KONSULTASI AI COPILOT ================= -->
+<!-- ================= MODAL: AI COPILOT CONSULTATION ================= -->
 <div class="modal fade" id="modalAskAI" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
@@ -281,29 +281,29 @@
       <div class="modal-body">
         <!-- Context Card -->
         <div id="aiContextCard" class="p-2 mb-3 rounded" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 12px; display: none;">
-          <strong style="color: var(--accent-primary);">Konteks Target:</strong> <span id="aiContextText">--</span>
+          <strong style="color: var(--accent-primary);">Target Context:</strong> <span id="aiContextText">--</span>
         </div>
 
         <!-- Presets -->
         <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-          <span style="font-size: 11px; color: var(--text-muted); margin-right: 4px;">Pertanyaan Cepat:</span>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm ai-preset-btn" data-q="Apa dampak terbesar jika kerentanan ini belum diperbaiki?">Dampak Serangan?</button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm ai-preset-btn" data-q="Bagaimana cara verifikasi bahwa celah keamanan ini sudah tertutup?">Cara Verifikasi?</button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm ai-preset-btn" data-q="Apakah perbaikan ini memerlukan restart server atau menyebabkan downtime?">Potensi Downtime?</button>
+          <span style="font-size: 11px; color: var(--text-muted); margin-right: 4px;">Quick Questions:</span>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm ai-preset-btn" data-q="What is the biggest impact if this vulnerability remains unpatched?">Attack Impact?</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm ai-preset-btn" data-q="How can I verify that this security issue has been resolved?">How to Verify?</button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm ai-preset-btn" data-q="Does this fix require a server restart or cause downtime?">Downtime Risk?</button>
         </div>
 
         <!-- AI Response Area -->
         <div id="aiResponseArea" style="min-height: 180px; max-height: 380px; overflow-y: auto; background: #080c14; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px; margin-bottom: 14px; font-size: 13px; line-height: 1.6; color: #e2e8f0;">
           <div style="color: var(--text-muted); text-align: center; margin-top: 50px;">
-            Ajukan pertanyaan mengenai analisis ancaman atau klik salah satu pertanyaan cepat di atas.
+            Ask a question about threat analysis or click one of the quick questions above.
           </div>
         </div>
 
         <!-- Input Box -->
         <div class="d-flex gap-2">
-          <input type="text" id="aiQuestionInput" class="lp-input" placeholder="Tanyakan apapun ke AI Security Copilot...">
+          <input type="text" id="aiQuestionInput" class="lp-input" placeholder="Ask anything to AI Security Copilot...">
           <button class="btn-lp btn-lp-primary d-flex align-items-center gap-1" id="btnSendAIQuestion">
-            <i class="bi bi-send-fill"></i> Kirim
+            <i class="bi bi-send-fill"></i> Send
           </button>
         </div>
       </div>

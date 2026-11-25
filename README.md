@@ -1,343 +1,204 @@
-# Linux Server Control Panel (Panelku)
+<div align="center">
 
-> Lightweight, modern, realtime Linux server control panel — a blend of aaPanel, Portainer, CasaOS, and Cockpit, but far lighter and feature-packed.
+# PanelKu
 
-[![Node.js](https://img.shields.io/badge/Node.js-20%2B-green)](https://nodejs.org)
-[![Version](https://img.shields.io/badge/version-3.7.0-blue)](CHANGELOG)
-[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
+**Lightweight, Enterprise-Grade Linux Server Control Panel**
 
-## Core Features
+*Real-time telemetry, Docker & Compose orchestration, multi-engine database studio, automated security auditing, and AI-assisted operations — all in one fast, zero-bloat web console.*
 
-- 🔐 **Multi-Factor Authentication (MFA / 2FA & FIDO2 Passkeys)** — WebAuthn / Passkeys (Touch ID, Windows Hello, Face ID, YubiKey) powered by SimpleWebAuthn, TOTP (Google Authenticator/Authy), and secure JWT session management.
-- 👥 **Dynamic RBAC & Password Policy Engine** — Super Admin, Admin, Operator, Read Only with per-resource permissions, configurable password complexity rules, expiration reminders, forced password change on first login (`mustChangePassword`), and JSON policy import/export.
-- 📊 **Realtime Dashboard & Telemetry** — CPU, RAM, Disk, Temperature, Network via Socket.IO + Chart.js, featuring a real-time Process Inspector and Webserver status controls (Nginx / Apache / Caddy).
-- 🌐 **Multi-Node Server Clustering & Fleet Mesh** — Centralized multi-server fleet capacity aggregator, 1-click cryptographic pairing tokens, one-line bootstrap agent installer, and parallel remote command dispatcher across remote nodes.
-- 🐳 **Docker Management & Compose Visual Studio** — Container lifecycle controls, live resource limit tuner (CPU Quota, Memory limits on running containers without restart), interactive Docker Hub search, Stack Manager with two-way visual GUI & YAML synchronizer, stack log tailing, and 1-Click Let's Encrypt / ZeroSSL auto-reverse proxy.
-- 🏪 **1-Click Docker App Store (20+ Templates)** — Curated production templates across AI & LLM (Ollama, Open WebUI, n8n), Web & CMS (WordPress + MariaDB, Nextcloud, Ghost, Strapi), Dev & Tools (Portainer CE, Uptime Kuma, Vaultwarden, Gitea), Databases (phpMyAdmin, pgAdmin 4, Redis Commander), and Media/IoT (Jellyfin, Home Assistant, Mosquitto MQTT).
-- 🛡️ **CrowdSec Community Defense & GeoIP Threat Shield** — Integrated CrowdSec decisions sync, real-time GeoIP attack origin map, bad bot honeypot traps (`/.env`, `/.git`, `/wp-login.php`), RCE Shellshock filter, and 1-Click Geo-Shield country blocking.
-- 💾 **ZFS / Btrfs Instant Snapshots & 1-Second Rollback** — Point-in-time volume protection for LVM thin pools, ZFS datasets, and Btrfs subvolumes with sub-second rollback capabilities.
-- 🚨 **Multi-Channel Incident Alerting & Auto-Remediation** — Real-time notification broadcaster to Telegram, Discord, Slack, WhatsApp, WebPush, and Email with automated remediation policies (Emergency Disk Cleanup, Dead Service Resurrect, OOM mitigation).
-- 🤖 **Autonomous AI Copilot & Terminal Assistant** — Unified terminal AI modal (Command Generator with safety guardrails, Error Diagnostics & 1-click fix execution, and Interactive Assistant chat), predictive log anomaly detection, and automated Root Cause Analysis (RCA) incident post-mortems.
-- 📈 **Prometheus / OpenMetrics Exporter & Kubernetes Inspector** — Native `/metrics` endpoint formatted for Prometheus/Grafana scraping and auto-detection of local K3s/MicroK8s cluster workloads, pods, and nodes.
-- 🗄️ **Advanced Database GUI Studio** — Multi-engine database manager (MySQL/MariaDB, PostgreSQL, MongoDB, Redis, SQLite) featuring double-click inline cell editing, dynamic row insert modal, safe record deletion, and SQL Scratchpad with `EXPLAIN` query execution plan visualization.
-- 📁 **Split-View File Manager & CodeMirror Studio** — Dual-pane side-by-side file tree and CodeMirror editor with syntax highlighting, bracket matching, inline media previewer (image zoom/audio/video/PDF), tree-to-editor drag & drop, and zip/unzip archive tools.
-- 📱 **Progressive Web App (PWA)** — Full mobile-first responsive layout with Service Worker offline caching, app install prompt, and native WebPush notifications.
-- 🔌 **Plugin Marketplace & Extensible SDK** — Hot-reloadable extension runtime with 15+ built-in modules (Fail2ban, PM2, WireGuard VPN, Tailscale, Rclone S3 Backups, AdGuard Home, MinIO, Uptime Kuma, etc.).
+[![Version](https://img.shields.io/badge/version-3.8.0-6366f1?style=for-the-badge)](package.json)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B%20LTS-10b981?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
+[![License](https://img.shields.io/badge/License-MIT-0ea5e9?style=for-the-badge)](LICENSE)
+[![Security](https://img.shields.io/badge/CSP-Nonce%20Enforced-f59e0b?style=for-the-badge)](#security-architecture)
+
+</div>
 
 ---
 
-## Requirements
+## Table of Contents
 
-- **Node.js**: 20+ LTS
-- **Database**: SQLite 3 (embedded, zero-configuration required)
-- **Redis**: 7+ (optional, for distributed caching and job queues)
-- **Supported Linux Distributions**: Debian, Ubuntu, Fedora, Arch Linux, Gentoo
+- [Why PanelKu?](#why-panelku)
+- [Core Capabilities](#core-capabilities)
+- [Quick Start](#quick-start)
+- [Operations CLI & Systemd Hardening](#operations-cli--systemd-hardening)
+- [Architecture](#architecture)
+- [Security Architecture](#security-architecture)
+- [Testing & Verification](#testing--verification)
+- [Release History](#release-history)
+- [License](#license)
+
+---
+
+## Why PanelKu?
+
+PanelKu combines the operational depth of **aaPanel**, **Portainer**, **Cockpit**, and **CasaOS** into a single modular Node.js platform backed by embedded **SQLite (WAL mode)** and optional **Redis**.
+
+- **Zero heavy runtime dependencies** — runs cleanly on a 512 MB VPS or a multi-node bare-metal fleet.
+- **Security-first design** — strict Content Security Policy (per-request nonces), `execFile()` argument isolation, dynamic RBAC, FIDO2 Passkeys, and opt-in `systemd` sandboxing.
+- **Resilient real-time operations** — persistent PTY web terminal sessions that survive transient WebSocket drops without interrupting running commands.
+
+---
+
+## Core Capabilities
+
+### Security, Identity & Threat Defense
+- **Zero-Trust Authentication**: Hardware **FIDO2 / WebAuthn Passkeys** (`@simplewebauthn/server`), TOTP 2FA, LDAP/SSO integration, and scoped JWT + API Key access.
+- **Dynamic RBAC & Password Policy**: Built-in roles (`Super Admin`, `Admin`, `Operator`, `Read Only`) with per-resource permissions, configurable complexity/expiry rules, and JSON policy import/export.
+- **Vulnerability Center & AI Remediation (`v3.8.0`)**: Multi-vector host auditing across OS/kernel (`regreSSHion`, `cups-browsed`, `needrestart`, `sshd`, `sysctl`), runtimes & web servers (`Node.js`, `Nginx server_tokens`, exposed Redis), websites (`.env`, `.git`, SQL dumps), and firewall/WAF posture — with 1-click guided remediation and Markdown/JSON audit report exports.
+- **CrowdSec, WAF & GeoIP Shield**: Built-in HTTP WAF middleware, honeypot traps (`/.env`, `/.git`, `/wp-login.php`), CrowdSec blocklist sync, Fail2Ban integration, and real-time GeoIP threat map.
+
+### Infrastructure, Containers & Fleet Mesh
+- **Docker & Compose Visual Studio**: Container lifecycle controls, live CPU/memory tuning without restarts, Docker Hub search, two-way Compose GUI/YAML editor, and 1-click reverse proxy + HTTPS provisioning.
+- **1-Click App Store**: 20+ curated production templates across AI/LLM (`Ollama`, `Open WebUI`, `n8n`), CMS (`WordPress`, `Ghost`, `Nextcloud`, `Strapi`), DevOps (`Gitea`, `Portainer`, `Vaultwarden`, `Uptime Kuma`), and Media/IoT (`Jellyfin`, `Home Assistant`, `Mosquitto`).
+- **Multi-Node Fleet Mesh**: Cryptographic token pairing, one-line agent bootstrapper, aggregate fleet telemetry, remote web terminal proxying, and Kubernetes (`K3s` / `MicroK8s`) cluster inspection.
+
+### Web, Databases & Storage
+- **Web Server & SSL Automation**: Native management for **Nginx**, **Apache**, and **Caddy**, PHP pool tuning, DNS management, and automated Let's Encrypt / ZeroSSL certificates.
+- **Multi-Engine Database Studio**: Unified GUI for **MySQL / MariaDB**, **PostgreSQL**, **MongoDB**, **Redis**, and **SQLite** with inline cell editing, SQL scratchpad (`EXPLAIN` analyzer), scheduled backups, and restore workflows.
+- **Split-View File Manager**: Dual-pane tree + CodeMirror studio, drag-and-drop, inline media preview (images, audio, video, PDF), archive tools, and token-authenticated downloads.
+- **Snapshots & S3 Backups**: Instant **ZFS / Btrfs / LVM** volume snapshots with sub-second rollback, directory snapshots, and Rclone / AWS S3 off-site sync.
+
+### Observability, Terminal & AI Operations
+- **Resilient Web Terminal**: Multi-tab `xterm.js` + `node-pty` shell with 16ms output batching, 128 KB scrollback ring buffer, and seamless session reattachment across WebSocket reconnects.
+- **OpenClaw AI Copilot**: Natural-language Linux command generator with destructive-command guardrails, live terminal error diagnostics, predictive log anomaly detection, and automated Root Cause Analysis (RCA).
+- **Telemetry & Alerting**: Real-time CPU/RAM/Disk/Network/GPU charts, native **Prometheus `/metrics`** exporter, background job queue (`BullMQ`), and multi-channel alerts (Telegram, Discord, Slack, WhatsApp, WebPush, Email).
 
 ---
 
 ## Quick Start
 
-### One-Line Server Install (Recommended)
+### 1. One-Line Server Installer (Recommended)
+
+Supports Debian, Ubuntu, Fedora, Arch Linux, and Gentoo:
 
 ```bash
 curl -sSL https://dl.panelku.fun/install.sh | sudo bash
 ```
 
-Or clone and run locally:
+For **hardened mode** (dedicated `panelku` user + `systemd` sandboxing):
 
 ```bash
+curl -sSL https://dl.panelku.fun/install.sh | sudo bash -s -- --hardened
+```
+
+Or install from a local clone:
+
+```bash
+git clone https://github.com/kiramizuky/PanelKu.git
+cd PanelKu/linux-panel
 sudo bash scripts/install.sh
 ```
 
-The installer installs into `/opt/panelku` as a real git clone (the updater depends
-on it). If `/opt/panelku` already exists without a `.git` directory it refuses to
-delete it, because that directory can contain the SQLite database, SSL
-certificates and uploads; move it aside before reinstalling.
+> **Note:** The installer provisions `/opt/panelku` as a git repository so the built-in in-place updater and rollback engine can operate safely.
 
-### With Docker Compose
+### 2. Docker Compose
 
 ```bash
 cp .env.example .env
-# IMPORTANT: replace APP_SECRET, JWT_SECRET and JWT_REFRESH_SECRET with random values.
-# The app refuses to start in production if the example placeholders are still set.
-# Optional: set ADMIN_PASSWORD to choose the first super-admin password.
+# IMPORTANT: Replace APP_SECRET, JWT_SECRET, and JWT_REFRESH_SECRET with strong random values.
+# Production startup refuses to boot if example placeholders remain unchanged.
 docker compose up -d
 ```
 
-Open: `http://<your-server-ip>:23456`  
-Login: `admin` — use the `ADMIN_PASSWORD` you set, or the generated password printed by the installer.
-A password change is forced on first login.
+Docker Compose isolates container socket access through `tecnativa/docker-socket-proxy` rather than mounting the raw Docker socket directly into the panel container.
 
-### With Docker CLI
+### 3. Local Development
 
 ```bash
-docker pull mastarom/panelku:latest
-
-docker run -d -p 23456:3000 --name panelku \
-  -e NODE_ENV=production \
-  -e JWT_SECRET="$(openssl rand -hex 32)" \
-  -e JWT_REFRESH_SECRET="$(openssl rand -hex 32)" \
-  -e APP_SECRET="$(openssl rand -hex 32)" \
-  -v $(pwd)/storage:/app/storage \
-  mastarom/panelku:latest
-```
-
-### Manual Development Setup
-
-```bash
-# 1. Install dependencies
 npm install
-
-# 2. Configure environment
 cp .env.example .env
-
-# 3. Start development server
 npm run dev
-
-# 4. Production start with PM2
-pm2 start ecosystem.config.cjs
 ```
+
+Access the panel at `http://localhost:3000` (or `http://<server-ip>:23456` on standard server installs).  
+Default username: `admin` — use the `ADMIN_PASSWORD` environment variable or the password generated during installation. A password change is enforced on first sign-in.
 
 ---
 
-## Operations CLI & Hardening
+## Operations CLI & Systemd Hardening
 
-The installer links `panelku` to `/usr/local/bin/panelku`:
-
-```bash
-panelku status                 # service, health endpoint, version
-panelku doctor                 # Node, .env, storage, SQLite, Docker, Redis, disk
-panelku check-update           # current/latest commit, never fakes "up to date"
-panelku rollback --commit <sha> --yes
-panelku reset-password --user admin   # prints a temporary password
-```
-
-`doctor --json` and `status --json` are safe for monitoring scripts. `rollback`
-refuses to run without `--yes`.
-
-### Opt-in systemd hardening
-
-The default installer keeps the service running as `root` so existing package,
-service, firewall and database actions keep working. To run as the dedicated
-`panelku` user with `ProtectSystem=strict`:
+The installer registers the `panelku` CLI globally at `/usr/local/bin/panelku`:
 
 ```bash
-sudo PANELKU_HARDENED=1 bash scripts/install.sh
+panelku status                         # Inspect service health, endpoint status, and version
+panelku doctor                         # Verify Node.js, .env, SQLite, Redis, Docker, and disk health
+panelku check-update                   # Compare local commit against origin/master
+panelku rollback --commit <sha> --yes  # Roll back to a verified commit
+panelku reset-password --user admin    # Issue a temporary password for recovery
 ```
 
-This creates the user, installs `deploy/panelku.sudoers`, and limits writes to
-`/opt/panelku/storage` plus the panel directory (required by the in-place
-updater). Set `PANELKU_USER=<name>` to use a different account; the installer
-validates the name, creates the matching group required by systemd, and scopes
-the sudoers policy to that user. `PANELKU_NNP=1` additionally sets
-`NoNewPrivileges=true`; that is stronger, but **disables sudo-based panel
-features**. See `deploy/systemd/panelku.service` and
-`deploy/panelku.polkit.rules`.
+`panelku status --json` and `panelku doctor --json` emit machine-readable JSON for external monitoring probes.
 
-Docker Compose runs the app through `tecnativa/docker-socket-proxy`; the raw
-Docker socket is never mounted into the app container.
+### Hardened Deployment Details
+- Runs under a dedicated unprivileged `panelku` service account with `ProtectSystem=strict`.
+- Restricts write access to `/opt/panelku/storage` and the application directory.
+- Scopes privileged operations via `deploy/panelku.sudoers` and `deploy/panelku.polkit.rules`.
 
 ---
 
-## Project Structure
+## Architecture
 
-```
+```text
 src/
-├── app.js              # Express application factory & route mounts
-├── server.js           # HTTP, HTTPS & Socket.IO server entry
-├── bootstrap.js        # DB initialization, Redis, WS handlers, jobs & plugins
-├── config/             # App, DB, Redis, Socket, Logger & CSP configs
+├── app.js                  # Express app factory, security headers, CSP & route mounts
+├── server.js               # HTTP server entry & process signal handling
+├── bootstrap.js            # SQLite WAL, migrations, Redis, Socket.IO, jobs & plugins
+├── config/                 # App, DB, Redis, Socket.IO, Logger & CSP configurations
 ├── core/
-│   ├── db/             # SQLite Singleton and Schema definitions
-│   ├── events/         # EventBus (pub/sub)
-│   ├── scheduler/      # Background job scheduler
-│   ├── permissions/    # Dynamic RBAC engine & policies
-│   └── plugin-loader/  # Plugin SDK & runtime hot-loader
-├── middleware/         # Auth, WebAuthn, RBAC, Rate Limiter, Nonce Injector, Error Handler
-├── models/             # SQLite Data Models (User, Role, Setting, Notification, etc.)
-├── repositories/       # Data access layer
-├── helpers/            # Security crypto, system information, response, validation helpers
-├── modules/            # Feature modules
-│   ├── ai-repair/      # AI Copilot, Anomaly Detector, RCA Generator & Predictive Alerts
-│   ├── cluster/        # Multi-node server fleet manager & agent mesh
-│   ├── docker/         # Containers, Images, Volumes, Compose Studio & 1-Click App Store
-│   ├── database/       # Advanced Database GUI Studio, SQL Console & Table Browser
-│   ├── lvm/            # ZFS, Btrfs & LVM Thin Pool Instant Snapshot integration
-│   ├── alerts/         # Multi-channel alerting & Auto-Remediation engine
-│   ├── metrics/        # Prometheus / OpenMetrics Exporter (/metrics) & K8s inspector
-│   ├── crowdsec/       # CrowdSec Community Defense, Honeypot Traps & GeoIP Shield
-│   ├── filemanager/    # Split-view file manager & media previewer
-│   ├── terminal/       # Web terminal (xterm.js + node-pty) with AI Copilot
-│   ├── updater/        # Auto-updater with health checks & rollback engine
-│   └── ...
-├── websocket/          # Socket.IO namespaces (terminal, monitor, fleet agent)
-├── jobs/               # Background cron workers (snapshots, log rotation, health checks)
-├── public/             # Frontend assets (Vanilla JS modules, CSS design system, fonts)
-└── views/              # EJS server-rendered responsive templates
+│   ├── db/                 # SQLite singleton, schema & versioned Migrator
+│   ├── events/             # Internal EventBus (pub/sub)
+│   ├── queue/              # BullMQ / in-memory background job manager
+│   ├── permissions/        # Dynamic RBAC engine
+│   └── plugin-loader/      # Extensible Plugin SDK & hot-loader
+├── middleware/             # JWT/API-Key Auth, WebAuthn, RBAC, Rate Limiter, WAF, Nonce
+├── modules/                # 42 self-contained feature modules (routes/controllers/services)
+├── repositories/           # Data access layer
+├── websocket/              # Socket.IO namespaces (/monitor, /terminal, /notifications, /docker)
+├── jobs/                   # Scheduled maintenance, backups, health & retention workers
+├── public/                 # Modular frontend JS controllers, CSS design system & PWA assets
+└── views/                  # EJS server-rendered templates with automatic CSP nonces
 ```
 
 ---
 
-## Default Credentials
+## Security Architecture
 
-| Username | Password | Role |
-|:---|:---|:---|
-| `admin` | `Admin@123456` | Super Admin |
-
-> ⚠️ **Important**: Panelku enforces password policy rules on first login (`mustChangePassword`). You will be required to update credentials immediately upon initial sign-in.
-
----
-
-## Release Roadmap
-
-| Phase | Version | Status | Milestone Highlights |
-|:---|:---|:---:|:---|
-| **Phase 1-5** | v1.0.0 - v1.5.0 | ✅ Done | Auth, RBAC, Dashboard, Web Terminal, File Manager, Docker, Websites, DB Manager, WAF, WireGuard, Fail2Ban, PM2 |
-| **Phase 6** | v1.6.0 | ✅ Done | Multi-Node Cluster, SQLite Auto-Backups, PTY Terminal Command Audit Logs, Docker Hub CI/CD |
-| **Phase 7** | v1.7.0 | ✅ Done | OpenClaw AI Copilot, Nginx Reverse Proxy Docker Mapper, PHP Pool Manager, WhatsApp Alerting, Tailscale VPN |
-| **Phase 8** | v1.8.0 | ✅ Done | **Security Hardening** — `execFile()` injection prevention, Zip Slip protection, upload extension blacklist, storage 750 |
-| **Phase 9-22** | v1.9.0 | ✅ Done | GPU Manager, Power Manager, Mail Server, CDN/Cache, IoT Edge Manager, Caddy, Node/Python Runtimes, Auto-Updater |
-| **Phase 23-24** | v2.0.0 | ✅ Done | Password Policy Engine, Split-View File Manager with CodeMirror & Media Previews, CSP Nonces, 0-Vulnerability Audit |
-| **Phase 25** | v2.9.0 | ✅ Done | WebAuthn / Passkeys (FIDO2) Passwordless Auth, Progressive Web App (PWA) with WebPush, Security Vulnerability Scanner |
-| **Phase 26** | v3.0.0 | ✅ Done | 1-Click Docker App Store (20+ Templates), Container Live Resource Limits & Stats, Real-Time GeoIP Threat Map & Geo-Shield |
-| **Phase 27** | v3.1.0 | ✅ Done | Autonomous AI Copilot, Predictive Log Anomaly Detection, Incident Post-Mortem & Automated RCA Report Generator |
-| **Phase 28** | v3.2.0 | ✅ Done | Smart Storage & Instant Directory Volume Snapshots with 1-Click Verification & Rollback |
-| **Phase 29** | v3.3.0 | ✅ Done | Native Prometheus / OpenMetrics Exporter (`/metrics`), Lightweight K3s & MicroK8s Kubernetes Inspector |
-| **Phase 30-32**| v3.5.0 | ✅ Done | Multi-Node Fleet Agent Mesh, Visual Docker Compose Studio, CrowdSec Community Defense, ZFS/Btrfs Instant Snapshots, Multi-Channel Incident Alerting & Auto-Remediation, Advanced Database GUI Studio |
+- **Content Security Policy (CSP)**: Every response receives a cryptographically unique per-request nonce injected into inline `<script>` and `<style>` blocks, enforced by automated CSP integration tests.
+- **Command Execution Safety**: System integrations use parameterized `execFile()` / `execFileSync()` calls rather than raw shell interpolation; AI-generated commands pass through a destructive-command guardrail and require explicit user confirmation.
+- **Database Integrity**: SQLite operates in WAL mode with graceful HTTP connection draining prior to database close on shutdown.
+- **Upload & Path Validation**: File operations enforce canonical path containment, Zip Slip prevention, and extension/signature verification.
 
 ---
 
-## Changelog
+## Testing & Verification
 
-### v3.5.0 — August 31, 2026 (Major Fleet, Docker Studio & Storage Release)
+PanelKu includes a comprehensive Jest test suite covering security middleware, CSP nonces, API controllers, terminal resilience, and vulnerability scanning:
 
-> Multi-Node Mesh & Fleet Orchestration, Visual Docker Compose Studio, CrowdSec Community Defense & Honeypots, ZFS / Btrfs Instant Snapshots, Real-Time Multi-Channel Incident Alerting & Auto-Remediation, and Advanced Database GUI Studio.
-
-**🚀 New Features & Enhancements**
-- **Docker Compose Visual Studio & Auto HTTPS**: 
-  - Two-way visual form and YAML synchronizer.
-  - Live container logs tailing and multi-service lifecycle control (`up`, `down`, `restart`, `pull`).
-  - Environment variable matrix manager and 1-Click Let's Encrypt / ZeroSSL auto-reverse proxy integration.
-- **CrowdSec Community Defense & Honeypot Traps**:
-  - CrowdSec decisions synchronization and live attack feed.
-  - Active honeypot traps for malicious probes (`/.env`, `/.git`, `/wp-login.php`).
-  - Shellshock / RCE query parameter filters and 1-Click System Hardening advisor.
-- **Multi-Node Server Clustering & Fleet Agent Mesh**:
-  - Centralized multi-server fleet capacity dashboard (aggregate CPU, RAM, Disk, Active Nodes).
-  - Cryptographic token pairing with automated one-line agent bootstrap script.
-  - Real-time node heartbeat health monitor and parallel remote command execution dispatcher.
-- **ZFS / Btrfs Instant Snapshots & 1-Second Rollback**:
-  - Storage engine integration supporting LVM Thin Pools, ZFS datasets, and Btrfs subvolumes.
-  - Point-in-time snapshot creation, instant sub-second rollback, and scheduled snapshot lifecycle retention.
-- **Multi-Channel Incident Alerting & Auto-Remediation**:
-  - Broadcast server alerts to Telegram, Discord, Slack, WhatsApp, WebPush, and Email.
-  - Auto-Remediation rules: Emergency Disk Cleanup (prune docker caches, purge old logs), Dead Service Resurrect, and OOM killer mitigation.
-- **Advanced Database GUI Studio**:
-  - Interactive table explorer with double-click inline cell editing.
-  - Dynamic row insertion modal with column type awareness.
-  - Safe record deletion with confirmation guardrails and SQL Scratchpad featuring `EXPLAIN` query execution plan visualization.
-- **Unified Terminal AI Copilot & Diagnostics**:
-  - Merged command generator, error diagnostics, and interactive chat into an expanded 820px multi-tab modal.
-  - Added smart error detector in terminal stream to trigger instant AI error diagnosis with 1-click execution.
-  - Expanded global AI floating chat window with Maximize toggle (720px × 720px).
+```bash
+npm test                     # Run all Jest unit & integration test suites
+npm run test:csp             # Verify CSP headers, nonces, and view compliance
+npm run test:window-check    # Verify all frontend modules expose window.* bindings
+npm run lint:check           # Run ESLint with --max-warnings 0
+npm run lint:ci              # Full CI pipeline (lint + window check + plugin check + coverage)
+```
 
 ---
 
-### v3.3.0 — August 29, 2026 (Enterprise Observability & Kubernetes)
+## Release History
 
-> Native Prometheus / OpenMetrics Exporter and Lightweight K3s / MicroK8s Kubernetes Inspector.
-
-**🚀 Highlights**
-- **Prometheus / OpenMetrics Exporter**: Native `/metrics` endpoint exposing CPU cores, memory bytes, load averages, container telemetry, and active firewall rules for Prometheus/Grafana scrapers.
-- **Lightweight Kubernetes Inspector**: Auto-detects local K3s and MicroK8s clusters, enumerating nodes, pods, namespaces, services, and workloads.
-
----
-
-### v3.2.0 — August 29, 2026 (Smart Storage & Instant Snapshots)
-
-> Instant Volume Snapshots and 1-Click Application Tree Rollback.
-
-**🚀 Highlights**
-- **Instant Directory Snapshots**: Capture point-in-time tarball archives of `/var/www` or application paths prior to risky updates.
-- **1-Click Rollback**: Instantly restore verified snapshots with automatic backup integrity validation.
-
----
-
-### v3.1.0 — August 29, 2026 (Autonomous AI Operations)
-
-> Terminal AI Copilot, Predictive Log Anomaly Detection, and Incident RCA Generator.
-
-**🚀 Highlights**
-- **Terminal AI Copilot**: Natural language to shell translation with Safety Guardrails protecting against destructive commands (`rm -rf`, disk format).
-- **Predictive Log Anomaly Detection**: Proactive background scanner detecting OOM killer events, HTTP 502/504 surges, database connection pool exhaustion, and SSH brute-force bursts.
-- **Incident Post-Mortem & RCA Generator**: Automated Root Cause Analysis report generation with impact timelines and remediation logs.
-
----
-
-### v3.0.0 — August 29, 2026 (1-Click App Store & Threat Intelligence)
-
-> 1-Click Docker App Store, Live Container Resource Limits, and Real-Time GeoIP Threat Map.
-
-**🚀 Highlights**
-- **1-Click Docker App Store**: 20+ curated application templates across AI & LLM, Web & CMS, Dev & Tools, Databases, and Media/IoT.
-- **Live Container Resource Limits**: Real-time in-place tuning of Memory Limits, CPU Quota (NanoCPUs), and Restart Policies without stopping or recreating containers.
-- **Real-Time GeoIP Threat Map**: Live visualization of Fail2Ban and WAF intrusion logs plotted on an interactive world map with 1-Click Geo-Shield country blocking.
-
----
-
-### v2.9.0 — August 28, 2026 (WebAuthn Passkeys & PWA Mobile)
-
-> Hardware FIDO2 Passkeys, Progressive Web App with WebPush, and CVE Vulnerability Scanner.
-
-**🚀 Highlights**
-- **WebAuthn / Passkeys (FIDO2)**: True passwordless and biometric authentication (Touch ID, Windows Hello, Face ID, YubiKey) powered by `@simplewebauthn/server` v13.
-- **Progressive Web App & WebPush**: Native-like mobile and desktop PWA support with Service Worker offline caching and background WebPush alerts.
-- **Security Health & CVE Vulnerability Scanner**: Host audit engine inspecting firewall, SSH hardening, unpatched packages, and exposed database ports with 1-click remediation.
-
----
-
-### v2.0.0 — July 28, 2026 (Major Architecture & Security Release)
-
-> Password Policy Engine, Split-View File Manager with CodeMirror & Media Previews, CSP Nonce Security, and 0-Vulnerability Audit.
-
-**🚀 Highlights**
-- **Password Policy Engine**: Enforce password complexity rules, expiration reminder job, forced password change on first login (`mustChangePassword`), and policy history audit trail.
-- **Split-View File Manager & CodeMirror**: Dual-pane file tree and CodeMirror editor with draggable divider, media previewer (image zoom/audio/video/PDF), and tree-to-editor drag & drop.
-- **CSP Nonce Security Hardening**: Automated Content Security Policy nonce injection for all inline scripts and styles across 45+ views.
-- **0-Vulnerability Dependency Audit**: 100% resolution of npm audit vulnerabilities.
-
----
-
-### v1.9.0 — July 17, 2026 (Feature Expansion)
-
-> 12 new modules added — GPU Manager, Power Manager, Mail Server, CDN/Cache, IoT Edge Manager, Runtime Managers (Node/Python/MongoDB/Redis/Apache), Caddy Server, and AI Auto-Repair.
-
----
-
-### v1.8.0 — July 15, 2026 (Security Hardening Patch)
-
-> Critical vulnerability fixes: `execFile()` shell injection prevention, Zip Slip protection, upload extension blacklist (18 dangerous extensions), WAL-safe graceful shutdown, and storage permissions (`750`).
-
----
-
-### v1.7.0 — July 13, 2026
-
-> OpenClaw AI Copilot, Nginx Reverse Proxy Docker Mapper, PHP Pool Manager, Database Visual Explorer, WhatsApp Alerting, Service Watchdog Auto-Healer, and Tailscale VPN.
-
----
-
-### v1.6.0 — July 9, 2026
-
-> Multi-Node Cluster Manager, SQLite Auto-Backups, Web Terminal Audit Logs, and GitHub Actions CI/CD.
-
----
-
-### v1.0.0 - v1.5.0 — June - July, 2026
-
-> Initial releases: Core dashboard, monitoring, web terminal, file manager, Docker engine, websites, SSL automation, and PHP version manager.
+| Version | Highlights |
+|:---|:---|
+| **v3.8.0** | Vulnerability Center & AI Remediation Engine, Markdown/JSON audit exports, resilient PTY terminal reattach & output batching, full English UI/API standardization, 1,500+ automated tests |
+| **v3.7.0** | Native module auto-rebuild diagnostics, hardened `panelku` CLI (`doctor`, `rollback`), safe in-place updater with pre-update snapshots |
+| **v3.5.0** | Multi-Node Fleet Mesh, Visual Docker Compose Studio, CrowdSec & Honeypots, ZFS/Btrfs Instant Snapshots, Multi-Channel Alerting & Auto-Remediation |
+| **v3.3.0** | Native Prometheus `/metrics` exporter and K3s/MicroK8s Kubernetes Inspector |
+| **v3.1.0 – v3.2.0** | Terminal AI Copilot, Predictive Log Anomaly Detection, Automated RCA, Directory Volume Snapshots |
+| **v2.9.0 – v3.0.0** | FIDO2 WebAuthn Passkeys, PWA + WebPush, 1-Click Docker App Store (20+ templates), GeoIP Threat Map |
+| **v2.0.0** | Password Policy Engine, Split-View File Manager + CodeMirror, Per-Request CSP Nonces |
+| **v1.0.0 – v1.9.0** | Core control panel, RBAC, Web Terminal, Docker, Websites, DB Studio, WAF, Mail, CDN, Runtimes & Cluster |
 
 ---
 
 ## License
 
-MIT © 2026 Panelku Contributors
+Released under the [MIT License](LICENSE). © 2026 PanelKu Contributors.

@@ -115,13 +115,13 @@ describe('Vulnerabilities Service Unit Tests', () => {
   test('askAI should return structured advisory with bash command', async () => {
     const res = await vulnerabilitiesService.askAI('Bagaimana cara hardening SSH di Linux?');
     expect(res).toHaveProperty('answer');
-    expect(res.answer).toContain('Rekomendasi');
+    expect(res.answer).toContain('Recommendation');
   });
 
   test('exportReport should generate markdown and JSON reports', async () => {
     const md = await vulnerabilitiesService.exportReport('markdown');
     expect(typeof md).toBe('string');
-    expect(md).toContain('Laporan Audit Keamanan');
+    expect(md).toContain('Server Security & Vulnerability Audit Report');
 
     const json = await vulnerabilitiesService.exportReport('json');
     expect(json).toHaveProperty('summary');
@@ -210,7 +210,7 @@ describe('Vulnerabilities API Integration Tests', () => {
     expect(res.headers['content-type']).toContain('text/markdown');
     expect(res.headers['content-disposition']).toContain('attachment');
     expect(res.headers['content-disposition']).toContain('panelku-vulnerability-report.md');
-    expect(res.text).toContain('Laporan Audit Keamanan');
+    expect(res.text).toContain('Server Security & Vulnerability Audit Report');
   });
 
   test('GET /api/vulnerabilities/export should export JSON report with query token', async () => {
@@ -229,7 +229,7 @@ describe('Vulnerabilities API Integration Tests', () => {
   test('GET /vulnerabilities view page should return 200 and render HTML', async () => {
     const res = await request(app).get('/vulnerabilities');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('Pusat Kerentanan');
+    expect(res.text).toContain('Vulnerability Center');
   });
 });
 

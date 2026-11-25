@@ -389,7 +389,7 @@
       <div class="modal-body">
         <div class="alert alert-danger" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;font-size:12.5px;padding:12px;border-radius:8px;">
           <i class="bi bi-exclamation-triangle-fill me-1"></i> <strong>PERINGATAN OVERWRITE:</strong><br>
-          Proses restore akan <strong>menimpa seluruh isi database</strong> dan menggantikan semua data yang ada dengan data cadangan.
+          Restoring will <strong>overwrite the entire database</strong> and replace all existing data with the backup.
         </div>
 
         <ul class="nav nav-tabs mb-3 db-tabs" id="restoreTabs">
@@ -403,7 +403,7 @@
             <div class="lp-form-group mb-3">
               <label class="lp-label">Pilih File Cadangan (.sql, .sqlite, .db)</label>
               <input type="file" id="restoreFileInput" class="lp-input" accept=".sql,.sqlite,.db,.dump">
-              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Mendukung file SQL dump (MySQL/PostgreSQL/SQLite) atau file biner SQLite (.sqlite / .db).</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Supports SQL dump files (MySQL/PostgreSQL/SQLite) or SQLite binary files (.sqlite / .db).</div>
             </div>
           </div>
 
@@ -412,7 +412,7 @@
             <div class="lp-form-group mb-3">
               <label class="lp-label">Pilih dari Cadangan Server</label>
               <select id="restoreServerBackupSelect" class="lp-input font-mono">
-                <option value="">Memuat cadangan server...</option>
+                <option value="">Loading server backups...</option>
               </select>
               <div id="restoreHistoryInfo" style="font-size:11px;color:var(--text-muted);margin-top:4px;">File cadangan yang tersimpan di server.</div>
             </div>
@@ -427,7 +427,7 @@
         </div>
       </div>
       <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);">
-        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn-lp btn-lp-danger" id="btnExecuteRestore" disabled onclick="DB.executeRestore()">
           <i class="bi bi-arrow-counterclockwise me-1"></i> Mulai Restore (Timpa Data)
         </button>
@@ -496,8 +496,8 @@
       <div class="modal-footer" style="border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;">
         <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm text-info" onclick="DB.runAutoBackupNow()"><i class="bi bi-play-circle me-1"></i> Run Now</button>
         <div>
-          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Tutup</button>
-          <button type="button" class="btn-lp btn-lp-primary" onclick="DB.saveAutoBackup()"><i class="bi bi-save me-1"></i> Simpan Pengaturan</button>
+          <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn-lp btn-lp-primary" onclick="DB.saveAutoBackup()"><i class="bi bi-save me-1"></i> Save Settings</button>
         </div>
       </div>
     </div>
@@ -516,7 +516,7 @@
       </div>
       <div class="modal-body pt-3">
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:15px;">
-          Panduan manajemen versi, kompatibilitas, peningkatan (upgrade), dan penurunan versi (downgrade) aman untuk MySQL, MariaDB, dan PostgreSQL.
+          Guide for version management, compatibility, safe upgrades, and downgrades for MySQL, MariaDB, and PostgreSQL.
         </p>
 
         <!-- Current Detected Engines -->
@@ -573,9 +573,9 @@
               <i class="bi bi-shield-exclamation me-1"></i> <strong>PENTING:</strong> Selalu buat cadangan (dump) seluruh database sebelum memperbarui paket binary database di server.
             </div>
             <ol class="ps-3 mb-2" style="line-height:1.6;color:var(--text-secondary);">
-              <li><strong>Backup Penuh:</strong> Klik tombol <em>"Backup Semua Database Sekarang"</em> di bawah ini untuk mengunduh arsip aman.</li>
-              <li><strong>MySQL / MariaDB:</strong> Gunakan APT repository resmi MySQL (<code class="font-mono text-info">repo.mysql.com</code>) atau MariaDB repository tool untuk update versi mayor.</li>
-              <li><strong>PostgreSQL:</strong> Install paket versi target (<code class="font-mono text-info">postgresql-16</code>) bersama versi lama, lalu migrasikan klaster dengan utilitas resmi <code class="font-mono text-info">pg_upgradecluster</code>.</li>
+              <li><strong>Full Backup:</strong> Click the <em>"Backup All Databases Now"</em> button below to download a safe archive.</li>
+              <li><strong>MySQL / MariaDB:</strong> Use the official MySQL APT repository (<code class="font-mono text-info">repo.mysql.com</code>) or MariaDB repository tool for major version upgrades.</li>
+              <li><strong>PostgreSQL:</strong> Install the target version package (<code class="font-mono text-info">postgresql-16</code>) alongside the old version, then migrate the cluster using <code class="font-mono text-info">pg_upgradecluster</code>.</li>
             </ol>
             <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning" onclick="DB.showAutoBackupModal()"><i class="bi bi-cloud-arrow-down me-1"></i> Backup Semua Database</button>
           </div>
@@ -583,13 +583,13 @@
           <!-- Tab Downgrade -->
           <div class="tab-pane fade" id="tab-ver-downgrade">
             <div class="alert alert-danger py-2 px-3 mb-2" style="font-size:11.5px;background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.2);color:#fca5a5;">
-              <i class="bi bi-exclamation-triangle-fill me-1"></i> Downgrade in-place (menimpa folder data lama dengan binary versi lebih rendah) <strong>dapat merusak data ibdata/cluster</strong>!
+              <i class="bi bi-exclamation-triangle-fill me-1"></i> In-place downgrades (overwriting the old data directory with older binaries) <strong>can corrupt ibdata/cluster data</strong>!
             </div>
             <p style="color:var(--text-secondary);line-height:1.5;margin-bottom:8px;">
-              Prosedur yang aman dan teruji untuk melakukan downgrade:
+              Safe, tested procedure for downgrading:
             </p>
             <ol class="ps-3 mb-0" style="line-height:1.6;color:var(--text-secondary);">
-              <li>Export seluruh database ke file SQL murni via fitur <strong>Export</strong> atau <strong>Backup</strong> di Panelku.</li>
+              <li>Export all databases to pure SQL files via Panelku's <strong>Export</strong> or <strong>Backup</strong> feature.</li>
               <li>Hentikan service database dan uninstall paket versi lebih tinggi.</li>
               <li>Install paket versi target yang diinginkan.</li>
               <li>Import kembali file SQL ke dalam database yang baru terpasang.</li>
@@ -604,7 +604,7 @@
             <pre class="p-3 rounded mb-2 font-mono text-info" style="background:#05070d;border:1px solid rgba(255,255,255,0.08);font-size:11.5px;white-space:pre-wrap;"># Contoh docker-compose.yml:
 services:
   database:
-    image: mysql:8.0          # Ubah ke mysql:8.4 atau mariadb:10.11
+    image: mysql:8.0          # Change to mysql:8.4 or mariadb:10.11
     volumes:
       - ./mysql_data:/var/lib/mysql
     ports:
@@ -615,7 +615,7 @@ services:
 
       </div>
       <div class="modal-footer border-0 pt-0">
-        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Tutup</button>
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -657,7 +657,7 @@ services:
         <div id="migrationAlertContainer"></div>
       </div>
       <div class="modal-footer border-0 pt-0">
-        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Tutup</button>
+        <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>

@@ -566,7 +566,7 @@ const FMPage = (() => {
       // 6. Binary file blocker (exe, db, etc.)
       const isText = ['txt', 'md', 'js', 'ts', 'json', 'html', 'css', 'py', 'php', 'sh', 'bash', 'zsh', 'env', 'yml', 'yaml', 'xml', 'log', 'htaccess', 'conf', 'ini'].includes(ext);
       if (!isText && ext) {
-        await LP.alert(`File <strong>${escHtml(item.name)}</strong> merupakan file biner (.${ext}) dan tidak dapat dibuka langsung menggunakan Text Editor. Silakan download file untuk membukanya.`, 'Buka File Gagal');
+        await LP.alert(`File <strong>${escHtml(item.name)}</strong> is a binary file (.${ext}) and cannot be opened directly in the Text Editor. Please download the file to open it.`, 'Cannot Open File');
         return;
       }
 

@@ -112,15 +112,23 @@ const TerminalPage = (() => {
       updateStatusUI('connected');
       startHeartbeat();
 
-      // Check all tabs and recreate any disconnected or missing sessions
+      // Reattach existing sessions or create new ones for uninitialized tabs
       Object.keys(tabs).forEach(id => {
         const tab = tabs[id];
         if (tab && tab.term) {
-          if (!tab.sessionId || tab.needsRecreate) {
+          if (tab.sessionId && !tab.needsRecreate) {
+            socket.emit('terminal:attach', {
+              sessionId: tab.sessionId,
+              cols: tab.term.cols || 80,
+              rows: tab.term.rows || 24,
+              lastOffset: tab.lastOffset || 0,
+            });
+          } else {
             tab.needsRecreate = false;
             tab.sessionId = null;
+            tab.lastOffset = 0;
             pendingTabsQueue.push(id);
-            tab.term.write('\r\n\x1b[32m[Koneksi tersambung. Menginisialisasi sesi shell...]\x1b[0m\r\n');
+            tab.term.write('\r\n\x1b[32m[Connected. Initializing shell session...]\x1b[0m\r\n');
             socket.emit('terminal:create', {
               cols: tab.term.cols || 80,
               rows: tab.term.rows || 24,
@@ -149,6 +157,22 @@ const TerminalPage = (() => {
       if (pendingTabId && tabs[pendingTabId]) {
         tabs[pendingTabId].sessionId = data.sessionId;
         tabs[pendingTabId].needsRecreate = false;
+        tabs[pendingTabId].lastOffset = 0;
+      }
+    });
+
+    socket.on('terminal:attached', (data) => {
+      const tabId = Object.keys(tabs).find(id => tabs[id].sessionId === data.sessionId);
+      if (tabId && tabs[tabId]) {
+        const tab = tabs[tabId];
+        tab.needsRecreate = false;
+        if (data.missedOutput) {
+          tab.term.write(data.missedOutput);
+        }
+        if (typeof data.offset === 'number') {
+          tab.lastOffset = data.offset;
+        }
+        tab.term.write('\r\n\x1b[32m[Connection restored. Session resumed.]\x1b[0m\r\n');
       }
     });
 
@@ -161,6 +185,9 @@ const TerminalPage = (() => {
       if (tabId) {
         const tab = tabs[tabId];
         tab.term.write(data.data);
+        if (typeof data.offset === 'number') {
+          tab.lastOffset = data.offset;
+        }
         if (tabId === activeTabId) {
           lastOutputBuffer.push(data.data);
           if (lastOutputBuffer.length > 500) lastOutputBuffer.shift();
@@ -185,6 +212,7 @@ const TerminalPage = (() => {
         tab.term.write(`\r\n\x1b[33m[Process exited with code ${data.exitCode}]\x1b[0m\r\n`);
         tab.sessionId = null;
         tab.needsRecreate = true;
+        tab.lastOffset = 0;
       }
     });
 
@@ -196,8 +224,9 @@ const TerminalPage = (() => {
           const tab = tabs[targetTabId];
           tab.sessionId = null;
           tab.needsRecreate = false;
+          tab.lastOffset = 0;
           pendingTabsQueue.push(targetTabId);
-          tab.term.write('\r\n\x1b[33m[Sesi lama kedaluwarsa. Memulai sesi baru...]\x1b[0m\r\n');
+          tab.term.write('\r\n\x1b[33m[Previous session expired. Starting a new session...]\x1b[0m\r\n');
           if (socket && socket.connected) {
             socket.emit('terminal:create', {
               cols: tab.term.cols || 80,
@@ -219,20 +248,18 @@ const TerminalPage = (() => {
 
     socket.on('disconnect', (reason) => {
       stopHeartbeat();
-      updateStatusUI('reconnecting', `Terputus (${reason})`);
+      updateStatusUI('reconnecting', `Disconnected (${reason})`);
       Object.keys(tabs).forEach(id => {
         const tab = tabs[id];
-        if (tab) {
-          tab.needsRecreate = true;
-          tab.sessionId = null;
-          tab.term.write('\r\n\x1b[33m[Koneksi terputus. Menunggu koneksi kembali...]\x1b[0m\r\n');
+        if (tab && tab.term) {
+          tab.term.write('\r\n\x1b[33m[Connection lost. Attempting to resume session...]\x1b[0m\r\n');
         }
       });
     });
 
     socket.on('connect_error', async (err) => {
       console.warn('Terminal WS Connect Error:', err.message);
-      updateStatusUI('reconnecting', 'Otentikasi / Reconnecting...');
+      updateStatusUI('reconnecting', 'Authenticating / Reconnecting...');
       if (err.message && (err.message.includes('Authentication') || err.message.includes('token') || err.message.includes('Unauthorized'))) {
         try {
           const refreshed = await LP.refreshToken();
@@ -248,7 +275,7 @@ const TerminalPage = (() => {
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
         if (socket && !socket.connected) {
-          updateStatusUI('reconnecting', 'Membangunkan koneksi...');
+          updateStatusUI('reconnecting', 'Waking connection...');
           socket.auth = { token: LP.state.accessToken || localStorage.getItem('lp_token') };
           socket.connect();
         } else if (activeTabId && tabs[activeTabId]) {
@@ -373,7 +400,7 @@ const TerminalPage = (() => {
 
     const tab = tabs[tabId];
     if (tab.sessionId && socket) {
-      socket.emit('terminal:input', { sessionId: tab.sessionId, data: 'exit\n' });
+      socket.emit('terminal:kill', { sessionId: tab.sessionId });
     }
     
     tab.term.dispose();
@@ -511,15 +538,15 @@ const TerminalPage = (() => {
     return /\b(?:systemctl|service|apt|apt-get|yum|dnf|pacman|rm|kill|pkill|killall|chown|chmod|sed|docker\s+(?:rm|stop|restart|kill)|ufw|iptables|reboot|shutdown|mkfs|dd|truncate)\b/i.test(cmd);
   }
 
-  async function confirmAndExecuteInTerminal(cmd, title = 'Konfirmasi Eksekusi Perintah') {
+  async function confirmAndExecuteInTerminal(cmd, title = 'Confirm Command Execution') {
     if (!cmd) return;
     const cleanCmd = cmd.trim();
     const isModifying = isSystemModifyingCommand(cleanCmd);
 
     const safeCmdHtml = LP.escHtml ? LP.escHtml(cleanCmd) : cleanCmd.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const msg = isModifying
-      ? `<div class="text-warning mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Perhatian:</strong> Perintah ini berhubungan dengan perubahan sistem atau layanan server.</div><code>${safeCmdHtml}</code><br><br>Apakah Anda menyetujui eksekusi perintah ini di terminal?`
-      : `Jalankan perintah berikut di sesi terminal aktif?<br><br><code>${safeCmdHtml}</code>`;
+      ? `<div class="text-warning mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Warning:</strong> This command modifies system configuration or server services.</div><code>${safeCmdHtml}</code><br><br>Are you sure you want to execute this command in the active terminal?`
+      : `Execute the following command in the active terminal session?<br><br><code>${safeCmdHtml}</code>`;
 
     const confirmed = await LP.confirm(msg, title);
     if (!confirmed) return;
@@ -527,9 +554,9 @@ const TerminalPage = (() => {
     if (socket && activeTabId && tabs[activeTabId] && tabs[activeTabId].sessionId) {
       socket.emit('terminal:input', { sessionId: tabs[activeTabId].sessionId, data: cleanCmd + '\n' });
       if (copilotModal) copilotModal.hide();
-      LP.toast('Perintah dikirim ke sesi terminal', 'info');
+      LP.toast('Command sent to terminal session', 'info');
     } else {
-      LP.toast('Sesi terminal tidak terhubung', 'warning');
+      LP.toast('Terminal session is not connected', 'warning');
     }
   }
 
@@ -540,21 +567,21 @@ const TerminalPage = (() => {
 
   async function runCopilotCommand() {
     if (!currentGeneratedCommand) return;
-    await confirmAndExecuteInTerminal(currentGeneratedCommand, 'Konfirmasi Perintah AI Copilot');
+    await confirmAndExecuteInTerminal(currentGeneratedCommand, 'Confirm AI Copilot Command');
   }
 
   async function analyzeTerminalError() {
     const logInput = document.getElementById('fixLogInput');
     const logText = logInput?.value?.trim() || getLatestOutputText();
     if (!logText) {
-      LP.toast('Tidak ada log error yang terdeteksi', 'warning');
+      LP.toast('No error log detected', 'warning');
       return;
     }
 
     try {
       LP.loading(true);
       const res = await LP.post('/ai/chat', {
-        message: 'Tolong berikan analisis singkat error terminal ini dan sertakan 1 perintah perbaikan solutif.',
+        message: 'Please provide a brief analysis of this terminal error and include 1 actionable fix command.',
         context: { logType: 'terminal_error', logText, cwd: initialCwd },
       });
       LP.loading(false);
@@ -598,18 +625,18 @@ const TerminalPage = (() => {
       }
     } catch (err) {
       LP.loading(false);
-      LP.toast('Gagal menganalisis error: ' + err.message, 'error');
+      LP.toast('Failed to analyze error: ' + err.message, 'error');
     }
   }
 
   function copyFixCommand() {
     if (!currentFixCommand) return;
-    LP.copy(currentFixCommand, 'Perintah solusi berhasil disalin');
+    LP.copy(currentFixCommand, 'Solution command copied to clipboard');
   }
 
   async function runFixCommand() {
     if (!currentFixCommand) return;
-    await confirmAndExecuteInTerminal(currentFixCommand, 'Konfirmasi Perintah Solusi AI');
+    await confirmAndExecuteInTerminal(currentFixCommand, 'Confirm AI Solution Command');
   }
 
   async function sendModalChatMessage() {
@@ -631,7 +658,7 @@ const TerminalPage = (() => {
     // Typing indicator
     const typingDiv = document.createElement('div');
     typingDiv.style.cssText = 'background:rgba(255,255,255,0.05); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--text-muted); font-style:italic;';
-    typingDiv.innerHTML = '<span class="spinner-border spinner-border-sm text-primary me-2"></span>AI sedang menganalisis...';
+    typingDiv.innerHTML = '<span class="spinner-border spinner-border-sm text-primary me-2"></span>AI is analyzing...';
     container.appendChild(typingDiv);
     container.scrollTop = container.scrollHeight;
 
@@ -674,14 +701,14 @@ const TerminalPage = (() => {
       } else {
         const errDiv = document.createElement('div');
         errDiv.style.cssText = 'background:rgba(239,68,68,0.1); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--accent-danger);';
-        errDiv.textContent = 'Gagal menghubungi asisten AI.';
+        errDiv.textContent = 'Failed to reach AI assistant.';
         container.appendChild(errDiv);
       }
     } catch (err) {
       typingDiv.remove();
       const errDiv = document.createElement('div');
       errDiv.style.cssText = 'background:rgba(239,68,68,0.1); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--accent-danger);';
-      errDiv.textContent = 'Error koneksi AI: ' + err.message;
+      errDiv.textContent = 'AI connection error: ' + err.message;
       container.appendChild(errDiv);
     }
     container.scrollTop = container.scrollHeight;
@@ -689,21 +716,21 @@ const TerminalPage = (() => {
 
   async function insertCodeToTerminal(cmd) {
     if (!cmd) return;
-    await confirmAndExecuteInTerminal(cmd, 'Konfirmasi Jalankan di Terminal');
+    await confirmAndExecuteInTerminal(cmd, 'Confirm Run in Terminal');
   }
 
   async function insertCodeFromB64(b64) {
     try {
       const code = decodeURIComponent(escape(atob(b64)));
-      await confirmAndExecuteInTerminal(code, 'Konfirmasi Jalankan di Terminal');
+      await confirmAndExecuteInTerminal(code, 'Confirm Run in Terminal');
     } catch (e) {
-      LP.toast('Format perintah tidak valid', 'error');
+      LP.toast('Invalid command format', 'error');
     }
   }
 
   async function reconnect() {
-    updateStatusUI('reconnecting', 'Menghubungkan ulang...');
-    LP.toast('Menghubungkan ulang sesi terminal...', 'info');
+    updateStatusUI('reconnecting', 'Reconnecting...');
+    LP.toast('Reconnecting terminal session...', 'info');
     try {
       await LP.refreshToken();
     } catch (_) {}

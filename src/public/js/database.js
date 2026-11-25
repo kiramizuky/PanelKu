@@ -112,17 +112,17 @@ const DB = (() => {
     if (type === 'mysql') {
       document.getElementById('credMysqlHost').value = host || '127.0.0.1';
       document.getElementById('credMysqlPort').value = port || 3306;
-      LP.toast(`Kredensial host/port Docker diisi (${host}:${port}). Masukkan user & password lalu simpan.`, 'info');
+      LP.toast(`Docker host/port populated (${host}:${port}). Enter username & password, then save.`, 'info');
     } else if (type === 'postgres') {
       document.getElementById('credPgHost').value = host || '127.0.0.1';
       document.getElementById('credPgPort').value = port || 5432;
-      LP.toast(`Kredensial host/port Docker diisi (${host}:${port}). Masukkan user & password lalu simpan.`, 'info');
+      LP.toast(`Docker host/port populated (${host}:${port}). Enter username & password, then save.`, 'info');
     }
   }
 
   function quickConnectPanel(_type, _socket) {
     showCredentialsModal();
-    LP.toast(`Panel lain terdeteksi. Gunakan host 127.0.0.1 dan user database yang dibuat dari panel tersebut.`, 'info');
+    LP.toast(`External panel detected. Use host 127.0.0.1 and the database credentials created in that panel.`, 'info');
   }
 
   function showVersionModal() {
@@ -147,8 +147,8 @@ const DB = (() => {
     if (isInstalled === false && type !== 'sqlite') {
       if (hasDocker || hasPanel || isListening) {
         tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:30px;">
-          <h5 style="margin-bottom:8px;color:#60a5fa;"><i class="bi bi-hdd-network me-2"></i>${type.toUpperCase()} Terdeteksi via ${hasDocker ? 'Docker Container' : (hasPanel ? 'Modul Panel Lain' : 'Service Port')}</h5>
-          <p style="color:var(--text-muted);font-size:12px;margin-bottom:15px;">Instance database aktif terdeteksi. Silakan atur kredensial koneksi untuk melihat dan mengelola database.</p>
+          <h5 style="margin-bottom:8px;color:#60a5fa;"><i class="bi bi-hdd-network me-2"></i>${type.toUpperCase()} Detected via ${hasDocker ? 'Docker Container' : (hasPanel ? 'External Panel Module' : 'Service Port')}</h5>
+          <p style="color:var(--text-muted);font-size:12px;margin-bottom:15px;">An active database instance was detected. Configure connection credentials to view and manage databases.</p>
           <button class="btn-lp btn-lp-primary btn-lp-sm" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.showCredentialsModal()
     })}"><i class="bi bi-gear-fill me-1"></i> Atur Kredensial ${type.toUpperCase()}</button>
         </td></tr>`;
@@ -169,7 +169,7 @@ const DB = (() => {
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-primary me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.openExplorer((LP.escHtml(type)), (LP.escHtml(db)))
     })}" title="Explore Database"><i class="bi bi-eye"></i> Explore</button>
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-info me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.backupDatabase((LP.escHtml(type)), (LP.escHtml(db)), this)
-    })}" title="Backup Database (Download & Simpan)"><i class="bi bi-cloud-arrow-down"></i> Backup</button>
+    })}" title="Backup Database (Download & Save)"><i class="bi bi-cloud-arrow-down"></i> Backup</button>
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-warning me-1" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.showRestoreModal((LP.escHtml(type)), (LP.escHtml(db)))
     })}" title="Restore Database (Menimpa Seluruh Data)"><i class="bi bi-cloud-arrow-up"></i> Restore</button>
           <button class="btn-lp btn-lp-ghost btn-lp-sm text-danger" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { DB.deleteDb((LP.escHtml(type)), (LP.escHtml(db)))
@@ -595,9 +595,9 @@ const DB = (() => {
   function copyJsonFromModal() {
     if (!_activeJsonData?.jsonStr) return;
     navigator.clipboard.writeText(_activeJsonData.jsonStr).then(() => {
-      LP.toast('JSON berhasil disalin ke clipboard!', 'success');
+      LP.toast('JSON copied to clipboard!', 'success');
     }).catch(() => {
-      LP.toast('Gagal menyalin JSON', 'error');
+      LP.toast('Failed to copy JSON', 'error');
     });
   }
 
@@ -1112,7 +1112,7 @@ const DB = (() => {
     try {
       const res = await LP.post('/database/backup', { type, name });
       if (res?.success && res.data) {
-        LP.toast(`Backup database ${name} berhasil dibuat!`, 'success');
+        LP.toast(`Backup for database ${name} created successfully!`, 'success');
 
         // Auto trigger browser download
         if (res.data.downloadUrl) {
@@ -1124,7 +1124,7 @@ const DB = (() => {
           a.remove();
         }
       } else {
-        LP.toast(res?.message || 'Gagal membuat backup database', 'error');
+        LP.toast(res?.message || 'Failed to create database backup', 'error');
       }
     } catch (err) {
       LP.toast(`Error backup: ${err.message}`, 'error');
@@ -1147,7 +1147,7 @@ const DB = (() => {
 
     // Load available server backups for this database
     const selectEl = document.getElementById('restoreServerBackupSelect');
-    selectEl.innerHTML = '<option value="">Memuat cadangan server...</option>';
+    selectEl.innerHTML = '<option value="">Loading server backups...</option>';
 
     try {
       const res = await LP.get(`/database/backups?type=${encodeURIComponent(type)}&name=${encodeURIComponent(name)}`);
@@ -1156,10 +1156,10 @@ const DB = (() => {
           <option value="${LP.escHtml(b.filename)}">${LP.escHtml(b.filename)} (${LP.formatBytes(b.size)} - ${new Date(b.created).toLocaleString()})</option>
         `).join('');
       } else {
-        selectEl.innerHTML = '<option value="">-- Belum ada file cadangan tersimpan di server --</option>';
+        selectEl.innerHTML = '<option value="">-- No backup files stored on server yet --</option>';
       }
     } catch (_) {
-      selectEl.innerHTML = '<option value="">-- Gagal mengambil daftar backup server --</option>';
+      selectEl.innerHTML = '<option value="">-- Failed to fetch server backup list --</option>';
     }
 
     restoreModal.show();
@@ -1203,18 +1203,18 @@ const DB = (() => {
         }).then(r => r.json());
 
         if (res?.success) {
-          LP.toast(`Database ${name} berhasil di-restore dan data lama telah ditimpa!`, 'success');
+          LP.toast(`Database ${name} restored successfully and existing data was overwritten!`, 'success');
           restoreModal.hide();
           loadData();
         } else {
-          LP.toast(res?.message || 'Gagal me-restore database', 'error');
+          LP.toast(res?.message || 'Failed to restore database', 'error');
         }
       } else {
         // From server backup history
         const selectEl = document.getElementById('restoreServerBackupSelect');
         const backupFilename = selectEl.value;
         if (!backupFilename) {
-          LP.toast('Pilih file backup dari komputer atau daftar server', 'warning');
+          LP.toast('Select a backup file from your computer or the server list', 'warning');
           return;
         }
 
@@ -1225,11 +1225,11 @@ const DB = (() => {
         });
 
         if (res?.success) {
-          LP.toast(`Database ${name} berhasil di-restore dan data lama telah ditimpa!`, 'success');
+          LP.toast(`Database ${name} restored successfully and existing data was overwritten!`, 'success');
           restoreModal.hide();
           loadData();
         } else {
-          LP.toast(res?.message || 'Gagal me-restore database', 'error');
+          LP.toast(res?.message || 'Failed to restore database', 'error');
         }
       }
     } catch (err) {
@@ -1278,10 +1278,10 @@ const DB = (() => {
     try {
       const res = await LP.post('/database/autobackup', payload);
       if (res?.success) {
-        LP.toast('Pengaturan auto-backup berhasil disimpan!', 'success');
+        LP.toast('Auto-backup settings saved successfully!', 'success');
         autoBackupModal.hide();
       } else {
-        LP.toast(res?.message || 'Gagal menyimpan pengaturan auto-backup', 'error');
+        LP.toast(res?.message || 'Failed to save auto-backup settings', 'error');
       }
     } catch (err) {
       LP.toast(`Error: ${err.message}`, 'error');
@@ -1294,9 +1294,9 @@ const DB = (() => {
       const res = await LP.post('/database/autobackup/run');
       if (res?.success) {
         const count = res.data?.results?.filter(r => r.status === 'success').length || 0;
-        LP.toast(`Auto-backup selesai: ${count} database berhasil dicadangkan!`, 'success');
+        LP.toast(`Auto-backup complete: ${count} database(s) backed up!`, 'success');
       } else {
-        LP.toast(res?.message || 'Auto-backup gagal dijalankan', 'error');
+        LP.toast(res?.message || 'Auto-backup failed to run', 'error');
       }
     } catch (err) {
       LP.toast(`Error running auto-backup: ${err.message}`, 'error');
@@ -1365,7 +1365,7 @@ const DB = (() => {
       if (pending.length > 0 && alertBox) {
         alertBox.innerHTML = `
           <div class="alert alert-warning py-2 px-3 mb-0" style="font-size:12px;background:rgba(234,179,8,0.1);border-color:rgba(234,179,8,0.2);color:#fef08a;">
-            <i class="bi bi-exclamation-triangle me-1"></i> Terdapat <strong>${pending.length}</strong> migrasi skema yang belum dijalankan. Klik <strong>Run Pending</strong> untuk memperbarui skema database SQLite.
+            <i class="bi bi-exclamation-triangle me-1"></i> There are <strong>${pending.length}</strong> pending schema migrations. Click <strong>Run Pending</strong> to update the SQLite database schema.
           </div>
         `;
       }
@@ -1394,7 +1394,7 @@ const DB = (() => {
   }
 
   async function rollbackLastMigration() {
-    if (!await LP.confirm('Apakah Anda yakin ingin membatalkan (rollback) migrasi skema database terakhir?', 'Rollback Migration')) {
+    if (!await LP.confirm('Are you sure you want to roll back the last database schema migration?', 'Rollback Migration')) {
       return;
     }
 

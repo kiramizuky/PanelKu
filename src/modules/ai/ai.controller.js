@@ -11,13 +11,13 @@ class AIController {
       // 1. Check if this is a Terminal Error Diagnosis request from /terminal
       if (context.logType === 'terminal_error' && context.logText) {
         const diag = aiService.diagnoseTerminalError(context.logText);
-        const response = `**Hasil Diagnosa Error Terminal (${diag.category}):**
+        const response = `**Terminal Error Diagnosis (${diag.category}):**
 ${diag.explanation}
 
-**Perintah Diagnosa / Pengecekan:**
+**Diagnostic / Check Command:**
 \`\`\`bash
 ${diag.fixCommand}
-\`\`\`${diag.actionAdvice ? `\n**Perintah Perbaikan yang Disarankan:**\n\`\`\`bash\n${diag.actionAdvice}\n\`\`\`\n` : ''}`;
+\`\`\`${diag.actionAdvice ? `\n**Suggested Fix Command:**\n\`\`\`bash\n${diag.actionAdvice}\n\`\`\`\n` : ''}`;
 
         return successResponse(res, { answer: response, diagnosis: diag });
       }
@@ -27,10 +27,10 @@ ${diag.fixCommand}
       if (matchedIntent) {
         try {
           const execRes = await aiService.executeCommand(matchedIntent.command);
-          const output = execRes.stdout || execRes.stderr || '(Tidak ada output yang dihasilkan)';
+          const output = execRes.stdout || execRes.stderr || '(No output produced)';
           
           let response = `### 🔍 ${matchedIntent.title}
-Data aktual dari server Anda saat ini:
+Live data from your server:
 
 \`\`\`bash
 # ${matchedIntent.command}
@@ -38,11 +38,11 @@ ${output}
 \`\`\``;
 
           if (matchedIntent.actionAdvice) {
-            response += `\n\n**💡 Rekomendasi Tindakan:**
+            response += `\n\n**💡 Recommended Action:**
 \`\`\`bash
 ${matchedIntent.actionAdvice}
 \`\`\`
-*Klik tombol **Jalankan** di atas jika Anda ingin menerapkan tindakan ini.*`;
+*Click the **Run** button above if you want to apply this action.*`;
           }
 
           return successResponse(res, {
@@ -106,7 +106,7 @@ Always provide practical, direct solutions. When suggesting any shell command fo
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 contents: [
-                  { parts: [{ text: `${systemPrompt}\n\nPertanyaan User: ${prompt}` }] },
+                  { parts: [{ text: `${systemPrompt}\n\nUser Question: ${prompt}` }] },
                 ],
               }),
             });
@@ -147,62 +147,62 @@ Always provide practical, direct solutions. When suggesting any shell command fo
 
       if (msg.includes('ram') || msg.includes('memori') || msg.includes('memory')) {
         const memRes = await aiService.executeCommand('free -h').catch(() => ({ stdout: 'Mem: 8.0Gi 6.5Gi 1.5Gi' }));
-        response = `Berdasarkan pengecekan memori server:
+        response = `Based on the server memory check:
 \`\`\`bash
 free -h
 ${memRes.stdout}
 \`\`\`
-Penyebab RAM tinggi biasanya caching kernel OS (pagecache/buffers) atau kontainer Docker/database.
-**Rekomendasi Pembersihan:**
+High RAM usage is commonly caused by OS kernel pagecache/buffers or Docker/database containers.
+**Recommended Cleanup:**
 \`\`\`bash
 sync && echo 3 > /proc/sys/vm/drop_caches
 \`\`\``;
       } else if (msg.includes('cpu') || msg.includes('proses')) {
         const cpuRes = await aiService.executeCommand('ps -eo pid,user,%cpu,cmd --sort=-%cpu | head -n 6').catch(() => ({ stdout: '15.5% nginx' }));
-        response = `Berikut 5 proses teratas yang menggunakan CPU paling banyak:
+        response = `Here are the top 5 CPU-consuming processes:
 \`\`\`bash
 ps -eo pid,user,%cpu,cmd --sort=-%cpu | head -n 6
 ${cpuRes.stdout}
 \`\`\`
-Jika CPU terus tinggi, Anda dapat membatasi batas CPU kontainer di menu Docker atau menghentikan proses yang menggantung.`;
+If CPU remains high, you can limit container CPU quotas in the Docker menu or terminate hung processes.`;
       } else if (msg.includes('disk') || msg.includes('penyimpanan') || msg.includes('habis')) {
         const dfRes = await aiService.executeCommand('df -h').catch(() => ({ stdout: '/dev/sda1 50G 45G 5G 90% /' }));
-        response = `Status kapasitas partisi disk saat ini:
+        response = `Current disk partition capacity:
 \`\`\`bash
 df -h
 ${dfRes.stdout}
 \`\`\`
-**Rekomendasi Pembersihan:**
+**Recommended Cleanup:**
 \`\`\`bash
 journalctl --vacuum-size=100M && apt clean
 \`\`\``;
       } else if (msg.includes('docker') || msg.includes('container')) {
         const docRes = await aiService.executeCommand('docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"').catch(() => ({ stdout: 'No running containers' }));
-        response = `Daftar kontainer Docker yang sedang aktif:
+        response = `Currently running Docker containers:
 \`\`\`bash
 docker ps
 ${docRes.stdout}
 \`\`\`
-Anda dapat mengelola kontainer lebih lengkap melalui menu **Docker** di sidebar.`;
+You can manage containers in full detail via the **Docker** menu in the sidebar.`;
       } else if (context.logType === 'fail2ban' || msg.includes('fail2ban') || msg.includes('blokir') || msg.includes('intrusion')) {
         const bannedIps = (context.logText || '').match(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/g) || [];
         const uniqueIps = [...new Set(bannedIps)].slice(0, 5);
-        response = `**Analisis Log Fail2Ban:**
-Fail2Ban mendeteksi upaya serangan dan memblokir IP penyerang secara otomatis.
-${uniqueIps.length > 0 ? `\n**IP terdeteksi:**\n${uniqueIps.map(ip => '- ' + ip).join('\n')}\n` : ''}
-Untuk membuka blokir IP tertentu jika salah terblokir:
+        response = `**Fail2Ban Log Analysis:**
+Fail2Ban detected attack attempts and automatically banned the offending IP(s).
+${uniqueIps.length > 0 ? `\n**Detected IPs:**\n${uniqueIps.map(ip => '- ' + ip).join('\n')}\n` : ''}
+To unban an IP address if it was blocked by mistake:
 \`\`\`bash
 fail2ban-client unban <IP_ADDRESS>
 \`\`\``;
       } else {
-        response = `Halo! Saya adalah **OpenClaw AI Copilot**. Saya dapat mengeksekusi pengecekan langsung pada server Anda.
-Contoh yang dapat Anda tanyakan:
-- *"Cek penggunaan RAM tertinggi"*
-- *"Cek proses CPU terberat"*
-- *"Cek sisa kapasitas disk"*
-- *"Cek port terbuka"*
-- *"Cek status kontainer Docker"*
-- *"Cek service yang gagal"*`;
+        response = `Hello! I am **OpenClaw AI Copilot**. I can run live diagnostics directly on your server.
+Examples of what you can ask:
+- *"Check highest RAM usage"*
+- *"Check top CPU processes"*
+- *"Check remaining disk space"*
+- *"Check open listening ports"*
+- *"Check Docker container status"*
+- *"Check failed systemd services"*`;
       }
 
       return successResponse(res, { answer: response });
@@ -221,7 +221,7 @@ Contoh yang dapat Anda tanyakan:
       if (!command) return errorResponse(res, 400, 'Command is required');
 
       const result = await aiService.executeCommand(command);
-      return successResponse(res, result, 'Perintah berhasil dieksekusi');
+      return successResponse(res, result, 'Command executed successfully');
     } catch (error) {
       return errorResponse(res, 400, error.message);
     }

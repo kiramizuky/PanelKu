@@ -103,7 +103,7 @@ class FileManagerController {
 
       // [9.1-UP] Validasi konten (magic bytes) tiap file yang sudah tersimpan.
       // Multer hanya memfilter ekstensi; di sini kita pastikan isi file cocok
-      // dengan ekstensi yang diklaim & bukan executable tersembunyi.
+      // matching the claimed extension and not a disguised executable.
       for (const f of req.files) {
         const result = verifyFileMagicBytes(f.path, f.originalname);
         if (!result.ok) {

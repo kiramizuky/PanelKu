@@ -202,8 +202,8 @@ const VulnerabilitiesPage = {
     const finding = this.findings.find(f => f.id === findingId);
     const titleSnippet = finding ? ` "${this.escapeHtml(finding.title)}"` : '';
     const confirmed = await LP.confirm(
-      `Apakah Anda yakin ingin mengabaikan kerentanan${titleSnippet}? Temuan ini tidak akan ditampilkan pada daftar aktif kecuali difilter.`,
-      'Konfirmasi Abaikan Kerentanan'
+      `Are you sure you want to ignore${titleSnippet}? This finding will be hidden from the active list unless filtered.`,
+      'Confirm Ignore Finding'
     );
     if (confirmed) {
       await this.ignoreFinding(findingId);
@@ -216,7 +216,7 @@ const VulnerabilitiesPage = {
       if (res?.success && res.data) {
         const d = res.data;
         const score = d.score !== undefined ? d.score : 100;
-        const rating = d.rating || { grade: 'A', label: 'Aman', color: '#10b981' };
+        const rating = d.rating || { grade: 'A', label: 'Secure', color: '#10b981' };
 
         // Circle score
         const circle = document.getElementById('scoreCircle');
@@ -239,16 +239,16 @@ const VulnerabilitiesPage = {
 
         const scoreDesc = document.getElementById('scoreStatusDesc');
         if (scoreDesc) {
-          scoreDesc.textContent = score >= 80 ? 'Infrastruktur Terlindungi Baik' : (score >= 60 ? 'Perlu Dilakukan Perbaikan' : 'Risiko Tinggi Terdeteksi');
+          scoreDesc.textContent = score >= 80 ? 'Infrastructure Well Protected' : (score >= 60 ? 'Remediation Recommended' : 'High Risk Detected');
         }
 
         const lastScanDesc = document.getElementById('lastScanTimeDesc');
         if (lastScanDesc) {
           if (d.lastScan && d.lastScan.completedAt) {
             const dt = new Date(d.lastScan.completedAt);
-            lastScanDesc.textContent = `Terakhir: ${dt.toLocaleDateString()} ${dt.toLocaleTimeString()}`;
+            lastScanDesc.textContent = `Last scan: ${dt.toLocaleDateString()} ${dt.toLocaleTimeString()}`;
           } else {
-            lastScanDesc.textContent = 'Belum pernah dipindai';
+            lastScanDesc.textContent = 'Never scanned';
           }
         }
 
@@ -275,7 +275,7 @@ const VulnerabilitiesPage = {
     container.innerHTML = `
       <div style="text-align: center; padding: 40px; color: var(--text-muted);">
         <div class="spinner-border spinner-border-sm text-primary me-2"></div>
-        Memuat daftar temuan...
+        Loading findings...
       </div>
     `;
 
@@ -288,10 +288,10 @@ const VulnerabilitiesPage = {
         this.findings = res.data || [];
         this.applyFilter();
       } else {
-        container.innerHTML = `<div class="lp-glass-card p-4 text-center text-muted">Gagal memuat temuan kerentanan.</div>`;
+        container.innerHTML = `<div class="lp-glass-card p-4 text-center text-muted">Failed to load vulnerability findings.</div>`;
       }
     } catch (err) {
-      container.innerHTML = `<div class="lp-glass-card p-4 text-center text-muted">Error memuat data: ${this.escapeHtml(err.message)}</div>`;
+      container.innerHTML = `<div class="lp-glass-card p-4 text-center text-muted">Error loading data: ${this.escapeHtml(err.message)}</div>`;
     }
   },
 
@@ -316,9 +316,9 @@ const VulnerabilitiesPage = {
       container.innerHTML = `
         <div class="lp-glass-card p-5 text-center" style="border: 1px dashed var(--glass-border);">
           <i class="bi bi-shield-check text-success" style="font-size: 48px; display: block; margin-bottom: 12px;"></i>
-          <h5 style="color: #fff; font-weight: 700; margin-bottom: 6px;">Tidak Ditemukan Kerentanan</h5>
+          <h5 style="color: #fff; font-weight: 700; margin-bottom: 6px;">No Vulnerabilities Found</h5>
           <p style="color: var(--text-muted); font-size: 13px; max-width: 480px; margin: 0 auto;">
-            Kategori ini tidak memiliki temuan aktif dengan filter saat ini. Jalankan scan berkala untuk menjaga sistem tetap terlindungi.
+            This category has no active findings under the current filter. Run periodic scans to keep your system protected.
           </p>
         </div>
       `;
@@ -365,9 +365,9 @@ const VulnerabilitiesPage = {
 
           <div>
             ${isFixed ? `
-              <span class="lp-badge lp-badge-success"><i class="bi bi-check-all me-1"></i>Telah Diperbaiki</span>
+              <span class="lp-badge lp-badge-success"><i class="bi bi-check-all me-1"></i>Fixed</span>
             ` : (isIgnored ? `
-              <span class="lp-badge lp-badge-ghost"><i class="bi bi-eye-slash me-1"></i>Diabaikan</span>
+              <span class="lp-badge lp-badge-ghost"><i class="bi bi-eye-slash me-1"></i>Ignored</span>
             ` : `
               <span class="lp-badge lp-badge-danger"><i class="bi bi-exclamation-circle-fill me-1"></i>Open</span>
             `)}
@@ -377,9 +377,9 @@ const VulnerabilitiesPage = {
         <!-- Title & Affected Component -->
         <h5 style="color: #fff; font-weight: 700; margin: 4px 0 6px;">${this.escapeHtml(f.title)}</h5>
         <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-          <i class="bi bi-hdd-network me-1"></i>Komponen Terpengaruh: <strong style="color: #e2e8f0;">${this.escapeHtml(f.component)}</strong>
-          ${f.installed_version ? ` &bull; Versi terdeteksi: <span style="font-family: monospace; color: #cbd5e1;">${this.escapeHtml(f.installed_version)}</span>` : ''}
-          ${f.fixed_version ? ` &bull; Versi aman: <span style="font-family: monospace; color: #10b981;">${this.escapeHtml(f.fixed_version)}</span>` : ''}
+          <i class="bi bi-hdd-network me-1"></i>Affected Component: <strong style="color: #e2e8f0;">${this.escapeHtml(f.component)}</strong>
+          ${f.installed_version ? ` &bull; Detected version: <span style="font-family: monospace; color: #cbd5e1;">${this.escapeHtml(f.installed_version)}</span>` : ''}
+          ${f.fixed_version ? ` &bull; Safe version: <span style="font-family: monospace; color: #10b981;">${this.escapeHtml(f.fixed_version)}</span>` : ''}
         </div>
 
         <!-- Description & Impact -->
@@ -388,7 +388,7 @@ const VulnerabilitiesPage = {
         </div>
         ${f.impact ? `
           <div style="font-size: 12px; color: #f87171; background: rgba(239, 68, 68, 0.06); padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; border: 1px solid rgba(239, 68, 68, 0.15);">
-            <strong><i class="bi bi-shield-x me-1"></i>Potensi Dampak:</strong> ${this.escapeHtml(f.impact)}
+            <strong><i class="bi bi-shield-x me-1"></i>Potential Impact:</strong> ${this.escapeHtml(f.impact)}
           </div>
         ` : ''}
 
@@ -396,10 +396,10 @@ const VulnerabilitiesPage = {
         <div style="margin-bottom: 14px;">
           <div class="d-flex justify-content-between align-items-center mb-1">
             <span style="font-size: 11px; text-transform: uppercase; font-weight: 600; color: var(--text-muted); letter-spacing: 0.5px;">
-              <i class="bi bi-terminal me-1"></i>Langkah Perbaikan Manual (Terminal)
+              <i class="bi bi-terminal me-1"></i>Manual Remediation Steps (Terminal)
             </span>
             <button class="btn-lp btn-lp-sm btn-lp-ghost btn-copy-command d-flex align-items-center gap-1" data-cmd="${this.escapeHtml(f.manual_steps)}" style="font-size: 11px; padding: 2px 8px;">
-              <i class="bi bi-clipboard"></i> Salin Perintah
+              <i class="bi bi-clipboard"></i> Copy Command
             </button>
           </div>
           <pre class="code-pre-block">${this.escapeHtml(f.manual_steps)}</pre>
@@ -410,7 +410,7 @@ const VulnerabilitiesPage = {
           <div class="d-flex align-items-center gap-2">
             ${!isFixed && f.auto_fix_command ? `
               <button class="btn-lp btn-lp-sm btn-lp-primary btn-auto-remediate d-flex align-items-center gap-1" data-id="${f.id}">
-                <i class="bi bi-magic"></i> Perbaiki Otomatis
+                <i class="bi bi-magic"></i> Auto-Fix
                 <span class="lp-badge" style="font-size: 9px; padding: 1px 5px; background: rgba(255,255,255,0.2);">
                   ${f.auto_fix_safe ? 'Safe' : 'Caution'}
                 </span>
@@ -418,14 +418,14 @@ const VulnerabilitiesPage = {
             ` : ''}
 
             <button class="btn-lp btn-lp-sm btn-lp-ghost btn-ask-finding-ai d-flex align-items-center gap-1" data-id="${f.id}">
-              <i class="bi bi-robot text-primary"></i> Tanya AI
+              <i class="bi bi-robot text-primary"></i> Ask AI
             </button>
           </div>
 
           <div>
             ${!isFixed && !isIgnored ? `
-              <button class="btn-lp btn-lp-sm btn-lp-ghost text-muted btn-ignore-finding" data-id="${f.id}" title="Abaikan temuan ini">
-                <i class="bi bi-eye-slash"></i> Abaikan
+              <button class="btn-lp btn-lp-sm btn-lp-ghost text-muted btn-ignore-finding" data-id="${f.id}" title="Ignore this finding">
+                <i class="bi bi-eye-slash"></i> Ignore
               </button>
             ` : ''}
           </div>
@@ -447,7 +447,7 @@ const VulnerabilitiesPage = {
       });
 
       if (!res.ok) {
-        throw new Error(`Gagal mengekspor laporan (status ${res.status})`);
+        throw new Error(`Failed to export report (status ${res.status})`);
       }
 
       const ext = format === 'json' ? 'json' : 'md';
@@ -460,9 +460,9 @@ const VulnerabilitiesPage = {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      LP.toast(`Laporan kerentanan berhasil diekspor (${format.toUpperCase()})`, 'success');
+      LP.toast(`Vulnerability report exported successfully (${format.toUpperCase()})`, 'success');
     } catch (err) {
-      LP.toast('Gagal mengekspor laporan: ' + err.message, 'error');
+      LP.toast('Failed to export report: ' + err.message, 'error');
     } finally {
       LP.loading(false);
     }
@@ -470,22 +470,22 @@ const VulnerabilitiesPage = {
 
   async startScan(type = 'full') {
     const btnText = document.getElementById('scanBtnText');
-    const origText = btnText ? btnText.textContent : 'Jalankan Scan';
+    const origText = btnText ? btnText.textContent : 'Run Scan';
     if (btnText) btnText.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Scanning...';
 
-    LP.toast(`Memulai pemindaian kerentanan (${type.toUpperCase()})...`, 'info');
+    LP.toast(`Starting vulnerability scan (${type.toUpperCase()})...`, 'info');
 
     try {
       const res = await LP.post('/vulnerabilities/scan', { type });
       if (res?.success) {
-        LP.toast(res.message || 'Pemindaian selesai!', 'success');
+        LP.toast(res.message || 'Scan complete!', 'success');
         await this.loadSummary();
         await this.loadFindings();
       } else {
-        LP.toast(res?.message || 'Pemindaian gagal', 'error');
+        LP.toast(res?.message || 'Scan failed', 'error');
       }
     } catch (err) {
-      LP.toast(`Gagal menjalankan scan: ${err.message}`, 'error');
+      LP.toast(`Failed to run scan: ${err.message}`, 'error');
     } finally {
       if (btnText) btnText.textContent = origText;
     }
@@ -505,8 +505,8 @@ const VulnerabilitiesPage = {
     const btnExec = document.getElementById('btnExecuteRemediation');
 
     if (titleEl) titleEl.textContent = finding.title;
-    if (metaEl) metaEl.textContent = `${finding.cve_id || 'ID N/A'} • Komponen: ${finding.component} (${finding.severity.toUpperCase()})`;
-    if (cmdEl) cmdEl.textContent = finding.auto_fix_command || '# Perintah otomatis tidak tersedia';
+    if (metaEl) metaEl.textContent = `${finding.cve_id || 'ID N/A'} • Component: ${finding.component} (${finding.severity.toUpperCase()})`;
+    if (cmdEl) cmdEl.textContent = finding.auto_fix_command || '# Automated command unavailable';
     if (safeEl) {
       safeEl.textContent = finding.auto_fix_safe ? 'Safe Automated Fix' : 'Requires Service Reload';
       safeEl.className = finding.auto_fix_safe ? 'lp-badge lp-badge-success' : 'lp-badge lp-badge-warning';
@@ -526,27 +526,27 @@ const VulnerabilitiesPage = {
     const btnExec = document.getElementById('btnExecuteRemediation');
     if (btnExec) {
       btnExec.disabled = true;
-      btnExec.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menerapkan Perbaikan...';
+      btnExec.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Applying Fix...';
     }
 
     try {
       const res = await LP.post(`/vulnerabilities/remediate/${this.selectedFindingForFix.id}`, { confirmed: true });
       if (res?.success) {
-        LP.toast(res.message || 'Perbaikan berhasil diterapkan!', 'success');
+        LP.toast(res.message || 'Remediation applied successfully!', 'success');
         if (this.remediateModalInstance) {
           this.remediateModalInstance.hide();
         }
         await this.loadSummary();
         await this.loadFindings();
       } else {
-        LP.toast(res?.message || 'Gagal menerapkan perbaikan', 'error');
+        LP.toast(res?.message || 'Failed to apply remediation', 'error');
       }
     } catch (err) {
-      LP.toast(`Gagal eksekusi: ${err.message}`, 'error');
+      LP.toast(`Execution failed: ${err.message}`, 'error');
     } finally {
       if (btnExec) {
         btnExec.disabled = false;
-        btnExec.innerHTML = '<i class="bi bi-play-circle-fill"></i> Eksekusi Perbaikan Sekarang';
+        btnExec.innerHTML = '<i class="bi bi-play-circle-fill"></i> Execute Fix Now';
       }
     }
   },
@@ -570,7 +570,7 @@ const VulnerabilitiesPage = {
     if (respArea) {
       respArea.innerHTML = `
         <div style="color: var(--text-muted); text-align: center; margin-top: 40px;">
-          Silakan ajukan pertanyaan atau pilih salah satu tombol pertanyaan cepat di atas.
+          Ask a question or select one of the quick question buttons above.
         </div>
       `;
     }
@@ -589,13 +589,13 @@ const VulnerabilitiesPage = {
     if (respArea) {
       respArea.innerHTML = `
         <div class="mb-3">
-          <strong style="color: #60a5fa;">Pertanyaan Anda:</strong>
+          <strong style="color: #60a5fa;">Your Question:</strong>
           <div style="color: #fff; margin-top: 4px;">${this.escapeHtml(question)}</div>
         </div>
         <hr style="border-color: rgba(255,255,255,0.1);">
         <div style="color: var(--text-muted);">
           <span class="spinner-border spinner-border-sm text-primary me-2"></span>
-          AI Copilot sedang menganalisis kerentanan dan menyusun rekomendasi...
+          AI Copilot is analyzing the vulnerability and preparing recommendations...
         </div>
       `;
     }
@@ -616,7 +616,7 @@ const VulnerabilitiesPage = {
         if (respArea) {
           respArea.innerHTML = `
             <div class="mb-3">
-              <strong style="color: #60a5fa;">Pertanyaan:</strong>
+              <strong style="color: #60a5fa;">Question:</strong>
               <div style="color: #fff; margin-top: 2px;">${this.escapeHtml(question)}</div>
             </div>
             <hr style="border-color: rgba(255,255,255,0.1);">
@@ -624,7 +624,7 @@ const VulnerabilitiesPage = {
           `;
         }
       } else {
-        if (respArea) respArea.innerHTML = '<div class="text-danger">Gagal menerima jawaban dari AI Copilot.</div>';
+        if (respArea) respArea.innerHTML = '<div class="text-danger">Failed to receive response from AI Copilot.</div>';
       }
     } catch (err) {
       if (respArea) respArea.innerHTML = `<div class="text-danger">Error: ${this.escapeHtml(err.message)}</div>`;
@@ -638,25 +638,25 @@ const VulnerabilitiesPage = {
     try {
       const res = await LP.post(`/vulnerabilities/ignore/${findingId}`);
       if (res?.success) {
-        LP.toast('Temuan telah diabaikan.', 'success');
+        LP.toast('Finding ignored.', 'success');
         await this.loadSummary();
         await this.loadFindings();
       }
     } catch (err) {
-      LP.toast(`Gagal mengabaikan: ${err.message}`, 'error');
+      LP.toast(`Failed to ignore finding: ${err.message}`, 'error');
     }
   },
 
   copyToClipboard(text, btnElement) {
     navigator.clipboard.writeText(text).then(() => {
       const origHtml = btnElement.innerHTML;
-      btnElement.innerHTML = '<i class="bi bi-check2 text-success"></i> Tersalin!';
+      btnElement.innerHTML = '<i class="bi bi-check2 text-success"></i> Copied!';
       setTimeout(() => {
         btnElement.innerHTML = origHtml;
       }, 2000);
-      LP.toast('Perintah berhasil disalin ke clipboard!', 'success');
+      LP.toast('Command copied to clipboard!', 'success');
     }).catch(() => {
-      LP.toast('Gagal menyalin perintah', 'error');
+      LP.toast('Failed to copy command', 'error');
     });
   },
 

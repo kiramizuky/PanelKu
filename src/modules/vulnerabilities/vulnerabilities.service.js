@@ -41,11 +41,11 @@ class VulnerabilitiesService {
    * Determine score rating badge
    */
   getScoreRating(score) {
-    if (score >= 90) return { grade: 'A+', label: 'Sangat Aman', color: '#10b981' };
-    if (score >= 80) return { grade: 'A', label: 'Aman', color: '#06b6d4' };
-    if (score >= 65) return { grade: 'B', label: 'Cukup Aman', color: '#f59e0b' };
-    if (score >= 45) return { grade: 'C', label: 'Beresiko', color: '#f97316' };
-    return { grade: 'F', label: 'Kritis', color: '#ef4444' };
+    if (score >= 90) return { grade: 'A+', label: 'Very Secure', color: '#10b981' };
+    if (score >= 80) return { grade: 'A', label: 'Secure', color: '#06b6d4' };
+    if (score >= 65) return { grade: 'B', label: 'Moderate', color: '#f59e0b' };
+    if (score >= 45) return { grade: 'C', label: 'At Risk', color: '#f97316' };
+    return { grade: 'F', label: 'Critical', color: '#ef4444' };
   }
 
   /**
@@ -179,9 +179,9 @@ class VulnerabilitiesService {
               component: 'OpenSSH Server',
               installed_version: `OpenSSH ${verStr}`,
               fixed_version: 'OpenSSH 9.8p1+ / LoginGraceTime 0',
-              description: 'Ditemukan kerentanan signal handler race condition di OpenSSH Server (sshd). Penyerang jarak jauh tanpa autentikasi dapat mengeksekusi kode arbitrary dengan hak akses root.',
-              impact: 'Kompromi total server (Remote Root Privilege Escalation tanpa password).',
-              manual_steps: `# Opsi 1: Upgrade OpenSSH via Package Manager\nsudo apt-get update && sudo apt-get --only-upgrade install -y openssh-server\n\n# Opsi 2: Mitigasi Cepat (non-aktifkan LoginGraceTime)\nsudo sed -i 's/^#*LoginGraceTime.*/LoginGraceTime 0/' /etc/ssh/sshd_config\nsudo systemctl reload ssh || sudo systemctl reload sshd`,
+              description: 'A signal handler race condition vulnerability was detected in OpenSSH Server (sshd). An unauthenticated remote attacker may execute arbitrary code as root.',
+              impact: 'Full server compromise (unauthenticated remote root privilege escalation).',
+              manual_steps: `# Option 1: Upgrade OpenSSH via Package Manager\nsudo apt-get update && sudo apt-get --only-upgrade install -y openssh-server\n\n# Option 2: Quick Mitigation (disable LoginGraceTime)\nsudo sed -i 's/^#*LoginGraceTime.*/LoginGraceTime 0/' /etc/ssh/sshd_config\nsudo systemctl reload ssh || sudo systemctl reload sshd`,
               auto_fix_command: "sed -i 's/^#*LoginGraceTime.*/LoginGraceTime 0/' /etc/ssh/sshd_config && (systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true)",
               auto_fix_safe: 1,
             });
@@ -209,9 +209,9 @@ class VulnerabilitiesService {
           component: 'cups-browsed',
           installed_version: 'Active Service',
           fixed_version: 'Disabled / Patched cups-browsed',
-          description: 'Layanan cups-browsed mendengarkan paket UDP di port 631 pada INADDR_ANY (0.0.0.0), menerima printer dari sumber tidak terpercaya dan memungkinkan injeksi perintah arbitrary saat proses pencetakan dilakukan.',
-          impact: 'Penyerang jarak jauh di jaringan publik/lokal dapat memicu eksekusi perintah arbitrer melalui paket IPP palsu.',
-          manual_steps: `# Non-aktifkan dan matikan daemon cups-browsed\nsudo systemctl stop cups-browsed\nsudo systemctl disable cups-browsed`,
+          description: 'The cups-browsed service listens on UDP port 631 on INADDR_ANY (0.0.0.0), accepting printers from untrusted sources and allowing arbitrary command injection during print jobs.',
+          impact: 'Remote attackers on public or local networks can trigger arbitrary command execution via forged IPP packets.',
+          manual_steps: `# Stop and disable the cups-browsed daemon\nsudo systemctl stop cups-browsed\nsudo systemctl disable cups-browsed`,
           auto_fix_command: 'systemctl stop cups-browsed && systemctl disable cups-browsed',
           auto_fix_safe: 1,
         });
@@ -246,9 +246,9 @@ class VulnerabilitiesService {
                 component: 'needrestart',
                 installed_version: `needrestart v${matchNr[1]}`,
                 fixed_version: 'needrestart 3.8+',
-                description: 'Needrestart versi sebelum 3.8 memicu eksekusi kode lokal dengan hak root saat memeriksa proses Python/Perl yang berjalan karena pemrosesan PYTHONPATH/PERL5LIB yang tidak aman.',
-                impact: 'Pengguna lokal non-root dapat mengelevasi hak akses ke root saat paket diupdate oleh sistem.',
-                manual_steps: `# Update paket needrestart ke versi terbaru\nsudo apt-get update && sudo apt-get --only-upgrade install -y needrestart\n\n# Atau nonaktifkan interpreter scanning di /etc/needrestart/needrestart.conf\nsudo sed -i "s/\\$nrconf{interpscan} = 1;/\$nrconf{interpscan} = 0;/" /etc/needrestart/needrestart.conf`,
+                description: 'Needrestart versions prior to 3.8 allow local privilege escalation to root when scanning running Python/Perl processes due to unsafe PYTHONPATH/PERL5LIB handling.',
+                impact: 'Local non-root users can escalate privileges to root during system package upgrades.',
+                manual_steps: `# Upgrade needrestart to the latest patched version\nsudo apt-get update && sudo apt-get --only-upgrade install -y needrestart\n\n# Or disable interpreter scanning in /etc/needrestart/needrestart.conf\nsudo sed -i "s/\\$nrconf{interpscan} = 1;/\$nrconf{interpscan} = 0;/" /etc/needrestart/needrestart.conf`,
                 auto_fix_command: 'apt-get update && apt-get --only-upgrade install -y needrestart',
                 auto_fix_safe: 1,
               });
@@ -296,16 +296,16 @@ class VulnerabilitiesService {
         if (isRootLoginAllowed) {
           findings.push({
             category: 'os',
-            title: 'SSH Root Login Terbuka (PermitRootLogin Yes)',
+            title: 'SSH Root Login Enabled (PermitRootLogin Yes)',
             cve_id: 'SEC-SSH-001',
             severity: 'high',
             cvss_score: 7.5,
             component: 'SSH Configuration',
             installed_version: 'PermitRootLogin yes',
             fixed_version: 'PermitRootLogin prohibit-password',
-            description: 'Konfigurasi SSH mengizinkan user root untuk login langsung menggunakan password, menjadikannya target empuk serangan brute-force otomatis di internet.',
-            impact: 'Potensi pembajakan akun root server secara langsung jika password mudah ditebak atau bocor.',
-            manual_steps: `# Ubah PermitRootLogin menjadi prohibit-password\nsudo sed -i 's/^\\s*PermitRootLogin\\s\\+yes/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config\nsudo systemctl reload ssh || sudo systemctl reload sshd`,
+            description: 'SSH configuration allows direct root login with a password, making the server a prime target for automated brute-force attacks.',
+            impact: 'Direct root account takeover if passwords are weak or leaked.',
+            manual_steps: `# Change PermitRootLogin to prohibit-password\nsudo sed -i 's/^\\s*PermitRootLogin\\s\\+yes/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config\nsudo systemctl reload ssh || sudo systemctl reload sshd`,
             auto_fix_command: "sed -i 's/^\\s*PermitRootLogin\\s\\+yes/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config && (systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true)",
             auto_fix_safe: 1,
           });
@@ -322,15 +322,15 @@ class VulnerabilitiesService {
         if (suidDump.trim() === '1' || suidDump.trim() === '2') {
           findings.push({
             category: 'os',
-            title: 'Insecure Sysctl: Core Dump SUID Diizinkan (fs.suid_dumpable)',
+            title: 'Insecure Sysctl: SUID Core Dumps Allowed (fs.suid_dumpable)',
             cve_id: 'SEC-SYS-001',
             severity: 'medium',
             cvss_score: 5.5,
             component: 'Linux Kernel Sysctl',
             installed_version: `fs.suid_dumpable = ${suidDump.trim()}`,
             fixed_version: 'fs.suid_dumpable = 0',
-            description: 'Core dump dari proses berkas SUID diizinkan untuk ditulis ke disk, yang dapat membocorkan informasi sensitif (memory/credential) kepada pengguna lokal.',
-            impact: 'Kebocoran data memory sensitif dari binary ber-hak akses tinggi.',
+            description: 'Core dumps from SUID binaries are allowed to be written to disk, which can leak sensitive memory or credentials to local users.',
+            impact: 'Leakage of sensitive memory contents from privileged binaries.',
             manual_steps: `echo "fs.suid_dumpable = 0" | sudo tee /etc/sysctl.d/99-panelku-suid.conf\nsudo sysctl -p /etc/sysctl.d/99-panelku-suid.conf`,
             auto_fix_command: 'echo "fs.suid_dumpable = 0" > /etc/sysctl.d/99-panelku-suid.conf && sysctl -w fs.suid_dumpable=0',
             auto_fix_safe: 1,
@@ -465,9 +465,9 @@ class VulnerabilitiesService {
           component: 'Node.js Engine',
           installed_version: nodeVersion,
           fixed_version: 'Node.js v20.18+ / v22.x LTS',
-          description: `Versi Node.js saat ini (${nodeVersion}) memiliki kerentanan keamanan yang telah diperbaiki pada rilis LTS terbaru, termasuk HTTP request smuggling dan permission model bypass.`,
-          impact: 'Potensi manipulasi request web atau bypass isolasi izin runtime.',
-          manual_steps: `# Update Node.js ke LTS terbaru via NVM atau NodeSource\nnvm install --lts && nvm use --lts\n# Atau via APT (Ubuntu/Debian):\nsudo apt-get update && sudo apt-get install -y nodejs`,
+          description: `The current Node.js version (${nodeVersion}) contains security vulnerabilities fixed in newer LTS releases, including HTTP request smuggling and permission model bypass.`,
+          impact: 'Potential HTTP request manipulation or runtime permission isolation bypass.',
+          manual_steps: `# Update Node.js to the latest LTS via NVM or NodeSource\nnvm install --lts && nvm use --lts\n# Or via APT (Ubuntu/Debian):\nsudo apt-get update && sudo apt-get install -y nodejs`,
           auto_fix_command: 'npm install -g n && n lts',
           auto_fix_safe: 0, // caution
         });
@@ -492,9 +492,9 @@ class VulnerabilitiesService {
               component: 'Nginx Web Server',
               installed_version: 'server_tokens on / default',
               fixed_version: 'server_tokens off;',
-              description: 'Nginx mengekspos nomor versi persis di HTTP header respon (Server: nginx/x.x.x) dan halaman error bawaan, memudahkan penyerang memetakan celah spesifik versi tersebut.',
-              impact: 'Information disclosure mengenai stack dan versi server web.',
-              manual_steps: `# Tambahkan "server_tokens off;" di block http {} pada konfigurasi Nginx\nif [ -f /etc/nginx/nginx.conf ]; then CONF="/etc/nginx/nginx.conf"; else CONF="/www/server/nginx/conf/nginx.conf"; fi\nsudo sed -i '/http {/a \\    server_tokens off;' "$CONF"\nsudo nginx -t && (sudo systemctl reload nginx || sudo nginx -s reload)`,
+              description: 'Nginx exposes its exact version number in HTTP response headers (Server: nginx/x.x.x) and default error pages, helping attackers fingerprint known version-specific flaws.',
+              impact: 'Information disclosure of web server stack and exact version.',
+              manual_steps: `# Add "server_tokens off;" inside the http {} block in your Nginx configuration\nif [ -f /etc/nginx/nginx.conf ]; then CONF="/etc/nginx/nginx.conf"; else CONF="/www/server/nginx/conf/nginx.conf"; fi\nsudo sed -i '/http {/a \\    server_tokens off;' "$CONF"\nsudo nginx -t && (sudo systemctl reload nginx || sudo nginx -s reload)`,
               auto_fix_command: "if [ -f /etc/nginx/nginx.conf ]; then CONF='/etc/nginx/nginx.conf'; elif [ -f /www/server/nginx/conf/nginx.conf ]; then CONF='/www/server/nginx/conf/nginx.conf'; else CONF='/etc/nginx/nginx.conf'; fi; if grep -qi 'server_tokens' \"$CONF\"; then sed -i 's/server_tokens.*/server_tokens off;/' \"$CONF\"; else sed -i '/http {/a \\    server_tokens off;' \"$CONF\"; fi; (nginx -t && (systemctl reload nginx 2>/dev/null || nginx -s reload 2>/dev/null || true))",
               auto_fix_safe: 1,
             });
@@ -512,16 +512,16 @@ class VulnerabilitiesService {
         if (/(?:0\.0\.0\.0|\*|\[::\]):6379\b/i.test(netstatOut)) {
           findings.push({
             category: 'apps',
-            title: 'Redis Server Terbuka ke Publik (0.0.0.0:6379)',
+            title: 'Redis Server Exposed Publicly (0.0.0.0:6379)',
             cve_id: 'SEC-REDIS-001',
             severity: 'high',
             cvss_score: 8.6,
             component: 'Redis In-Memory Store',
             installed_version: 'Listening on 0.0.0.0:6379',
             fixed_version: 'Bind 127.0.0.1 / Protected Mode',
-            description: 'Port Redis (6379) mendengarkan seluruh antarmuka jaringan (0.0.0.0). Jika tidak diproteksi password kuat, penyerang dapat membaca cache, menghapus database, atau menulis file SSH authorized_keys.',
-            impact: 'Pencurian seluruh data memory cache atau eksekusi perintah arbitrer jika redis berjalan sebagai root.',
-            manual_steps: `# Pastikan bind 127.0.0.1 di /etc/redis/redis.conf\nsudo sed -i 's/^bind .*/bind 127.0.0.1 ::1/' /etc/redis/redis.conf\nsudo systemctl restart redis`,
+            description: 'Redis port (6379) is listening on all network interfaces (0.0.0.0). Without strong authentication and firewalling, attackers can read cache data, flush databases, or write SSH authorized_keys.',
+            impact: 'Full cache data exfiltration or arbitrary command execution if Redis runs as root.',
+            manual_steps: `# Ensure bind 127.0.0.1 is set in /etc/redis/redis.conf\nsudo sed -i 's/^bind .*/bind 127.0.0.1 ::1/' /etc/redis/redis.conf\nsudo systemctl restart redis`,
             auto_fix_command: "sed -i 's/^bind .*/bind 127.0.0.1 ::1/' /etc/redis/redis.conf && systemctl restart redis",
             auto_fix_safe: 1,
           });
@@ -568,16 +568,16 @@ class VulnerabilitiesService {
           if (!isPermissionSafe || isWorldReadable) {
             findings.push({
               category: 'websites',
-              title: `Exposed Environment Secrets (.env) di ${docRoot}`,
+              title: `Exposed Environment Secrets (.env) in ${docRoot}`,
               cve_id: 'CWE-200 / CWE-552',
               severity: 'critical',
               cvss_score: 9.3,
               component: `Website DocRoot: ${docRoot}`,
               installed_version: `Permission: ${modeOctal} (world-readable: ${isWorldReadable})`,
               fixed_version: 'Permission 600 / Web Block Rule',
-              description: `Berkas rahasia .env terdeteksi di dalam root web (${envPath}) dengan izin berkas terbuka (${modeOctal}). Berkas ini umumnya menyimpan DB_PASSWORD, JWT_SECRET, APP_KEY, dan kredensial API lainnya.`,
-              impact: 'Pencurian seluruh kredensial database, API keys, dan token sistem oleh publik.',
-              manual_steps: `# Kunci hak akses berkas menjadi 600\nsudo chmod 600 ${envPath}\n\n# Pastikan web server memblokir akses ke berkas hidden:\n# Pada Nginx tambahkan: location ~ /\\.(?!well-known) { deny all; return 404; }`,
+              description: `A sensitive .env file was found inside web root (${envPath}) with overly permissive permissions (${modeOctal}). It typically stores DB_PASSWORD, JWT_SECRET, APP_KEY, and API credentials.`,
+              impact: 'Public exposure of database credentials, API keys, and system secrets.',
+              manual_steps: `# Lock file permissions to 600\nsudo chmod 600 ${envPath}\n\n# Ensure your web server blocks access to hidden files:\n# In Nginx add: location ~ /\\.(?!well-known) { deny all; return 404; }`,
               auto_fix_command: `chmod 600 "${envPath}"`,
               auto_fix_safe: 1,
             });
@@ -594,16 +594,16 @@ class VulnerabilitiesService {
           if (!isSafe || isWorldAccessible) {
             findings.push({
               category: 'websites',
-              title: `Direktori .git Terbuka di Web Root (${docRoot})`,
+              title: `Exposed .git Directory in Web Root (${docRoot})`,
               cve_id: 'CWE-538 / Git Disclosure',
               severity: 'high',
               cvss_score: 8.2,
               component: `Website DocRoot: ${docRoot}`,
               installed_version: `.git Directory Present (mode: ${(stat.mode & 0o777).toString(8)})`,
               fixed_version: 'Restricted / Denied by Web Server',
-              description: `Folder repositori .git berada di direktori publik web (${gitPath}). Penyerang dapat mengunduh seluruh commit history dan merekonstruksi source code aplikasi secara utuh.`,
-              impact: 'Source code aplikasi bocor 100% beserta history commit dan kata sandi hardcoded.',
-              manual_steps: `# Batasi akses ke folder .git\nsudo chmod 700 ${gitPath}\n\n# Blokir akses via Nginx:\n# location ~ /\\.git { deny all; return 404; }`,
+              description: `The .git repository folder resides inside a public web directory (${gitPath}). Attackers can download commit history and reconstruct your application source code.`,
+              impact: 'Full application source code leakage including commit history and hardcoded secrets.',
+              manual_steps: `# Restrict permissions on the .git directory\nsudo chmod 700 ${gitPath}\n\n# Block access via Nginx:\n# location ~ /\\.git { deny all; return 404; }`,
               auto_fix_command: `chmod 700 "${gitPath}"`,
               auto_fix_safe: 1,
             });
@@ -617,16 +617,16 @@ class VulnerabilitiesService {
           if (sqlDumps.length > 0) {
             findings.push({
               category: 'websites',
-              title: `Database Backup / SQL Dump Terbuka di Web Root (${sqlDumps[0]})`,
+              title: `Exposed Database Backup / SQL Dump in Web Root (${sqlDumps[0]})`,
               cve_id: 'CWE-530 / Exposure of Backup',
               severity: 'high',
               cvss_score: 8.5,
               component: `Website DocRoot: ${docRoot}`,
-              installed_version: `${sqlDumps.length} file dump ditemukan`,
+              installed_version: `${sqlDumps.length} dump file(s) found`,
               fixed_version: 'Moved to /var/backups',
-              description: `Ditemukan berkas dump database (${sqlDumps.join(', ')}) langsung di dalam folder web. Siapapun dapat mengunduh database secara langsung via browser.`,
-              impact: 'Pencurian seluruh isi basis data aplikasi secara langsung.',
-              manual_steps: `# Pindahkan dump ke folder backup aman di luar web root\nsudo mkdir -p /var/backups/web-dumps\nsudo mv ${path.join(docRoot, '*.sql')} /var/backups/web-dumps/`,
+              description: `Database dump file(s) (${sqlDumps.join(', ')}) were found directly inside the web directory, allowing anyone to download the database via HTTP.`,
+              impact: 'Direct exfiltration of the entire application database.',
+              manual_steps: `# Move dumps to a secure backup directory outside the web root\nsudo mkdir -p /var/backups/web-dumps\nsudo mv ${path.join(docRoot, '*.sql')} /var/backups/web-dumps/`,
               auto_fix_command: `mkdir -p /var/backups/web-dumps && mv ${path.join(docRoot, '*.sql')} /var/backups/web-dumps/ 2>/dev/null || true`,
               auto_fix_safe: 1,
             });
@@ -658,16 +658,16 @@ class VulnerabilitiesService {
           if (!isUfwActive) {
             findings.push({
               category: 'plugins',
-              title: 'Firewall Sistem (UFW) Tidak Aktif',
+              title: 'System Firewall (UFW) Inactive',
               cve_id: 'SEC-FW-001',
               severity: 'high',
               cvss_score: 7.9,
               component: 'UFW Firewall',
               installed_version: 'Status: Inactive',
               fixed_version: 'Status: Active',
-              description: 'Firewall UFW berada dalam status mati (inactive), sehingga seluruh port terbuka dapat diakses langsung tanpa filter dari jaringan publik.',
-              impact: 'Layanan internal yang tidak sengaja terbuka dapat langsung diakses penyerang luar.',
-              manual_steps: `# Buka port penting sebelum mengaktifkan UFW agar tidak terputus\nsudo ufw allow 22/tcp\nsudo ufw allow 80/tcp\nsudo ufw allow 443/tcp\nsudo ufw --force enable`,
+              description: 'The UFW firewall is inactive, leaving all listening ports directly reachable from the public network without filtering.',
+              impact: 'Accidentally exposed internal services can be accessed directly by external attackers.',
+              manual_steps: `# Allow essential ports before enabling UFW to avoid lockout\nsudo ufw allow 22/tcp\nsudo ufw allow 80/tcp\nsudo ufw allow 443/tcp\nsudo ufw --force enable`,
               auto_fix_command: 'ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable',
               auto_fix_safe: 0, // caution: requires port 22 open
             });
@@ -685,16 +685,16 @@ class VulnerabilitiesService {
       if (parsedWaf.enabled === false) {
         findings.push({
           category: 'plugins',
-          title: 'Panelku Web Application Firewall (WAF) Dinonaktifkan',
+          title: 'Panelku Web Application Firewall (WAF) Disabled',
           cve_id: 'SEC-WAF-001',
           severity: 'medium',
           cvss_score: 5.8,
           component: 'Panelku Built-in WAF',
           installed_version: 'Status: Disabled',
           fixed_version: 'Status: Enabled',
-          description: 'Modul Web Application Firewall (WAF) sedang non-aktif. Perlindungan terhadap SQL injection, XSS, Path Traversal, dan Prototype Pollution tidak aktif pada level HTTP middleware.',
-          impact: 'Aplikasi panel rentan terhadap request berbahaya yang lolos tanpa filter WAF.',
-          manual_steps: `# Aktifkan WAF melalui Panelku Settings -> WAF atau via API`,
+          description: 'The built-in Web Application Firewall (WAF) module is disabled. Protection against SQL injection, XSS, Path Traversal, and Prototype Pollution is inactive at the HTTP middleware layer.',
+          impact: 'Control panel endpoints are exposed to malicious requests without WAF filtering.',
+          manual_steps: `# Enable WAF via Panelku Settings -> WAF or via API`,
           auto_fix_command: 'PANELKU_WAF_ENABLE',
           auto_fix_safe: 1,
         });
@@ -711,7 +711,7 @@ class VulnerabilitiesService {
    */
   async startScan(scanType = 'full', _options = {}) {
     if (this._isScanning) {
-      throw new Error('Proses pemindaian kerentanan sedang berjalan di background.');
+      throw new Error('A vulnerability scan is already running in the background.');
     }
 
     this._isScanning = true;
@@ -838,19 +838,19 @@ class VulnerabilitiesService {
    */
   async remediate(findingId, options = {}) {
     if (!options.confirmed) {
-      throw new Error('Persetujuan manual diperlukan untuk menjalankan perbaikan otomatis.');
+      throw new Error('Manual confirmation is required before running automated remediation.');
     }
 
     const db = getDb();
     const finding = db.prepare('SELECT * FROM vulnerability_findings WHERE id = ?').get(findingId);
     if (!finding) {
-      throw new Error('Temuan kerentanan tidak ditemukan.');
+      throw new Error('Vulnerability finding not found.');
     }
     if (finding.status === 'fixed') {
-      return { success: true, message: 'Kerentanan ini sudah dalam status diperbaiki.', finding };
+      return { success: true, message: 'This vulnerability is already marked as fixed.', finding };
     }
     if (!finding.auto_fix_command) {
-      throw new Error('Tidak ada perintah perbaikan otomatis yang tersedia untuk kerentanan ini. Silakan jalankan langkah manual.');
+      throw new Error('No automated fix command is available for this finding. Please follow the manual steps.');
     }
 
     const cmd = finding.auto_fix_command;
@@ -860,21 +860,21 @@ class VulnerabilitiesService {
       await Setting.set('waf_config', JSON.stringify({ enabled: true }), 'json');
       db.prepare(`
         UPDATE vulnerability_findings 
-        SET status = 'fixed', remediation_notes = 'Panelku WAF berhasil diaktifkan kembali.', updated_at = ?
+        SET status = 'fixed', remediation_notes = 'Panelku WAF re-enabled successfully.', updated_at = ?
         WHERE id = ?
       `).run(now(), findingId);
 
       this._updateScanStats(finding.scan_id);
       return {
         success: true,
-        message: 'WAF Panelku berhasil diaktifkan kembali.',
+        message: 'Panelku WAF re-enabled successfully.',
         findingId,
       };
     }
 
     // Security guard check
     if (aiService.isDangerousCommand(cmd)) {
-      throw new Error('Perintah perbaikan diblokir oleh AI Security Guard demi keselamatan sistem.');
+      throw new Error('Remediation command blocked by AI Security Guard for system safety.');
     }
 
     logger.info(`[Vuln-Remediate] Executing fix for ${finding.cve_id || finding.title}: ${cmd}`);
@@ -893,7 +893,7 @@ class VulnerabilitiesService {
         UPDATE vulnerability_findings 
         SET status = 'fixed', remediation_notes = ?, updated_at = ?
         WHERE id = ?
-      `).run(`Perbaikan otomatis berhasil dijalankan: ${output.slice(0, 300) || 'OK'}`, ts, findingId);
+      `).run(`Automated remediation executed: ${output.slice(0, 300) || 'OK'}`, ts, findingId);
 
       // Recalculate scan score
       this._updateScanStats(finding.scan_id);
@@ -919,13 +919,13 @@ class VulnerabilitiesService {
 
       return {
         success: true,
-        message: `Kerentanan ${finding.cve_id || finding.title} berhasil diperbaiki!`,
+        message: `Vulnerability ${finding.cve_id || finding.title} remediated successfully!`,
         output,
         findingId,
       };
     } catch (err) {
       logger.error(`Remediation execution failed: ${err.message}`);
-      throw new Error(`Gagal menjalankan perbaikan: ${err.message}`);
+      throw new Error(`Failed to execute remediation: ${err.message}`);
     }
   }
 
@@ -966,7 +966,7 @@ class VulnerabilitiesService {
       SET status = 'ignored', updated_at = ?
       WHERE id = ?
     `).run(now(), findingId);
-    return { success: true, message: 'Temuan telah ditandai untuk diabaikan.' };
+    return { success: true, message: 'Finding marked as ignored.' };
   }
 
   /**
@@ -974,7 +974,7 @@ class VulnerabilitiesService {
    */
   async askAI(question, context = {}) {
     if (!question || typeof question !== 'string') {
-      throw new Error('Pertanyaan harus berupa teks.');
+      throw new Error('Question must be a non-empty string.');
     }
 
     // Try AI provider if configured in Setting
@@ -985,10 +985,10 @@ class VulnerabilitiesService {
     } catch {}
 
     const findingInfo = context.finding ? `
-Target Kerentanan:
+Target Vulnerability:
 - Judul: ${context.finding.title}
 - CVE: ${context.finding.cve_id || 'N/A'} (CVSS: ${context.finding.cvss_score || 'N/A'})
-- Komponen: ${context.finding.component}
+- Component: ${context.finding.component}
 - Deskripsi: ${context.finding.description}
 ` : '';
 
@@ -1048,16 +1048,16 @@ ${findingInfo}`;
     }
 
     // Offline Intelligent Heuristic Response
-    let fallbackAnswer = `### 🛡️ Rekomendasi AI Security Copilot\n\n`;
+    let fallbackAnswer = `### 🛡️ AI Security Copilot Recommendation\n\n`;
     if (context.finding) {
-      fallbackAnswer += `Mengenai kerentanan **${context.finding.title}** (${context.finding.cve_id || 'Security Finding'}):\n\n`;
-      fallbackAnswer += `**Analisis Risiko:**\nKerentanan ini memiliki tingkat keparahan **${context.finding.severity.toUpperCase()}** dengan skor CVSS ${context.finding.cvss_score || 'N/A'}. Eksploitasi dapat mengganggu stabilitas layanan atau membuka akses tidak sah.\n\n`;
-      fallbackAnswer += `**Langkah Perbaikan Manual yang Dianjurkan:**\n\`\`\`bash\n${context.finding.manual_steps}\n\`\`\`\n\n`;
+      fallbackAnswer += `Regarding **${context.finding.title}** (${context.finding.cve_id || 'Security Finding'}):\n\n`;
+      fallbackAnswer += `**Risk Analysis:**\nThis finding has **${context.finding.severity.toUpperCase()}** severity with CVSS score ${context.finding.cvss_score || 'N/A'}. Exploitation could disrupt service stability or grant unauthorized access.\n\n`;
+      fallbackAnswer += `**Recommended Manual Remediation Steps:**\n\`\`\`bash\n${context.finding.manual_steps}\n\`\`\`\n\n`;
       if (context.finding.auto_fix_command) {
-        fallbackAnswer += `💡 **Perbaikan Cepat:** Anda juga dapat menggunakan tombol **Perbaiki Otomatis** pada kartu temuan ini untuk menerapkan patch tanpa harus mengetik manual di terminal.`;
+        fallbackAnswer += `💡 **Quick Fix:** You can also use the **Auto-Fix** button on this finding card to apply the patch automatically without manual terminal typing.`;
       }
     } else {
-      fallbackAnswer += `Berikut rekomendasi hardening umum untuk keamanan server Linux Anda:\n\n1. Selalu terapkan security updates berkala (\`sudo apt update && sudo apt upgrade -y\`).\n2. Gunakan autentikasi Public Key untuk SSH dan matikan login password (\`PasswordAuthentication no\`).\n3. Pastikan port database (3306, 5432, 6379, 27017) hanya terikat pada \`127.0.0.1\` dan aktifkan UFW firewall.\n4. Amankan berkas sensitif \`.env\` dengan hak akses \`chmod 600\`.`;
+      fallbackAnswer += `General Linux server hardening recommendations:\n\n1. Apply security updates regularly (\`sudo apt update && sudo apt upgrade -y\`).\n2. Use SSH public key authentication and disable password login (\`PasswordAuthentication no\`).\n3. Ensure database ports (3306, 5432, 6379, 27017) bind only to \`127.0.0.1\` and enable UFW firewall.\n4. Secure sensitive \`.env\` files with \`chmod 600\` permissions.`;
     }
 
     return { answer: fallbackAnswer, source: 'offline-smart-advisory' };
@@ -1074,27 +1074,27 @@ ${findingInfo}`;
       return { summary, findings };
     }
 
-    let md = `# 🛡️ Laporan Audit Keamanan & Kerentanan Server (Panelku v3.8.0)\n\n`;
-    md += `**Tanggal Pemindaian:** ${summary.lastScan ? summary.lastScan.completedAt : now()}\n`;
-    md += `**Skor Keamanan:** ${summary.score}/100 (${summary.rating.grade} - ${summary.rating.label})\n\n`;
-    md += `## Ringkasan Temuan\n`;
-    md += `- Kritis (Critical): ${summary.counts.critical}\n`;
-    md += `- Tinggi (High): ${summary.counts.high}\n`;
-    md += `- Sedang (Medium): ${summary.counts.medium}\n`;
-    md += `- Rendah (Low): ${summary.counts.low}\n`;
-    md += `- Berhasil Diperbaiki (Fixed): ${summary.counts.fixed}\n\n`;
-    md += `## Rincian Kerentanan Terbuka\n\n`;
+    let md = `# 🛡️ Server Security & Vulnerability Audit Report (Panelku v3.8.0)\n\n`;
+    md += `**Scan Date:** ${summary.lastScan ? summary.lastScan.completedAt : now()}\n`;
+    md += `**Security Score:** ${summary.score}/100 (${summary.rating.grade} - ${summary.rating.label})\n\n`;
+    md += `## Findings Summary\n`;
+    md += `- Critical: ${summary.counts.critical}\n`;
+    md += `- High: ${summary.counts.high}\n`;
+    md += `- Medium: ${summary.counts.medium}\n`;
+    md += `- Low: ${summary.counts.low}\n`;
+    md += `- Fixed: ${summary.counts.fixed}\n\n`;
+    md += `## Open Vulnerability Details\n\n`;
 
     if (findings.length === 0) {
-      md += `*Tidak ada kerentanan terbuka yang terdeteksi. Sistem Anda dalam kondisi sangat aman.*\n`;
+      md += `*No open vulnerabilities detected. Your system is in a secure state.*\n`;
     } else {
       findings.forEach((f, idx) => {
         md += `### ${idx + 1}. [${f.severity.toUpperCase()}] ${f.title}\n`;
         md += `- **CVE / ID:** ${f.cve_id || 'N/A'} (CVSS: ${f.cvss_score})\n`;
-        md += `- **Komponen:** ${f.component} (${f.installed_version || 'N/A'})\n`;
-        md += `- **Dampak:** ${f.impact}\n`;
-        md += `- **Deskripsi:** ${f.description}\n\n`;
-        md += `**Langkah Perbaikan Manual (Terminal):**\n\`\`\`bash\n${f.manual_steps}\n\`\`\`\n\n`;
+        md += `- **Component:** ${f.component} (${f.installed_version || 'N/A'})\n`;
+        md += `- **Impact:** ${f.impact}\n`;
+        md += `- **Description:** ${f.description}\n\n`;
+        md += `**Manual Remediation Steps (Terminal):**\n\`\`\`bash\n${f.manual_steps}\n\`\`\`\n\n`;
       });
     }
 

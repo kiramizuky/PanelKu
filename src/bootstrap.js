@@ -128,8 +128,12 @@ export const gracefulShutdown = async () => {
     });
   }
 
-  // Now safe to close Queues, DB and Redis
+  // Now safe to close Queues, Terminals, DB and Redis
   cache.stopHealthMonitor();
+  try {
+    const { default: terminalService } = await import('./modules/terminal/terminal.service.js');
+    terminalService.killAll();
+  } catch (e) { logger.warn('Terminal cleanup error: ' + e.message); }
   try { await queueManager.closeAll(); } catch (e) { logger.warn('Queue close error: ' + e.message); }
   try { getDb().close(); } catch (e) { logger.warn('DB close error: ' + e.message); }
   if (redis) {

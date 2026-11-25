@@ -297,14 +297,14 @@
         </div>
         <div style="display:flex; align-items:center; gap:6px;">
           <button class="btn-lp btn-lp-ghost btn-lp-sm p-0" id="aiExpandBtn" onclick="toggleAIChatExpand()" title="Perbesar / Perkecil Jendela" style="width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:6px;"><i class="bi bi-arrows-fullscreen" style="font-size:12px;"></i></button>
-          <button class="btn-lp btn-lp-ghost btn-lp-sm p-0" onclick="toggleAIChat()" title="Tutup" style="width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:50%;"><i class="bi bi-x-lg" style="font-size:12px;"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm p-0" onclick="toggleAIChat()" title="Close" style="width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:50%;"><i class="bi bi-x-lg" style="font-size:12px;"></i></button>
         </div>
       </div>
       
       <!-- Messages Area -->
       <div id="aiChatMessages" style="flex:1; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; font-size:13px;">
         <div style="background:rgba(255,255,255,0.05); padding:12px 14px; border-radius:12px; max-width:88%; align-self:flex-start; line-height:1.5; color:var(--text-secondary); border:1px solid rgba(255,255,255,0.06);">
-          Halo! Saya adalah <strong>OpenClaw AI Copilot</strong>. Ada yang bisa saya bantu terkait pengelolaan server, diagnosa error, atau optimasi Linux Anda hari ini?
+          Hello! I am <strong>OpenClaw AI Copilot</strong>. How can I help with server management, error diagnostics, or Linux optimization today?
         </div>
       </div>
       
@@ -319,7 +319,7 @@
 
       <!-- Input Area -->
       <div style="padding:12px 16px; border-top:1px solid var(--glass-border); display:flex; gap:8px; background:rgba(0,0,0,0.3);">
-        <input type="text" id="aiChatInput" class="lp-input" style="flex:1; margin:0; padding:8px 14px; font-size:13px; height:40px;" placeholder="Tanyakan seputar Linux, konfigurasi server, atau minta bantuan..." onkeypress="if(event.key==='Enter') sendAIMessage()">
+        <input type="text" id="aiChatInput" class="lp-input" style="flex:1; margin:0; padding:8px 14px; font-size:13px; height:40px;" placeholder="Ask about Linux, server configuration, or troubleshooting..." onkeypress="if(event.key==='Enter') sendAIMessage()">
         <button class="btn-lp btn-lp-primary" onclick="sendAIMessage()" style="width:40px; height:40px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:8px;" title="Kirim"><i class="bi bi-send-fill" style="font-size:14px;"></i></button>
       </div>
     </div>
@@ -375,9 +375,9 @@
     function copyAICode(b64) {
       try {
         const code = decodeURIComponent(escape(atob(b64)));
-        LP.copy(code, 'Perintah disalin ke clipboard');
+        LP.copy(code, 'Command copied to clipboard');
       } catch (e) {
-        LP.toast('Gagal menyalin perintah', 'error');
+        LP.toast('Failed to copy command', 'error');
       }
     }
 
@@ -386,15 +386,15 @@
       try {
         command = decodeURIComponent(escape(atob(b64)));
       } catch (e) {
-        return LP.toast('Format perintah tidak valid', 'error');
+        return LP.toast('Invalid command format', 'error');
       }
 
       const isModifying = /\b(?:systemctl|service|apt|apt-get|yum|dnf|pacman|rm|kill|pkill|killall|chown|chmod|sed|docker\s+(?:rm|stop|restart|kill)|ufw|iptables|reboot|shutdown|mkfs|dd)\b/i.test(command);
       const confirmMsg = isModifying
-        ? `<div class="text-warning mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Perhatian:</strong> Perintah ini berpotensi memodifikasi sistem atau layanan server.</div><code>${LP.escHtml ? LP.escHtml(command) : command.replace(/</g, '&lt;')}</code><br><br>Apakah Anda yakin ingin menjalankannya di server?`
-        : `Jalankan perintah berikut di server?<br><br><code>${LP.escHtml ? LP.escHtml(command) : command.replace(/</g, '&lt;')}</code>`;
+        ? `<div class="text-warning mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i><strong>Warning:</strong> This command may modify system files or server services.</div><code>${LP.escHtml ? LP.escHtml(command) : command.replace(/</g, '&lt;')}</code><br><br>Are you sure you want to run it on the server?`
+        : `Run the following command on the server?<br><br><code>${LP.escHtml ? LP.escHtml(command) : command.replace(/</g, '&lt;')}</code>`;
 
-      const confirmed = await LP.confirm(confirmMsg, 'Konfirmasi Eksekusi Perintah');
+      const confirmed = await LP.confirm(confirmMsg, 'Confirm Command Execution');
       if (!confirmed) return;
 
       const container = document.getElementById('aiChatMessages');
@@ -417,20 +417,20 @@
             </div>
             <pre style="background:#05070d; padding:8px 10px; border-radius:6px; font-family:'JetBrains Mono', monospace; font-size:11.5px; border:1px solid rgba(255,255,255,0.06); max-height:220px; overflow-y:auto; margin:0; white-space:pre-wrap;" class="${isSuccess ? 'text-light' : 'text-warning'}">${displayOut}</pre>
           `;
-          LP.toast('Perintah berhasil dieksekusi', isSuccess ? 'success' : 'warning');
+          LP.toast('Command executed successfully', isSuccess ? 'success' : 'warning');
         } else {
           execDiv.innerHTML = `
             <div class="font-monospace text-info mb-1" style="font-size:11.5px;">$ ${command.replace(/</g, '&lt;')}</div>
-            <div class="text-danger"><i class="bi bi-x-circle me-1"></i>${(res && res.message) || 'Gagal mengeksekusi perintah'}</div>
+            <div class="text-danger"><i class="bi bi-x-circle me-1"></i>${(res && res.message) || 'Failed to execute command'}</div>
           `;
-          LP.toast((res && res.message) || 'Eksekusi diblokir atau gagal', 'error');
+          LP.toast((res && res.message) || 'Execution blocked or failed', 'error');
         }
       } catch (err) {
         execDiv.innerHTML = `
           <div class="font-monospace text-info mb-1" style="font-size:11.5px;">$ ${command.replace(/</g, '&lt;')}</div>
           <div class="text-danger"><i class="bi bi-x-circle me-1"></i>Error: ${err.message}</div>
         `;
-        LP.toast('Gagal mengeksekusi: ' + err.message, 'error');
+        LP.toast('Execution failed: ' + err.message, 'error');
       }
       container.scrollTop = container.scrollHeight;
     }
@@ -454,7 +454,7 @@
       // Append Typing Indicator
       const typingDiv = document.createElement('div');
       typingDiv.style.cssText = 'background:rgba(255,255,255,0.05); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--text-muted); font-style:italic; border:1px solid rgba(255,255,255,0.06);';
-      typingDiv.innerHTML = '<span class="spinner-border spinner-border-sm text-primary me-2"></span>AI sedang berpikir...';
+      typingDiv.innerHTML = '<span class="spinner-border spinner-border-sm text-primary me-2"></span>AI is thinking...';
       container.appendChild(typingDiv);
       container.scrollTop = container.scrollHeight;
 
@@ -481,7 +481,7 @@
                 <span class="text-muted" style="font-size:11px; font-family:monospace;">bash</span>
                 <div class="d-flex gap-1">
                   <button class="btn btn-sm btn-dark py-0 px-2" style="font-size:11px;" data-lp-on-click="${LP.registerInlineHandler('click', function () { copyAICode(b64); })}"><i class="bi bi-clipboard"></i> Copy</button>
-                  <button class="btn btn-sm btn-primary py-0 px-2" style="font-size:11px;" data-lp-on-click="${LP.registerInlineHandler('click', function () { executeAICommand(b64); })}"><i class="bi bi-play-fill"></i> Jalankan</button>
+                  <button class="btn btn-sm btn-primary py-0 px-2" style="font-size:11px;" data-lp-on-click="${LP.registerInlineHandler('click', function () { executeAICommand(b64); })}"><i class="bi bi-play-fill"></i> Run</button>
                 </div>
               </div>
               <pre style="background:#05070d; padding:10px; border-radius:6px; font-family:'JetBrains Mono', monospace; font-size:12px; border:1px solid rgba(255,255,255,0.08); white-space:pre-wrap; margin:0;">${code}</pre>
@@ -496,14 +496,14 @@
         } else {
           const errDiv = document.createElement('div');
           errDiv.style.cssText = 'background:rgba(239,68,68,0.1); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--accent-danger); border:1px solid rgba(239,68,68,0.2);';
-          errDiv.textContent = 'Gagal menghubungi asisten AI.';
+          errDiv.textContent = 'Failed to reach AI assistant.';
           container.appendChild(errDiv);
         }
       } catch (err) {
         typingDiv.remove();
         const errDiv = document.createElement('div');
         errDiv.style.cssText = 'background:rgba(239,68,68,0.1); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; color:var(--accent-danger); border:1px solid rgba(239,68,68,0.2);';
-        errDiv.textContent = 'Error koneksi ke asisten AI: ' + err.message;
+        errDiv.textContent = 'AI connection error: ' + err.message;
         container.appendChild(errDiv);
       }
       container.scrollTop = container.scrollHeight;

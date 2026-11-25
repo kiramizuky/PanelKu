@@ -22,7 +22,8 @@ function logTerminalCommand(username, command) {
 
 /**
  * Terminal WebSocket namespace.
- * Handles bidirectional PTY communication (local or remote cluster agent).
+ * Handles bidirectional PTY communication (local or remote cluster agent)
+ * with resilient session reattachment across transient disconnects.
  */
 export const registerTerminalSocket = (namespace) => {
   namespace.on('connection', (socket) => {
@@ -36,9 +37,32 @@ export const registerTerminalSocket = (namespace) => {
       return socket.disconnect(true);
     }
 
-    let activeSessions = new Set();
-    let sessionBuffers = new Map();
-    let remoteSockets = new Map(); // sessionId -> WebSocket client connecting to agent node
+    const activeSessions = new Set();
+    const sessionBuffers = new Map();
+    const remoteSockets = new Map(); // sessionId -> WebSocket client connecting to agent node
+    const localUnsubscribers = new Map(); // sessionId -> { offData, offExit }
+
+    function bindLocalSessionListeners(sessionId) {
+      // Avoid duplicate listeners if reattaching
+      const existing = localUnsubscribers.get(sessionId);
+      if (existing) {
+        existing.offData();
+        existing.offExit();
+      }
+
+      const offData = terminalService.onData(sessionId, (data, offset) => {
+        socket.emit('terminal:data', { sessionId, data, offset });
+      });
+
+      const offExit = terminalService.onExit(sessionId, ({ exitCode }) => {
+        socket.emit('terminal:exit', { sessionId, exitCode });
+        activeSessions.delete(sessionId);
+        sessionBuffers.delete(sessionId);
+        localUnsubscribers.delete(sessionId);
+      });
+
+      localUnsubscribers.set(sessionId, { offData, offExit });
+    }
 
     // Create terminal session
     socket.on('terminal:create', ({ shell = 'bash', cols = 80, rows = 24, osUser = 'root', nodeId, cwd }) => {
@@ -61,7 +85,7 @@ export const registerTerminalSocket = (namespace) => {
 
           // Log URL without API key to prevent credential leakage
           logger.info(`Connecting terminal proxy to remote node: ${node.name}`);
-          
+
           const agentWs = new WebSocket(wsUrl, {
             rejectUnauthorized: false, // Allow self-signed certs for nodes
             headers: {
@@ -127,24 +151,40 @@ export const registerTerminalSocket = (namespace) => {
         try {
           const { sessionId, pid } = terminalService.create(socket.user._id, shell, cols, rows, osUser, cwd);
           activeSessions.add(sessionId);
-
+          bindLocalSessionListeners(sessionId);
           socket.emit('terminal:created', { sessionId, pid });
-
-          // Stream PTY output to client
-          terminalService.onData(sessionId, (data) => {
-            socket.emit('terminal:data', { sessionId, data });
-          });
-
-          // Handle PTY exit
-          terminalService.onExit(sessionId, ({ exitCode }) => {
-            socket.emit('terminal:exit', { sessionId, exitCode });
-            activeSessions.delete(sessionId);
-            sessionBuffers.delete(sessionId);
-          });
         } catch (err) {
           socket.emit('terminal:error', { message: err.message });
         }
       }
+    });
+
+    // Reattach to an existing live PTY session after a transient WebSocket reconnect
+    socket.on('terminal:attach', ({ sessionId, cols, rows, lastOffset = 0 }) => {
+      if (!sessionId) return;
+      const attached = terminalService.attach(sessionId, socket.user._id, lastOffset);
+      if (!attached) {
+        socket.emit('terminal:error', {
+          sessionId,
+          code: 'SESSION_NOT_FOUND',
+          message: 'Terminal session expired or not found. Starting a new session...',
+        });
+        return;
+      }
+
+      activeSessions.add(sessionId);
+      bindLocalSessionListeners(sessionId);
+      if (cols && rows) {
+        terminalService.resize(sessionId, cols, rows);
+      }
+
+      socket.emit('terminal:attached', {
+        sessionId,
+        pid: attached.pid,
+        missedOutput: attached.missedOutput,
+        offset: attached.totalBytes,
+      });
+      logger.debug(`Terminal WS: reattached session ${sessionId} (missed=${attached.missedOutput.length} chars)`);
     });
 
     // Application-level heartbeat ping to prevent TCP / reverse-proxy idle timeouts
@@ -214,7 +254,7 @@ export const registerTerminalSocket = (namespace) => {
       }
     });
 
-    // Kill a specific session
+    // Kill a specific session explicitly (e.g. user closed tab)
     socket.on('terminal:kill', ({ sessionId }) => {
       if (!activeSessions.has(sessionId)) return;
       const agentWs = remoteSockets.get(sessionId);
@@ -225,13 +265,20 @@ export const registerTerminalSocket = (namespace) => {
         activeSessions.delete(sessionId);
         remoteSockets.delete(sessionId);
       } else {
+        const unsub = localUnsubscribers.get(sessionId);
+        if (unsub) {
+          unsub.offData();
+          unsub.offExit();
+          localUnsubscribers.delete(sessionId);
+        }
         terminalService.kill(sessionId);
         activeSessions.delete(sessionId);
       }
+      sessionBuffers.delete(sessionId);
       socket.emit('terminal:killed', { sessionId });
     });
 
-    // Cleanup on disconnect
+    // Detach local sessions on socket disconnect (keeps running processes alive during reconnects)
     socket.on('disconnect', () => {
       for (const sessionId of activeSessions) {
         const agentWs = remoteSockets.get(sessionId);
@@ -240,11 +287,18 @@ export const registerTerminalSocket = (namespace) => {
             agentWs.close();
           }
         } else {
-          terminalService.kill(sessionId);
+          const unsub = localUnsubscribers.get(sessionId);
+          if (unsub) {
+            unsub.offData();
+            unsub.offExit();
+            localUnsubscribers.delete(sessionId);
+          }
+          terminalService.detach(sessionId);
         }
       }
       activeSessions.clear();
       remoteSockets.clear();
+      sessionBuffers.clear();
       logger.debug(`Terminal WS: client disconnected ${socket.id}`);
     });
   });

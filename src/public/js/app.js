@@ -188,7 +188,7 @@ const LP = {
 
     // Rate Limited (429) — Do NOT logout, inform user gracefully
     if (res.status === 429) {
-      this.toast('Terlalu banyak permintaan. Silakan tunggu beberapa saat.', 'warning');
+      this.toast('Too many requests. Please wait a moment.', 'warning');
       return { success: false, message: 'Too many requests, please slow down.' };
     }
 
@@ -519,7 +519,7 @@ const LP = {
   /**
    * Universal clipboard copy method with toast notification and quote/%22 sanitization
    */
-  copy(text, msg = 'Berhasil disalin ke clipboard!') {
+  copy(text, msg = 'Copied to clipboard!') {
     const clean = this.cleanText(text);
     if (!clean) return;
 
@@ -534,7 +534,7 @@ const LP = {
     }
   },
 
-  _fallbackCopy(text, msg = 'Berhasil disalin ke clipboard!') {
+  _fallbackCopy(text, msg = 'Copied to clipboard!') {
     try {
       const ta = document.createElement('textarea');
       ta.value = text;
@@ -547,7 +547,7 @@ const LP = {
       document.body.removeChild(ta);
       this.toast(msg, 'success');
     } catch {
-      this.toast('Gagal menyalin ke clipboard', 'warning');
+      this.toast('Failed to copy to clipboard', 'warning');
     }
   },
 
@@ -842,29 +842,29 @@ const LP = {
               <div class="alert alert-danger d-flex align-items-start gap-3 mb-4" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; border-radius: 10px; padding: 14px 18px;">
                 <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0 mt-1"></i>
                 <div style="font-size: 13px;">
-                  <strong style="font-size: 14px;">Instalasi Otomatis Gagal:</strong>
+                  <strong style="font-size: 14px;">Automatic Installation Failed:</strong>
                   <div style="margin-top: 6px; font-family: monospace; word-break: break-all; opacity: 0.95; font-size: 12px; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px;">${safeError}</div>
                 </div>
               </div>
 
               <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
-                Anda dapat memasang paket/komponen <strong>${safeName}</strong> secara manual dengan membuka <strong>Terminal Server</strong> (atau SSH) dan menjalankan perintah di bawah ini:
+                You can install <strong>${safeName}</strong> manually by opening the <strong>Server Terminal</strong> (or SSH) and running the command below:
               </p>
 
               <div style="position: relative; background: #0d1117; border: 1px solid #30363d; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
                 <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" id="${modalId}_copyBtn" style="position: absolute; right: 12px; top: 12px; font-size: 11px; color: #58a6ff; background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.2); border-radius: 6px; padding: 4px 10px;">
-                  <i class="bi bi-clipboard me-1"></i>Salin Perintah
+                  <i class="bi bi-clipboard me-1"></i>Copy Command
                 </button>
                 <div style="font-size: 10px; text-transform: uppercase; color: #8b949e; margin-bottom: 8px; font-weight: 600; letter-spacing: 0.5px;">Terminal Bash Command</div>
                 <code id="${modalId}_code" style="color: #58a6ff; font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all;">${safeCmd}</code>
               </div>
 
               <div class="p-3" style="background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.2); border-radius: 10px; font-size: 12px; color: var(--text-muted);">
-                <i class="bi bi-info-circle text-info me-1"></i> Setelah perintah di atas selesai dieksekusi di terminal server, silakan refresh halaman web ini atau klik tombol <strong>Refresh Halaman</strong>.
+                <i class="bi bi-info-circle text-info me-1"></i> Once the command above finishes executing on the server, please refresh this page or click <strong>Refresh Page</strong>.
               </div>
             </div>
             <div class="modal-footer" style="border-top: 1px solid var(--glass-border, rgba(255,255,255,0.1)); padding: 14px 24px;">
-              <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Tutup</button>
+              <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Close</button>
               <button type="button" class="btn-lp btn-lp-primary" data-lp-on-click="${LP.registerInlineHandler('click', function (_event) { location.reload()
     })}">
                 <i class="bi bi-arrow-clockwise me-1"></i>Refresh Halaman
@@ -885,11 +885,11 @@ const LP = {
     const copyBtn = document.getElementById(`${modalId}_copyBtn`);
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
-        const ok = LP.copy(cmd, 'Perintah berhasil disalin ke clipboard!');
+        const ok = LP.copy(cmd, 'Command copied to clipboard!');
         if (ok) {
           copyBtn.innerHTML = '<i class="bi bi-check2 me-1"></i>Tersalin!';
           setTimeout(() => {
-            copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Salin Perintah';
+            copyBtn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copy Command';
           }, 3000);
         }
       });

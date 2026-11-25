@@ -38,7 +38,7 @@
       <span id="terminalStatusBadge" class="badge bg-secondary-subtle text-secondary border border-secondary-subtle d-inline-flex align-items-center gap-1" style="font-size:11px; font-weight:500;">
         <i class="bi bi-circle-fill" style="font-size:7px;"></i><span id="terminalStatusText">Connecting...</span>
       </span>
-      <button id="terminalReconnectBtn" class="btn btn-sm btn-outline-warning d-none" onclick="TerminalPage.reconnect()" style="font-size:11px; padding:2px 8px;" title="Hubungkan ulang koneksi terminal">
+      <button id="terminalReconnectBtn" class="btn btn-sm btn-outline-warning d-none" onclick="TerminalPage.reconnect()" style="font-size:11px; padding:2px 8px;" title="Reconnect terminal session">
         <i class="bi bi-arrow-clockwise me-1"></i>Reconnect
       </button>
       <div class="dropdown">
@@ -76,7 +76,7 @@
           <h5 class="modal-title" style="font-size: 17px; font-weight: 600; display:flex; align-items:center; gap:8px;">
             <i class="bi bi-stars text-primary"></i> Terminal AI Copilot &amp; Diagnostics
           </h5>
-          <p style="color:var(--text-muted); font-size:12px; margin:2px 0 0 0;">Asisten cerdas pembuatan perintah shell, diagnosa error, dan konsultasi server.</p>
+          <p style="color:var(--text-muted); font-size:12px; margin:2px 0 0 0;">Intelligent assistant for shell command generation, error diagnostics, and server troubleshooting.</p>
         </div>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
@@ -108,10 +108,10 @@
           <!-- Tab 1: Generate Command -->
           <div class="tab-pane fade show active" id="tab-generate" role="tabpanel">
             <div class="lp-form-group mb-3">
-              <label class="lp-label" style="font-size:12.5px; font-weight:500; margin-bottom:6px;">Tuliskan apa yang ingin Anda lakukan dalam bahasa sehari-hari:</label>
-              <textarea id="copilotPromptInput" class="lp-input font-mono" rows="3" style="font-size:13px; line-height:1.5; resize:vertical; margin-bottom:8px; border-radius:8px;" placeholder="Contoh: Cari file > 100MB di disk, periksa port aktif, cek pemakaian RAM... (Tekan Ctrl+Enter untuk generate)" onkeydown="if(event.ctrlKey && event.key==='Enter') { event.preventDefault(); TerminalPage.generateCopilotCommand(); }"></textarea>
+              <label class="lp-label" style="font-size:12.5px; font-weight:500; margin-bottom:6px;">Describe what you want to do in plain English:</label>
+              <textarea id="copilotPromptInput" class="lp-input font-mono" rows="3" style="font-size:13px; line-height:1.5; resize:vertical; margin-bottom:8px; border-radius:8px;" placeholder="Example: Find files > 100MB on disk, check listening ports, check RAM usage... (Press Ctrl+Enter to generate)" onkeydown="if(event.ctrlKey && event.key==='Enter') { event.preventDefault(); TerminalPage.generateCopilotCommand(); }"></textarea>
               <div class="d-flex justify-content-between align-items-center">
-                <span class="text-muted" style="font-size:11px;"><kbd style="background:rgba(255,255,255,0.1);color:#ddd;padding:2px 5px;border-radius:4px;">Ctrl</kbd> + <kbd style="background:rgba(255,255,255,0.1);color:#ddd;padding:2px 5px;border-radius:4px;">Enter</kbd> untuk generate cepat</span>
+                <span class="text-muted" style="font-size:11px;"><kbd style="background:rgba(255,255,255,0.1);color:#ddd;padding:2px 5px;border-radius:4px;">Ctrl</kbd> + <kbd style="background:rgba(255,255,255,0.1);color:#ddd;padding:2px 5px;border-radius:4px;">Enter</kbd> for quick generate</span>
                 <button class="btn-lp btn-lp-primary px-3 py-2" id="copilotGenerateBtn" onclick="TerminalPage.generateCopilotCommand()" style="font-size:13px; font-weight:600; box-shadow:0 2px 10px rgba(99,102,241,0.3);">
                   <i class="bi bi-stars me-1"></i> Generate Command
                 </button>
@@ -120,12 +120,12 @@
 
             <!-- Quick Suggestion Badges -->
             <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
-              <span style="font-size:11px; color:var(--text-muted);">Saran Cepat:</span>
-              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Cari file berukuran lebih dari 100MB')">📁 Cari File > 100MB</button>
-              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Tampilkan daftar port yang sedang listening')">🔌 Port Listening</button>
-              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Tampilkan penggunaan RAM dan 10 proses terboros')">📊 Top Memori Proses</button>
-              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Cek penggunaan disk dan direktori terbesar')">💾 Penggunaan Disk</button>
-              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Bersihkan kontainer dan image docker yang tidak terpakai')">🐳 Docker Cleanup</button>
+              <span style="font-size:11px; color:var(--text-muted);">Quick Suggestions:</span>
+              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Find files larger than 100MB')">📁 Find Files > 100MB</button>
+              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Show all listening network ports')">🔌 Listening Ports</button>
+              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Show RAM usage and top 10 memory processes')">📊 Top Memory</button>
+              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Check disk usage and largest directories')">💾 Disk Usage</button>
+              <button class="badge bg-dark border border-secondary text-light text-decoration-none py-1 px-2" style="font-size:11px; cursor:pointer;" onclick="TerminalPage.setQuickPrompt('Prune unused Docker containers and images')">🐳 Docker Cleanup</button>
             </div>
 
             <!-- Result Box -->
@@ -142,7 +142,7 @@
               </div>
               <div class="d-flex justify-content-end gap-2">
                 <button class="btn-lp btn-lp-secondary" onclick="TerminalPage.copyCopilotCommand()"><i class="bi bi-clipboard me-1"></i> Copy Command</button>
-                <button class="btn-lp btn-lp-primary" onclick="TerminalPage.runCopilotCommand()"><i class="bi bi-play-fill me-1"></i> Insert &amp; Run di Terminal</button>
+                <button class="btn-lp btn-lp-primary" onclick="TerminalPage.runCopilotCommand()"><i class="bi bi-play-fill me-1"></i> Insert &amp; Run in Terminal</button>
               </div>
             </div>
           </div>
@@ -150,11 +150,11 @@
           <!-- Tab 2: Diagnose & Fix Error -->
           <div class="tab-pane fade" id="tab-fix" role="tabpanel">
             <div class="mb-3">
-              <label class="lp-label" style="font-size:12.5px; font-weight:500; margin-bottom:6px;">Log Output Terakhir Terminal yang Terdeteksi:</label>
-              <textarea id="fixLogInput" class="form-control font-mono" rows="4" style="background:#05070d; color:#f87171; font-size:12px; border:1px solid rgba(255,255,255,0.1); border-radius:8px; resize:vertical;" placeholder="Output terminal error akan muncul di sini..."></textarea>
+              <label class="lp-label" style="font-size:12.5px; font-weight:500; margin-bottom:6px;">Latest Detected Terminal Output Log:</label>
+              <textarea id="fixLogInput" class="form-control font-mono" rows="4" style="background:#05070d; color:#f87171; font-size:12px; border:1px solid rgba(255,255,255,0.1); border-radius:8px; resize:vertical;" placeholder="Terminal error output will appear here..."></textarea>
               <div class="d-flex justify-content-between align-items-center mt-2">
-                <small class="text-muted" style="font-size:11.5px;">AI akan mendiagnosa akar masalah error di atas dan memberikan perintah solutif.</small>
-                <button class="btn-lp btn-lp-primary" onclick="TerminalPage.analyzeTerminalError()"><i class="bi bi-magic me-1"></i> Diagnosa &amp; Buat Solusi</button>
+                <small class="text-muted" style="font-size:11.5px;">AI will diagnose the root cause of the error above and suggest a fix command.</small>
+                <button class="btn-lp btn-lp-primary" onclick="TerminalPage.analyzeTerminalError()"><i class="bi bi-magic me-1"></i> Diagnose &amp; Fix</button>
               </div>
             </div>
 
@@ -162,18 +162,18 @@
             <div id="fixResultBox" class="d-none p-3 rounded" style="background: rgba(10,14,24,0.9); border: 1px solid var(--glass-border);">
               <div class="d-flex align-items-center gap-2 mb-2">
                 <i class="bi bi-check2-circle text-success" style="font-size:18px;"></i>
-                <span class="text-white fw-bold" style="font-size: 13.5px;">Hasil Diagnosa AI &amp; Solusi</span>
+                <span class="text-white fw-bold" style="font-size: 13.5px;">AI Diagnosis &amp; Solution</span>
               </div>
               <div id="fixExplanationOutput" class="p-3 rounded mb-3" style="background:rgba(255,255,255,0.04); font-size:13px; line-height:1.5; color:var(--text-secondary); border:1px solid rgba(255,255,255,0.06);"></div>
               <div id="fixCmdContainer" class="d-none">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                  <label class="lp-label mb-0" style="font-size:11.5px;">Perintah Solusi yang Disarankan:</label>
+                  <label class="lp-label mb-0" style="font-size:11.5px;">Suggested Fix Command:</label>
                   <span id="fixRiskBadge" class="lp-badge lp-badge-success" style="font-size:10px;">Safe</span>
                 </div>
                 <pre id="fixCommandOutput" class="p-3 rounded text-info mb-3" style="background:#05070d; font-family:'JetBrains Mono', monospace; font-size:13px; line-height:1.5; white-space:pre-wrap; border:1px solid rgba(255,255,255,0.08);"></pre>
                 <div class="d-flex justify-content-end gap-2">
-                  <button class="btn-lp btn-lp-secondary" onclick="TerminalPage.copyFixCommand()"><i class="bi bi-clipboard me-1"></i> Copy Perintah Solusi</button>
-                  <button class="btn-lp btn-lp-primary" onclick="TerminalPage.runFixCommand()"><i class="bi bi-play-fill me-1"></i> Jalankan Solusi di Terminal</button>
+                  <button class="btn-lp btn-lp-secondary" onclick="TerminalPage.copyFixCommand()"><i class="bi bi-clipboard me-1"></i> Copy Fix Command</button>
+                  <button class="btn-lp btn-lp-primary" onclick="TerminalPage.runFixCommand()"><i class="bi bi-play-fill me-1"></i> Run Fix in Terminal</button>
                 </div>
               </div>
 
@@ -184,13 +184,13 @@
           <div class="tab-pane fade" id="tab-chat" role="tabpanel">
             <div id="modalChatMessages" class="p-3 rounded mb-3" style="background:#05070d; border:1px solid rgba(255,255,255,0.08); height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; font-size:13px;">
               <div style="background:rgba(255,255,255,0.05); padding:10px 14px; border-radius:12px; max-width:85%; align-self:flex-start; line-height:1.5; color:var(--text-secondary);">
-                Halo! Saya adalah <strong>Terminal AI Assistant</strong>. Tanyakan apa saja mengenai sintaks bash, perbaikan sistem Linux, konfigurasi service, atau manajemen server.
+                Hello! I am the <strong>Terminal AI Assistant</strong>. Ask me anything about bash syntax, Linux troubleshooting, service configuration, or server management.
               </div>
             </div>
             <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
-              <input type="text" id="modalChatInput" class="lp-input" style="flex: 1 1 auto; margin: 0; font-size: 13.5px; height: 42px;" placeholder="Tanyakan seputar Linux, bash command, atau problem server..." onkeydown="if(event.key==='Enter') TerminalPage.sendModalChatMessage()">
+              <input type="text" id="modalChatInput" class="lp-input" style="flex: 1 1 auto; margin: 0; font-size: 13.5px; height: 42px;" placeholder="Ask about Linux, bash commands, or server issues..." onkeydown="if(event.key==='Enter') TerminalPage.sendModalChatMessage()">
               <button class="btn-lp btn-lp-primary" style="flex-shrink: 0; height: 42px; padding: 0 18px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;" onclick="TerminalPage.sendModalChatMessage()">
-                <i class="bi bi-send-fill"></i> Kirim
+                <i class="bi bi-send-fill"></i> Send
               </button>
             </div>
           </div>
