@@ -3,13 +3,17 @@
   <!-- Left Column -->
   <div class="col-12 col-lg-4">
     <!-- Time Widget -->
-    <div class="lp-glass-card mb-2 text-center" style="background: rgba(20,25,40,0.6); padding: 10px 15px; height: 100px; vertical-align: middle;">
-      <h1 id="currentTime" style="font-size: 2rem; font-weight: 700; margin-bottom: 0; font-family: var(--font-mono); line-height: 1;">--:--</h1>
-      <p id="currentDate" style="color: var(--text-muted); font-size: 1.5rem; margin: 2px 0 0 0;">Loading date...</p>
+    <div class="lp-glass-card lp-kpi-card mb-2 text-center" style="background: linear-gradient(135deg, rgba(30,41,59,0.72), rgba(15,23,42,0.78)); padding: 14px 16px; min-height: 100px; display:flex; flex-direction:column; justify-content:center;">
+      <div class="d-flex justify-content-center align-items-center gap-2 mb-1">
+        <span class="lp-status-dot lp-status-dot--live"></span>
+        <span style="font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#10b981;">Host Online</span>
+      </div>
+      <h1 id="currentTime" style="font-size: 2rem; font-weight: 700; margin-bottom: 0; font-family: var(--font-mono); line-height: 1.05;">--:--</h1>
+      <p id="currentDate" style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 0 0; letter-spacing: 0.02em;">Loading date...</p>
     </div>
 
     <!-- System Status Widget -->
-    <div class="lp-glass-card mb-2" style="padding: 10px 15px; height: 150px;">
+    <div class="lp-glass-card lp-kpi-card mb-2" style="padding: 12px 15px; min-height: 150px;">
       <div class="lp-card-title" style="margin-bottom: 5px; font-size: 13px;">System status <i class="bi bi-chevron-right float-end" style="font-size: 12px; color: var(--text-muted); cursor: pointer;" onclick="window.location='/monitor'"></i></div>
       
       <div class="d-flex justify-content-around align-items-center mt-1">

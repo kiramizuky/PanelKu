@@ -1,12 +1,15 @@
-<div class="d-flex justify-content-between align-items-center" style="margin-bottom:20px;">
-  <div class="lp-page-header">
-    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">System Monitoring</h1>
-    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Real-time performance metrics</p>
+<div class="lp-hero-header">
+  <div class="lp-hero-title-wrap">
+    <div class="lp-hero-icon"><i class="bi bi-activity"></i></div>
+    <div>
+      <h1 class="lp-page-title" style="font-size:22px;font-weight:700;margin:0;">System Monitoring</h1>
+      <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;font-size:13px;">Real-time CPU, memory, load average &amp; process telemetry</p>
+    </div>
   </div>
   <div class="d-flex align-items-center gap-3">
-    <div class="d-flex align-items-center" style="background: rgba(255,255,255,0.05); padding: 5px 12px; border-radius: 20px; font-size: 13px; border: 1px solid var(--glass-border);">
+    <div class="d-flex align-items-center" style="background: rgba(16,185,129,0.1); padding: 6px 14px; border-radius: 20px; font-size: 12.5px; border: 1px solid rgba(16,185,129,0.3);">
       <span class="spinner-grow spinner-grow-sm text-success me-2" id="streamStatusBadge" role="status" style="width: 8px; height: 8px;"></span>
-      <span id="streamStatusText" style="color: var(--text-primary); font-weight: 500;">LIVE</span>
+      <span id="streamStatusText" style="color: #34d399; font-weight: 600; letter-spacing: 0.04em;">LIVE</span>
     </div>
     <select class="form-select form-select-sm" id="refreshInterval" onchange="MonitorPage.setRefreshInterval(this.value)" style="width: auto; background-color: var(--glass-bg); border-color: var(--glass-border); color: var(--text-primary);">
       <option value="1000">1s</option>
