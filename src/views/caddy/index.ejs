@@ -36,14 +36,15 @@
   .caddy-log-line:hover { background:rgba(255,255,255,0.03); }
 </style>
 
-<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
-  <div>
-    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
-      <i class="bi bi-shield-fill-check text-success me-2"></i> Caddy Server
-    </h1>
-    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
-      Reverse proxy with automatic HTTPS — manage sites, Caddyfile, certificates, and logs
-    </p>
+<div class="lp-hero-header">
+  <div class="lp-hero-title-wrap">
+    <div class="lp-hero-icon"><i class="bi bi-shield-fill-check text-success"></i></div>
+    <div>
+      <h1 class="lp-page-title">Caddy Server</h1>
+      <p class="lp-page-subtitle">
+        Reverse proxy with automatic HTTPS — manage sites, Caddyfile, certificates, and logs
+      </p>
+    </div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="CaddyPage.refresh()" title="Refresh">

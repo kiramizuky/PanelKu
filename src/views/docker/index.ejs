@@ -1,7 +1,10 @@
-<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
-  <div>
-    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Docker Management</h1>
-    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage containers, images, and stacks</p>
+<div class="lp-hero-header">
+  <div class="lp-hero-title-wrap">
+    <div class="lp-hero-icon"><i class="bi bi-box-seam"></i></div>
+    <div>
+      <h1 class="lp-page-title">Docker Management</h1>
+      <p class="lp-page-subtitle">Manage containers, images, and stacks</p>
+    </div>
   </div>
   <div style="display:flex;gap:10px">
     <button class="btn-lp btn-lp-ghost" onclick="DockerPage.loadData()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
@@ -11,19 +14,19 @@
 <!-- Stats -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
-    <div class="lp-glass-card p-3 text-center">
+    <div class="lp-glass-card lp-kpi-card p-3 text-center">
       <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Total Containers</div>
       <div style="font-size:28px;font-weight:700" id="statTotal">—</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="lp-glass-card p-3 text-center">
+    <div class="lp-glass-card lp-kpi-card p-3 text-center">
       <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Running</div>
       <div style="font-size:28px;font-weight:700;color:var(--accent-success)" id="statRunning">—</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="lp-glass-card p-3 text-center">
+    <div class="lp-glass-card lp-kpi-card p-3 text-center">
       <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Stopped</div>
       <div style="font-size:28px;font-weight:700;color:var(--accent-danger)" id="statStopped">—</div>
     </div>

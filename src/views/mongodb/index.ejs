@@ -26,14 +26,15 @@
   }
 </style>
 
-<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
-  <div>
-    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
-      <i class="bi bi-database-fill text-success me-2"></i> MongoDB Manager
-    </h1>
-    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
-      Manage MongoDB databases, collections, users, and run queries
-    </p>
+<div class="lp-hero-header">
+  <div class="lp-hero-title-wrap">
+    <div class="lp-hero-icon"><i class="bi bi-database-fill text-success"></i></div>
+    <div>
+      <h1 class="lp-page-title">MongoDB Manager</h1>
+      <p class="lp-page-subtitle">
+        Manage MongoDB databases, collections, users, and run queries
+      </p>
+    </div>
   </div>
   <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="MongoDBPage.refresh()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
 </div>
@@ -41,7 +42,7 @@
 <!-- Status Cards -->
 <div class="row g-3 mb-4">
   <div class="col-12 col-md-6 col-lg-3">
-    <div class="lp-glass-card p-3 d-flex align-items-center gap-3" style="border-left:3px solid var(--accent-success);">
+    <div class="lp-glass-card lp-kpi-card p-3 d-flex align-items-center gap-3" style="border-left:3px solid var(--accent-success);">
       <div style="width:44px;height:44px;border-radius:12px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#10b981;flex-shrink:0;">
         <i class="bi bi-database-fill"></i>
       </div>

@@ -23,14 +23,15 @@
   @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 </style>
 
-<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
-  <div>
-    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">
-      <i class="bi bi-database-fill-gear text-danger me-2"></i> Redis Manager
-    </h1>
-    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">
-      Monitor Redis server, manage keys, configuration, clients, and slow queries
-    </p>
+<div class="lp-hero-header">
+  <div class="lp-hero-title-wrap">
+    <div class="lp-hero-icon"><i class="bi bi-database-fill-gear text-danger"></i></div>
+    <div>
+      <h1 class="lp-page-title">Redis Manager</h1>
+      <p class="lp-page-subtitle">
+        Monitor Redis server, manage keys, configuration, clients, and slow queries
+      </p>
+    </div>
   </div>
   <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="RedisPage.refresh()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
 </div>

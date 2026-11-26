@@ -1,7 +1,10 @@
-<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;">
-  <div>
-    <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;">Database Explorer</h1>
-    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage MySQL, PostgreSQL, SQLite — Browse, Query, Export & Import</p>
+<div class="lp-hero-header">
+  <div class="lp-hero-title-wrap">
+    <div class="lp-hero-icon"><i class="bi bi-database"></i></div>
+    <div>
+      <h1 class="lp-page-title">Database Explorer</h1>
+      <p class="lp-page-subtitle">Manage MySQL, PostgreSQL, SQLite — Browse, Query, Export &amp; Import</p>
+    </div>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
     <button class="btn-lp btn-lp-ghost text-warning" onclick="DB.showMigrationsModal()"><i class="bi bi-stack me-1"></i> Schema Migrations</button>
@@ -20,8 +23,8 @@
         <i class="bi bi-diagram-3-fill"></i>
       </div>
       <div>
-        <div style="font-size:13px; font-weight:600; color:#fff;" id="dbEnvTitle">Pendeteksian Lingkungan Database</div>
-        <div style="font-size:11.5px; color:var(--text-muted);" id="dbEnvSubtitle">Memeriksa status container Docker, modul panel lain, dan database native...</div>
+        <div style="font-size:13px; font-weight:600; color:#fff;" id="dbEnvTitle">Database Environment Detection</div>
+        <div style="font-size:11.5px; color:var(--text-muted);" id="dbEnvSubtitle">Checking Docker containers, external panel modules, and native databases...</div>
       </div>
     </div>
     <div id="dbEnvBadges" class="d-flex align-items-center gap-2 flex-wrap"></div>
