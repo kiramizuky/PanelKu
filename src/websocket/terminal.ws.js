@@ -87,7 +87,7 @@ export const registerTerminalSocket = (namespace) => {
           logger.info(`Connecting terminal proxy to remote node: ${node.name}`);
 
           const agentWs = new WebSocket(wsUrl, {
-            rejectUnauthorized: false, // Allow self-signed certs for nodes
+            rejectUnauthorized: process.env.AGENT_TLS_STRICT === 'true',
             headers: {
               'X-API-Key': node.api_key
             }

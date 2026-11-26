@@ -57,6 +57,13 @@ router.post(
   vulnerabilitiesController.askAI.bind(vulnerabilitiesController)
 );
 
+// ── CIS Benchmark Compliance ──
+router.get(
+  '/cis',
+  rbac(RESOURCES.VULNERABILITIES, ACTIONS.READ),
+  vulnerabilitiesController.getCisReport.bind(vulnerabilitiesController)
+);
+
 // ── Export ──
 router.get(
   '/export',

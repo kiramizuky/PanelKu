@@ -23,6 +23,7 @@ import aiService from '../ai/ai.service.js';
 import Setting from '../../models/Setting.js';
 import auditRepository from '../../repositories/audit.repository.js';
 import logger from '../../config/logger.js';
+import intelligenceService from './intelligence.service.js';
 
 class VulnerabilitiesService {
   constructor() {
@@ -725,6 +726,8 @@ class VulnerabilitiesService {
       if (scanType === 'full' || scanType === 'os') {
         const osFindings = await this.scanOS();
         rawFindings.push(...osFindings);
+        const liveCveFindings = await intelligenceService.scanLivePackages();
+        rawFindings.push(...liveCveFindings);
       }
       if (scanType === 'full' || scanType === 'apps') {
         const appsFindings = await this.scanApps();
@@ -737,6 +740,14 @@ class VulnerabilitiesService {
       if (scanType === 'full' || scanType === 'plugins') {
         const pluginFindings = await this.scanPlugins();
         rawFindings.push(...pluginFindings);
+      }
+      if (scanType === 'full' || scanType === 'cis') {
+        const cisResult = await intelligenceService.scanCisBenchmark();
+        rawFindings.push(...cisResult.findings);
+      }
+      if (scanType === 'full' || scanType === 'containers') {
+        const containerFindings = await intelligenceService.scanContainers();
+        rawFindings.push(...containerFindings);
       }
 
       // Tally severity
@@ -1064,6 +1075,13 @@ ${findingInfo}`;
   }
 
   /**
+   * Run CIS Linux Benchmark compliance check and return structured controls
+   */
+  async getCisReport() {
+    return intelligenceService.scanCisBenchmark();
+  }
+
+  /**
    * Export scan report
    */
   async exportReport(format = 'markdown') {
@@ -1072,6 +1090,9 @@ ${findingInfo}`;
 
     if (format === 'json') {
       return { summary, findings };
+    }
+    if (format === 'sarif') {
+      return intelligenceService.buildSarifReport(summary, findings);
     }
 
     let md = `# 🛡️ Server Security & Vulnerability Audit Report (Panelku v3.8.0)\n\n`;

@@ -3,6 +3,7 @@ import { authenticate } from '../../middleware/auth.js';
 import { rbac } from '../../middleware/rbac.js';
 import { RESOURCES, ACTIONS } from '../../config/constants.js';
 import dashboardService from '../dashboard/dashboard.service.js';
+import aiService from '../ai/ai.service.js';
 import { success, error } from '../../helpers/response.js';
 import appConfig from '../../config/app.js';
 import logger from '../../config/logger.js';
@@ -73,6 +74,10 @@ router.post('/exec', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), async (req, res) =
   const { command, timeout = 30000 } = req.body;
   if (!command || typeof command !== 'string' || command.length > 2048) {
     return error(res, 'Valid command (max 2048 chars) is required', 400);
+  }
+  if (aiService.isDangerousCommand(command)) {
+    logger.warn(`[Agent-Exec] Blocked dangerous command from user=${req.user?.username || 'unknown'}: ${command.slice(0, 120)}`);
+    return error(res, 'Command blocked by Security Guard for system safety', 403);
   }
 
   logger.info(`[Agent-Exec] User=${req.user?.username || 'unknown'} executing remote command (${command.length} chars)`);

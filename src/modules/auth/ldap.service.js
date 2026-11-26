@@ -97,7 +97,7 @@ class LDAPService {
     return new Promise((resolve, reject) => {
       const client = ldapClient({
         url: config.url,
-        tlsOptions: config.tls ? {} : { rejectUnauthorized: false },
+        tlsOptions: { rejectUnauthorized: config.allowSelfSigned ? false : true },
         timeout: 10000,
         connectTimeout: 10000,
       });
@@ -265,7 +265,7 @@ class LDAPService {
     return new Promise((resolve, reject) => {
       const client = ldapClient({
         url: config.url,
-        tlsOptions: config.tls ? {} : { rejectUnauthorized: false },
+        tlsOptions: { rejectUnauthorized: config.allowSelfSigned ? false : true },
         timeout: 10000,
         connectTimeout: 10000,
       });

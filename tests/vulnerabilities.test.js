@@ -226,6 +226,32 @@ describe('Vulnerabilities API Integration Tests', () => {
     expect(parsed).toHaveProperty('findings');
   });
 
+  test('GET /api/vulnerabilities/export should export SARIF v2.1.0 report', async () => {
+    const res = await request(app)
+      .get('/api/vulnerabilities/export?format=sarif')
+      .set('Authorization', `Bearer ${authToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/sarif+json');
+    expect(res.headers['content-disposition']).toContain('panelku-vulnerability-report.sarif.json');
+    const sarif = JSON.parse(res.text);
+    expect(sarif.version).toBe('2.1.0');
+    expect(Array.isArray(sarif.runs)).toBe(true);
+    expect(sarif.runs[0].tool.driver.name).toContain('PanelKu');
+  });
+
+  test('GET /api/vulnerabilities/cis should return CIS benchmark controls and score', async () => {
+    const res = await request(app)
+      .get('/api/vulnerabilities/cis')
+      .set('Authorization', `Bearer ${authToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty('scorePercent');
+    expect(Array.isArray(res.body.data.controls)).toBe(true);
+    expect(res.body.data.controls.length).toBeGreaterThanOrEqual(6);
+  });
+
   test('GET /vulnerabilities view page should return 200 and render HTML', async () => {
     const res = await request(app).get('/vulnerabilities');
     expect(res.status).toBe(200);

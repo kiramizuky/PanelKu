@@ -106,11 +106,27 @@ class VulnerabilitiesController {
         return res.send(JSON.stringify(report, null, 2));
       }
 
+      if (format === 'sarif') {
+        res.setHeader('Content-Type', 'application/sarif+json; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="panelku-vulnerability-report.sarif.json"');
+        return res.send(JSON.stringify(report, null, 2));
+      }
+
       res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="panelku-vulnerability-report.md"');
       return res.send(report);
     } catch (err) {
       logger.error(`Failed to export report: ${err.message}`);
+      return error(res, err.message, 500);
+    }
+  }
+
+  async getCisReport(req, res) {
+    try {
+      const report = await vulnerabilitiesService.getCisReport();
+      return success(res, report, 'CIS compliance audit completed');
+    } catch (err) {
+      logger.error(`Failed to run CIS benchmark: ${err.message}`);
       return error(res, err.message, 500);
     }
   }

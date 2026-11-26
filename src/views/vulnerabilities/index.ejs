@@ -79,6 +79,8 @@
           <li><a class="dropdown-item" href="#" id="actScanApps"><i class="bi bi-app-indicator text-info me-2"></i>Scan Apps &amp; Runtimes</a></li>
           <li><a class="dropdown-item" href="#" id="actScanWebsites"><i class="bi bi-globe2 text-success me-2"></i>Scan Websites &amp; Projects</a></li>
           <li><a class="dropdown-item" href="#" id="actScanPlugins"><i class="bi bi-puzzle-fill text-danger me-2"></i>Scan Plugins &amp; Security Tools</a></li>
+          <li><a class="dropdown-item" href="#" id="actScanCis"><i class="bi bi-shield-check text-primary me-2"></i>Scan CIS Benchmark</a></li>
+          <li><a class="dropdown-item" href="#" id="actScanContainers"><i class="bi bi-box-seam text-info me-2"></i>Scan Containers &amp; Images</a></li>
         </ul>
       </div>
 
@@ -89,6 +91,7 @@
         <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end lp-dropdown" aria-labelledby="btnExportReport">
           <li><a class="dropdown-item" href="#" id="actExportMarkdown"><i class="bi bi-filetype-md text-primary me-2"></i>Markdown Format (.md)</a></li>
           <li><a class="dropdown-item" href="#" id="actExportJSON"><i class="bi bi-filetype-json text-warning me-2"></i>JSON Format (.json)</a></li>
+          <li><a class="dropdown-item" href="#" id="actExportSarif"><i class="bi bi-file-earmark-code text-success me-2"></i>SARIF v2.1.0 (.sarif.json)</a></li>
         </ul>
       </div>
 
@@ -191,6 +194,8 @@
         <button class="vuln-tab" data-cat="apps"><i class="bi bi-app-indicator me-1"></i>Apps &amp; Services</button>
         <button class="vuln-tab" data-cat="websites"><i class="bi bi-globe me-1"></i>Websites &amp; Projects</button>
         <button class="vuln-tab" data-cat="plugins"><i class="bi bi-puzzle me-1"></i>Plugins &amp; Tools</button>
+        <button class="vuln-tab" data-cat="cis"><i class="bi bi-shield-check me-1"></i>CIS Compliance</button>
+        <button class="vuln-tab" data-cat="containers"><i class="bi bi-box-seam me-1"></i>Containers</button>
       </div>
 
       <!-- Right controls: Status filter & Search -->

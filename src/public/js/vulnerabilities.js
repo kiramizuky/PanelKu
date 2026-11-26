@@ -42,6 +42,8 @@ const VulnerabilitiesPage = {
       { id: 'actScanApps', type: 'apps' },
       { id: 'actScanWebsites', type: 'websites' },
       { id: 'actScanPlugins', type: 'plugins' },
+      { id: 'actScanCis', type: 'cis' },
+      { id: 'actScanContainers', type: 'containers' },
     ];
     scanTypes.forEach(({ id, type }) => {
       const el = document.getElementById(id);
@@ -67,6 +69,14 @@ const VulnerabilitiesPage = {
       actExpJson.addEventListener('click', (e) => {
         e.preventDefault();
         this.exportReport('json');
+      });
+    }
+
+    const actExpSarif = document.getElementById('actExportSarif');
+    if (actExpSarif) {
+      actExpSarif.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.exportReport('sarif');
       });
     }
 
@@ -450,7 +460,7 @@ const VulnerabilitiesPage = {
         throw new Error(`Failed to export report (status ${res.status})`);
       }
 
-      const ext = format === 'json' ? 'json' : 'md';
+      const ext = format === 'sarif' ? 'sarif.json' : (format === 'json' ? 'json' : 'md');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
