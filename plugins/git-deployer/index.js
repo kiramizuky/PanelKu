@@ -79,9 +79,14 @@ export default {
       res.render('layout', {
         title: 'Git Auto-Deploy',
         body: `
-          <div class="lp-page-header" style="margin-bottom:20px;">
-            <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-git text-danger"></i> Git Auto-Deploy</h1>
-            <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Deploy code automatically via Git Webhooks</p>
+          <div class="lp-hero-header">
+            <div class="lp-hero-title-wrap">
+              <div class="lp-hero-icon"><i class="bi bi-git text-danger"></i></div>
+              <div>
+                <h1 class="lp-page-title">Git Auto-Deploy</h1>
+                <p class="lp-page-subtitle">Deploy code automatically via Git Webhooks</p>
+              </div>
+            </div>
           </div>
 
           <div class="row">

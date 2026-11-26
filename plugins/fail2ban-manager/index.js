@@ -93,9 +93,14 @@ export default {
       res.render('layout', {
         title: 'Fail2ban Admin',
         body: `
-          <div class="lp-page-header" style="margin-bottom:20px;">
-            <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-firewall text-danger"></i> Fail2ban Admin</h1>
-            <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Monitor security jails and manage banned IP addresses</p>
+          <div class="lp-hero-header">
+            <div class="lp-hero-title-wrap">
+              <div class="lp-hero-icon"><i class="bi bi-firewall text-danger"></i></div>
+              <div>
+                <h1 class="lp-page-title">Fail2ban Admin</h1>
+                <p class="lp-page-subtitle">Monitor security jails and manage banned IP addresses</p>
+              </div>
+            </div>
           </div>
 
           ${!data.isInstalled ? `

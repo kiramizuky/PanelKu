@@ -28,10 +28,13 @@ export default {
         res.render('layout', {
           title: 'AdGuard Home',
           body: `
-            <div class="lp-page-header" style="margin-bottom:25px; display:flex; justify-content:space-between; align-items:flex-end;">
-              <div>
-                <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-shield-fill-check text-success me-2"></i> AdGuard Home</h1>
-                <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Network-wide DNS server for blocking ads and tracking</p>
+            <div class="lp-hero-header">
+              <div class="lp-hero-title-wrap">
+                <div class="lp-hero-icon"><i class="bi bi-shield-fill-check text-success"></i></div>
+                <div>
+                  <h1 class="lp-page-title">AdGuard Home</h1>
+                  <p class="lp-page-subtitle">Network-wide DNS server for blocking ads and tracking</p>
+                </div>
               </div>
             </div>
 

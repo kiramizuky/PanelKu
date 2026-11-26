@@ -26,10 +26,13 @@ export default {
         res.render('layout', {
           title: 'OpenClaw AI',
           body: `
-            <div class="lp-page-header" style="margin-bottom:25px; display:flex; justify-content:space-between; align-items:flex-end;">
-              <div>
-                <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-robot text-primary me-2"></i> OpenClaw AI</h1>
-                <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Autonomous AI agent platform and gateway orchestration service</p>
+            <div class="lp-hero-header">
+              <div class="lp-hero-title-wrap">
+                <div class="lp-hero-icon"><i class="bi bi-robot text-primary"></i></div>
+                <div>
+                  <h1 class="lp-page-title">OpenClaw AI</h1>
+                  <p class="lp-page-subtitle">Autonomous AI agent platform and gateway orchestration service</p>
+                </div>
               </div>
             </div>
 

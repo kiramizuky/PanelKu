@@ -29,10 +29,13 @@ export default {
         res.render('layout', {
           title: 'MinIO Server',
           body: `
-            <div class="lp-page-header" style="margin-bottom:25px; display:flex; justify-content:space-between; align-items:flex-end;">
-              <div>
-                <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-box-fill text-danger me-2"></i> MinIO Server</h1>
-                <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">High-performance, S3-compatible self-hosted object storage</p>
+            <div class="lp-hero-header">
+              <div class="lp-hero-title-wrap">
+                <div class="lp-hero-icon"><i class="bi bi-box-fill text-danger"></i></div>
+                <div>
+                  <h1 class="lp-page-title">MinIO Server</h1>
+                  <p class="lp-page-subtitle">High-performance, S3-compatible self-hosted object storage</p>
+                </div>
               </div>
             </div>
 

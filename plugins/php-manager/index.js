@@ -115,10 +115,13 @@ export default {
         res.render('layout', {
           title: 'PHP Manager',
           body: `
-            <div class="lp-page-header" style="margin-bottom:25px; display:flex; justify-content:space-between; align-items:flex-end;">
-              <div>
-                <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-code-slash text-primary me-2"></i> PHP Manager</h1>
-                <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage multiple PHP-FPM versions, extensions, and configuration settings</p>
+            <div class="lp-hero-header">
+              <div class="lp-hero-title-wrap">
+                <div class="lp-hero-icon"><i class="bi bi-code-slash text-primary"></i></div>
+                <div>
+                  <h1 class="lp-page-title">PHP Manager</h1>
+                  <p class="lp-page-subtitle">Manage multiple PHP-FPM versions, extensions, and configuration settings</p>
+                </div>
               </div>
               <div style="font-size:12px; color:var(--text-muted); text-align:right;">
                 <div>Distro: <strong class="text-white">${phpData.system.distro} (${phpData.system.name})</strong></div>

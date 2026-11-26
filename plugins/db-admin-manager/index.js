@@ -29,10 +29,13 @@ export default {
         res.render('layout', {
           title: 'DB Web Admin',
           body: `
-            <div class="lp-page-header" style="margin-bottom:25px; display:flex; justify-content:space-between; align-items:flex-end;">
-              <div>
-                <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-database-fill-gear text-emerald me-2"></i> Database Web Admin</h1>
-                <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Deploy web-based administration interfaces for your database engines</p>
+            <div class="lp-hero-header">
+              <div class="lp-hero-title-wrap">
+                <div class="lp-hero-icon"><i class="bi bi-database-fill-gear text-emerald"></i></div>
+                <div>
+                  <h1 class="lp-page-title">Database Web Admin</h1>
+                  <p class="lp-page-subtitle">Deploy web-based administration interfaces for your database engines</p>
+                </div>
               </div>
             </div>
 

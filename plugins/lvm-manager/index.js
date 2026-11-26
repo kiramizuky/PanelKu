@@ -815,10 +815,13 @@ export default {
           layout: false,
           body: `
 <!-- ═══════════════════════════════════════════════ LVM MANAGER ═══ -->
-<div class="lp-page-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
-  <div>
-    <h1 class="lp-page-title" style="font-size:24px;font-weight:700;margin:0;"><i class="bi bi-hdd-stack-fill text-warning me-2"></i>LVM Manager</h1>
-    <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Storage health, capacity, and volume management</p>
+<div class="lp-hero-header">
+  <div class="lp-hero-title-wrap">
+    <div class="lp-hero-icon"><i class="bi bi-hdd-stack-fill text-warning"></i></div>
+    <div>
+      <h1 class="lp-page-title">LVM Manager</h1>
+      <p class="lp-page-subtitle">Storage health, capacity, and volume management</p>
+    </div>
   </div>
   <div style="display:flex;gap:8px;">
     <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="LvmPage.refresh()" id="refreshBtn">

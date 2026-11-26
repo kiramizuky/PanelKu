@@ -95,10 +95,13 @@ export default {
       res.render('layout', {
         title: 'Log Analyzer',
         body: `
-          <div class="lp-page-header" style="margin-bottom:25px; display:flex; justify-content:space-between; align-items:flex-end;">
-            <div>
-              <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-shield-check text-purple me-2"></i> Log Analyzer</h1>
-              <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Inspect security logs, authentication attempts, and scan system anomalies</p>
+          <div class="lp-hero-header">
+            <div class="lp-hero-title-wrap">
+              <div class="lp-hero-icon"><i class="bi bi-shield-check text-purple"></i></div>
+              <div>
+                <h1 class="lp-page-title">Log Analyzer</h1>
+                <p class="lp-page-subtitle">Inspect security logs, authentication attempts, and scan system anomalies</p>
+              </div>
             </div>
             <div>
               <select id="logFileSelect" class="lp-input" style="width:200px; padding:6px 12px;" onchange="LogAnalyzer.loadLogs()">

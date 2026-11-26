@@ -26,10 +26,13 @@ export default {
         res.render('layout', {
           title: 'Uptime Kuma',
           body: `
-            <div class="lp-page-header" style="margin-bottom:25px; display:flex; justify-content:space-between; align-items:flex-end;">
-              <div>
-                <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-heart-pulse-fill text-success me-2"></i> Uptime Kuma</h1>
-                <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Self-hosted monitoring tool for website, port, ping, and DNS status</p>
+            <div class="lp-hero-header">
+              <div class="lp-hero-title-wrap">
+                <div class="lp-hero-icon"><i class="bi bi-heart-pulse-fill text-success"></i></div>
+                <div>
+                  <h1 class="lp-page-title">Uptime Kuma</h1>
+                  <p class="lp-page-subtitle">Self-hosted monitoring tool for website, port, ping, and DNS status</p>
+                </div>
               </div>
             </div>
 

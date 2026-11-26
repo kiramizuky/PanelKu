@@ -79,9 +79,14 @@ export default {
       res.render('layout', {
         title: 'S3/Rclone Backups',
         body: `
-          <div class="lp-page-header" style="margin-bottom:20px;">
-            <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-cloud-upload-fill text-warning"></i> S3/Rclone Backups</h1>
-            <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Schedule and synchronize directory or database backups to cloud endpoints</p>
+          <div class="lp-hero-header">
+            <div class="lp-hero-title-wrap">
+              <div class="lp-hero-icon"><i class="bi bi-cloud-upload-fill text-warning"></i></div>
+              <div>
+                <h1 class="lp-page-title">S3/Rclone Backups</h1>
+                <p class="lp-page-subtitle">Schedule and synchronize directory or database backups to cloud endpoints</p>
+              </div>
+            </div>
           </div>
 
           ${!remoteData.isInstalled ? `

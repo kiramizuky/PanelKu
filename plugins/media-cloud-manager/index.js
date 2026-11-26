@@ -28,10 +28,13 @@ export default {
         res.render('layout', {
           title: 'Media & Cloud Services',
           body: `
-            <div class="lp-page-header" style="margin-bottom:25px; display:flex; justify-content:space-between; align-items:flex-end;">
-              <div>
-                <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-tv text-danger me-2"></i> Media & Cloud Services</h1>
-                <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Deploy home entertainment centers and downloading tools</p>
+            <div class="lp-hero-header">
+              <div class="lp-hero-title-wrap">
+                <div class="lp-hero-icon"><i class="bi bi-tv text-danger"></i></div>
+                <div>
+                  <h1 class="lp-page-title">Media &amp; Cloud Services</h1>
+                  <p class="lp-page-subtitle">Deploy home entertainment centers and downloading tools</p>
+                </div>
               </div>
             </div>
 

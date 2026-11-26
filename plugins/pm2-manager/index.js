@@ -101,9 +101,14 @@ export default {
       res.render('layout', {
         title: 'PM2 Manager',
         body: `
-          <div class="lp-page-header" style="margin-bottom:20px;">
-            <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-cpu text-success"></i> PM2 Process Manager</h1>
-            <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Monitor, restart, and inspect Node.js microservices</p>
+          <div class="lp-hero-header">
+            <div class="lp-hero-title-wrap">
+              <div class="lp-hero-icon"><i class="bi bi-cpu text-success"></i></div>
+              <div>
+                <h1 class="lp-page-title">PM2 Process Manager</h1>
+                <p class="lp-page-subtitle">Monitor, restart, and inspect Node.js microservices</p>
+              </div>
+            </div>
           </div>
 
           ${!data.isInstalled ? `

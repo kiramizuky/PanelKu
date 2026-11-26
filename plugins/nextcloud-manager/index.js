@@ -33,10 +33,13 @@ export default {
         res.render('layout', {
           title: 'Nextcloud Manager',
           body: `
-            <div class="lp-page-header" style="margin-bottom:25px; display:flex; justify-content:space-between; align-items:flex-end;">
-              <div>
-                <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-cloud-fill text-info me-2"></i> Nextcloud Manager</h1>
-                <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Deploy and manage your personal Cloud Storage service</p>
+            <div class="lp-hero-header">
+              <div class="lp-hero-title-wrap">
+                <div class="lp-hero-icon"><i class="bi bi-cloud-fill text-info"></i></div>
+                <div>
+                  <h1 class="lp-page-title">Nextcloud Manager</h1>
+                  <p class="lp-page-subtitle">Deploy and manage your personal Cloud Storage service</p>
+                </div>
               </div>
             </div>
 

@@ -149,9 +149,14 @@ export default {
       res.render('layout', {
         title: 'WireGuard VPN',
         body: `
-          <div class="lp-page-header" style="margin-bottom:20px;">
-            <h1 class="lp-page-title" style="font-size:24px;font-weight:600;margin:0;"><i class="bi bi-shield-lock-fill text-success"></i> WireGuard VPN</h1>
-            <p class="lp-page-subtitle" style="color:var(--text-muted);margin:0;">Manage VPN tunnels, peers, and client connections</p>
+          <div class="lp-hero-header">
+            <div class="lp-hero-title-wrap">
+              <div class="lp-hero-icon"><i class="bi bi-shield-lock-fill text-success"></i></div>
+              <div>
+                <h1 class="lp-page-title">WireGuard VPN</h1>
+                <p class="lp-page-subtitle">Manage VPN tunnels, peers, and client connections</p>
+              </div>
+            </div>
           </div>
 
           ${!data.isInstalled ? `
