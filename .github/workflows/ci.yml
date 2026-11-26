@@ -299,7 +299,7 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies & Playwright Chromium
-        run: npm ci && npx playwright install --with-deps chromium
+        run: npm ci && npm install --no-save @playwright/test && npx playwright install --with-deps chromium
 
       - name: Run Playwright E2E Suite
         run: npx playwright test --config=tests/e2e/playwright.config.mjs
