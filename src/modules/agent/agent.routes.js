@@ -71,10 +71,11 @@ router.get('/info', async (req, res) => {
  */
 router.post('/exec', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), async (req, res) => {
   const { command, timeout = 30000 } = req.body;
-  if (!command || typeof command !== 'string') {
-    return error(res, 'Command is required', 400);
+  if (!command || typeof command !== 'string' || command.length > 2048) {
+    return error(res, 'Valid command (max 2048 chars) is required', 400);
   }
 
+  logger.info(`[Agent-Exec] User=${req.user?.username || 'unknown'} executing remote command (${command.length} chars)`);
   const { exec } = await import('child_process');
   const safeTimeout = Math.min(Math.max(parseInt(timeout, 10) || 30000, 1000), 60000);
 

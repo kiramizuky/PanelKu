@@ -237,6 +237,18 @@ describe('Auth Middleware', () => {
     expect(res.body.message).toBe('No authentication token provided');
   });
 
+  test('authenticate rejects query token on non-download routes and non-GET methods', async () => {
+    const validToken = jwt.sign({ sub: 'user_ok' }, appConfig.jwt.secret, { expiresIn: '1h' });
+
+    const resGet = mockRes();
+    await authenticate({ method: 'GET', path: '/users', query: { token: validToken }, headers: {} }, resGet, jest.fn());
+    expect(resGet.statusCode).toBe(401);
+
+    const resPost = mockRes();
+    await authenticate({ method: 'POST', path: '/export', query: { token: validToken }, headers: {} }, resPost, jest.fn());
+    expect(resPost.statusCode).toBe(401);
+  });
+
   test('authenticate rejects expired or invalid JWT tokens', async () => {
     const expiredToken = jwt.sign({ sub: 'user1' }, appConfig.jwt.secret, { expiresIn: '-10s' });
     const resExpired = mockRes();

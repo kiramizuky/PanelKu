@@ -208,7 +208,7 @@
       <% if (typeof loadedPlugins !== 'undefined' && loadedPlugins.length > 0) { %>
         <% loadedPlugins.forEach(function(plugin) { %>
           <a href="<%= plugin.path || '/plugins/' + plugin.name %>" class="lp-app-item" draggable="true" data-id="plugin-<%= plugin.name %>">
-            <div class="lp-app-icon" <%- `style="color: ${plugin.color || '#38bdf8'};"` %>><i class="bi <%= plugin.icon || 'bi-plugin' %>"></i></div>
+            <div class="lp-app-icon" style="color: <%= /^#[0-9a-fA-F]{3,8}$/.test(plugin.color || '') ? plugin.color : '#38bdf8' %>;"><i class="bi <%= plugin.icon || 'bi-plugin' %>"></i></div>
             <div style="font-size: 13px; font-weight: 500;"><%= plugin.name %></div>
           </a>
         <% }); %>
