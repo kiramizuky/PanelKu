@@ -16,89 +16,23 @@
 
   <!-- Top Navbar -->
   <header class="lp-top-navbar">
-    <a href="/dashboard" class="lp-brand">
-      <img src="/images/logo.png" alt="Panelku Logo" style="width: 32px; height: 32px; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-      Panelku
-    </a>
-    
-    <nav class="lp-nav-links d-none d-md-flex" style="gap:5px;">
-      <a href="/dashboard" class="lp-nav-link <%= typeof title !== 'undefined' && title === 'Dashboard' ? 'active' : '' %>">Dashboard</a>
-      
-      <!-- Core Dropdown -->
-      <div class="dropdown">
-        <a href="#" class="lp-nav-link dropdown-toggle" data-bs-toggle="dropdown">Core</a>
-        <ul class="dropdown-menu lp-dropdown" style="background:rgba(20,25,40,0.9); backdrop-filter:blur(15px); border:1px solid var(--glass-border);">
-          <li><a class="dropdown-item" href="/monitor"><i class="bi bi-cpu me-2"></i>Monitoring</a></li>
-          <li><a class="dropdown-item" href="/analytics"><i class="bi bi-bar-chart-fill me-2"></i>Analytics</a></li>
-          <li><a class="dropdown-item" href="/system"><i class="bi bi-gear-wide-connected me-2"></i>System</a></li>
-          <li><a class="dropdown-item" href="/terminal"><i class="bi bi-terminal me-2"></i>Terminal</a></li>
-          <li><a class="dropdown-item" href="/filemanager"><i class="bi bi-folder2-open me-2"></i>File Manager</a></li>
-        </ul>
-      </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="btn-lp btn-lp-ghost btn-lp-sm d-none d-lg-inline-flex" id="lpSidebarToggleBtn" title="Toggle Sidebar" style="width:34px;height:34px;padding:0;align-items:center;justify-content:center;border-radius:9px;">
+        <i class="bi bi-layout-sidebar" style="font-size:16px;"></i>
+      </button>
+      <a href="/dashboard" class="lp-brand">
+        <img src="/images/logo.png" alt="Panelku Logo" style="width: 32px; height: 32px; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+        Panelku
+      </a>
+    </div>
 
-      <!-- Services Dropdown -->
-      <div class="dropdown">
-        <a href="#" class="lp-nav-link dropdown-toggle" data-bs-toggle="dropdown">Services</a>
-        <ul class="dropdown-menu lp-dropdown" style="background:rgba(20,25,40,0.9); backdrop-filter:blur(15px); border:1px solid var(--glass-border);">
-          <li><a class="dropdown-item" href="/docker"><i class="bi bi-box-seam me-2"></i>Docker</a></li>
-          <li><a class="dropdown-item" href="/websites"><i class="bi bi-globe2 me-2"></i>Websites (Nginx)</a></li>
-          <li><a class="dropdown-item" href="/caddy"><i class="bi bi-shield-fill-check me-2"></i>Caddy Server</a></li>
-          <li><a class="dropdown-item" href="/apache"><i class="bi bi-server me-2"></i>Apache</a></li>
-          <li><a class="dropdown-item" href="/dns"><i class="bi bi-globe2 me-2"></i>DNS Manager</a></li>
-          <li><a class="dropdown-item" href="/database"><i class="bi bi-database me-2"></i>Databases</a></li>
-          <li><a class="dropdown-item" href="/nodejs"><i class="bi bi-code-slash me-2"></i>Node.js</a></li>
-          <li><a class="dropdown-item" href="/python"><i class="bi bi-filetype-py me-2"></i>Python</a></li>
-          <li><a class="dropdown-item" href="/mongodb"><i class="bi bi-database-fill me-2"></i>MongoDB</a></li>
-          <li><a class="dropdown-item" href="/redis-manager"><i class="bi bi-database-fill-gear me-2"></i>Redis</a></li>
-          <li><a class="dropdown-item" href="/cron"><i class="bi bi-calendar3 me-2"></i>Cron Jobs</a></li>
-          <li><a class="dropdown-item" href="/gpu"><i class="bi bi-cpu me-2"></i>GPU Manager</a></li>
-          <li><a class="dropdown-item" href="/power"><i class="bi bi-sliders2 me-2"></i>Power Manager</a></li>
-          <li><a class="dropdown-item" href="/mail"><i class="bi bi-envelope me-2"></i>Mail Server</a></li>
-          <li><a class="dropdown-item" href="/cdn"><i class="bi bi-cloud-fill me-2"></i>CDN & Cache</a></li>
-          <li><a class="dropdown-item" href="/iot"><i class="bi bi-wifi me-2"></i>IoT Manager</a></li>
-          <li><a class="dropdown-item" href="/whatsapp"><i class="bi bi-whatsapp text-success me-2"></i>WhatsApp API</a></li>
-          <li><a class="dropdown-item" href="/plugins/lvm-manager"><i class="bi bi-hdd-rack me-2"></i>LVM & RAID Manager</a></li>
-        </ul>
-      </div>
-
-      <!-- Security Dropdown -->
-      <div class="dropdown">
-        <a href="#" class="lp-nav-link dropdown-toggle" data-bs-toggle="dropdown">Security</a>
-        <ul class="dropdown-menu lp-dropdown" style="background:rgba(20,25,40,0.9); backdrop-filter:blur(15px); border:1px solid var(--glass-border);">
-          <li><a class="dropdown-item" href="/firewall"><i class="bi bi-shield-lock me-2"></i>Firewall</a></li>
-          <li><a class="dropdown-item" href="/ssl"><i class="bi bi-safe me-2"></i>SSL Certificates</a></li>
-          <li><a class="dropdown-item" href="/autoheal"><i class="bi bi-heart-pulse-fill me-2"></i>Auto-Healing</a></li>
-          <li><a class="dropdown-item" href="/vulnerabilities"><i class="bi bi-shield-slash-fill text-danger me-2"></i>AI Vulnerabilities <span class="badge bg-danger ms-1" style="font-size: 9px;">New v3.8</span></a></li>
-          <li><a class="dropdown-item" href="/ai-repair"><i class="bi bi-robot me-2"></i>AI Auto-Repair</a></li>
-          <li><a class="dropdown-item" href="/waf"><i class="bi bi-shield-fill-exclamation me-2"></i>WAF</a></li>
-          <li><a class="dropdown-item" href="/alerts"><i class="bi bi-bell-fill text-warning me-2"></i>Notification Alerts</a></li>
-          <li><a class="dropdown-item" href="/n8n"><i class="bi bi-shuffle me-2"></i>n8n Automation</a></li>
-          <li><a class="dropdown-item" href="/tailscale"><i class="bi bi-shield-shaded me-2"></i>Tailscale VPN</a></li>
-        </ul>
-      </div>
-
-      <!-- System Dropdown -->
-      <div class="dropdown">
-        <a href="#" class="lp-nav-link dropdown-toggle" data-bs-toggle="dropdown">Tools</a>
-        <ul class="dropdown-menu lp-dropdown" style="background:rgba(20,25,40,0.9); backdrop-filter:blur(15px); border:1px solid var(--glass-border);">
-          <li><a class="dropdown-item" href="/backup"><i class="bi bi-cloud-arrow-up me-2"></i>Backups</a></li>
-          <li><a class="dropdown-item" href="/cloudflare"><i class="bi bi-cloud me-2"></i>Cloudflare Tunnel</a></li>
-          <li><a class="dropdown-item" href="/plugins"><i class="bi bi-plugin me-2"></i>Plugins</a></li>
-          <li><a class="dropdown-item" href="/cluster"><i class="bi bi-diagram-3-fill me-2"></i>Cluster Manager</a></li>
-          <% if (typeof loadedPlugins !== 'undefined' && loadedPlugins.length > 0) { %>
-            <li><hr class="dropdown-divider" style="border-color: var(--glass-border);"></li>
-            <% loadedPlugins.forEach(function(plugin) { %>
-              <li><a class="dropdown-item" href="<%= plugin.path || '/plugins/' + plugin.name %>"><i class="bi <%= plugin.icon || 'bi-plugin' %> me-2"></i><%= plugin.name %></a></li>
-            <% }); %>
-          <% } %>
-          <li><hr class="dropdown-divider" style="border-color: var(--glass-border);"></li>
-          <li><a class="dropdown-item" href="/updater"><i class="bi bi-arrow-up-circle me-2"></i>Panel Updater</a></li>
-          <li><a class="dropdown-item" href="/settings/profile"><i class="bi bi-person-fill-gear me-2"></i>Settings</a></li>
-          <li><a class="dropdown-item" href="/settings/themes"><i class="bi bi-palette me-2"></i>Themes</a></li>
-          <li><a class="dropdown-item" href="/api-docs"><i class="bi bi-book me-2"></i>API Docs</a></li>
-        </ul>
-      </div>
-    </nav>
+    <div class="d-none d-md-flex align-items-center gap-2">
+      <button type="button" class="lp-cp-trigger" id="lpCommandPaletteTrigger" title="Quick Jump (Ctrl+K)">
+        <i class="bi bi-search"></i>
+        <span>Quick jump to module...</span>
+        <span class="lp-cp-kbd">Ctrl+K</span>
+      </button>
+    </div>
 
     <div class="lp-user-menu" style="display:flex;align-items:center;gap:15px;">
       <!-- Mobile Burger Menu Trigger -->
@@ -267,15 +201,110 @@
     </div>
   </div>
 
-  <!-- Main Content Area -->
-  <div class="lp-container">
-    <%- body %>
+  <!-- Modern App Shell: Desktop Sidebar + Main Content -->
+  <div class="lp-app-shell" id="lpAppShell">
+    <aside class="lp-sidebar" id="lpDesktopSidebar" aria-label="Primary Navigation">
+      <div class="lp-side-group" data-nav-group="Overview">
+        <span class="lp-side-group-title">Overview</span>
+        <a href="/dashboard" class="lp-side-link" title="Dashboard"><i class="bi bi-speedometer2"></i><span class="lp-side-label">Dashboard</span></a>
+        <a href="/monitor" class="lp-side-link" title="Monitoring"><i class="bi bi-cpu"></i><span class="lp-side-label">Monitoring</span></a>
+        <a href="/analytics" class="lp-side-link" title="Analytics"><i class="bi bi-bar-chart-fill"></i><span class="lp-side-label">Analytics</span></a>
+      </div>
+
+      <div class="lp-side-group" data-nav-group="Core">
+        <span class="lp-side-group-title">Core</span>
+        <a href="/terminal" class="lp-side-link" title="Web Terminal"><i class="bi bi-terminal"></i><span class="lp-side-label">Terminal</span></a>
+        <a href="/filemanager" class="lp-side-link" title="File Manager"><i class="bi bi-folder2-open"></i><span class="lp-side-label">File Manager</span></a>
+        <a href="/system" class="lp-side-link" title="System"><i class="bi bi-gear-wide-connected"></i><span class="lp-side-label">System &amp; Vault</span></a>
+        <a href="/cron" class="lp-side-link" title="Cron Jobs"><i class="bi bi-calendar3"></i><span class="lp-side-label">Cron Jobs</span></a>
+      </div>
+
+      <div class="lp-side-group" data-nav-group="Infrastructure">
+        <span class="lp-side-group-title">Web &amp; Containers</span>
+        <a href="/docker" class="lp-side-link" title="Docker"><i class="bi bi-box-seam"></i><span class="lp-side-label">Docker</span></a>
+        <a href="/websites" class="lp-side-link" title="Websites (Nginx)"><i class="bi bi-globe2"></i><span class="lp-side-label">Websites (Nginx)</span></a>
+        <a href="/caddy" class="lp-side-link" title="Caddy Server"><i class="bi bi-shield-fill-check"></i><span class="lp-side-label">Caddy Server</span></a>
+        <a href="/apache" class="lp-side-link" title="Apache"><i class="bi bi-server"></i><span class="lp-side-label">Apache</span></a>
+        <a href="/dns" class="lp-side-link" title="DNS Manager"><i class="bi bi-diagram-2"></i><span class="lp-side-label">DNS Manager</span></a>
+        <a href="/nodejs" class="lp-side-link" title="Node.js"><i class="bi bi-code-slash"></i><span class="lp-side-label">Node.js</span></a>
+        <a href="/python" class="lp-side-link" title="Python"><i class="bi bi-filetype-py"></i><span class="lp-side-label">Python</span></a>
+      </div>
+
+      <div class="lp-side-group" data-nav-group="Databases">
+        <span class="lp-side-group-title">Data &amp; Services</span>
+        <a href="/database" class="lp-side-link" title="Databases"><i class="bi bi-database"></i><span class="lp-side-label">Databases</span></a>
+        <a href="/mongodb" class="lp-side-link" title="MongoDB"><i class="bi bi-database-fill"></i><span class="lp-side-label">MongoDB</span></a>
+        <a href="/redis-manager" class="lp-side-link" title="Redis"><i class="bi bi-database-fill-gear"></i><span class="lp-side-label">Redis</span></a>
+        <a href="/backup" class="lp-side-link" title="Backups"><i class="bi bi-cloud-arrow-up"></i><span class="lp-side-label">Backups</span></a>
+        <a href="/mail" class="lp-side-link" title="Mail Server"><i class="bi bi-envelope"></i><span class="lp-side-label">Mail Server</span></a>
+        <a href="/cdn" class="lp-side-link" title="CDN &amp; Cache"><i class="bi bi-cloud-fill"></i><span class="lp-side-label">CDN &amp; Cache</span></a>
+        <a href="/gpu" class="lp-side-link" title="GPU Manager"><i class="bi bi-gpu-card"></i><span class="lp-side-label">GPU Manager</span></a>
+        <a href="/power" class="lp-side-link" title="Power Manager"><i class="bi bi-sliders2"></i><span class="lp-side-label">Power Manager</span></a>
+        <a href="/iot" class="lp-side-link" title="IoT Manager"><i class="bi bi-wifi"></i><span class="lp-side-label">IoT Manager</span></a>
+        <a href="/whatsapp" class="lp-side-link" title="WhatsApp API"><i class="bi bi-whatsapp text-success"></i><span class="lp-side-label">WhatsApp API</span></a>
+      </div>
+
+      <div class="lp-side-group" data-nav-group="Security">
+        <span class="lp-side-group-title">Security &amp; Hardening</span>
+        <a href="/vulnerabilities" class="lp-side-link" title="Vulnerability Center"><i class="bi bi-shield-slash-fill text-danger"></i><span class="lp-side-label">Vulnerabilities</span><span class="badge bg-danger ms-auto lp-side-badge" style="font-size:9px;">v3.8</span></a>
+        <a href="/firewall" class="lp-side-link" title="Firewall &amp; nftables"><i class="bi bi-shield-lock"></i><span class="lp-side-label">Firewall</span></a>
+        <a href="/waf" class="lp-side-link" title="WAF"><i class="bi bi-shield-fill-exclamation"></i><span class="lp-side-label">WAF &amp; CrowdSec</span></a>
+        <a href="/ssl" class="lp-side-link" title="SSL Certificates"><i class="bi bi-safe"></i><span class="lp-side-label">SSL Certificates</span></a>
+        <a href="/autoheal" class="lp-side-link" title="Auto-Healing"><i class="bi bi-heart-pulse-fill"></i><span class="lp-side-label">Auto-Healing</span></a>
+        <a href="/ai-repair" class="lp-side-link" title="AI Auto-Repair"><i class="bi bi-robot"></i><span class="lp-side-label">AI Auto-Repair</span></a>
+        <a href="/alerts" class="lp-side-link" title="Notification Alerts"><i class="bi bi-bell-fill text-warning"></i><span class="lp-side-label">Alerts</span></a>
+        <a href="/tailscale" class="lp-side-link" title="Tailscale VPN"><i class="bi bi-shield-shaded"></i><span class="lp-side-label">Tailscale VPN</span></a>
+      </div>
+
+      <div class="lp-side-group" data-nav-group="Tools">
+        <span class="lp-side-group-title">Fleet &amp; Platform</span>
+        <a href="/cluster" class="lp-side-link" title="Cluster Manager"><i class="bi bi-diagram-3-fill"></i><span class="lp-side-label">Cluster &amp; mTLS</span></a>
+        <a href="/cloudflare" class="lp-side-link" title="Cloudflare Tunnel"><i class="bi bi-cloud"></i><span class="lp-side-label">Cloudflare Tunnel</span></a>
+        <a href="/n8n" class="lp-side-link" title="n8n Automation"><i class="bi bi-shuffle"></i><span class="lp-side-label">n8n Automation</span></a>
+        <a href="/plugins" class="lp-side-link" title="Plugins"><i class="bi bi-plugin"></i><span class="lp-side-label">Plugins</span></a>
+        <a href="/updater" class="lp-side-link" title="Panel Updater"><i class="bi bi-arrow-up-circle"></i><span class="lp-side-label">Updater</span></a>
+        <a href="/settings/profile" class="lp-side-link" title="Settings"><i class="bi bi-person-fill-gear"></i><span class="lp-side-label">Settings</span></a>
+        <a href="/settings/themes" class="lp-side-link" title="Themes"><i class="bi bi-palette"></i><span class="lp-side-label">Themes</span></a>
+        <a href="/api-docs" class="lp-side-link" title="API Docs"><i class="bi bi-book"></i><span class="lp-side-label">API Docs</span></a>
+      </div>
+
+      <% if (typeof loadedPlugins !== 'undefined' && loadedPlugins.length > 0) { %>
+        <div class="lp-side-group" data-nav-group="Plugins">
+          <span class="lp-side-group-title">Installed Plugins</span>
+          <% loadedPlugins.forEach(function(plugin) { %>
+            <a href="<%= plugin.path || '/plugins/' + plugin.name %>" class="lp-side-link" title="<%= plugin.name %>">
+              <i class="bi <%= plugin.icon || 'bi-plugin' %>"></i>
+              <span class="lp-side-label"><%= plugin.name %></span>
+            </a>
+          <% }); %>
+        </div>
+      <% } %>
+    </aside>
+
+    <div class="lp-app-main">
+      <!-- Main Content Area -->
+      <div class="lp-container">
+        <%- body %>
+      </div>
+
+      <!-- Transparent Center Footer -->
+      <footer style="text-align: center; padding: 20px; font-size: 11px; color: var(--text-muted); opacity: 0.7; background: transparent;">
+        by Phersa Creative Studio™
+      </footer>
+    </div>
   </div>
 
-  <!-- Transparent Center Footer -->
-  <footer style="text-align: center; padding: 20px; font-size: 11px; color: var(--text-muted); opacity: 0.7; background: transparent;">
-    by Phersa Creative Studio™
-  </footer>
+  <!-- Ctrl+K Command Palette -->
+  <div class="lp-cp-overlay" id="lpCommandPalette" role="dialog" aria-modal="true" aria-label="Quick Command Palette">
+    <div class="lp-cp-dialog">
+      <div class="lp-cp-search-wrap">
+        <i class="bi bi-search text-primary"></i>
+        <input type="text" class="lp-cp-input" id="lpCommandPaletteInput" placeholder="Type a module name, plugin, or quick action..." autocomplete="off">
+        <span class="lp-cp-kbd">ESC</span>
+      </div>
+      <div class="lp-cp-list" id="lpCommandPaletteList"></div>
+    </div>
+  </div>
 
   <!-- OpenClaw AI Copilot Floating Widget -->
   <div id="aiWidgetContainer" style="position:fixed; bottom:25px; right:25px; z-index:9999; font-family:var(--font-sans);">
@@ -296,7 +325,7 @@
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:6px;">
-          <button class="btn-lp btn-lp-ghost btn-lp-sm p-0" id="aiExpandBtn" onclick="toggleAIChatExpand()" title="Perbesar / Perkecil Jendela" style="width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:6px;"><i class="bi bi-arrows-fullscreen" style="font-size:12px;"></i></button>
+          <button class="btn-lp btn-lp-ghost btn-lp-sm p-0" id="aiExpandBtn" onclick="toggleAIChatExpand()" title="Expand / Collapse Window" style="width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:6px;"><i class="bi bi-arrows-fullscreen" style="font-size:12px;"></i></button>
           <button class="btn-lp btn-lp-ghost btn-lp-sm p-0" onclick="toggleAIChat()" title="Close" style="width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:50%;"><i class="bi bi-x-lg" style="font-size:12px;"></i></button>
         </div>
       </div>
@@ -518,5 +547,6 @@
       sendAIMessage(message, context);
     };
   </script>
+  <script src="/js/command-palette.js"></script>
 </body>
 </html>
