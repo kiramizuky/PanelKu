@@ -45,3 +45,5 @@ install.sh
 tmp-*
 *.tmp
 plugins/_test_*
+storage/.vault.key
+storage/certs/
