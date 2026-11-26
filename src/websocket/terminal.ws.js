@@ -7,6 +7,7 @@ import path from 'path';
 import WebSocket from 'ws';
 import { getDb } from '../core/db/sqlite.js';
 import { getStorageDir } from '../config/paths.js';
+import mtlsService from '../modules/cluster/mtls.service.js';
 
 const AUDIT_LOG_PATH = path.join(getStorageDir(), 'logs', 'terminal_audit.log');
 
@@ -87,7 +88,7 @@ export const registerTerminalSocket = (namespace) => {
           logger.info(`Connecting terminal proxy to remote node: ${node.name}`);
 
           const agentWs = new WebSocket(wsUrl, {
-            rejectUnauthorized: process.env.AGENT_TLS_STRICT === 'true',
+            ...mtlsService.getWsTlsOptions(),
             headers: {
               'X-API-Key': node.api_key
             }

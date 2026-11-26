@@ -100,6 +100,16 @@ export const bootstrap = async (app, httpServer) => {
   startPasswordExpiryReminder();
   startRetentionJob();
 
+  // 5.2 Start File Integrity Monitoring (FIM) watcher on Linux production hosts
+  if (process.env.NODE_ENV !== 'test' && process.platform !== 'win32') {
+    try {
+      const { default: fimService } = await import('./modules/vulnerabilities/fim.service.js');
+      fimService.startWatcher();
+    } catch (err) {
+      logger.warn(`FIM watcher startup error (non-fatal): ${err.message}`);
+    }
+  }
+
   // 5.5 Load WAF cache
   const { refreshWafCache } = await import('./middleware/waf.middleware.js');
   await refreshWafCache();
@@ -130,6 +140,10 @@ export const gracefulShutdown = async () => {
 
   // Now safe to close Queues, Terminals, DB and Redis
   cache.stopHealthMonitor();
+  try {
+    const { default: fimService } = await import('./modules/vulnerabilities/fim.service.js');
+    await fimService.stopWatcher();
+  } catch (e) { logger.warn('FIM stop error: ' + e.message); }
   try {
     const { default: terminalService } = await import('./modules/terminal/terminal.service.js');
     terminalService.killAll();

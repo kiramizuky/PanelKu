@@ -64,6 +64,45 @@ router.get(
   vulnerabilitiesController.getCisReport.bind(vulnerabilitiesController)
 );
 
+// ── Baseline Hardening Profiles (Preview Diff, Apply + Auto-Rollback) ──
+router.get(
+  '/hardening/profiles',
+  rbac(RESOURCES.VULNERABILITIES, ACTIONS.READ),
+  vulnerabilitiesController.listHardeningProfiles.bind(vulnerabilitiesController)
+);
+router.get(
+  '/hardening/preview/:profile',
+  rbac(RESOURCES.VULNERABILITIES, ACTIONS.READ),
+  vulnerabilitiesController.previewHardeningProfile.bind(vulnerabilitiesController)
+);
+router.post(
+  '/hardening/apply/:profile',
+  rbac(RESOURCES.VULNERABILITIES, ACTIONS.EXECUTE),
+  vulnerabilitiesController.applyHardeningProfile.bind(vulnerabilitiesController)
+);
+router.post(
+  '/hardening/rollback',
+  rbac(RESOURCES.VULNERABILITIES, ACTIONS.EXECUTE),
+  vulnerabilitiesController.rollbackHardeningProfile.bind(vulnerabilitiesController)
+);
+
+// ── File Integrity Monitoring (FIM) & Drift Detection ──
+router.get(
+  '/fim/status',
+  rbac(RESOURCES.VULNERABILITIES, ACTIONS.READ),
+  vulnerabilitiesController.getFimStatus.bind(vulnerabilitiesController)
+);
+router.post(
+  '/fim/check',
+  rbac(RESOURCES.VULNERABILITIES, ACTIONS.EXECUTE),
+  vulnerabilitiesController.checkFimNow.bind(vulnerabilitiesController)
+);
+router.post(
+  '/fim/accept',
+  rbac(RESOURCES.VULNERABILITIES, ACTIONS.EXECUTE),
+  vulnerabilitiesController.acceptFimDrift.bind(vulnerabilitiesController)
+);
+
 // ── Export ──
 router.get(
   '/export',

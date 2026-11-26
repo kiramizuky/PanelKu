@@ -3,6 +3,8 @@
  */
 
 import vulnerabilitiesService from './vulnerabilities.service.js';
+import hardeningService from './hardening.service.js';
+import fimService from './fim.service.js';
 import { success, error } from '../../helpers/response.js';
 import logger from '../../config/logger.js';
 
@@ -128,6 +130,69 @@ class VulnerabilitiesController {
     } catch (err) {
       logger.error(`Failed to run CIS benchmark: ${err.message}`);
       return error(res, err.message, 500);
+    }
+  }
+
+  async listHardeningProfiles(req, res) {
+    try {
+      return success(res, hardeningService.listProfiles(), 'Hardening profiles loaded');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async previewHardeningProfile(req, res) {
+    try {
+      const preview = hardeningService.previewProfile(req.params.profile);
+      return success(res, preview, 'Hardening diff preview generated');
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  async applyHardeningProfile(req, res) {
+    try {
+      const { confirmed } = req.body || {};
+      const result = await hardeningService.applyProfile(req.params.profile, { confirmed: Boolean(confirmed) });
+      return success(res, result, result.rolledBack ? 'Healthcheck failed; profile rolled back' : 'Hardening profile applied');
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  async rollbackHardeningProfile(req, res) {
+    try {
+      const result = await hardeningService.rollbackSnapshot();
+      return success(res, result, 'Hardening snapshot rolled back');
+    } catch (err) {
+      return error(res, err.message, 400);
+    }
+  }
+
+  async getFimStatus(req, res) {
+    try {
+      return success(res, fimService.getStatus(), 'FIM status loaded');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async checkFimNow(req, res) {
+    try {
+      const result = await fimService.checkNow();
+      return success(res, result, 'FIM verification completed');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async acceptFimDrift(req, res) {
+    try {
+      const { file } = req.body || {};
+      if (!file) return error(res, 'file is required', 400);
+      return success(res, fimService.acceptDrift(file), 'FIM baseline updated');
+    } catch (err) {
+      return error(res, err.message, 400);
     }
   }
 }

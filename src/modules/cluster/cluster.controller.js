@@ -1,5 +1,6 @@
 import clusterService from './cluster.service.js';
 import k8sService from './k8s.service.js';
+import mtlsService from './mtls.service.js';
 import { success, error } from '../../helpers/response.js';
 
 class ClusterController {
@@ -138,6 +139,34 @@ class ClusterController {
       return success(res, summary, 'Kubernetes cluster summary retrieved');
     } catch (err) {
       return error(res, err.message, 500);
+    }
+  }
+
+  async getMtlsStatus(req, res) {
+    try {
+      return success(res, mtlsService.getStatus(), 'Cluster mTLS status retrieved');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async initMtlsCa(req, res) {
+    try {
+      const status = await mtlsService.initCA();
+      return success(res, status, 'Internal Cluster CA initialized');
+    } catch (err) {
+      return error(res, err.message, 500);
+    }
+  }
+
+  async issueNodeMtlsCert(req, res) {
+    try {
+      const { id } = req.params;
+      const { host } = req.body || {};
+      const bundle = await mtlsService.issueNodeCert(id, host);
+      return success(res, bundle, 'Node mTLS certificate issued');
+    } catch (err) {
+      return error(res, err.message, 400);
     }
   }
 }

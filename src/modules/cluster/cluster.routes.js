@@ -27,5 +27,10 @@ router.get('/nodes/:id/metrics',       clusterController.getNodeMetrics.bind(clu
 // ── K3s / MicroK8s Cluster Support (Fase 5) ──
 router.get('/k8s/summary',             clusterController.getK8sSummary.bind(clusterController));
 
+// ── Zero-Trust mTLS CA & Node Certificates ──
+router.get('/mtls/status',             clusterController.getMtlsStatus.bind(clusterController));
+router.post('/mtls/init',              clusterController.initMtlsCa.bind(clusterController));
+router.post('/nodes/:id/mtls-cert',    clusterController.issueNodeMtlsCert.bind(clusterController));
+
 export default router;
 
