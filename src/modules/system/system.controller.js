@@ -557,6 +557,37 @@ class SystemController {
       return errorResponse(res, error.message || 'Failed to update locale', 500);
     }
   }
+
+  async listVaultSecrets(req, res) {
+    try {
+      const { default: secretVault } = await import('../../core/security/secretVault.js');
+      const secrets = await secretVault.listSecrets();
+      return success(res, secrets, 'Vault secrets listed');
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to list vault secrets', 500);
+    }
+  }
+
+  async setVaultSecret(req, res) {
+    try {
+      const { default: secretVault } = await import('../../core/security/secretVault.js');
+      const { name, value } = req.body || {};
+      const result = await secretVault.setSecret(name, value);
+      return success(res, result, 'Secret encrypted and stored in vault');
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to store secret', 400);
+    }
+  }
+
+  async deleteVaultSecret(req, res) {
+    try {
+      const { default: secretVault } = await import('../../core/security/secretVault.js');
+      const result = await secretVault.deleteSecret(req.params.name);
+      return success(res, result, 'Secret deleted from vault');
+    } catch (error) {
+      return errorResponse(res, error.message || 'Failed to delete secret', 400);
+    }
+  }
 }
 
 export default new SystemController();

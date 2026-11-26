@@ -280,3 +280,31 @@ jobs:
           tags: panelku:ci-build
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ── Stage 6: Playwright E2E Security & UI Regression ────────────
+  e2e-playwright:
+    name: 🎭 Playwright E2E Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [smoke-boot]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies & Playwright Chromium
+        run: npm ci && npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Suite
+        run: npx playwright test --config=tests/e2e/playwright.config.mjs
+        env:
+          CI: 'true'
+          JWT_SECRET: e2e-jwt-secret-must-be-32-chars-min
+          JWT_REFRESH_SECRET: e2e-refresh-secret-must-be-32-chars
+          APP_SECRET: e2e-app-secret-must-be-32-chars-min

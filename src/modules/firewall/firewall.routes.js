@@ -14,4 +14,10 @@ router.post('/toggle', firewallController.toggleStatus.bind(firewallController))
 router.post('/rules', firewallController.addRule.bind(firewallController));
 router.delete('/rules/:id', firewallController.deleteRule.bind(firewallController));
 
+// ── Modern nftables & Outbound Egress Filtering ──
+router.get('/nftables', firewallController.getNftablesStatus.bind(firewallController));
+router.post('/nftables/egress', firewallController.enableEgressFilter.bind(firewallController));
+router.delete('/nftables/egress', firewallController.disableEgressFilter.bind(firewallController));
+router.post('/nftables/ingress', firewallController.addNftIngressRule.bind(firewallController));
+
 export default router;

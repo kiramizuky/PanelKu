@@ -92,5 +92,15 @@ router.put(
   systemController.setLocale.bind(systemController)
 );
 
+// AES-256-GCM Secret Vault endpoints
+router.get('/vault/secrets', rbac(RESOURCES.SYSTEM, ACTIONS.READ), systemController.listVaultSecrets.bind(systemController));
+router.post(
+  '/vault/secrets',
+  rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE),
+  validateSchema({ body: { name: { type: 'string', required: true, min: 2, max: 64 }, value: { type: 'string', required: true, min: 1 } } }),
+  systemController.setVaultSecret.bind(systemController)
+);
+router.delete('/vault/secrets/:name', rbac(RESOURCES.SYSTEM, ACTIONS.EXECUTE), systemController.deleteVaultSecret.bind(systemController));
+
 export default router;
 
