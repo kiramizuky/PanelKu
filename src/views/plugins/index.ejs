@@ -44,11 +44,25 @@
 
   <!-- Tab: Installed -->
   <div id="tab-installed" class="pl-tab-content active" style="padding:20px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-      <h5 style="font-size:15px;font-weight:600;margin:0;color:var(--text-primary);">
-        <i class="bi bi-box-seam text-primary me-1"></i> Installed Plugins
-      </h5>
-      <input type="text" id="installedFilter" class="lp-input" style="width:200px;font-size:12px;" placeholder="Filter plugins..." oninput="PluginsPage.filterInstalled()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h5 style="font-size:15px;font-weight:600;margin:0;color:var(--text-primary);">
+          <i class="bi bi-box-seam text-primary me-1"></i> Installed Plugins
+        </h5>
+        <div id="pluginLastChecked" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Update check: Never</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <select id="pluginCheckInterval" class="lp-input" style="width:145px;font-size:12px;" onchange="PluginsPage.saveInterval(this.value)" title="Periodic Update Check Interval">
+          <option value="0">Auto-Check: Off</option>
+          <option value="1">Every 1 hour</option>
+          <option value="6">Every 6 hours</option>
+          <option value="12">Every 12 hours</option>
+          <option value="24">Every 24 hours</option>
+        </select>
+        <button class="btn-lp btn-lp-ghost btn-lp-sm" onclick="PluginsPage.checkUpdates()"><i class="bi bi-arrow-repeat me-1"></i>Check Updates</button>
+        <button class="btn-lp btn-lp-primary btn-lp-sm d-none" id="btnUpdateAllPlugins" onclick="PluginsPage.updateAll()"><i class="bi bi-cloud-arrow-down me-1"></i>Update All</button>
+        <input type="text" id="installedFilter" class="lp-input" style="width:180px;font-size:12px;" placeholder="Filter plugins..." oninput="PluginsPage.filterInstalled()">
+      </div>
     </div>
     <div class="row g-3" id="pluginsContainer"></div>
   </div>
@@ -174,8 +188,33 @@ plugin-name/
     async function loadInstalled() {
       try {
         const res = await LP.get('/plugins');
-        if (res?.success) renderInstalled(res.data || []);
+        if (res?.success) {
+          const payload = res.data;
+          const plugins = Array.isArray(payload) ? payload : (payload?.plugins || []);
+          const policy = payload?.policy || null;
+          renderPolicyBar(plugins, policy);
+          renderInstalled(plugins);
+        }
       } catch { LP.toast('Failed to load plugins', 'error'); }
+    }
+
+    function renderPolicyBar(plugins, policy) {
+      const checkedEl = document.getElementById('pluginLastChecked');
+      const intervalEl = document.getElementById('pluginCheckInterval');
+      const updateAllBtn = document.getElementById('btnUpdateAllPlugins');
+      if (checkedEl) {
+        checkedEl.textContent = policy?.lastCheckedAt
+          ? `Last checked: ${new Date(policy.lastCheckedAt).toLocaleString()}`
+          : 'Update check: Not run yet';
+      }
+      if (intervalEl && policy?.intervalHours !== undefined) {
+        intervalEl.value = String(policy.intervalHours);
+      }
+      const updatableCount = plugins.filter(p => p.installed && p.updateAvailable).length;
+      if (updateAllBtn) {
+        updateAllBtn.classList.toggle('d-none', updatableCount === 0);
+        updateAllBtn.innerHTML = `<i class="bi bi-cloud-arrow-down me-1"></i>Update All (${updatableCount})`;
+      }
     }
 
     function renderInstalled(plugins) {
@@ -196,13 +235,17 @@ plugin-name/
                 </div>
                 <div>
                   <div style="font-weight:600;font-size:14px;color:var(--text-primary);">${p.name}</div>
-                  <div style="font-size:11px;color:var(--text-muted);">v${p.version}</div>
+                  <div style="font-size:11px;color:var(--text-muted);">v${p.version}${p.updateAvailable ? ` → <span class="text-warning">v${p.latestVersion}</span>` : ''}</div>
                 </div>
               </div>
               ${p.updateAvailable ? '<span class="lp-badge lp-badge-warning" style="font-size:9px;">Update</span>' : ''}
             </div>
             <p style="font-size:12px;color:var(--text-secondary);flex-grow:1;margin-bottom:10px;">${p.description || ''}</p>
             ${p.proxyUrl ? `<div style="font-size:11px;color:#38bdf8;background:rgba(56,189,248,0.08);padding:5px 8px;border-radius:6px;margin-bottom:8px;"><i class="bi bi-link-45deg"></i> ${p.proxyUrl}</div>` : ''}
+            <div class="form-check form-switch mb-2" style="font-size:11.5px;color:var(--text-muted);">
+              <input class="form-check-input" type="checkbox" ${p.autoUpdate ? 'checked' : ''} data-lp-on-change="${LP.registerInlineHandler('change', function () { PluginsPage.toggleAutoUpdate(p.id, this.checked); })}">
+              <label class="form-check-label">Auto-Update</label>
+            </div>
             <div style="display:flex;gap:6px;align-items:center;margin-top:auto;flex-wrap:wrap;">
               ${p.updateAvailable ? `<button class="btn-lp flex-grow-1 text-center" style="background:var(--accent-warning);color:#fff;font-size:12px;font-weight:600;border-radius:8px;height:34px;padding:0 8px;border:none;display:inline-flex;align-items:center;justify-content:center;" data-lp-on-click="${LP.registerInlineHandler('click', function () { PluginsPage.update(p.id, this); })}"><i class="bi bi-arrow-up-circle-fill me-1"></i>Update</button>` : ''}
               <a href="${p.path || '/plugins/' + (p.id || p.name)}" target="${p.proxyUrl ? '_blank' : '_self'}" class="btn-lp btn-lp-primary flex-grow-1 text-center" style="text-decoration:none;height:34px;padding:0 12px;font-size:13px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;">Open</a>
@@ -344,12 +387,19 @@ plugin-name/
 
     async function update(id, btn) {
       const orig = btn.innerHTML;
-      btn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Updating...';
+      btn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Starting...';
       btn.disabled = true;
       try {
         const res = await LP.post('/plugins/update', { id });
-        if (res?.success) { LP.toast(res.message, 'success'); loadInstalled(); }
-        else {
+        if (res?.success && res.data?.processId) {
+          LP.ProcessModal.open(res.data.processId, {
+            title: `Updating ${id}`,
+            onComplete: () => loadInstalled()
+          });
+        } else if (res?.success) {
+          LP.toast(res.message, 'success');
+          loadInstalled();
+        } else {
           const errMsg = res?.message || 'Update failed';
           LP.toast(errMsg, 'error');
           LP.showManualInstallModal(id, errMsg);
@@ -362,8 +412,60 @@ plugin-name/
       finally { btn.innerHTML = orig; btn.disabled = false; }
     }
 
+    async function checkUpdates() {
+      try {
+        const res = await LP.post('/plugins/check-updates', {});
+        if (res?.success && res.data?.processId) {
+          LP.ProcessModal.open(res.data.processId, {
+            title: 'Checking Plugin Updates',
+            onComplete: () => loadInstalled()
+          });
+        } else if (res?.success) {
+          LP.toast('Plugin update check completed', 'success');
+          loadInstalled();
+        }
+      } catch (err) {
+        LP.toast(err?.message || 'Check updates failed', 'error');
+      }
+    }
+
+    async function updateAll() {
+      try {
+        const res = await LP.post('/plugins/update-all', {});
+        if (res?.success && res.data?.processId) {
+          LP.ProcessModal.open(res.data.processId, {
+            title: 'Updating All Plugins',
+            onComplete: () => loadInstalled()
+          });
+        } else if (res?.success) {
+          LP.toast(res.message || 'All plugins are up to date', 'info');
+          loadInstalled();
+        }
+      } catch (err) {
+        LP.toast(err?.message || 'Batch update failed', 'error');
+      }
+    }
+
+    async function toggleAutoUpdate(pluginId, autoUpdate) {
+      try {
+        const res = await LP.post('/plugins/policy', { pluginId, autoUpdate });
+        if (res?.success) LP.toast(`Auto-update ${autoUpdate ? 'enabled' : 'disabled'} for ${pluginId}`, 'success');
+      } catch {
+        LP.toast('Failed to save auto-update setting', 'error');
+      }
+    }
+
+    async function saveInterval(intervalHours) {
+      try {
+        const res = await LP.post('/plugins/policy', { intervalHours: Number(intervalHours) });
+        if (res?.success) LP.toast('Periodic update check interval saved', 'success');
+      } catch {
+        LP.toast('Failed to save interval', 'error');
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', loadInstalled);
 
-    return { switchTab, loadMarketplace, filterMarketplace, filterInstalled, triggerUpload, uploadPlugin, showConfigModal, submitConfig, uninstall, update };
+    return { switchTab, loadMarketplace, filterMarketplace, filterInstalled, triggerUpload, uploadPlugin, showConfigModal, submitConfig, uninstall, update, checkUpdates, updateAll, toggleAutoUpdate, saveInterval };
   })();
 </script>

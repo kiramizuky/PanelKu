@@ -6,6 +6,8 @@ import path from 'path';
 import { execFile } from 'child_process';
 import util from 'util';
 import { getPluginsDir } from '../../config/paths.js';
+import pluginUpdateService, { PLUGIN_RELEASE_CATALOG } from './pluginUpdate.service.js';
+import processRunner from '../../services/processRunner.js';
 
 const execFileAsync = util.promisify(execFile);
 
@@ -108,29 +110,25 @@ class PluginsController {
       const proxiesStr = await Setting.get('plugin_proxies') || '{}';
       const proxies = JSON.parse(typeof proxiesStr === 'string' ? proxiesStr : JSON.stringify(proxiesStr));
 
-      const serverVersions = {
-        'php-manager': '1.2.0',
-        'home-assistant-manager': '1.5.0',
-        'adguard-manager': '1.1.0',
-        'fail2ban-manager': '1.0.5',
-        'nextcloud-manager': '1.3.0'
-      };
+      const policy = await pluginUpdateService.getPolicy();
+      pluginUpdateService.startPeriodicScheduler(req.app);
 
       const pluginsList = [];
       for (const entry of dirs) {
-        if (!entry.isDirectory()) continue;
+        if (!entry.isDirectory() || entry.name === 'shared') continue;
         try {
           const manifestPath = path.join(pluginsDir, entry.name, 'plugin.json');
           const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
           const currentVersion = manifest.version || '1.0.0';
-          const latestVersion = serverVersions[entry.name] || currentVersion;
+          const catalogInfo = PLUGIN_RELEASE_CATALOG[entry.name];
+          const latestVersion = catalogInfo?.version || currentVersion;
           const isInstalled = installedIds.includes(entry.name) && (
             proxies[entry.name]   // proxy plugin — no local route needed
               ? true
               : pluginLoader.isLoaded(entry.name) && pluginLoader.hasRoute(entry.name) // local plugin must have route
           );
-          // Basic semver check
-          const updateAvailable = isInstalled && (currentVersion !== latestVersion);
+          const updateInfo = policy.availableUpdates?.[entry.name];
+          const updateAvailable = isInstalled && (Boolean(updateInfo) || currentVersion !== latestVersion);
 
           pluginsList.push({
             id: entry.name,
@@ -139,6 +137,8 @@ class PluginsController {
             version: currentVersion,
             latestVersion,
             updateAvailable,
+            updateNotes: catalogInfo?.notes || '',
+            autoUpdate: policy.autoUpdatePlugins.includes(entry.name),
             path: (isInstalled && proxies[entry.name]) ? proxies[entry.name] : `/plugins/${entry.name}`,
             icon: manifest.icon || 'bi-plugin',
             color: manifest.color || '#38bdf8',
@@ -150,7 +150,7 @@ class PluginsController {
         }
       }
 
-      return successResponse(res, pluginsList, 'Plugins retrieved successfully');
+      return successResponse(res, { plugins: pluginsList, policy }, 'Plugins retrieved successfully');
     } catch (error) {
       return errorResponse(res, error.message, 500);
     }
@@ -472,98 +472,105 @@ class PluginsController {
     try {
       const { id } = req.body;
       if (!id) return errorResponse(res, 'Plugin ID is required', 400);
-      // [SECURITY FIX] Validate plugin ID to prevent path traversal AND command injection
       const safeId = validatePluginId(id);
+      const io = req.app.get('io');
 
-      const serverVersions = {
-        'php-manager': '1.2.0',
-        'home-assistant-manager': '1.5.0',
-        'adguard-manager': '1.1.0',
-        'fail2ban-manager': '1.0.5',
-        'nextcloud-manager': '1.3.0'
-      };
+      const proc = processRunner.create(io, {
+        title: `Updating Plugin: ${safeId}`,
+        subtitle: 'Snapshot backup, dependency sync, and runtime reload',
+        steps: [
+          'Create pre-update snapshot backup',
+          'Update manifest & install dependencies',
+          'Reload plugin into runtime & verify'
+        ]
+      });
 
-      const targetVersion = serverVersions[safeId];
-      if (!targetVersion) return errorResponse(res, 'No updates found for this plugin on the server', 404);
+      pluginUpdateService.updatePlugin({ id: safeId, app: req.app, io, proc }).catch((err) => {
+        proc.fail(err.message);
+      });
 
-      const pluginPath = path.join(getPluginsDir(), safeId);
-      const manifestPath = path.join(pluginPath, 'plugin.json');
-      
-      let manifest;
-      try {
-        manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
-      } catch {
-        return errorResponse(res, 'Plugin manifest not found', 404);
-      }
-
-      // Initialize PackageManager to check active distro and architecture
-      const packageManager = (await import('../system/package-manager.js')).default;
-      await packageManager.init();
-      const pmInfo = packageManager.getPMInfo();
-      
-      // Perform one-click update actions
-      // 1. Update the local manifest version
-      manifest.version = targetVersion;
-      await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
-
-      let updateLog = `Updating ${manifest.name} on ${pmInfo.name} (${pmInfo.arch})...\n`;
-
-      // 2. Perform install/setup commands safely
-      // [SECURITY FIX] Use execFile with args array — no shell string interpolation.
-      // The plugin directory is already validated by validatePluginId, so safeId is safe.
-
-      // If the plugin has a package.json, run npm install inside it
-      let hasPackageJson = false;
-      try {
-        await fs.access(path.join(pluginPath, 'package.json'));
-        hasPackageJson = true;
-      } catch {}
-
-      if (hasPackageJson) {
-        updateLog += 'Running npm install --production...\n';
-        if (process.platform !== 'win32') {
-          try {
-            const { stdout } = await execFileAsync('npm', ['install', '--production'], {
-              cwd: pluginPath,
-              timeout: 180000
-            });
-            updateLog += stdout + '\n';
-          } catch (cmdErr) {
-            updateLog += `npm install failed: ${cmdErr.message}\n`;
-          }
-        } else {
-          updateLog += 'Mock npm install completed on Windows.\n';
-        }
-      }
-
-      // If there is an update.sh or setup.sh, run it
-      let hasUpdateScript = false;
-      try {
-        await fs.access(path.join(pluginPath, 'update.sh'));
-        hasUpdateScript = true;
-      } catch {}
-
-      if (hasUpdateScript && process.platform !== 'win32') {
-        updateLog += 'Running update.sh...\n';
-        try {
-          await execFileAsync('chmod', ['+x', path.join(pluginPath, 'update.sh')], { timeout: 10000 });
-          const { stdout } = await execFileAsync('./update.sh', [], {
-            cwd: pluginPath,
-            timeout: 300000
-          });
-          updateLog += stdout + '\n';
-        } catch (cmdErr) {
-          updateLog += `update.sh failed: ${cmdErr.message}\n`;
-        }
-      }
-
-      // 3. Reload plugin in memory
-      await pluginLoader._loadPlugin(safeId, req.app, req.app.get('io'));
-
-      return successResponse(res, { log: updateLog }, `Plugin ${safeId} updated to v${targetVersion} successfully`);
+      return successResponse(res, { processId: proc.id }, `Update started for ${safeId}`);
     } catch (error) {
       return errorResponse(res, error.message, 500);
     }
+  }
+
+  async checkUpdates(req, res) {
+    try {
+      const io = req.app.get('io');
+      const proc = processRunner.create(io, {
+        title: 'Checking Plugin Updates',
+        subtitle: 'Comparing local plugin manifests against release catalog',
+        steps: ['Scan plugin manifests', 'Save update state to SQLite']
+      });
+      const policy = await pluginUpdateService.checkUpdates({ proc });
+      return successResponse(res, { policy, processId: proc.id }, 'Plugin update check completed');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async updatePolicy(req, res) {
+    try {
+      const { pluginId, autoUpdate, intervalHours, autoUpdateEnabled } = req.body;
+      let policy;
+      if (pluginId) {
+        const safeId = validatePluginId(pluginId);
+        policy = await pluginUpdateService.togglePluginAutoUpdate(safeId, Boolean(autoUpdate));
+      } else {
+        const patch = {};
+        if (intervalHours !== undefined) patch.intervalHours = Number(intervalHours);
+        if (autoUpdateEnabled !== undefined) patch.autoUpdateEnabled = Boolean(autoUpdateEnabled);
+        policy = await pluginUpdateService.savePolicy(patch);
+      }
+      return successResponse(res, policy, 'Plugin update policy saved');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async updateAllPlugins(req, res) {
+    try {
+      const io = req.app.get('io');
+      const currentPolicy = await pluginUpdateService.checkUpdates();
+      const ids = Object.keys(currentPolicy.availableUpdates || {});
+      if (ids.length === 0) {
+        return successResponse(res, { updated: 0 }, 'All plugins are already up to date');
+      }
+
+      const proc = processRunner.create(io, {
+        title: `Updating ${ids.length} Plugin(s)`,
+        subtitle: ids.join(', '),
+        steps: ids.map((id) => `Update ${id}`)
+      });
+
+      (async () => {
+        for (let i = 0; i < ids.length; i++) {
+          const id = ids[i];
+          proc.startStep(i, `Updating ${id}...`);
+          const subProc = processRunner.create(null, { title: id, steps: ['Snapshot', 'Install', 'Reload'] });
+          try {
+            await pluginUpdateService.updatePlugin({ id, app: req.app, io, proc: subProc });
+            subProc.getState().logs.forEach((l) => proc.log(`[${id}] ${l.text}`, l.stream));
+            proc.completeStep(i, 'Updated');
+          } catch (err) {
+            proc.failStep(i, err.message);
+            proc.log(`[${id}] Failed: ${err.message}`, 'stderr');
+          }
+        }
+        proc.finish({ updated: ids.length }, 'Batch plugin update completed.');
+      })().catch((err) => proc.fail(err.message));
+
+      return successResponse(res, { processId: proc.id, count: ids.length }, 'Batch update started');
+    } catch (error) {
+      return errorResponse(res, error.message, 500);
+    }
+  }
+
+  async getProcessStatus(req, res) {
+    const proc = processRunner.get(req.params.processId);
+    if (!proc) return errorResponse(res, 'Process not found', 404);
+    return successResponse(res, proc, 'Process status');
   }
 }
 

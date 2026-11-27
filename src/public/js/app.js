@@ -900,6 +900,132 @@ const LP = {
     });
   },
 
+  // ── Live Process Modal (Steps + Real-Time Terminal Stream) ──
+  ProcessModal: {
+    open(processId, opts = {}) {
+      if (!processId) return;
+      const modalId = `lp_proc_${Date.now()}`;
+      const title = LP.escHtml(opts.title || 'Running Process');
+      const pollUrl = opts.pollUrl || `/plugins/process/${encodeURIComponent(processId)}`;
+
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = `
+        <div class="modal fade" id="${modalId}" tabindex="-1" data-bs-backdrop="static" style="z-index:1065;">
+          <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content lp-glass-card" style="background:var(--bg-secondary);border:1px solid var(--glass-border);color:var(--text-primary);border-radius:16px;">
+              <div class="modal-header" style="border-bottom:1px solid var(--glass-border);padding:16px 22px;">
+                <div class="d-flex align-items-center gap-2">
+                  <span id="${modalId}_spinner" class="spinner-border spinner-border-sm text-primary"></span>
+                  <div>
+                    <h5 id="${modalId}_title" class="modal-title" style="font-size:15px;font-weight:700;margin:0;">${title}</h5>
+                    <div id="${modalId}_sub" style="font-size:11.5px;color:var(--text-muted);">Initializing live stream...</div>
+                  </div>
+                </div>
+                <span id="${modalId}_badge" class="lp-badge lp-badge-info" style="font-size:10px;">RUNNING</span>
+              </div>
+              <div class="modal-body" style="padding:18px 22px;">
+                <div class="lp-proc-progress-wrap mb-3">
+                  <div class="lp-proc-progress-bar" id="${modalId}_bar" style="width:8%;"></div>
+                </div>
+                <div id="${modalId}_steps" class="lp-proc-steps mb-3"></div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">
+                    <i class="bi bi-terminal me-1"></i>Live Process Output
+                  </span>
+                  <button type="button" class="btn-lp btn-lp-ghost btn-lp-sm" id="${modalId}_copy" style="font-size:11px;padding:2px 8px;">
+                    <i class="bi bi-clipboard me-1"></i>Copy Logs
+                  </button>
+                </div>
+                <pre id="${modalId}_logs" class="lp-proc-console">Waiting for output...</pre>
+              </div>
+              <div class="modal-footer" style="border-top:1px solid var(--glass-border);padding:12px 22px;">
+                <button type="button" class="btn-lp btn-lp-ghost" id="${modalId}_close" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+      document.body.appendChild(wrapper);
+      const modalEl = document.getElementById(modalId);
+      const bsModal = new bootstrap.Modal(modalEl);
+      bsModal.show();
+
+      let closed = false;
+      let finished = false;
+      let pollTimer = null;
+
+      const render = (state) => {
+        if (!state || state.id !== processId || closed) return;
+        const titleEl = document.getElementById(`${modalId}_title`);
+        const subEl = document.getElementById(`${modalId}_sub`);
+        const barEl = document.getElementById(`${modalId}_bar`);
+        const stepsEl = document.getElementById(`${modalId}_steps`);
+        const logsEl = document.getElementById(`${modalId}_logs`);
+        const badgeEl = document.getElementById(`${modalId}_badge`);
+        const spinEl = document.getElementById(`${modalId}_spinner`);
+
+        if (titleEl && state.title) titleEl.textContent = state.title;
+        if (subEl && state.subtitle) subEl.textContent = state.subtitle;
+        if (barEl) barEl.style.width = `${state.progress || 0}%`;
+
+        if (stepsEl && Array.isArray(state.steps)) {
+          stepsEl.innerHTML = state.steps.map((s) => {
+            let icon = '<i class="bi bi-circle text-muted"></i>';
+            if (s.status === 'running') icon = '<i class="bi bi-arrow-repeat spin text-primary"></i>';
+            else if (s.status === 'done') icon = '<i class="bi bi-check-circle-fill text-success"></i>';
+            else if (s.status === 'failed') icon = '<i class="bi bi-x-circle-fill text-danger"></i>';
+            return `<div class="lp-proc-step lp-proc-step--${LP.escHtml(s.status)}">
+              ${icon}
+              <span class="lp-proc-step-label">${LP.escHtml(s.label)}</span>
+              ${s.detail ? `<span class="lp-proc-step-detail">${LP.escHtml(s.detail)}</span>` : ''}
+            </div>`;
+          }).join('');
+        }
+
+        if (logsEl && Array.isArray(state.logs) && state.logs.length > 0) {
+          logsEl.textContent = state.logs.map((l) => `[${l.ts}] ${l.text}`).join('\n');
+          logsEl.scrollTop = logsEl.scrollHeight;
+        }
+
+        if ((state.status === 'completed' || state.status === 'failed') && !finished) {
+          finished = true;
+          if (pollTimer) clearInterval(pollTimer);
+          if (spinEl) spinEl.classList.add('d-none');
+          if (badgeEl) {
+            badgeEl.textContent = state.status === 'completed' ? 'COMPLETED' : 'FAILED';
+            badgeEl.className = `lp-badge ${state.status === 'completed' ? 'lp-badge-success' : 'lp-badge-danger'}`;
+          }
+          if (typeof opts.onComplete === 'function') opts.onComplete(state);
+        }
+      };
+
+      const onSocketState = (state) => render(state);
+      if (LP.socket) LP.socket.on('process:state', onSocketState);
+
+      const pollOnce = async () => {
+        if (closed || finished) return;
+        try {
+          const res = await LP.get(pollUrl);
+          if (res?.success && res.data) render(res.data);
+        } catch (_) {}
+      };
+      pollOnce();
+      pollTimer = setInterval(pollOnce, 1200);
+
+      document.getElementById(`${modalId}_copy`)?.addEventListener('click', () => {
+        const txt = document.getElementById(`${modalId}_logs`)?.textContent || '';
+        LP.copy(txt, 'Process logs copied');
+      });
+
+      modalEl.addEventListener('hidden.bs.modal', () => {
+        closed = true;
+        if (pollTimer) clearInterval(pollTimer);
+        if (LP.socket) LP.socket.off('process:state', onSocketState);
+        wrapper.remove();
+      });
+    },
+  },
+
   // Format numbers
   num(n) {
     return typeof n === 'number' ? n.toLocaleString() : n;
