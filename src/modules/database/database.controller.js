@@ -3,6 +3,8 @@ import fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import databaseService from './database.service.js';
 import { success, error } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 function cleanStr(str) {
   if (!str) return '';
@@ -297,17 +299,31 @@ class DatabaseController {
   // ── Database Backup & Restore Endpoints ──────────────────────
 
   async backupDatabase(req, res) {
+    const type = cleanStr(req.body.type);
+    const name = cleanStr(req.body.name);
+    if (!type || !name) return error(res, 'Database type and name are required', 400);
+    const proc = processRunner.create(req.app.get('io'), {
+      title: `Backup Database: ${name}`,
+      subtitle: `Engine: ${type}`,
+      steps: ['Dump database schema & data', 'Verify backup archive']
+    });
     try {
-      const type = cleanStr(req.body.type);
-      const name = cleanStr(req.body.name);
-      if (!type || !name) return error(res, 'Database type and name are required', 400);
-
-      const result = await databaseService.backupDatabase(type, name);
+      const result = await withLock(`db:backup:${type}:${name}`, async () => {
+        proc.startStep(0, `Dumping ${name}...`);
+        const r = await databaseService.backupDatabase(type, name);
+        proc.completeStep(0, 'Dump completed');
+        proc.startStep(1, 'Finalizing backup file...');
+        return r;
+      });
+      proc.completeStep(1, result.filename || 'Saved');
+      proc.finish(result, `Backup ${result.filename} created.`);
       return success(res, {
         ...result,
+        processId: proc.id,
         downloadUrl: `/api/database/backup/download/${encodeURIComponent(result.filename)}`
       }, `Backup for ${name} created successfully`);
     } catch (err) {
+      proc.fail(err.message);
       return error(res, err.message, 500);
     }
   }

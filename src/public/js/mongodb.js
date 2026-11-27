@@ -119,7 +119,8 @@ const MongoDBPage = {
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Installing...'; }
     try {
       const res = await LP.post('/mongodb/install');
-      if (res?.success) { LP.toast(res?.message || 'MongoDB installed successfully', 'success'); this.refresh(); }
+      if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: 'Installing MongoDB', onComplete: () => this.refresh() }); LP.toast(res?.message || 'MongoDB installed successfully', 'success'); this.refresh(); }
       else { LP.toast(res?.message || 'Install failed', 'error'); }
     } catch { LP.toast('Error', 'error'); }
     finally { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-download me-1"></i> Install MongoDB'; } }

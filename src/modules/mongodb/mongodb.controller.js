@@ -1,5 +1,7 @@
 import mongodbService from './mongodb.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class MongoDBController {
   /**
@@ -18,10 +20,24 @@ class MongoDBController {
    * POST /api/mongodb/install
    */
   async install(req, res) {
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Installing MongoDB Server',
+      subtitle: 'Installing mongod packages and enabling service',
+      steps: ['Install MongoDB packages', 'Start & verify mongod']
+    });
     try {
-      const result = await mongodbService.installMongoDB();
-      return successResponse(res, result, result.message);
+      const result = await withLock('mongodb:install', async () => {
+        proc.startStep(0, 'Installing MongoDB...');
+        const r = await mongodbService.installMongoDB();
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying service...');
+        return r;
+      });
+      proc.completeStep(1, 'Running');
+      proc.finish(result, result.message || 'MongoDB installed.');
+      return successResponse(res, { ...result, processId: proc.id }, result.message);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 500);
     }
   }

@@ -1112,6 +1112,7 @@ const DB = (() => {
     try {
       const res = await LP.post('/database/backup', { type, name });
       if (res?.success && res.data) {
+        if (res.data.processId) LP.ProcessModal.open(res.data.processId, { title: `Backup Database: ${name}` });
         LP.toast(`Backup for database ${name} created successfully!`, 'success');
 
         // Auto trigger browser download

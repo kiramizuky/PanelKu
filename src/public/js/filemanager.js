@@ -1991,6 +1991,7 @@ const FMPage = (() => {
       for (const p of _extractTargetPaths) {
         const res = await LP.post('/filemanager/unzip', { path: p, destination });
         if (res?.success) {
+          if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: 'Extracting Archive', onComplete: () => refresh() });
           successCount++;
         } else {
           LP.toast(res?.message || `Failed to extract ${p.split('/').pop()}`, 'error');
@@ -2231,7 +2232,11 @@ const FMPage = (() => {
     if (!selectedItem) return;
     const output = currentPath + '/' + selectedItem.name + '.zip';
     const res = await LP.post('/filemanager/zip', { path: selectedItem.path, output });
-    if (res?.success) { LP.toast('Zipped: ' + output, 'success'); refresh(); }
+    if (res?.success) {
+      if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: 'Compressing Files', onComplete: () => refresh() });
+      LP.toast('Zipped: ' + output, 'success');
+      refresh();
+    }
     else LP.toast(res?.message || 'Zip failed', 'error');
   }
 

@@ -1031,6 +1031,69 @@ const LP = {
     return typeof n === 'number' ? n.toLocaleString() : n;
   },
 
+  escapeHtml(str) {
+    return this.escHtml(str);
+  },
+
+  _loadingCount: 0,
+  loading(show, text = 'Processing...') {
+    if (typeof document === 'undefined') return;
+    const id = 'lpGlobalLoadingOverlay';
+    if (show) {
+      this._loadingCount++;
+      let el = document.getElementById(id);
+      if (!el) {
+        el = document.createElement('div');
+        el.id = id;
+        el.style.cssText = 'position:fixed;inset:0;z-index:2050;background:rgba(5,9,20,0.55);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;';
+        el.innerHTML = `
+          <div class="lp-glass-card d-flex align-items-center gap-3 px-4 py-3" style="border-radius:14px;background:rgba(15,23,42,0.92);border:1px solid rgba(255,255,255,0.14);box-shadow:0 20px 40px rgba(0,0,0,0.45);">
+            <span class="spinner-border spinner-border-sm text-primary"></span>
+            <span class="lp-loading-text" style="font-size:13px;font-weight:600;color:#f8fafc;">${this.escHtml(text)}</span>
+          </div>`;
+        document.body.appendChild(el);
+      } else {
+        const txt = el.querySelector('.lp-loading-text');
+        if (txt) txt.textContent = text;
+        el.style.display = 'flex';
+      }
+    } else {
+      this._loadingCount = Math.max(0, this._loadingCount - 1);
+      if (this._loadingCount === 0) {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      }
+    }
+  },
+
+  modal(opts = {}) {
+    const id = `lp_modal_${Date.now()}`;
+    const safeTitle = this.escHtml(opts.title || 'Details');
+    const sizeClass = opts.size ? `modal-${this.escHtml(opts.size)}` : '';
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+      <div class="modal fade" id="${id}" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered ${sizeClass}">
+          <div class="modal-content lp-glass-card" style="background:var(--bg-secondary);border:1px solid var(--glass-border);color:var(--text-primary);border-radius:14px;">
+            <div class="modal-header" style="border-bottom:1px solid var(--glass-border);">
+              <h5 class="modal-title" style="font-size:15px;font-weight:600;">${safeTitle}</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">${opts.body || ''}</div>
+            <div class="modal-footer" style="border-top:1px solid var(--glass-border);">
+              <button type="button" class="btn-lp btn-lp-ghost" data-bs-dismiss="modal">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(wrapper);
+    const modalEl = document.getElementById(id);
+    const bsModal = new bootstrap.Modal(modalEl);
+    bsModal.show();
+    modalEl.addEventListener('hidden.bs.modal', () => wrapper.remove());
+    return bsModal;
+  },
+
   // Pagination Helper
   _paginationState: {},
   paginate(data, itemsPerPage, tbodyId, paginationContainerId, renderRowFn, emptyMessage, colspan) {

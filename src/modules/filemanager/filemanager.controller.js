@@ -4,6 +4,8 @@ import { createReadStream } from 'fs';
 import { createDownloadToken, verifyDownloadToken } from '../../helpers/crypto.js';
 import { verifyFileMagicBytes, removeUploadedFiles } from '../../helpers/file-validation.js';
 import appConfig from '../../config/app.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class FileManagerController {
   async list(req, res) {
@@ -198,22 +200,44 @@ class FileManagerController {
   }
 
   async zip(req, res) {
+    const { path: targetPath, output } = req.body;
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Compressing Files',
+      subtitle: targetPath || '',
+      steps: ['Compress target to archive']
+    });
     try {
-      const { path: targetPath, output } = req.body;
-      await fileManagerService.zip(targetPath, output);
-      return success(res, {}, 'Zipped successfully');
+      await withLock(`fm:zip:${targetPath}`, async () => {
+        proc.startStep(0, 'Creating archive...');
+        await fileManagerService.zip(targetPath, output);
+      });
+      proc.completeStep(0, 'Archive created');
+      proc.finish({ output }, 'Zipped successfully.');
+      return success(res, { processId: proc.id }, 'Zipped successfully');
     } catch (err) {
+      proc.fail(err.message);
       return error(res, err.message, 500);
     }
   }
 
   async unzip(req, res) {
+    const { path: zipPath, destination } = req.body;
+    if (!zipPath) return error(res, 'Archive path is required', 400);
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Extracting Archive',
+      subtitle: zipPath,
+      steps: ['Extract archive contents']
+    });
     try {
-      const { path: zipPath, destination } = req.body;
-      if (!zipPath) return error(res, 'Archive path is required', 400);
-      await fileManagerService.unzip(zipPath, destination);
-      return success(res, {}, 'Extracted successfully');
+      await withLock(`fm:unzip:${zipPath}`, async () => {
+        proc.startStep(0, 'Extracting...');
+        await fileManagerService.unzip(zipPath, destination);
+      });
+      proc.completeStep(0, 'Extracted');
+      proc.finish({ destination }, 'Extracted successfully.');
+      return success(res, { processId: proc.id }, 'Extracted successfully');
     } catch (err) {
+      proc.fail(err.message);
       return error(res, err.message, err.statusCode || 500);
     }
   }

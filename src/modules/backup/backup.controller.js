@@ -1,6 +1,8 @@
 import backupService from './backup.service.js';
 import snapshotService from './snapshot.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class BackupController {
   // ── Rclone Management ────────────────────────────────────────────
@@ -108,18 +110,36 @@ class BackupController {
   }
 
   async createBackup(req, res) {
-    try {
-      const { type, target } = req.body;
-      if (!type || !target) return errorResponse(res, 'Type and target are required', 400);
+    const { type, target } = req.body;
+    if (!type || !target) return errorResponse(res, 'Type and target are required', 400);
 
-      if (req.query.async === 'true' || req.body?.async === true) {
+    if (req.query.async === 'true' || req.body?.async === true) {
+      try {
         const queued = await backupService.queueCreateBackup(type, target);
         return successResponse(res, queued, 'Backup creation queued', 202);
+      } catch (error) {
+        return errorResponse(res, error.message, 500);
       }
+    }
 
-      const result = await backupService.createBackup(type, target);
-      return successResponse(res, result, 'Backup created successfully');
+    const proc = processRunner.create(req.app.get('io'), {
+      title: `Create Backup (${type})`,
+      subtitle: `Target: ${target}`,
+      steps: ['Archive target data', 'Verify backup integrity']
+    });
+    try {
+      const result = await withLock(`backup:create:${target}`, async () => {
+        proc.startStep(0, `Archiving ${target}...`);
+        const r = await backupService.createBackup(type, target);
+        proc.completeStep(0, 'Archive created');
+        proc.startStep(1, 'Verifying...');
+        return r;
+      });
+      proc.completeStep(1, 'Verified');
+      proc.finish(result, 'Backup created successfully.');
+      return successResponse(res, { ...result, processId: proc.id }, 'Backup created successfully');
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 500);
     }
   }
