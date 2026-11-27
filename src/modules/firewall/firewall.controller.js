@@ -1,6 +1,8 @@
 import firewallService from './firewall.service.js';
 import nftablesService from './nftables.service.js';
 import { success, errorResponse } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class FirewallController {
   async getStatus(req, res) {
@@ -58,11 +60,24 @@ class FirewallController {
   }
 
   async enableEgressFilter(req, res) {
+    const { allowedTcpPorts, allowedUdpPorts } = req.body || {};
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Configure nftables Outbound Egress Filter',
+      subtitle: 'Applying outbound port allowlist to prevent reverse shells',
+      steps: ['Validate port allowlist', 'Apply nftables egress policy']
+    });
     try {
-      const { allowedTcpPorts, allowedUdpPorts } = req.body || {};
-      const result = await nftablesService.enableEgressFilter({ allowedTcpPorts, allowedUdpPorts });
-      return success(res, result, 'Outbound egress filter configured');
+      const result = await withLock('firewall:nftables', async () => {
+        proc.startStep(0, 'Validating ports...');
+        proc.completeStep(0, 'Valid');
+        proc.startStep(1, 'Applying nftables rules...');
+        return nftablesService.enableEgressFilter({ allowedTcpPorts, allowedUdpPorts });
+      });
+      proc.completeStep(1, 'Active');
+      proc.finish(result, 'Outbound egress filter configured.');
+      return success(res, { ...result, processId: proc.id }, 'Outbound egress filter configured');
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message || 'Invalid egress configuration', 400);
     }
   }

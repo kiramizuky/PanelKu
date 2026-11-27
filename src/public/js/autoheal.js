@@ -393,6 +393,7 @@ const AutoHealPage = {
       try {
         const res = await LP.post('/autoheal/heal-all');
         if (res?.success) {
+          if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: 'Universal Auto-Healing', onComplete: () => this.refresh() });
           LP.toast(res.message || 'Universal healing completed!', 'success');
           this.refresh();
         } else {

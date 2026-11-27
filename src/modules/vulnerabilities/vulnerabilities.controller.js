@@ -7,6 +7,8 @@ import hardeningService from './hardening.service.js';
 import fimService from './fim.service.js';
 import { success, error } from '../../helpers/response.js';
 import logger from '../../config/logger.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class VulnerabilitiesController {
   async getSummary(req, res) {
@@ -48,11 +50,25 @@ class VulnerabilitiesController {
   }
 
   async startScan(req, res) {
+    const scanType = req.body.type || 'full';
+    const proc = processRunner.create(req.app.get('io'), {
+      title: `Vulnerability Scan (${scanType})`,
+      subtitle: 'Scanning OS packages, runtimes, web configs, and plugins',
+      steps: ['Run multi-vector security scan', 'Aggregate findings & risk score']
+    });
     try {
-      const scanType = req.body.type || 'full';
-      const result = await vulnerabilitiesService.startScan(scanType);
-      return success(res, result, 'Vulnerability scan completed successfully.');
+      const result = await withLock('vuln:scan', async () => {
+        proc.startStep(0, `Running ${scanType} scan...`);
+        const r = await vulnerabilitiesService.startScan(scanType);
+        proc.completeStep(0, 'Scan complete');
+        proc.startStep(1, 'Saving scan report...');
+        return r;
+      });
+      proc.completeStep(1, 'Saved');
+      proc.finish(result, `Vulnerability ${scanType} scan completed.`);
+      return success(res, { ...result, processId: proc.id }, 'Vulnerability scan completed successfully.');
     } catch (err) {
+      proc.fail(err.message);
       logger.error(`Scan execution failed: ${err.message}`);
       return error(res, err.message, 500);
     }
@@ -151,11 +167,25 @@ class VulnerabilitiesController {
   }
 
   async applyHardeningProfile(req, res) {
+    const profile = req.params.profile;
+    const { confirmed } = req.body || {};
+    const proc = processRunner.create(req.app.get('io'), {
+      title: `Apply Hardening Profile: ${profile}`,
+      subtitle: 'Applying sshd, sysctl, fail2ban, and systemd baseline with healthcheck',
+      steps: ['Snapshot current configs', 'Apply hardening rules & verify healthcheck']
+    });
     try {
-      const { confirmed } = req.body || {};
-      const result = await hardeningService.applyProfile(req.params.profile, { confirmed: Boolean(confirmed) });
-      return success(res, result, result.rolledBack ? 'Healthcheck failed; profile rolled back' : 'Hardening profile applied');
+      const result = await withLock('vuln:hardening', async () => {
+        proc.startStep(0, 'Snapshotting baseline configs...');
+        proc.completeStep(0, 'Snapshotted');
+        proc.startStep(1, `Applying ${profile} profile...`);
+        return hardeningService.applyProfile(profile, { confirmed: Boolean(confirmed) });
+      });
+      proc.completeStep(1, result.rolledBack ? 'Rolled back' : 'Applied');
+      proc.finish(result, result.rolledBack ? 'Healthcheck failed; profile rolled back.' : 'Hardening profile applied.');
+      return success(res, { ...result, processId: proc.id }, result.rolledBack ? 'Healthcheck failed; profile rolled back' : 'Hardening profile applied');
     } catch (err) {
+      proc.fail(err.message);
       return error(res, err.message, 400);
     }
   }

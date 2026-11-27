@@ -1,6 +1,8 @@
 import aiRepairService from './ai-repair.service.js';
 import anomalyDetectorService from './anomaly-detector.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class AIRepairController {
   // ── Configuration ────────────────────────────────────────────────
@@ -39,10 +41,24 @@ class AIRepairController {
   // ── Auto Diagnostic ──────────────────────────────────────────────
 
   async runDiagnostic(req, res) {
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'AI Auto-Diagnostic',
+      subtitle: 'Inspecting system health, logs, and service anomalies',
+      steps: ['Collect system telemetry & logs', 'Analyze health & recommendations']
+    });
     try {
-      const result = await aiRepairService.runAutoDiagnostic();
-      return successResponse(res, result);
+      const result = await withLock('airepair:diagnostic', async () => {
+        proc.startStep(0, 'Collecting diagnostics...');
+        const r = await aiRepairService.runAutoDiagnostic();
+        proc.completeStep(0, 'Collected');
+        proc.startStep(1, 'Generating report...');
+        return r;
+      });
+      proc.completeStep(1, 'Ready');
+      proc.finish(result, 'Auto-diagnostic completed.');
+      return successResponse(res, { ...result, processId: proc.id });
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 500);
     }
   }

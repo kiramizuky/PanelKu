@@ -1,5 +1,7 @@
 import autohealService from './autoheal.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class AutoHealController {
   // ── Config ──
@@ -100,10 +102,24 @@ class AutoHealController {
   }
 
   async healAll(req, res) {
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Universal Auto-Healing (All Modules)',
+      subtitle: 'Diagnosing and recovering degraded services',
+      steps: ['Scan all module health states', 'Apply automated remediation']
+    });
     try {
-      const result = await autohealService.healAll();
-      return successResponse(res, result, result.message);
+      const result = await withLock('autoheal:all', async () => {
+        proc.startStep(0, 'Scanning modules...');
+        const r = await autohealService.healAll();
+        proc.completeStep(0, 'Scanned');
+        proc.startStep(1, 'Completed remediation...');
+        return r;
+      });
+      proc.completeStep(1, 'Healthy');
+      proc.finish(result, result.message || 'Auto-healing completed.');
+      return successResponse(res, { ...result, processId: proc.id }, result.message);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 500);
     }
   }

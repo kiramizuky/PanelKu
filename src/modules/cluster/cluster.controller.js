@@ -2,6 +2,8 @@ import clusterService from './cluster.service.js';
 import k8sService from './k8s.service.js';
 import mtlsService from './mtls.service.js';
 import { success, error } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class ClusterController {
   async getNodes(req, res) {
@@ -151,10 +153,24 @@ class ClusterController {
   }
 
   async initMtlsCa(req, res) {
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Initialize Cluster Internal mTLS CA',
+      subtitle: 'Generating root CA and master client identity',
+      steps: ['Generate CA key & certificate', 'Persist mTLS trust store']
+    });
     try {
-      const status = await mtlsService.initCA();
-      return success(res, status, 'Internal Cluster CA initialized');
+      const status = await withLock('cluster:mtls-ca', async () => {
+        proc.startStep(0, 'Generating internal CA...');
+        const s = await mtlsService.initCA();
+        proc.completeStep(0, 'Generated');
+        proc.startStep(1, 'Saved trust store...');
+        return s;
+      });
+      proc.completeStep(1, 'Active');
+      proc.finish(status, 'Internal Cluster CA initialized.');
+      return success(res, { ...status, processId: proc.id }, 'Internal Cluster CA initialized');
     } catch (err) {
+      proc.fail(err.message);
       return error(res, err.message, 500);
     }
   }

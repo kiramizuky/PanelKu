@@ -488,6 +488,7 @@ const VulnerabilitiesPage = {
     try {
       const res = await LP.post('/vulnerabilities/scan', { type });
       if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: `Vulnerability Scan (${type.toUpperCase()})` });
         LP.toast(res.message || 'Scan complete!', 'success');
         await this.loadSummary();
         await this.loadFindings();
