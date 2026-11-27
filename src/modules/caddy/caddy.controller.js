@@ -1,5 +1,7 @@
 import caddyService from './caddy.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class CaddyController {
   // ── Status ──────────────────────────────────────────────────────
@@ -16,10 +18,24 @@ class CaddyController {
   // ── Install / Uninstall ────────────────────────────────────────
 
   async install(req, res) {
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Installing Caddy Server',
+      subtitle: 'Setting up Caddy reverse proxy and systemd service',
+      steps: ['Install Caddy package', 'Verify service status']
+    });
     try {
-      const result = await caddyService.installCaddy();
-      return successResponse(res, result, result.message);
+      const result = await withLock('caddy:service', async () => {
+        proc.startStep(0, 'Installing Caddy...');
+        const r = await caddyService.installCaddy();
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying service...');
+        return r;
+      });
+      proc.completeStep(1, 'Ready');
+      proc.finish(result, result.message || 'Caddy installed successfully.');
+      return successResponse(res, { ...result, processId: proc.id }, result.message);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 500);
     }
   }
@@ -61,12 +77,26 @@ class CaddyController {
   }
 
   async saveCaddyfile(req, res) {
+    const { content } = req.body;
+    if (!content) return errorResponse(res, 'Caddyfile content is required', 400);
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Apply Caddyfile Configuration',
+      subtitle: 'Validating syntax and reloading Caddy',
+      steps: ['Write & validate Caddyfile', 'Reload Caddy service']
+    });
     try {
-      const { content } = req.body;
-      if (!content) return errorResponse(res, 'Caddyfile content is required', 400);
-      const result = await caddyService.saveCaddyfile(content);
-      return successResponse(res, result, result.message);
+      const result = await withLock('caddy:service', async () => {
+        proc.startStep(0, 'Validating Caddyfile syntax...');
+        const r = await caddyService.saveCaddyfile(content);
+        proc.completeStep(0, 'Syntax valid');
+        proc.startStep(1, 'Reloaded');
+        return r;
+      });
+      proc.completeStep(1, 'Applied');
+      proc.finish(result, result.message || 'Caddyfile saved & reloaded.');
+      return successResponse(res, { ...result, processId: proc.id }, result.message);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 400);
     }
   }

@@ -94,6 +94,7 @@ const ApachePage = {
     try {
       const res = await LP.post('/apache/install');
       if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: 'Installing Apache Server', onComplete: () => this.refresh() });
         LP.toast('Apache installed successfully!', 'success');
         this.refresh();
       } else {

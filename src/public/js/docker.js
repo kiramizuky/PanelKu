@@ -177,6 +177,7 @@ const DockerPage = (() => {
     LP.toast('Pruning unused images...', 'info');
     const res = await LP.post('/docker/images/prune');
     if (res?.success) {
+      if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: 'Prune Docker Images', onComplete: () => loadData() });
       const { count, reclaimed } = res.data;
       LP.toast(`Pruned ${count} images (${LP.formatBytes(reclaimed)} reclaimed)`, 'success');
       loadData();
@@ -1061,6 +1062,7 @@ services:
     try {
       const res = await LP.post('/docker/compose', { projectName, yaml });
       if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: `Deploy Stack: ${projectName}`, onComplete: () => loadData() });
         LP.toast(`Stack ${projectName} deployed successfully!`, 'success');
         closeStudio();
       } else {
@@ -1497,6 +1499,7 @@ services:
       });
 
       if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: `Deploy ${activeTemplate.name}`, onComplete: () => loadData() });
         LP.toast(`${activeTemplate.name} deployed successfully!`, 'success');
         bootstrap.Modal.getInstance(document.getElementById('appInstallModal')).hide();
         loadData();

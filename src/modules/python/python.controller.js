@@ -1,5 +1,7 @@
 import pythonService from './python.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class PythonController {
   /**
@@ -22,10 +24,24 @@ class PythonController {
     // Pyenv download + compile can take several minutes — extend HTTP timeout
     req.setTimeout(660000);
     res.setTimeout(660000);
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Installing Pyenv (Python Version Manager)',
+      subtitle: 'Installing build dependencies and configuring Pyenv',
+      steps: ['Install Pyenv & build tools', 'Verify Pyenv environment']
+    });
     try {
-      const result = await pythonService.installPyenv();
-      return successResponse(res, result, result.message);
+      const result = await withLock('python:pyenv', async () => {
+        proc.startStep(0, 'Installing Pyenv...');
+        const r = await pythonService.installPyenv();
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying...');
+        return r;
+      });
+      proc.completeStep(1, 'Ready');
+      proc.finish(result, result.message || 'Pyenv installed.');
+      return successResponse(res, { ...result, processId: proc.id }, result.message);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 500);
     }
   }
@@ -63,13 +79,26 @@ class PythonController {
    * POST /api/python/versions/install
    */
   async installVersion(req, res) {
+    const { version } = req.body;
+    if (!version) return errorResponse(res, 'Version is required', 400);
+    const proc = processRunner.create(req.app.get('io'), {
+      title: `Installing Python ${version}`,
+      subtitle: 'Compiling and configuring Python runtime via Pyenv',
+      steps: [`Install Python ${version}`, 'Verify python & pip']
+    });
     try {
-      const { version } = req.body;
-      if (!version) return errorResponse(res, 'Version is required', 400);
-
-      const result = await pythonService.installVersion(version);
-      return successResponse(res, result, result.message);
+      const result = await withLock(`python:version:${version}`, async () => {
+        proc.startStep(0, `Installing ${version}...`);
+        const r = await pythonService.installVersion(version);
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying...');
+        return r;
+      });
+      proc.completeStep(1, 'Ready');
+      proc.finish(result, result.message || `Python ${version} installed.`);
+      return successResponse(res, { ...result, processId: proc.id }, result.message);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 500);
     }
   }

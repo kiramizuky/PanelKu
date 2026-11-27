@@ -1,5 +1,7 @@
 import apacheService from './apache.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class ApacheController {
   // ── Status ──────────────────────────────────────────────────────
@@ -16,10 +18,24 @@ class ApacheController {
   // ── Install / Uninstall ────────────────────────────────────────
 
   async install(req, res) {
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Installing Apache HTTP Server',
+      subtitle: 'Installing Apache2 packages and enabling service',
+      steps: ['Install Apache2 package', 'Verify service status']
+    });
     try {
-      const result = await apacheService.installApache();
-      return successResponse(res, result, result.message);
+      const result = await withLock('apache:service', async () => {
+        proc.startStep(0, 'Installing Apache2...');
+        const r = await apacheService.installApache();
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying service...');
+        return r;
+      });
+      proc.completeStep(1, 'Ready');
+      proc.finish(result, result.message || 'Apache installed successfully.');
+      return successResponse(res, { ...result, processId: proc.id }, result.message);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 500);
     }
   }

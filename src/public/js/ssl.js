@@ -110,6 +110,7 @@ const SSLPage = {
     try {
       const res = await LP.post('/ssl/issue', payload);
       if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: 'Issue SSL Certificate', onComplete: () => this.loadCertificates() });
         LP.toast('Certificate issued successfully and Nginx reloaded!', 'success');
         bootstrap.Modal.getInstance(document.getElementById('issueSslModal')).hide();
         this.loadCertificates();

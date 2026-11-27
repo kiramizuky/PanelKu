@@ -60,7 +60,8 @@ const PythonPage = {
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Installing...'; }
     try {
       const res = await LP.post('/python/pyenv/install');
-      if (res?.success) { LP.toast('Pyenv installed!', 'success'); this.refresh(); }
+      if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: 'Installing Pyenv', onComplete: () => this.refresh() }); LP.toast('Pyenv installed!', 'success'); this.refresh(); }
       else { LP.toast(res?.message || 'Install failed', 'error'); }
     } catch { LP.toast('Error installing Pyenv', 'error'); }
     finally { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-download me-1"></i> Install Pyenv'; } }
@@ -157,7 +158,8 @@ const PythonPage = {
     LP.toast(`Installing Python ${version}...`, 'info');
     try {
       const res = await LP.post('/python/versions/install', { version });
-      if (res?.success) { LP.toast(`Python ${version} installed!`, 'success'); this.loadLocalVersions(); }
+      if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: `Installing Python ${version}`, onComplete: () => this.refresh() }); LP.toast(`Python ${version} installed!`, 'success'); this.loadLocalVersions(); }
       else { LP.toast(res?.message || 'Install failed', 'error'); }
     } catch { LP.toast('Error', 'error'); }
   },

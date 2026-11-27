@@ -91,6 +91,7 @@ const CaddyPage = {
     try {
       const res = await LP.post('/caddy/install');
       if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: 'Installing Caddy Server', onComplete: () => this.refresh() });
         LP.toast('Caddy installed successfully!', 'success');
         this.refresh();
       } else {

@@ -743,6 +743,7 @@ const WebsitesPage = (() => {
 
       const res = await LP.post('/websites', { domain, type, rootDirectory, targetHost, port, gitRepo, autoDeploy, phpVersion });
       if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: `Create Website: ${domain}`, onComplete: () => loadWebsites() });
         LP.toast('Website created and Nginx reloaded', 'success');
         createModal.hide();
         loadWebsites();

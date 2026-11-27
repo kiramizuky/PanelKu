@@ -1,5 +1,7 @@
 import websiteService from './websites.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class WebsitesController {
   async listWebsites(req, res) {
@@ -21,16 +23,27 @@ class WebsitesController {
   }
 
   async createWebsite(req, res) {
+    const { domain, aliases, type, rootDirectory, port, targetHost, phpVersion } = req.body;
+    if (!domain) return errorResponse(res, 400, 'Domain is required');
+    const proc = processRunner.create(req.app.get('io'), {
+      title: `Create Website: ${domain}`,
+      subtitle: `Type: ${type || 'static'}`,
+      steps: ['Validate domain & configuration', 'Generate Nginx vhost & reload service']
+    });
     try {
-      const { domain, aliases, type, rootDirectory, port, targetHost, phpVersion } = req.body;
-      if (!domain) return errorResponse(res, 400, 'Domain is required');
-      
-      const website = await websiteService.createWebsite({
-        domain, aliases, type, rootDirectory, port, targetHost, phpVersion
-      }, req.user._id);
-
-      return successResponse(res, { website }, 'Website created successfully', 201);
+      const website = await withLock(`website:${domain}`, async () => {
+        proc.startStep(0, `Validating ${domain}...`);
+        proc.completeStep(0, 'Validated');
+        proc.startStep(1, 'Writing Nginx vhost & reloading...');
+        return websiteService.createWebsite({
+          domain, aliases, type, rootDirectory, port, targetHost, phpVersion
+        }, req.user._id);
+      });
+      proc.completeStep(1, 'Active');
+      proc.finish({ domain }, `Website ${domain} created and Nginx reloaded.`);
+      return successResponse(res, { website, processId: proc.id }, 'Website created successfully', 201);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, 400, error.message);
     }
   }

@@ -1,5 +1,7 @@
 import nodejsService from './nodejs.service.js';
 import { successResponse, errorResponse } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class NodeJSController {
   /**
@@ -21,10 +23,24 @@ class NodeJSController {
    * Install NVM on the host system.
    */
   async installNvm(req, res) {
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Installing NVM (Node Version Manager)',
+      subtitle: 'Downloading and configuring NVM in user profile',
+      steps: ['Download & install NVM', 'Verify NVM environment']
+    });
     try {
-      const result = await nodejsService.installNvm();
-      return successResponse(res, result, result.message);
+      const result = await withLock('nodejs:nvm', async () => {
+        proc.startStep(0, 'Installing NVM...');
+        const r = await nodejsService.installNvm();
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying...');
+        return r;
+      });
+      proc.completeStep(1, 'Ready');
+      proc.finish(result, result.message || 'NVM installed.');
+      return successResponse(res, { ...result, processId: proc.id }, result.message);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 500);
     }
   }
@@ -66,13 +82,26 @@ class NodeJSController {
    * Install a specific Node.js version.
    */
   async installVersion(req, res) {
+    const { version } = req.body;
+    if (!version) return errorResponse(res, 'Version is required', 400);
+    const proc = processRunner.create(req.app.get('io'), {
+      title: `Installing Node.js ${version}`,
+      subtitle: 'Using NVM to download and compile/extract Node.js runtime',
+      steps: [`Install Node.js ${version}`, 'Verify node & npm binaries']
+    });
     try {
-      const { version } = req.body;
-      if (!version) return errorResponse(res, 'Version is required', 400);
-
-      const result = await nodejsService.installVersion(version);
-      return successResponse(res, result, result.message);
+      const result = await withLock(`nodejs:version:${version}`, async () => {
+        proc.startStep(0, `Installing ${version}...`);
+        const r = await nodejsService.installVersion(version);
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying...');
+        return r;
+      });
+      proc.completeStep(1, 'Ready');
+      proc.finish(result, result.message || `Node.js ${version} installed.`);
+      return successResponse(res, { ...result, processId: proc.id }, result.message);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 500);
     }
   }

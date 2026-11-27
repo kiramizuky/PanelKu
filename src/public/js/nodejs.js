@@ -74,6 +74,7 @@ const NodeJSPage = {
     try {
       const res = await LP.post('/nodejs/nvm/install');
       if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: 'Installing NVM', onComplete: () => this.refresh() });
         LP.toast('NVM installed successfully! Refreshing...', 'success');
         this.refresh();
       } else {
@@ -205,6 +206,7 @@ const NodeJSPage = {
     try {
       const res = await LP.post('/nodejs/versions/install', { version });
       if (res?.success) {
+        if (res.data?.processId) LP.ProcessModal.open(res.data.processId, { title: `Installing Node.js ${version}`, onComplete: () => this.refresh() });
         LP.toast(`Node.js ${version} installed!`, 'success');
         this.loadLocalVersions();
       } else {
