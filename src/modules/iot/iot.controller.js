@@ -1,5 +1,7 @@
 import iotService from './iot.service.js';
 import { success, error } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class IotController {
   // MQTT Status
@@ -9,8 +11,26 @@ class IotController {
   }
 
   async installMosquitto(req, res) {
-    try { return success(res, await iotService.installMosquitto(), 'Mosquitto installed'); }
-    catch (err) { return error(res, err.message, 500); }
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Installing Mosquitto MQTT Broker',
+      subtitle: 'Setting up MQTT broker and systemd service',
+      steps: ['Install Mosquitto', 'Verify broker status']
+    });
+    try {
+      const r = await withLock('iot:mosquitto', async () => {
+        proc.startStep(0, 'Installing Mosquitto...');
+        const resData = await iotService.installMosquitto();
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying...');
+        return resData;
+      });
+      proc.completeStep(1, 'Active');
+      proc.finish(r, 'Mosquitto installed.');
+      return success(res, { ...r, processId: proc.id }, 'Mosquitto installed');
+    } catch (err) {
+      proc.fail(err.message);
+      return error(res, err.message, 500);
+    }
   }
 
   async controlMosquitto(req, res) {
@@ -72,8 +92,26 @@ class IotController {
   }
 
   async installHomeAssistant(req, res) {
-    try { return success(res, await iotService.installHomeAssistant(), 'Home Assistant installed'); }
-    catch (err) { return error(res, err.message, 500); }
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Installing Home Assistant',
+      subtitle: 'Deploying Home Assistant container/service',
+      steps: ['Pull & configure Home Assistant', 'Verify service']
+    });
+    try {
+      const r = await withLock('iot:homeassistant', async () => {
+        proc.startStep(0, 'Installing Home Assistant...');
+        const resData = await iotService.installHomeAssistant();
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying...');
+        return resData;
+      });
+      proc.completeStep(1, 'Active');
+      proc.finish(r, 'Home Assistant installed.');
+      return success(res, { ...r, processId: proc.id }, 'Home Assistant installed');
+    } catch (err) {
+      proc.fail(err.message);
+      return error(res, err.message, 500);
+    }
   }
 
   // Node-RED
@@ -83,8 +121,26 @@ class IotController {
   }
 
   async installNodeRed(req, res) {
-    try { return success(res, await iotService.installNodeRed(), 'Node-RED installed'); }
-    catch (err) { return error(res, err.message, 500); }
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Installing Node-RED',
+      subtitle: 'Deploying Node-RED flow automation engine',
+      steps: ['Install & start Node-RED', 'Verify service']
+    });
+    try {
+      const r = await withLock('iot:nodered', async () => {
+        proc.startStep(0, 'Installing Node-RED...');
+        const resData = await iotService.installNodeRed();
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying...');
+        return resData;
+      });
+      proc.completeStep(1, 'Active');
+      proc.finish(r, 'Node-RED installed.');
+      return success(res, { ...r, processId: proc.id }, 'Node-RED installed');
+    } catch (err) {
+      proc.fail(err.message);
+      return error(res, err.message, 500);
+    }
   }
 
   // Device Discovery

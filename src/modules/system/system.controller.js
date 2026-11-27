@@ -4,6 +4,8 @@ import phpService from './php.service.js';
 import { success, errorResponse } from '../../helpers/response.js';
 import { runSecurityScan, fixSecurityIssue } from '../../helpers/security-advisor.js';
 import passwordPolicyService, { SCHEMA_VERSION } from './password-policy.service.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class SystemController {
   async getServicesStatus(req, res) {
@@ -68,15 +70,25 @@ class SystemController {
   }
 
   async installPackage(req, res) {
+    const { package: pkgName, password } = req.body;
+    if (!pkgName) return errorResponse(res, 'Package name is required', 400);
+    const proc = processRunner.create(req.app.get('io'), {
+      title: `Installing System Package: ${pkgName}`,
+      subtitle: 'Running host package manager installation',
+      steps: [`Install ${pkgName}`, 'Verify installation']
+    });
     try {
-      const { package: pkgName, password } = req.body;
-      if (!pkgName) return errorResponse(res, 'Package name is required', 400);
-      
-      // Fire and forget or wait. apt-get takes time.
-      // We will wait for it so the frontend spinner stays active.
-      await systemService.installPackage(pkgName, password);
-      return success(res, null, `${pkgName} installed successfully`);
+      await withLock(`system:pkg:${pkgName}`, async () => {
+        proc.startStep(0, `Installing ${pkgName}...`);
+        await systemService.installPackage(pkgName, password);
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying...');
+      });
+      proc.completeStep(1, 'Ready');
+      proc.finish({ package: pkgName }, `${pkgName} installed successfully.`);
+      return success(res, { processId: proc.id }, `${pkgName} installed successfully`);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message || 'Failed to install package', 500);
     }
   }
@@ -119,11 +131,25 @@ class SystemController {
   }
 
   async runAptUpgrade(req, res) {
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'System Package Upgrade',
+      subtitle: 'Upgrading installed OS packages',
+      steps: ['Detect package manager', 'Run package upgrade']
+    });
     try {
-      const info = await systemService.getPackageManagerInfo();
-      const log = await systemService.runAptUpgrade();
-      return success(res, { log }, `${info.name} upgrade completed`);
+      const { info, log } = await withLock('system:apt-upgrade', async () => {
+        proc.startStep(0, 'Checking package manager...');
+        const i = await systemService.getPackageManagerInfo();
+        proc.completeStep(0, i.name);
+        proc.startStep(1, `Running ${i.name} upgrade...`);
+        const l = await systemService.runAptUpgrade();
+        return { info: i, log: l };
+      });
+      proc.completeStep(1, 'Upgraded');
+      proc.finish({ log }, `${info.name} upgrade completed.`);
+      return success(res, { log, processId: proc.id }, `${info.name} upgrade completed`);
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message || 'Failed to run upgrade', 500);
     }
   }
@@ -331,10 +357,23 @@ class SystemController {
   }
 
   async installTailscale(req, res) {
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Installing Tailscale Mesh VPN',
+      subtitle: 'Installing tailscale daemon and CLI',
+      steps: ['Install Tailscale package', 'Verify tailscaled service']
+    });
     try {
-      await systemService.installTailscale();
-      return success(res, null, 'Tailscale installed successfully');
+      await withLock('system:tailscale-install', async () => {
+        proc.startStep(0, 'Installing Tailscale...');
+        await systemService.installTailscale();
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying daemon...');
+      });
+      proc.completeStep(1, 'Ready');
+      proc.finish(null, 'Tailscale installed successfully.');
+      return success(res, { processId: proc.id }, 'Tailscale installed successfully');
     } catch (error) {
+      proc.fail(error.message);
       return errorResponse(res, error.message, 500);
     }
   }

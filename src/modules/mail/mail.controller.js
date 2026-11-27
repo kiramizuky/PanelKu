@@ -1,5 +1,7 @@
 import mailService from './mail.service.js';
 import { success, error } from '../../helpers/response.js';
+import { withLock } from '../../helpers/moduleGuard.js';
+import processRunner from '../../services/processRunner.js';
 
 class MailController {
   async getStatus(req, res) {
@@ -8,14 +10,33 @@ class MailController {
   }
 
   async install(req, res) {
-    try {
-      const isAsync = req.query?.async === 'true' || req.body?.async === true;
-      if (isAsync) {
+    const isAsync = req.query?.async === 'true' || req.body?.async === true;
+    if (isAsync) {
+      try {
         const job = await mailService.queueInstall();
         return success(res, { queued: true, job }, 'Mail server installation queued');
-      }
-      return success(res, await mailService.install(), 'Mail server installed');
-    } catch (err) { return error(res, err.message, 500); }
+      } catch (err) { return error(res, err.message, 500); }
+    }
+    const proc = processRunner.create(req.app.get('io'), {
+      title: 'Installing Mail Server (Postfix & Dovecot)',
+      subtitle: 'Configuring SMTP, IMAP, and DKIM/SPF stack',
+      steps: ['Install Postfix & Dovecot', 'Verify mail services']
+    });
+    try {
+      const r = await withLock('mail:install', async () => {
+        proc.startStep(0, 'Installing Postfix & Dovecot...');
+        const resData = await mailService.install();
+        proc.completeStep(0, 'Installed');
+        proc.startStep(1, 'Verifying...');
+        return resData;
+      });
+      proc.completeStep(1, 'Active');
+      proc.finish(r, 'Mail server installed.');
+      return success(res, { ...r, processId: proc.id }, 'Mail server installed');
+    } catch (err) {
+      proc.fail(err.message);
+      return error(res, err.message, 500);
+    }
   }
 
   async uninstall(req, res) {
