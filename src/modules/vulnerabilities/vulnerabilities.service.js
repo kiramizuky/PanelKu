@@ -349,37 +349,34 @@ class VulnerabilitiesService {
    * Helper: Check if Nginx server_tokens is turned off
    */
   async isNginxServerTokensOff() {
-    // 1. Check live HTTP response from local Nginx (fastest and most accurate)
-    try {
-      const curlOut = await execShell('curl -sI -m 2 http://127.0.0.1:80 2>/dev/null || curl -sI -m 2 http://localhost:80 2>/dev/null || true');
-      const serverMatch = curlOut.match(/^[Ss]erver:\s*(.+)$/m);
-      if (serverMatch) {
-        const serverVal = serverMatch[1].trim();
-        // "Server: nginx" without version number means server_tokens is OFF
-        if (/^nginx$/i.test(serverVal)) {
-          return true;
-        }
-        // "Server: nginx/1.24.0" (contains slash and version digits) means it is ON
-        if (/^nginx\/[0-9]/i.test(serverVal)) {
-          return false;
-        }
-      }
-    } catch (_) {}
+    const hasTokensOff = (text) => {
+      if (!text) return false;
+      const activeLines = text
+        .split(/\r?\n/)
+        .filter((l) => !/^\s*#/.test(l))
+        .join('\n');
+      return /(?:^|[\n;{])\s*server_tokens\s+off\b/i.test(activeLines);
+    };
 
-    // 2. Check compiled configuration via `nginx -T`
+    const hasTokensOn = (text) => {
+      if (!text) return false;
+      const activeLines = text
+        .split(/\r?\n/)
+        .filter((l) => !/^\s*#/.test(l))
+        .join('\n');
+      return /(?:^|[\n;{])\s*server_tokens\s+on\b/i.test(activeLines);
+    };
+
+    // 1. Check compiled configuration via `nginx -T` (most authoritative for host Nginx)
     try {
       const nginxT = await execShell('nginx -T 2>/dev/null || sudo -n nginx -T 2>/dev/null || true');
       if (nginxT && nginxT.length > 50) {
-        if (/(?:^|\n)\s*server_tokens\s+off\b/i.test(nginxT)) {
-          return true;
-        }
-        if (/(?:^|\n)\s*server_tokens\s+on\b/i.test(nginxT)) {
-          return false;
-        }
+        if (hasTokensOff(nginxT)) return true;
+        if (hasTokensOn(nginxT)) return false;
       }
     } catch (_) {}
 
-    // 3. Scan candidate configuration files across standard and aaPanel paths
+    // 2. Scan candidate configuration files across standard and aaPanel paths
     const candidateFiles = [
       '/etc/nginx/nginx.conf',
       '/www/server/nginx/conf/nginx.conf',
@@ -412,25 +409,33 @@ class VulnerabilitiesService {
         if (fs.existsSync(confPath)) {
           foundAnyConfig = true;
           const content = fs.readFileSync(confPath, 'utf8');
-          // Match active server_tokens off (allow arbitrary spaces, tabs, optional semicolon)
-          if (/(?:^|\n)\s*server_tokens\s+off\b/i.test(content)) {
-            return true;
-          }
+          if (hasTokensOff(content)) return true;
         }
       } catch (_) {}
     }
 
-    // Fallback: check with grep in case of file permission restrictions
+    // 3. Fallback: check with grep in case of file permission restrictions
     try {
       const grepOut = await execShell('grep -ri "server_tokens" /etc/nginx/ /www/server/nginx/conf/ 2>/dev/null || sudo -n grep -ri "server_tokens" /etc/nginx/ 2>/dev/null || true');
       if (grepOut) {
         const lines = grepOut.split('\n');
         for (const line of lines) {
           const clean = line.replace(/^[^:]+:\s*/, '').trim();
-          if (/^server_tokens\s+off\b/i.test(clean)) {
+          if (!clean.startsWith('#') && /^server_tokens\s+off\b/i.test(clean)) {
             return true;
           }
         }
+      }
+    } catch (_) {}
+
+    // 4. Check live HTTP response from local Nginx if config had no explicit directive
+    try {
+      const curlOut = await execShell('curl -sI -m 2 http://127.0.0.1:80 2>/dev/null || curl -sI -m 2 http://localhost:80 2>/dev/null || true');
+      const serverMatch = curlOut.match(/^[Ss]erver:\s*(.+)$/m);
+      if (serverMatch) {
+        const serverVal = serverMatch[1].trim();
+        if (/^nginx$/i.test(serverVal)) return true;
+        if (/^nginx\/[0-9]/i.test(serverVal)) return false;
       }
     } catch (_) {}
 
