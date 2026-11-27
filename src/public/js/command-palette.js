@@ -47,6 +47,63 @@ const LPCommandPalette = (() => {
     });
   }
 
+  function initSidebarGroups() {
+    const storageKey = 'lp_sidebar_collapsed_groups';
+    let collapsedGroups = [];
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) collapsedGroups = JSON.parse(raw);
+      if (!Array.isArray(collapsedGroups)) collapsedGroups = [];
+    } catch (_) {
+      collapsedGroups = [];
+    }
+
+    const saveGroups = () => {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(collapsedGroups));
+      } catch (_) {}
+    };
+
+    document.querySelectorAll('#lpDesktopSidebar .lp-side-group[data-nav-group]').forEach((group) => {
+      const groupName = group.getAttribute('data-nav-group');
+      const title = group.querySelector('.lp-side-group-title');
+      if (!groupName || !title) return;
+
+      if (!title.querySelector('.lp-side-group-chevron')) {
+        const chevron = document.createElement('i');
+        chevron.className = 'bi bi-chevron-down lp-side-group-chevron';
+        chevron.setAttribute('aria-hidden', 'true');
+        title.appendChild(chevron);
+      }
+
+      const hasActiveLink = Boolean(group.querySelector('.lp-side-link.active'));
+      const shouldCollapse = !hasActiveLink && collapsedGroups.includes(groupName);
+      group.classList.toggle('is-collapsed', shouldCollapse);
+      title.setAttribute('role', 'button');
+      title.setAttribute('tabindex', '0');
+      title.setAttribute('aria-expanded', shouldCollapse ? 'false' : 'true');
+
+      const toggleGroup = () => {
+        const isCollapsed = group.classList.toggle('is-collapsed');
+        title.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        if (isCollapsed) {
+          if (!collapsedGroups.includes(groupName)) collapsedGroups.push(groupName);
+        } else {
+          collapsedGroups = collapsedGroups.filter((g) => g !== groupName);
+        }
+        saveGroups();
+      };
+
+      title.addEventListener('click', toggleGroup);
+      title.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggleGroup();
+        }
+      });
+    });
+  }
+
   function applySidebarState(collapsed) {
     const shell = document.getElementById('lpAppShell');
     if (!shell) return;
@@ -126,6 +183,7 @@ const LPCommandPalette = (() => {
 
   function init() {
     highlightActiveSidebarLink();
+    initSidebarGroups();
 
     try {
       if (localStorage.getItem('lp_sidebar_collapsed') === '1') {

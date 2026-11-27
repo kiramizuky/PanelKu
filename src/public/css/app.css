@@ -1488,9 +1488,44 @@ html.light-mode body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
-  padding: 4px 10px;
+  padding: 5px 10px;
   margin-bottom: 2px;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.lp-side-group-title:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.lp-side-group-chevron {
+  font-size: 11px;
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+}
+
+.lp-side-group.is-collapsed .lp-side-group-chevron {
+  transform: rotate(-90deg);
+}
+
+.lp-side-group.is-collapsed .lp-side-link {
+  display: none;
+}
+
+.lp-sidebar-collapsed .lp-side-group.is-collapsed .lp-side-link {
+  display: flex;
+}
+
+.light-mode .lp-side-group-title:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #111827;
 }
 
 .lp-side-link {
